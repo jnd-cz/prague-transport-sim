@@ -108,7 +108,8 @@ it). Built lines: 9, 17, 22, 23, 37.
 The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
 list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
 as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages).
+pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages;
+`tools/sound_encode.py` also needs lameenc).
 Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait their turn among the heavy jobs, as
 `rebuild.py` does; under it they run in its turn. Any other long run (a profile, a bench, a comparison) goes through
 `python -I tools/heavy.py "what" -- CMD ...` (AGENTS.md, #536):
@@ -198,10 +199,12 @@ headless browser, writes the check's report and pictures it beside the hybrid (`
 names one that is not there) or linked at the author's address (`--url` for an uploaded one; the upload deleted);
 `--reject ID "why"`; `--delete ID` once the author has the verdict.
 
-**Sound packs' files** (#636): a pack's WAVs (or MP3s) become the Ogg Opus files it plays with
-`python -P -E tools/sound_encode.py assets/<id>`: headless Chromium encodes them (WebCodecs) and checks each against
-its master; the manifest then names the `.ogg` files, each with its master as `fallback`, and every file's size and
-hash. `--check` checks a pack as it is (`tools/test_sound_encode.py` runs it on the shipped one). The fields:
+**Sound packs' files** (#636): a pack's WAV masters become the Ogg Opus files it plays and their MP3 fallbacks with
+`python -P -E tools/sound_encode.py assets/<id>`: headless Chromium encodes the Opus (WebCodecs), LAME the MP3s
+(`python -m pip install --user lameenc`, the user, 2026-11-17: "please install mp3 encoder and use mp3 as fallback
+in some good quality setting"), and each is checked against its master; the manifest then names the `.ogg` files,
+each with its MP3 as `fallback` and its master as `master`, and every file's size and hash. `--check` checks a pack
+as it is (`tools/test_sound_encode.py` runs it on the shipped one). The format:
 [docs/vehicles.md](docs/vehicles.md#sound-packs).
 
 **Performance on players' machines** (#350): every drawn frame of a shift goes into a 1 ms histogram of frame

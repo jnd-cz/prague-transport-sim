@@ -211,9 +211,9 @@ def sound_problems(p, vehicles, files_on_disk=None, own=False):
     def file(what, f):
         if not need(f in paths, f"{what}: {f} is not among its files"):
             return
-        if isinstance(f, str) and f.lower().endswith(".ogg"):  # (Ogg Opus with its WAV or MP3 fallback, #636)
+        if isinstance(f, str) and f.lower().endswith(".ogg"):  # (Ogg Opus with its MP3 fallback, #636)
             fb = entries[f].get("fallback")
-            need(fb in paths and str(fb).lower().endswith((".wav", ".mp3")), f"{what}: {f} has no WAV or MP3 fallback among its files")
+            need(fb in paths and str(fb).lower().endswith(".mp3"), f"{what}: {f} has no MP3 fallback among its files")
         else:
             need(isinstance(f, str) and f.lower().endswith((".wav", ".mp3")), f"{what}: {f} is not WAV, MP3 or Ogg")
     for e, f in (p.get("events") or {}).items():
@@ -405,7 +405,7 @@ def main():
         fails += [f"{sid}: {b}" for b in need_id + bad]
     # (the shipped packs above; tools/test_sounds.py serves a sample pack) the check refuses what it should
     sbase = {"schema": 1, "kind": "sounds", "id": "x", "requires": {"t3h": ">=1"}, "names": {"cs": "x", "en": "x"},
-             "licence": {"spdx": "CC0-1.0", "authors": ["a"], "sources": ["b"]}, "files": [{"path": "a.wav"}, {"path": "b.ogg"}, {"path": "d.ogg", "fallback": "a.wav"}, {"path": "e.ogg", "fallback": "b.ogg"}]}
+             "licence": {"spdx": "CC0-1.0", "authors": ["a"], "sources": ["b"]}, "files": [{"path": "a.wav"}, {"path": "b.ogg"}, {"path": "c.mp3"}, {"path": "d.ogg", "fallback": "c.mp3"}, {"path": "e.ogg", "fallback": "b.ogg"}, {"path": "f.ogg", "fallback": "a.wav"}]}
     ssamples = [
         ({**sbase, "events": {"lineContactor.close": ["a.wav"], "lineContactor.open": "a.wav"}, "lineContactorRelease": {"minGain": 0.3}}, None),
         *[({**sbase, "lineContactorRelease": curve}, "lineContactorRelease:") for curve in
@@ -413,8 +413,9 @@ def main():
         ({**sbase, "events": {"bell": "a.wav", "points": ["a.wav", "a.wav"]}, "loops": {"motor": {"file": "a.wav", "refSpeed": 8.3}}}, None),
         ({**sbase, "events": {"gong": "a.wav"}}, "event gong: the game raises no such event"),
         ({**sbase, "events": {"bell": "c.wav"}}, "event bell: c.wav is not among its files"),
-        ({**sbase, "events": {"bell": "b.ogg"}}, "event bell: b.ogg has no WAV or MP3 fallback"),
-        ({**sbase, "events": {"bell": "e.ogg"}}, "event bell: e.ogg has no WAV or MP3 fallback"),
+        ({**sbase, "events": {"bell": "b.ogg"}}, "event bell: b.ogg has no MP3 fallback"),
+        ({**sbase, "events": {"bell": "e.ogg"}}, "event bell: e.ogg has no MP3 fallback"),
+        ({**sbase, "events": {"bell": "f.ogg"}}, "event bell: f.ogg has no MP3 fallback"),
         ({**sbase, "events": {"bell": "d.ogg"}, "loops": {"flange": {"file": "d.ogg"}}}, None),
         ({**sbase, "loops": {"compressor": {"file": "a.wav"}}}, "loop compressor: the game has no such loop"),
         ({**sbase, "loops": {"mg": {"file": "a.wav"}}}, "loop mg: refRpm is not"),

@@ -1,17 +1,23 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""tools/sound_encode.py (#636): its Ogg pages, and WAVs encoded to Ogg Opus and decoded back in headless Chromium.
+"""tools/sound_encode.py (#636): its Ogg pages and MP3 info frames, and WAVs encoded to Ogg Opus and MP3 and decoded
+back in headless Chromium.
 
 Usage: python -P -E tools/test_sound_encode.py
 
-A browser test (the encoder starts Chromium through sync_playwright). The muxer: packets of 0 to 600 bytes come back
-from their page as they went in, a changed byte fails the checksum, the head and tags have pages of their own, the
-granules grow and the last one is pre-skip + the audio's samples. The encoder, on a generated pack (a stereo 16-bit
-WAV of a tone and clicks over noise, a mono 32-bit float WAV as the user's recorder writes them): both encoded with
-their length to the sample, no shift, their envelopes matching, the manifest naming the .ogg files with their WAVs
-as fallbacks, at most a fifth of the WAVs' size; --check passes, then fails on a changed .ogg; a file compared with
-another file's master fails. The shipped pack (assets/jnd.t2r6004) passes --check.
+A browser test (the encoder starts Chromium through sync_playwright; the MP3s need lameenc). The muxer: packets of 0
+to 600 bytes come back from their page as they went in, a changed byte fails the checksum, the head and tags have
+pages of their own, the granules grow and the last one is pre-skip + the audio's samples. The MP3 info frame: the
+CRC-16 of its checksums, the frames of a stream counted, the frame count, encoder delay and padding read back, a
+changed byte failing its checksum, a stream too short for its master refused. The encoder, on a generated pack (a
+stereo 16-bit WAV of a tone and clicks over noise, a mono 32-bit float WAV as the user's recorder writes them): both
+encoded in Ogg Opus and MP3 that decode to their master's length to the sample, no shift, their envelopes matching;
+the manifest naming the .ogg files, each with its MP3 as fallback and its WAV as master; the .ogg files at most a
+fifth of the WAVs' size, the MP3s a third; a second run writes the same bytes; --check passes, then fails on a
+changed .ogg or .mp3 and on an .ogg whose fallback is its WAV; a file compared with another file's master fails. The
+shipped pack (assets/jnd.t2r6004) passes --check.
 """
 import faulthandler
+import importlib.util
 import json
 import math
 import os
@@ -93,9 +99,41 @@ class Muxer(unittest.TestCase):
             se.ogg_opus(head, packets, 9600, 99)
 
 
+class Mp3(unittest.TestCase):
+    """The info frame on a made-up stream: ten MPEG-1 Layer III frames at 128 kbit/s, 44.1 kHz, mono, silent."""
+    AUDIO = b"".join(bytes.fromhex("fffb90c0") + bytes([i]) * 413 for i in range(10))
+
+    def test_crc16(self):
+        self.assertEqual(se.crc16(b"123456789"), 0xBB3D)  # (CRC-16/ARC's check value)
+
+    def test_frames(self):
+        self.assertEqual(se.mp3_frames(self.AUDIO), [(417 * i, 417) for i in range(10)])
+        with self.assertRaisesRegex(ValueError, "cut short"):
+            se.mp3_frames(self.AUDIO[:-1])
+        with self.assertRaisesRegex(ValueError, "no MPEG-1 Layer III frame at byte 417"):
+            se.mp3_frames(self.AUDIO[:417] + b"ID3" + self.AUDIO[420:])
+
+    def test_info(self):
+        n = 10 * 1152 - 576 - 1000
+        info = se.lame_info(self.AUDIO, n)
+        self.assertEqual(len(info), 417)
+        self.assertEqual(se.mp3_frames(info + self.AUDIO)[0], (0, 417))
+        self.assertEqual(se.lame_tag(info + self.AUDIO), (10, 576, 1000))
+        self.assertEqual(info[21:25], b"Xing")
+        self.assertEqual(struct.unpack_from(">I", info, 33)[0], 417 + len(self.AUDIO))
+        bad = bytearray(info)
+        bad[160] ^= 1
+        with self.assertRaisesRegex(ValueError, "checksum"):
+            se.lame_tag(bytes(bad))
+        with self.assertRaisesRegex(ValueError, "do not hold"):
+            se.lame_info(self.AUDIO, 10 * 1152)
+
+
 class Encoder(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if importlib.util.find_spec("lameenc") is None:
+            raise unittest.SkipTest("no lameenc: python -m pip install --user lameenc")
         cls.dir = tempfile.mkdtemp(prefix="sound-encode-")
         pcm16(os.path.join(cls.dir, "stereo.wav"), 2)
         float32(os.path.join(cls.dir, "mono-float.wav"))
@@ -116,32 +154,66 @@ class Encoder(unittest.TestCase):
         m = json.loads(read(os.path.join(self.dir, "sounds.json")))
         self.assertEqual(m["events"], {"bell": "mono-float.ogg", "lineContactor.close": ["stereo.ogg", "mono-float.ogg"]})
         by = {f["path"]: f for f in m["files"]}
-        self.assertEqual([f["path"] for f in m["files"]], ["stereo.wav", "stereo.ogg", "mono-float.wav", "mono-float.ogg"])
+        self.assertEqual([f["path"] for f in m["files"]],
+                         ["stereo.wav", "stereo.ogg", "stereo.mp3", "mono-float.wav", "mono-float.ogg", "mono-float.mp3"])
         for name in ("stereo", "mono-float"):
-            ogg, wav = by[name + ".ogg"], by[name + ".wav"]
-            self.assertEqual(ogg["fallback"], name + ".wav")
-            self.assertEqual(ogg["bytes"], os.path.getsize(os.path.join(self.dir, name + ".ogg")))
+            ogg, mp3, wav = by[name + ".ogg"], by[name + ".mp3"], by[name + ".wav"]
+            self.assertEqual((ogg["fallback"], ogg["master"], mp3["master"]), (name + ".mp3", name + ".wav", name + ".wav"))
+            self.assertNotIn("fallback", mp3)
+            for e in (ogg, mp3):
+                self.assertEqual(e["bytes"], os.path.getsize(os.path.join(self.dir, e["path"])))
             self.assertLess(ogg["bytes"], wav["bytes"] / 5, self.log)
+            self.assertLess(mp3["bytes"], wav["bytes"] / 3, self.log)
             ps = se.pages(read(os.path.join(self.dir, name + ".ogg")))
             head = ps[0][4][0]
             self.assertEqual(head[9], 2 if name == "stereo" else 1)
             pre, rate = struct.unpack_from("<HI", head, 10)
             self.assertEqual(rate, RATE)
-            seconds = 1.3 if name == "stereo" else 1.1
-            self.assertEqual(ps[-1][1] - pre, round(seconds * RATE) * 48000 // RATE, "the last granule: the audio's samples at 48 kHz")
-        # (each line: its length to the sample, the shift, the envelope)
-        for line in self.log[:2]:
+            samples = round((1.3 if name == "stereo" else 1.1) * RATE)
+            self.assertEqual(ps[-1][1] - pre, samples * 48000 // RATE, "the last granule: the audio's samples at 48 kHz")
+            frames, delay, pad = se.lame_tag(read(os.path.join(self.dir, name + ".mp3")))
+            self.assertEqual((delay, frames * 1152 - delay - pad), (576, samples), "the info frame: the master's samples")
+        # (each line: its length, the shift, the envelope)
+        self.assertEqual(len(self.log), 5, self.log)
+        for line in self.log[:4]:
             self.assertIn("shift 0.00 ms", line)
+
+    def test_lengths(self):
+        """Each file decodes to its master's length to the sample (at 48 kHz), the MP3s too: the info frame's trim."""
+        with se.Browser() as b:
+            for name in ("stereo.ogg", "stereo.mp3", "mono-float.ogg", "mono-float.mp3"):
+                c = b.compare(read(os.path.join(self.dir, name)), read(os.path.join(self.dir, name.split(".")[0] + ".wav")))
+                self.assertEqual((c["file"], c["lag"]), (c["master"], 0), (name, c))
+
+    def test_same_bytes(self):
+        """A second run writes the same files."""
+        names = ("sounds.json", "stereo.ogg", "stereo.mp3", "mono-float.ogg", "mono-float.mp3")
+        before = [read(os.path.join(self.dir, x)) for x in names]
+        self.assertEqual(se.run(self.dir, log=lambda s: None), [])
+        self.assertEqual([read(os.path.join(self.dir, x)) for x in names], before)
 
     def test_check(self):
         self.assertEqual(se.run(self.dir, check=True, log=lambda s: None), [])
-        path = os.path.join(self.dir, "stereo.ogg")
+        for name in ("stereo.ogg", "mono-float.mp3"):
+            path = os.path.join(self.dir, name)
+            keep = read(path)
+            try:
+                with open(path, "wb") as fh:
+                    fh.write(keep[:-1] + bytes([keep[-1] ^ 1]))
+                fails = se.run(self.dir, check=True, log=lambda s: None)
+                self.assertTrue(any(f.startswith(name) and "hash" in f for f in fails), fails)
+            finally:
+                with open(path, "wb") as fh:
+                    fh.write(keep)
+        path = os.path.join(self.dir, "sounds.json")
         keep = read(path)
         try:
-            with open(path, "wb") as fh:
-                fh.write(keep[:-1] + bytes([keep[-1] ^ 1]))
+            m = json.loads(keep)
+            next(f for f in m["files"] if f["path"] == "stereo.ogg")["fallback"] = "stereo.wav"
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(m, fh)
             fails = se.run(self.dir, check=True, log=lambda s: None)
-            self.assertTrue(any(f.startswith("stereo.ogg") and "hash" in f for f in fails), fails)
+            self.assertIn("stereo.ogg: its fallback stereo.wav is not an MP3", fails)
         finally:
             with open(path, "wb") as fh:
                 fh.write(keep)
@@ -159,8 +231,9 @@ class Shipped(unittest.TestCase):
             self.skipTest("no assets/jnd.t2r6004")
         log = []
         self.assertEqual(se.run(folder, check=True, log=log.append), [], log)
-        total = sum(os.path.getsize(os.path.join(folder, f)) for f in os.listdir(folder) if f.endswith(".ogg"))
-        self.assertLess(total, 150_000)
+        size = {k: sum(os.path.getsize(os.path.join(folder, f)) for f in os.listdir(folder) if f.endswith(k)) for k in (".ogg", ".mp3")}
+        self.assertLess(size[".ogg"], 80_000)
+        self.assertLess(size[".mp3"], 150_000)
 
 
 if __name__ == "__main__":

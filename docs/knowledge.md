@@ -1201,6 +1201,11 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
   `OpusHead` (pre-skip 312) as `decoderConfig.description`; the Ogg pages are ours (`tools/sound_encode.py`). Chromium's
   `decodeAudioData` applies Ogg Opus's pre-skip and end granule: the shipped pack's five files decode to their WAVs'
   length to the sample, with no shift (#636). The same input encodes to the same bytes on this machine.
+- lameenc (LAME 3.100) writes MP3 frames without LAME's info frame: Chromium decodes them whole, the sound starting
+  1,105 samples late (LAME's encoder delay of 576 and the decoder's 529) and padded at the end to a whole frame. With
+  an info frame before them holding the delay (576) and the padding (frames × 1152 − 576 − the master's samples),
+  Chromium's `decodeAudioData` trims both: the shipped pack's five MP3s decode to their WAVs' length to the sample,
+  with no shift (#636; `tools/sound_encode.py` `lame_info`).
 
 ## The test host
 

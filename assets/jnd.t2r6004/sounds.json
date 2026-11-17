@@ -30,7 +30,14 @@
       "path": "bell_medium.ogg",
       "bytes": 9779,
       "sha256": "38747804715cdb808dd8035743007fdbd133e5f085929613973fc054aea33e95",
-      "fallback": "bell_medium.wav"
+      "fallback": "bell_medium.mp3",
+      "master": "bell_medium.wav"
+    },
+    {
+      "path": "bell_medium.mp3",
+      "bytes": 17052,
+      "sha256": "59f8bebb6b78c1d1c41a29e1bc7b0e55f73bcffe65c07b528cd86fd087b22700",
+      "master": "bell_medium.wav"
     },
     {
       "path": "bell_short.wav",
@@ -46,7 +53,14 @@
       "path": "door_alert.ogg",
       "bytes": 26414,
       "sha256": "f50e2aa2c02187de2e7aa49aac34a08e485c0b5ead0212d8ad0fabcbeda76fdd",
-      "fallback": "door_alert.wav"
+      "fallback": "door_alert.mp3",
+      "master": "door_alert.wav"
+    },
+    {
+      "path": "door_alert.mp3",
+      "bytes": 38917,
+      "sha256": "f4bedd386d0940198ab3910c78edccd06a74668250cb376d19cbe4cdb0601002",
+      "master": "door_alert.wav"
     },
     {
       "path": "door_alert_loop.wav",
@@ -60,13 +74,13 @@
     },
     {
       "path": "provenance.json",
-      "bytes": 5259,
-      "sha256": "8af764f8b51356f9b8a983f5c633a93d22528e27626965214867dc685a5ac90f"
+      "bytes": 5583,
+      "sha256": "5bb747961d9b495f76b20f4f45d30a6b771ebf69e2665a0bde3f179fdcceb99b"
     },
     {
       "path": "README.txt",
-      "bytes": 1296,
-      "sha256": "d0ae3d2bec87b359093c03eb88bc21af361b35a4a96e3d1af78ab12898797639"
+      "bytes": 1405,
+      "sha256": "5c70982df3de5ac74266ace926780247209126fa92b757dd33f39de148d1fa88"
     },
     {
       "path": "release-01.wav",
@@ -77,7 +91,14 @@
       "path": "release-01.ogg",
       "bytes": 6365,
       "sha256": "1a1503f7551293d395ca5a1692b0e716f7fd9de1bb4bf0c82ae953b361c43aac",
-      "fallback": "release-01.wav"
+      "fallback": "release-01.mp3",
+      "master": "release-01.wav"
+    },
+    {
+      "path": "release-01.mp3",
+      "bytes": 12394,
+      "sha256": "e8381d033d2a39ec2e701795ff34414934354fe247aa0ffd0359d0bc2ab9a953",
+      "master": "release-01.wav"
     },
     {
       "path": "start-01.wav",
@@ -88,7 +109,14 @@
       "path": "start-01.ogg",
       "bytes": 9003,
       "sha256": "a8ece33fc0aae67732008b931603a530aebca9e69804947788bfd391519e8153",
-      "fallback": "start-01.wav"
+      "fallback": "start-01.mp3",
+      "master": "start-01.wav"
+    },
+    {
+      "path": "start-01.mp3",
+      "bytes": 17324,
+      "sha256": "dcb9159b5cf172262437d8426bac7cf14e51847570f964df1c8efbdd4246a6c6",
+      "master": "start-01.wav"
     },
     {
       "path": "start-02.wav",
@@ -99,7 +127,14 @@
       "path": "start-02.ogg",
       "bytes": 8329,
       "sha256": "e18be8b7dba86cc661b34ae680dd6a5d019ae9cf5e7c4bb1f1c7d497b1366f34",
-      "fallback": "start-02.wav"
+      "fallback": "start-02.mp3",
+      "master": "start-02.wav"
+    },
+    {
+      "path": "start-02.mp3",
+      "bytes": 16803,
+      "sha256": "858efa2953e1c52949e4bb82a7ccc4a95fc3b10cd7ce446a6fc5e76c17a8f01a",
+      "master": "start-02.wav"
     }
   ],
   "events": {

@@ -338,7 +338,7 @@ export class TramAudio {
 
   // A sound pack (src/vehicles.js soundsFor): its recordings fetched and decoded (url(path) their address); null, the
   // built-in sounds. Resolves when the pack plays. A file the browser cannot decode (Ogg Opus before Safari 18.4,
-  // #636) plays as its fallback, the pack's WAV or MP3 of it (fallback(path)); this.fellBack lists those.
+  // #636) plays as its fallback, the pack's MP3 of it (fallback(path)); this.fellBack lists those.
   async usePack(pack, url = pack?.url ?? ((p) => p)) {
     if (!this.ctx) this.start();
     if ((this.pack?.id ?? null) === (pack?.id ?? null)) return;

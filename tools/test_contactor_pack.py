@@ -3,9 +3,9 @@
 
 Usage: python -P -E tools/test_contactor_pack.py [--against origin/main]
 Own free-port server, no world data needed. The pack is listed in assets/vehicles.json and the game loads it; the
-hybrid sounds with it only when it is picked (the default: the built-in sounds). All its Ogg Opus files and WAVs
-decode; its events play by the pack; where the browser cannot decode the Ogg files (served broken here), each event
-plays its WAV fallback. Its zip offered as a package is refused (the id is the game's own). --against compares
+hybrid sounds with it only when it is picked (the default: the built-in sounds). All its Ogg Opus files, their MP3
+fallbacks and the WAV masters decode; its events play by the pack; where the browser cannot decode the Ogg files
+(served broken here), each event plays its MP3 fallback, as long as the Ogg. Its zip offered as a package is refused (the id is the game's own). --against compares
 20,000 deterministic equipment steps.
 """
 import argparse
@@ -43,7 +43,7 @@ CHECK = """async () => {
     for (const e of ['bell','door.buzzer','lineContactor.close','lineContactor.open','door.open']) a.emit(e,{current:240});
     const r = { trace: a.trace.map((x) => x.by), fellBack: a.fellBack, events: Object.fromEntries([...a.pack.events].map(([e, b]) => [e, b.map((x) => +x.duration.toFixed(3))])) };
     const decoded = [];
-    for (const f of manifest.files.filter((f) => ['wav', 'ogg'].includes(f.path.split('.').pop()))) {
+    for (const f of manifest.files.filter((f) => ['wav', 'ogg', 'mp3'].includes(f.path.split('.').pop()))) {
       const b = await a.ctx.decodeAudioData(await (await fetch(pack.url(f.path))).arrayBuffer());
       decoded.push({ file: f.path, channels: b.numberOfChannels, duration: +b.duration.toFixed(3) });
     }
@@ -52,7 +52,8 @@ CHECK = """async () => {
   };
   out.ogg = await play();
   // a browser without Opus: the Ogg files answer bytes it cannot decode
-  out.wav = await play((f, pack) => f.endsWith('.ogg') ? '/__undecodable.ogg' : pack.url(f));
+  out.asked = [];
+  out.fallback = await play((f, pack) => { out.asked.push(f); return f.endsWith('.ogg') ? '/__undecodable.ogg' : pack.url(f); });
   out.refused = (await P.installUrl('/test-pack.zip'))[0];
   return out;
 }"""
@@ -109,12 +110,14 @@ def main():
             result = page.evaluate(CHECK)
             assert result['offered'] == ['jnd.t2r6004'] and result['byDefault'] is None, result
             oggs = sum(f.endswith('.ogg') for f in json.load(open(folder/'sounds.json',encoding='utf-8'))['events'].values() for f in ([f] if isinstance(f,str) else f))
-            for how in ('ogg', 'wav'):
+            for how in ('ogg', 'fallback'):
                 r = result[how]
                 assert r['trace'] == ['pack']*4+['built-in'], (how, r['trace'])
-                assert len(r['decoded']) == 13, (how, r['decoded'])
-            assert result['ogg']['fellBack'] == [] and len(result['wav']['fellBack']) == 5 == oggs, result
-            assert result['ogg']['events'] == result['wav']['events'], (result['ogg']['events'], result['wav']['events'])
+                assert len(r['decoded']) == 18, (how, r['decoded'])
+            assert result['ogg']['fellBack'] == [] and len(result['fallback']['fellBack']) == 5 == oggs, result
+            fetched = sorted(f for f in result['asked'] if not f.endswith('.ogg'))
+            assert fetched == sorted(f[:-4] + '.mp3' for f in result['fallback']['fellBack']), result['asked']
+            assert result['ogg']['events'] == result['fallback']['events'], (result['ogg']['events'], result['fallback']['events'])
             assert not result['refused']['ok'] and any('taken by the game' in x for x in result['refused']['problems']), result['refused']
             if before:
                 result['physics'] = page.evaluate(COMPARE)

@@ -85,11 +85,15 @@ jeho vlastních zvuků (vestavěných, kde vlastní nemá), které jsou výchoz�
 od začátku další směny. Hra dodává jeden, pro hybrid: `assets/jnd.t2r6004/` (#590), *T2R 6004 – částečné zvuky*;
 `tools/test_sounds.py` podává vlastní ukázkový.
 
-Soubory, které balíček hraje, jsou nejlépe Ogg Opus (`.ogg`): pět souborů dodaného balíčku má dohromady 60 kB, jako WAV
-823 kB. Každý `.ogg` v `files` jmenuje svůj WAV nebo MP3 jako `fallback`, který si stáhne a přehraje prohlížeč, jenž
-Opus nedekóduje (Safari před 18.4). Z WAV (nebo MP3) balíčku je píše `python -P -E tools/sound_encode.py assets/<id>`.
-Pole, seznam událostí, smyček a veličin a pravidla srdcovek: anglická verze, [Sound packs](vehicles.md#sound-packs)
-(seznamy píše `tools/sound_lists.py` z kódu).
+Balíček je složka: popis (`sounds.json` v repozitáři, `package.json` jako balíček), soubory, které hraje, jejich
+předlohy a poznámky. Předlohy jsou WAV, mono nebo stereo, 16 nebo 24 bitů nebo 32bitové float, 44,1 nebo 48 kHz;
+událost hraje od prvního vzorku souboru v nahrané hlasitosti (ticho před zvukem ořízněte), smyčka hraje celý soubor
+dokola. Hra hraje Ogg Opus (`.ogg`); každý `.ogg` v `files` jmenuje svoje MP3 jako `fallback`, které přehraje
+prohlížeč, jenž Opus nedekóduje (Safari před 18.4), a svou předlohu jako `master`. Oba soubory píše z předloh
+`python -P -E tools/sound_encode.py <složka>`: Opus 64 kbit/s mono a 96 stereo s proměnným tokem, MP3 kodérem LAME
+-V2 (modul `lameenc`); oba dekódují na délku předlohy přesně na vzorek. Pět zvuků dodaného balíčku má jako WAV 823 kB,
+jako Ogg Opus 60 kB a jako MP3 102 kB. Pole, příklad popisu, seznam událostí, smyček a veličin a pravidla srdcovek:
+anglická verze, [Sound packs](vehicles.md#sound-packs) (seznamy píše `tools/sound_lists.py` z kódu).
 
 ## Balíčky
 

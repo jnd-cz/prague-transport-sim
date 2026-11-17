@@ -1,20 +1,28 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""A sound pack's playback files in Ogg Opus (#636): each event's and loop's WAV or MP3 encoded beside it as an
-.ogg, which the manifest then names, the original staying among its files as the .ogg's `fallback` (a browser that
-cannot decode Opus plays it: docs/vehicles.md, Sound packs).
+"""A sound pack's playback files (#636): each event's and loop's master (a WAV) encoded beside it in Ogg Opus, which
+the manifest then names, and in MP3, the .ogg's `fallback` (a browser that cannot decode Opus, Safari before 18.4,
+plays it: docs/vehicles.md, Sound packs). The masters stay among the pack's files; each encoded file names its own
+as `master`. A master that is an MP3 is its .ogg's fallback itself.
 
 Usage: python -P -E tools/sound_encode.py assets/<id> [--kbps 64] [--check]
 
-The encoder is Chromium's WebCodecs AudioEncoder (headless, Playwright, as the tests): the master decoded and
-resampled to Opus's 48 kHz by the browser, encoded in 20 ms frames, and written here into Ogg pages (RFC 7845) with
-the encoder's pre-skip and an end granule that trims its padding. Every file is decoded back in the browser and
-compared with its master: the length within one frame, no shift over 1 ms, the loudness envelope (10 ms windows)
-correlated at 0.98 and the peak within 1.5 dB; a file that fails is not written. The manifest (`sounds.json`, else
-`package.json`) gets the .ogg names in `events` and `loops` and each file's `bytes` and `sha256`.
+Opus: Chromium's WebCodecs AudioEncoder (headless, Playwright, as the tests), the master decoded and resampled to
+Opus's 48 kHz by the browser, encoded at a variable bitrate (64 kbit/s mono, 96 stereo) in 20 ms frames at
+complexity 10, and written here into Ogg pages (RFC 7845) with the encoder's pre-skip and an end granule that trims
+its padding. MP3: LAME 3.100 (the lameenc module: pip install --user lameenc) at -V2, its variable-bitrate setting
+for transparent quality (the shipped pack's: 97 to 119 kbit/s mono, 200 to 207 stereo), at the master's rate
+(48 kHz where MPEG-1 has no such rate), from the master decoded by the browser to 16 bits; before its audio a LAME
+info frame holds the encoder's delay and padding, which decoders trim (the file plays as long as its master, from its
+first sample).
 
---kbps: the bitrate of a mono file (default 64); a stereo one gets 1.5 times it. --check: writes nothing; checks
-that every .ogg the manifest names decodes as its fallback sounds and has the size and hash the manifest says.
-Exit code 1 on a failure.
+Every file is decoded back in the browser and compared with its master: the length within one Opus frame, no shift
+over 1 ms, the loudness envelope (10 ms windows) correlated at 0.98 and the peak within 1.5 dB; nothing is written
+while a file fails. The manifest (`sounds.json`, else `package.json`) gets the .ogg names in `events` and `loops` and
+each file's `bytes` and `sha256`.
+
+--kbps: Opus's bitrate of a mono file (default 64); a stereo one gets 1.5 times it. --check: writes nothing; checks
+that every .ogg the manifest names, and its fallback, an MP3, decode as their master sounds, and that every file has
+the size and hash the manifest says. Exit code 1 on a failure.
 """
 import argparse
 import base64
@@ -136,6 +144,94 @@ def pages(data):
     return out
 
 
+# --- MP3 (ISO 11172-3) with LAME's info frame ------------------------------------------------------------------------
+
+MP3_RATES = (44100, 48000, 32000)                                          # MPEG-1, by the header's index
+MP3_KBPS = (0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320)  # MPEG-1 Layer III, by index
+LAME_DELAY = 576     # LAME 3.100's encoder delay (ENCDELAY): its audio starts this many samples into its frames
+VBR_Q = 2            # LAME -V2
+QUALITY = 2          # LAME -q2, its slowest and best search
+
+
+def _table16():
+    out = []
+    for i in range(256):
+        r = i
+        for _ in range(8):
+            r = (r >> 1) ^ 0xA001 if r & 1 else r >> 1
+        out.append(r)
+    return out
+
+
+CRC16 = _table16()
+
+
+def crc16(data):
+    """CRC-16/ARC (polynomial 0x8005 reflected, starting at 0): the LAME tag's checksums of the audio and of the tag."""
+    c = 0
+    for b in data:
+        c = (c >> 8) ^ CRC16[(c ^ b) & 0xFF]
+    return c
+
+
+def mp3_frames(data):
+    """[(offset, size)] of the frames of an MPEG-1 Layer III stream without tags; raises on anything else."""
+    out, at = [], 0
+    while at < len(data):
+        h = struct.unpack_from(">I", data, at)[0] if at + 4 <= len(data) else 0
+        bi, ri = (h >> 12) & 15, (h >> 10) & 3
+        if h >> 21 != 0x7FF or (h >> 19) & 3 != 3 or (h >> 17) & 3 != 1 or not 0 < bi < 15 or ri == 3:
+            raise ValueError(f"no MPEG-1 Layer III frame at byte {at}")
+        size = 144000 * MP3_KBPS[bi] // MP3_RATES[ri] + ((h >> 9) & 1)
+        out.append((at, size))
+        at += size
+    if at != len(data):
+        raise ValueError("the last frame is cut short")
+    return out
+
+
+def lame_info(audio, samples):
+    """The frame LAME puts before an MP3's audio (its Xing info frame, tag revision 1: the frame count, the size, a
+    seek table, the encoder's delay and padding, the checksums), for audio, LAME's frames of a master of samples (per
+    channel). Decoders skip the delay (and their own 529) and drop the padding: the file decodes to the master's length.
+    lameenc writes the frames alone."""
+    frames = mp3_frames(audio)
+    h = struct.unpack_from(">I", audio, 0)[0]
+    if not (h >> 16) & 1:
+        raise ValueError("frames with a CRC: the tag's place differs")
+    rate, mode = MP3_RATES[(h >> 10) & 3], (h >> 6) & 3
+    head = h & ~(0xF << 12) & ~(1 << 9) | 9 << 12        # the same header at 128 kbit/s, unpadded: room for the tag
+    size = 144000 * 128 // rate
+    total = size + len(audio)
+    pad = len(frames) * 1152 - LAME_DELAY - samples
+    if not 0 <= pad < 4096:
+        raise ValueError(f"padding of {pad} samples: the frames do not hold {samples} samples")
+    toc = bytes(min(255, (size + frames[i * len(frames) // 100][0]) * 256 // total) for i in range(100))
+    xing = struct.pack(">4sIII", b"Xing", 0x0F, len(frames), total) + toc + struct.pack(">I", 100 - 10 * VBR_Q - QUALITY)
+    stereo = (1, 3, 2, 0)[mode]                          # the tag's codes for stereo, joint, dual channel, mono
+    lame = (b"LAME3.100" + bytes([0x04, 0])               # tag revision 0, VBR method 4 (LAME's default VBR); lowpass
+            + bytes(10)                                   # peak and replay gains (not measured), flags, ATH, bitrate
+            + (LAME_DELAY << 12 | pad).to_bytes(3, "big")
+            + bytes([{32000: 0, 44100: 1, 48000: 2}[rate] << 6 | stereo << 2, 0]) + bytes(2)  # rate, mode; gain, preset
+            + struct.pack(">IH", total, crc16(audio)))
+    frame = struct.pack(">I", head) + bytes(17 if mode == 3 else 32) + xing + lame
+    frame += struct.pack(">H", crc16(frame))
+    return frame + bytes(size - len(frame))
+
+
+def lame_tag(data):
+    """(frames, encoder delay, padding) from an MP3's info frame (the tests read the files back with it)."""
+    h = struct.unpack_from(">I", data, 0)[0]
+    at = 4 + (17 if (h >> 6) & 3 == 3 else 32)
+    if data[at:at + 4] not in (b"Xing", b"Info") or data[at + 120:at + 124] != b"LAME":
+        raise ValueError("no LAME info frame")
+    end = at + 154
+    if crc16(data[:end]) != struct.unpack_from(">H", data, end)[0]:
+        raise ValueError("the info frame's checksum")
+    v = int.from_bytes(data[at + 141:at + 144], "big")
+    return struct.unpack_from(">I", data, at + 8)[0], v >> 12, v & 4095
+
+
 def wav_rate(data):
     """A WAV's sample rate from its fmt chunk (for the head's informational input rate), else 0 (unspecified)."""
     if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
@@ -176,11 +272,18 @@ window.encode = async ({ master, kbps }) => {
   if (err) throw Error(err);
   return { n, ch, head, packets };
 };
+// the master at its own rate as 16-bit interleaved PCM, LAME's input
+window.pcm = async ({ master, rate }) => {
+  const buf = await new OfflineAudioContext(1, 1, rate).decodeAudioData(bytes(master).buffer), ch = buf.numberOfChannels, n = buf.length;
+  const out = new Int16Array(n * ch);
+  for (let c = 0; c < ch; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) out[i * ch + c] = Math.max(-32768, Math.min(32767, Math.round(d[i] * 32767))); }
+  return { n, ch, pcm: b64(new Uint8Array(out.buffer)) };
+};
 // the encoded file against its master, both decoded at 48 kHz and mixed to mono: lengths, the shift of the best
 // match within 5 ms, the 10 ms loudness envelopes' correlation at that shift, the peaks
-window.compare = async ({ ogg, master }) => {
+window.compare = async ({ file, master }) => {
   const mono = (b) => { const o = new Float32Array(b.length); for (let c = 0; c < b.numberOfChannels; c++) { const d = b.getChannelData(c); for (let i = 0; i < o.length; i++) o[i] += d[i] / b.numberOfChannels; } return o; };
-  const a = mono(await decode(master)), b = mono(await decode(ogg)), n = Math.min(a.length, b.length);
+  const a = mono(await decode(master)), b = mono(await decode(file)), n = Math.min(a.length, b.length);
   let lag = 0, best = -Infinity;
   for (let k = -240; k <= 240; k++) {
     let s = 0;
@@ -193,7 +296,7 @@ window.compare = async ({ ogg, master }) => {
   let sab = 0, saa = 0, sbb = 0;
   for (let i = 0; i < m; i++) { sab += (ea[i] - ma) * (eb[i] - mb); saa += (ea[i] - ma) ** 2; sbb += (eb[i] - mb) ** 2; }
   const peak = (x) => 20 * Math.log10(x.reduce((p, q) => Math.max(p, Math.abs(q)), 0) || 1e-9);
-  return { master: a.length, ogg: b.length, lag, envelope: sab / Math.sqrt(saa * sbb || 1), peakMaster: peak(a), peakOgg: peak(b) };
+  return { master: a.length, file: b.length, lag, envelope: sab / Math.sqrt(saa * sbb || 1), peakMaster: peak(a), peakFile: peak(b) };
 };
 """
 
@@ -215,8 +318,12 @@ class Browser:
     def encode(self, master, kbps):
         return self.page.evaluate("(a) => encode(a)", {"master": base64.b64encode(master).decode(), "kbps": kbps})
 
-    def compare(self, ogg, master):
-        return self.page.evaluate("(a) => compare(a)", {"ogg": base64.b64encode(ogg).decode(), "master": base64.b64encode(master).decode()})
+    def pcm(self, master, rate):
+        r = self.page.evaluate("(a) => pcm(a)", {"master": base64.b64encode(master).decode(), "rate": rate})
+        return r["n"], r["ch"], base64.b64decode(r["pcm"])
+
+    def compare(self, data, master):
+        return self.page.evaluate("(a) => compare(a)", {"file": base64.b64encode(data).decode(), "master": base64.b64encode(master).decode()})
 
     def __exit__(self, *exc):
         self.browser.close()
@@ -226,19 +333,19 @@ class Browser:
 def judge(c):
     """The comparison's failures (LIMITS), [] when the file sounds as its master."""
     bad = []
-    if abs(c["ogg"] - c["master"]) > LIMITS["frames"] * FRAME:
-        bad.append(f"{c['ogg']} samples against the master's {c['master']}")
+    if abs(c["file"] - c["master"]) > LIMITS["frames"] * FRAME:
+        bad.append(f"{c['file']} samples against the master's {c['master']}")
     if abs(c["lag"]) / 48 > LIMITS["shift_ms"]:
         bad.append(f"shifted {c['lag'] / 48:.2f} ms")
     if c["envelope"] < LIMITS["envelope"]:
         bad.append(f"envelope correlation {c['envelope']:.3f}")
-    if abs(c["peakOgg"] - c["peakMaster"]) > LIMITS["peak_db"]:
-        bad.append(f"peak {c['peakOgg']:.1f} dB against {c['peakMaster']:.1f}")
+    if abs(c["peakFile"] - c["peakMaster"]) > LIMITS["peak_db"]:
+        bad.append(f"peak {c['peakFile']:.1f} dB against {c['peakMaster']:.1f}")
     return bad
 
 
-def encode(b, master, kbps, name):
-    """(the Ogg Opus bytes, how it compares with the master) of one master file."""
+def encode_opus(b, master, kbps, name):
+    """One master's Ogg Opus bytes."""
     r = b.encode(master, kbps)
     pre = 312
     head = base64.b64decode(r["head"]) if r["head"] else b""
@@ -246,8 +353,30 @@ def encode(b, master, kbps, name):
         pre = struct.unpack_from("<H", head, 10)[0]
     head = opus_head(r["ch"], pre, wav_rate(master) or 48000)
     packets = [(base64.b64decode(p), n) for p, n in r["packets"]]
-    ogg = ogg_opus(head, packets, r["n"], zlib.crc32(name.encode()), [f"TITLE={name}"])
-    return ogg, b.compare(ogg, master)
+    return ogg_opus(head, packets, r["n"], zlib.crc32(name.encode()), [f"TITLE={name}"])
+
+
+def encode_mp3(b, master):
+    """One master's MP3 bytes: its info frame, then LAME's frames."""
+    try:
+        import lameenc
+    except ImportError:
+        raise SystemExit("the MP3 fallbacks need LAME: python -m pip install --user lameenc") from None
+    rate = wav_rate(master)
+    rate = rate if rate in MP3_RATES else 48000
+    n, ch, pcm = b.pcm(master, rate)
+    if ch > 2:
+        raise ValueError(f"{ch} channels: a sound pack's files are mono or stereo")
+    e = lameenc.Encoder()
+    e.set_channels(ch)
+    e.set_in_sample_rate(rate)
+    e.set_out_sample_rate(rate)
+    e.set_vbr(4)                 # vbr_mtrh, LAME's default VBR
+    e.set_vbr_quality(VBR_Q)
+    e.set_quality(QUALITY)
+    e.silence()
+    audio = bytes(e.encode(pcm) + e.flush())
+    return lame_info(audio, n) + audio
 
 
 def manifest_path(folder):
@@ -280,31 +409,44 @@ def run(folder, kbps=64, check=False, log=print):
     path = manifest_path(folder)
     m = json.loads(read(path))
     entries = {f["path"]: f for f in m.get("files", [])}
-    fails, done = [], {}
+    fails, made, rename = [], {}, {}    # made: master -> {the file's name: its bytes}, the .ogg first
     with Browser() as b:
         for f in named(m):
             if f.lower().endswith(".ogg"):
-                fb = entries.get(f, {}).get("fallback")
-                if not fb:
-                    fails.append(f"{f}: no fallback to encode from or compare with")
+                master_name = entries.get(f, {}).get("master") or entries.get(f, {}).get("fallback")
+                if not master_name:
+                    fails.append(f"{f}: no master to encode from or compare with")
                     continue
-                master_name, target = fb, f
+                ogg_name = f
             elif check:
                 fails.append(f"{f}: not encoded (the manifest names the master)")
                 continue
             else:
-                master_name, target = f, os.path.splitext(f)[0] + ".ogg"
+                master_name, ogg_name = f, os.path.splitext(f)[0] + ".ogg"
+            rename[f] = ogg_name
+            if master_name in made:
+                continue
+            if master_name not in entries:
+                fails.append(f"{master_name}: not among the manifest's files")
+                continue
             master = read(os.path.join(folder, master_name))
             if check:
-                ogg = read(os.path.join(folder, target))
-                c = b.compare(ogg, master)
+                fb = entries.get(ogg_name, {}).get("fallback")
+                if not (fb or "").lower().endswith(".mp3"):
+                    fails.append(f"{ogg_name}: its fallback {fb} is not an MP3")
+                outs = {x: read(os.path.join(folder, x)) for x in (ogg_name, fb)
+                        if x and x != master_name and os.path.isfile(os.path.join(folder, x))}
             else:
-                ogg, c = encode(b, master, kbps, target)
-            bad = judge(c)
-            log(f"{target}: {len(ogg)} bytes from {master_name} ({len(master)}), {c['ogg'] / 48000:.3f} s, shift {c['lag'] / 48:.2f} ms, "
-                f"envelope {c['envelope']:.4f}, peak {c['peakOgg']:.1f}/{c['peakMaster']:.1f} dB" + (f": {'; '.join(bad)}" if bad else ""))
-            fails += [f"{target}: {x}" for x in bad]
-            done[f] = (target, master_name, ogg)
+                outs = {ogg_name: encode_opus(b, master, kbps, ogg_name)}
+                if not master_name.lower().endswith(".mp3"):
+                    outs[os.path.splitext(master_name)[0] + ".mp3"] = encode_mp3(b, master)
+            for name, data in outs.items():
+                c = b.compare(data, master)
+                bad = judge(c)
+                log(f"{name}: {len(data)} bytes from {master_name} ({len(master)}), {c['file'] / 48000:.3f} s, shift {c['lag'] / 48:.2f} ms, "
+                    f"envelope {c['envelope']:.4f}, peak {c['peakFile']:.1f}/{c['peakMaster']:.1f} dB" + (f": {'; '.join(bad)}" if bad else ""))
+                fails += [f"{name}: {x}" for x in bad]
+            made[master_name] = outs
     if check:
         for e in m.get("files", []):
             q = os.path.join(folder, e["path"])
@@ -314,22 +456,23 @@ def run(folder, kbps=64, check=False, log=print):
         return list(dict.fromkeys(fails))
     if fails:
         return fails
-    for f, (target, master_name, ogg) in done.items():
-        with replacing(os.path.join(folder, target), "wb") as fh:
-            fh.write(ogg)
-    rename = {f: target for f, (target, _, _) in done.items()}
+    written = {x for outs in made.values() for x in outs}
+    for outs in made.values():
+        for name, data in outs.items():
+            with replacing(os.path.join(folder, name), "wb") as fh:
+                fh.write(data)
     m["events"] = {e: [rename.get(x, x) for x in v] if isinstance(v, list) else rename.get(v, v) for e, v in m.get("events", {}).items()}
     for lp in m.get("loops", {}).values():
         lp["file"] = rename.get(lp["file"], lp["file"])
     files = []
-    oggs = {target: (master_name, ogg) for target, master_name, ogg in done.values()}
     for e in m.get("files", []):
-        if e["path"] in oggs:
+        if e["path"] in written:
             continue
         files.append(e)
-        for target, (master_name, ogg) in oggs.items():
-            if master_name == e["path"]:
-                files.append({"path": target, "bytes": len(ogg), "sha256": sha(ogg), "fallback": master_name})
+        if e["path"] in made:
+            ogg_name, *mp3 = made[e["path"]]
+            files.append({"path": ogg_name, "bytes": 0, "sha256": "", "fallback": (mp3 or [e["path"]])[0], "master": e["path"]})
+            files += [{"path": x, "bytes": 0, "sha256": "", "master": e["path"]} for x in mp3]
     # (every file's size and hash as it is now: the pack's other files may have changed with it)
     for e in files:
         data = read(os.path.join(folder, e["path"]))
@@ -337,8 +480,8 @@ def run(folder, kbps=64, check=False, log=print):
     m["files"] = files
     with replacing(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(json.dumps(m, ensure_ascii=False, indent=2) + "\n")
-    total = sum(len(ogg) for _, _, ogg in done.values())
-    log(f"{path}: {len(done)} files in Ogg Opus, {total} bytes together")
+    size = {k: sum(len(d) for outs in made.values() for x, d in outs.items() if x.endswith(k)) for k in (".ogg", ".mp3")}
+    log(f"{path}: {len(made)} masters, {size['.ogg']} bytes of Ogg Opus, {size['.mp3']} of MP3")
     return []
 
 

@@ -62,8 +62,8 @@ export async function loadRegistry(get = (u) => fetch(u)) {
 
 // A sound pack (#528; docs/decisions/2026-11-10-vehicle-packages.md, section 5): `events`, an event's file or a list
 // (one picked at random each time), and `loops`, a loop's `file` with its reference (`refSpeed` m/s for motor and
-// rolling, `refRpm` for mg) and `gain`; files in WAV or MP3, or in Ogg (Opus, #636) with a WAV or MP3 among the
-// files as its `fallback` (Safari before 18.4 decodes no Ogg; the decision of 2026-11-10: "Ogg/Opus only with a
+// rolling, `refRpm` for mg) and `gain`; files in WAV or MP3, or in Ogg (Opus, #636) with an MP3 among the files as
+// its `fallback` (Safari before 18.4 decodes no Ogg; the decision of 2026-11-10: "Ogg/Opus only with an MP3
 // fallback"). A vehicle's manifest may hold one as `sounds` (its files among the vehicle's), or a pack shipped in
 // assets/ or a package (kind `sounds`) adds one; the events and loops it leaves out keep the built-in sounds
 // (src/audio.js).
@@ -71,7 +71,7 @@ export function soundProblems(p, v) {
   const out = [];
   if (!v) return [`its vehicle ${liveryVehicle(p)} is not loaded`];
   const entries = new Map((p.files || []).map((f) => [f.path, f])), files = new Set(entries.keys()), sound = /\.(wav|mp3)$/i;
-  const fallback = (f) => { const fb = entries.get(f)?.fallback; return files.has(fb) && sound.test(fb); };
+  const fallback = (f) => { const fb = entries.get(f)?.fallback; return files.has(fb) && /\.mp3$/i.test(fb); };
   if (p.lineContactorRelease != null) {
     const { minGain = 0.25, maxGain = 1, refCurrent = 480 } = p.lineContactorRelease;
     if (typeof p.lineContactorRelease !== 'object' || Array.isArray(p.lineContactorRelease) ||
@@ -80,7 +80,7 @@ export function soundProblems(p, v) {
   }
   const file = (what, f) => {
     if (!files.has(f)) out.push(`${what}: ${f} is not among its files`);
-    else if (/\.ogg$/i.test(f)) { if (!fallback(f)) out.push(`${what}: ${f} has no WAV or MP3 fallback among its files`); }
+    else if (/\.ogg$/i.test(f)) { if (!fallback(f)) out.push(`${what}: ${f} has no MP3 fallback among its files`); }
     else if (!sound.test(f)) out.push(`${what}: ${f} is not WAV, MP3 or Ogg`);
   };
   for (const [e, f] of Object.entries(p.events || {})) {
