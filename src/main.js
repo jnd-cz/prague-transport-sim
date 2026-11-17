@@ -1004,7 +1004,7 @@ function updateCamera(dt, t) {
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
   // the cab's frame where the eye sees it, the panel's band turned with the head
   cabFrame.draw(camera, lead, leadFront(), game ? game.doorOpenness : 0);
-  hud.panel.setLook(look);
+  hud.panel.setLook(look, lookMax());
 }
 
 // ✉ Feedback (F9, #138, #350): a note with the moment's state and a screenshot, to feedback.php

@@ -200,6 +200,9 @@ const marks = (x, y, w, list) => `<div class="pos" style="left:${px(x)};top:${px
 // The band's sections, x from the screen's middle at the head straight ahead (design px; the band is 240 high)
 const H = 240, W0 = 1640, PER_RAD = 850; // the design height and width; the band's slide per radian of the head's turn
 const SEC = { wall: [-2600, 1740], console: [-840, 478], panel: [-362, 980], wing: [630, 1740] };
+// the sides' last things, band x: the wall's plate of the sanding lever (wallSec, to 1700), the wing's timetable (wingSec,
+// to 1300); with the head turned all the way they end before the game's block (slide())
+const SIDE_END = { left: SEC.wall[0] + 1700, right: SEC.wing[0] + 1300 };
 // the sheet's tabs: a part of a section ([section, x from, x to] in its own x)
 const TABS = [['left', 'wall', 880, 1720], ['panel', 'panel', 0, 544], ['right', 'panel', 540, 980], ['wing', 'wing', 560, 1320], ['game']];
 
@@ -499,7 +502,11 @@ export class Panel {
       pz.style.width = px(dw / s);
       this.el.band.style.left = px(dw / s / 2);
       this.bandScale = s;
+      // (slide(): where the band's middle and the game's block stand, design px; 12 px kept clear before the block)
+      const gm = this.el.gm;
+      this.clear = gm.offsetWidth ? { band: dw / s / 2, gm: gm.offsetLeft - 12 } : null;
     } else {
+      this.clear = null;
       for (const c of this.dash.querySelectorAll('.cmp')) {
         const w = c.classList.contains('cp') ? 380 : 600, h = c.classList.contains('cp') ? 112 : 88;
         const k = Math.min(dw / w, dh / h);
@@ -600,10 +607,19 @@ export class Panel {
     this.slide();
   }
 
-  // the band follows the head (each frame, src/main.js)
-  setLook(look) { this.look = look; this.slide(); }
+  // the band follows the head (each frame, src/main.js); lim: the head's turn at its most each way (src/cabframe.js
+  // lookLimits). With the head turned all the way, the side's last control ends before the game's block (the user,
+  // 2026-11-17: "in the side views, the info overlay hides the panel features"): the band slides that much further
+  // left, in step with the turn.
+  setLook(look, lim) { this.look = look; this.lim = lim; this.slide(); }
   slide() {
-    const x = Math.round(this.look * PER_RAD * 2) / 2;
+    let x = this.look * PER_RAD;
+    const L = this.lim && (this.look > 0 ? this.lim.left : this.lim.right), c = this.clear;
+    if (L > 0 && c) {
+      const over = c.band + Math.sign(this.look) * L * PER_RAD + (this.look > 0 ? SIDE_END.left : SIDE_END.right) - c.gm;
+      if (over > 0) x -= over * Math.min(1, Math.abs(this.look) / L);
+    }
+    x = Math.round(x * 2) / 2;
     if (x !== this.slid) { this.slid = x; this.el.band.style.transform = `translateX(${x}px)`; this.el.gm.classList.toggle('aside', Math.abs(this.look) > 0.3); }
   }
 }

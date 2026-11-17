@@ -22,7 +22,7 @@ const dz = (z) => z - CAB.front;
 const SIDE = { window: CAB.window.map(dz), door: CAB.door.map(dz), wrap: dz(CAB.wrap) };
 const half = (d) => CAB.half(CAB.front + d);
 const TOP = CAB.glass[1]; // the side windows' and the door's top
-const COL = { post: '#59605c', postEdge: '#2b2f2d', wall: '#6c726e', partition: '#5f6562', door: '#b8b3a3', doorEdge: '#3a3a36' };
+const COL = { post: '#59605c', postEdge: '#2b2f2d', rubber: '#151616', wall: '#6c726e', partition: '#5f6562', door: '#b8b3a3', doorEdge: '#3a3a36' };
 
 // A quad in a side's plane (sign +1 the left, -1 the right) from d0 to d1 along the car, h0 to h1 high
 function side(sign, d0, d1, h0, h1) {
@@ -45,16 +45,19 @@ function members() {
   return L;
 }
 // The posts in front of the door: where the windscreen's wrap ends, between it and the cab window (left) or the door
-// (right), and the windscreen's two, leaning back with the face
+// (right), and the windscreen's two, leaning back with the face. Those two join its panes: 3 cm, the rubber gasket's
+// black stripe down their middle (the user, 2026-11-17: "the window divider frame I would make thinner with rubber
+// gasket stripe in middle"; they were 6 cm, plain)
 function posts() {
   const L = [];
   L.push([side(1, SIDE.window[1], SIDE.wrap, 0.5, 3.4), COL.post, COL.postEdge]);
   L.push([side(-1, SIDE.door[1], SIDE.wrap, 0.5, 3.4), COL.post, COL.postEdge]);
+  // a strip of the face, x ± w
+  const strip = (x, w) => [1.3, 1.9, 2.5, 3.1].map((h) => [x - w, h, dz(CAB.face(x - w, h))])
+    .concat([3.1, 2.5, 1.9, 1.3].map((h) => [x + w, h, dz(CAB.face(x + w, h))]));
   for (const x of [-CAB.post, CAB.post]) {
-    const p = [];
-    for (const h of [1.3, 1.9, 2.5, 3.1]) p.push([x - 0.03, h, dz(CAB.face(x - 0.03, h))]);
-    for (const h of [3.1, 2.5, 1.9, 1.3]) p.push([x + 0.03, h, dz(CAB.face(x + 0.03, h))]);
-    L.push([p, COL.post, COL.postEdge]);
+    L.push([strip(x, 0.015), COL.post, COL.postEdge]);
+    L.push([strip(x, 0.006), COL.rubber]);
   }
   return L;
 }

@@ -46,3 +46,14 @@ The user's next answers (same session), on the draft (#641):
   20 A with a long one every 100 A and figures every 200 A; a tick every 2 V and figures every 10 V; the pointer's dark
   blade comes in from the right (src/panel.js `meter`).
 - **The phone's buttons:** "i will try it later".
+
+Then, on the same draft: "the window divider frame I would make thinner with rubber gasket stripe in middle. And in the
+side views, the info overlay hides the panel features".
+
+- **The windscreen's posts** (where its panes meet) are 3 cm with the gasket's black stripe down their middle; they were
+  6 cm, plain. The pillars between the windscreen's wrap and the cab window or the door stay as wide as the outside
+  model has them (0.27 and 0.19 m).
+- **The game's block over the side views:** with the head turned all the way, the band slides further left until the
+  side's last plate (the sanding lever's on the wall, the timetable on the wing) ends 12 px before the block; the extra
+  slide grows with the turn (src/panel.js `slide`). At 1600 × 900 and 1920 × 1200 they end 10–12 px before it; at
+  1280 × 1024 and 2560 × 1080 they cleared it already.
