@@ -5,24 +5,34 @@
     python -P -E tools/network.py --lines 9,17,22,23,37 --parity
                                     # also the page's own network (headless Chromium), compared with the build's
 
-Step 2 of the design note (docs/decisions/2026-11-18-network-layer.md): the roads. src/traffic.js's rules are ported
-whole and in its order, so that the build's roads are the page's (--parity):
+Steps 2-4 of the design note (docs/decisions/2026-11-18-network-layer.md): the roads, their lanes, the footways and
+the doors. src/traffic.js's rules are ported whole and in its order, so that the build's network is the page's
+(--parity):
 - src/streets.js widenTramStreets: a road with tracks along it is 3.2 m wider a track (the page does it at load);
 - the vehicle ways split at every node another way shares (the junctions), each piece smoothed (src/route.js
   smoothPolyline: every 3 m, over 6 m);
 - cars only on public roads (OSM's `c`) from 5 m wide;
 - `_fitRoad`: every 4 m, the survey's carriageway across ±16 m (a tram area or parking at its side trimmed, a median
   kept apart), its kerbs smoothed; `_parallelWays`: a way alongside in the same carriageway takes its own side;
-- `_trackLats`: the tracks' lateral positions on the road every 4 m (ours and the opposite direction's).
+- `_trackLats`: the tracks' lateral positions on the road every 4 m (ours and the opposite direction's);
+- `_buildLanes`, `laneOffset`: a lane per direction and OSM lane, beside the kerbs, a median or the tracks' middle;
+- the walks: OSM's footways (cut where they lie on the surveyed carriageway) and the sidewalks the survey shows beside
+  the roads, away from the tracks; `_linkWalks`: their ends joined, or linked across a street clear of the tracks;
+- `_findDoors`: a building's door where its outline comes nearest a walk.
 
 The survey is read as the page reads it: the ground file's triangles (data/lineN.ground.*, tools/ground_mesh.py), the
 highest holding the point and the survey's class under it (src/groundFile.js GroundLookup.survey), the 10 m cells the
 survey covers (`covered`), and data/lineN.dtm.json's underground areas (src/terrain.js classUnder). The arithmetic is
 the page's, in its order, with Math.hypot as V8 computes it (js_hypot).
 
-The file, data/lineN.network.json: `roads`, each with its points `p` (cm, flat x, y), its OSM tags (`w` with the tracks,
-`o`, `b`, `t`, `tram`, `ln`, `lf`, `lb`), its junctions' keys `ends` (src/traffic.js key()), and where the survey fitted
-it its kerbs `lo`, `hi` and median `med` (cm from the centre line, + right, every 4 m), and the tracks on it `trk`.
+The file, data/lineN.network.json, positions in cm (a path flat x, y):
+- `roads`: each with its points `p`, its OSM tags (`w` with the tracks, `o`, `b`, `t`, `tram`, `ln`, `lf`, `lb`), its
+  junctions' keys `ends` (src/traffic.js key()), and where the survey fitted it its kerbs `lo`, `hi` and median `med`
+  (from the centre line, + right, every 4 m), and the tracks on it `trk`;
+- `lanes`: each lane's `road` (its index), `dir`, `sel` (the lane of its direction) and points `p`;
+- `walks`: each walk's points `p`, `link` for a crossing or a join, `deck` (with its `way`, data.roads' index) on a
+  bridge, and its `links` at each end ([walk, s]);
+- `doors`: [walk, s, x, y, ix, iy]: the point on the walk and the one 1.5 m inside the building.
 """
 import argparse
 import json
@@ -37,7 +47,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 VERSION = 1
-PARTS = ("roads", "lanes")  # (what the layer holds so far, in the note's steps)
+PARTS = ("roads", "lanes", "walks", "doors")  # (what the layer holds so far, in the note's steps)
 
 
 # ---------------------------------------------------------------- the page's arithmetic
@@ -131,6 +141,10 @@ class Path:
         ln = js_hypot(dx, dy)
         ln = np.where(ln == 0, 1.0, ln)
         return a[:, 0] + dx * t, a[:, 1] + dy * t, dx / ln, dy / ln
+
+    def at1(self, s):
+        """at() of one arc length: (x, y, hx, hy) floats."""
+        return tuple(float(v[0]) for v in self.at(np.array([s], float)))
 
 
 class Route:
@@ -508,19 +522,19 @@ def pieces(data):
         for k in {(p[0], p[1]) for p in r["p"]}:
             uses[k] = uses.get(k, 0) + 1
     out = []
-    for r in data["roads"]:
+    for k, r in enumerate(data["roads"]):
         if len(r["p"]) < 2:
             continue
         if r.get("f"):
-            out.append(r)
+            out.append({**r, "src": k})
             continue
         cur = [r["p"][0]]
         for i in range(1, len(r["p"])):
             cur.append(r["p"][i])
             if i < len(r["p"]) - 1 and uses.get((r["p"][i][0], r["p"][i][1]), 0) > 1:
-                out.append({**r, "p": cur})
+                out.append({**r, "p": cur, "src": k})
                 cur = [r["p"][i]]
-        out.append({**r, "p": cur})
+        out.append({**r, "p": cur, "src": k})
     return out
 
 
@@ -529,8 +543,9 @@ def jkey(p):
     return f"{js_round(p[0])},{js_round(p[1])}"
 
 
-class Roads:
-    """The page's road list (src/traffic.js Traffic's constructor, its roads only) built from the line data."""
+class Network:
+    """The page's traffic network (src/traffic.js Traffic's constructor) built from the line data: the roads and their
+    lanes, the footways (OSM's, and the sidewalks beside the roads) linked into one network, and the doors on them."""
 
     def __init__(self, data, survey, route, back):
         self.survey, self.route, self.back = survey, route, back
@@ -546,27 +561,62 @@ class Roads:
                 for ix in range(math.floor(min(a[0], b[0]) / 20), math.floor(max(a[0], b[0]) / 20) + 1):
                     for iy in range(math.floor(min(a[1], b[1]) / 20), math.floor(max(a[1], b[1]) / 20) + 1):
                         self.way_idx.setdefault(ix * 100003 + iy, []).append(sg)
-        self.roads = []
+        self.roads, foot = [], []
         for pi, r in enumerate(self.pieces):
             if len(r["p"]) < 2:
                 continue
-            if r.get("f"):
-                continue  # (footways: step 4)
-            if not r.get("c") or r["w"] < 5:
-                continue
+            if not r.get("f") and (not r.get("c") or r["w"] < 5):
+                continue  # (cars only on public vehicle roads; the page smooths them first, to no effect)
             path = Path(smooth_polyline(r["p"], 3, 6) if len(r["p"]) > 2 else r["p"])
-            if path.length < 2:
+            if path.length < (15 if r.get("f") else 2):
                 continue
-            road = {"piece": pi, "path": path, "w": r["w"], "o": r.get("o") or 0, "tram": r.get("tram"),
+            if r.get("f"):
+                if not r.get("t"):  # (pedestrian underpasses: nobody walks under the ground here)
+                    foot.append((pi, path, r))
+                continue
+            road = {"piece": pi, "src": r["src"], "path": path, "w": r["w"], "o": r.get("o") or 0, "tram": r.get("tram"),
                     "b": r.get("b") or 0, "t": r.get("t") or 0, "ln": r.get("ln"), "lf": r.get("lf"), "lb": r.get("lb"),
-                    "ends": [jkey(r["p"][0]), jkey(r["p"][-1])], "fitLo": None, "fitHi": None, "fitMed": None}
+                    "ends": [jkey(r["p"][0]), jkey(r["p"][-1])], "fitLo": None, "fitHi": None, "fitMed": None,
+                    "along": self.along(path)}
             self.roads.append(road)
         self.fit()
         for road in self.roads:
             self.track_lats(road)
+        self.walks = self.build_walks(foot)
         self.lanes = []
         for k, road in enumerate(self.roads):
             self.build_lanes(k, road)
+        self.link_walks()
+        self.find_doors(data.get("buildings") or [])
+
+    # ------------------------------------------------------------ the tracks
+    def track_dist(self, x, y):
+        """trackDist(): the distance to the nearest track centre, ours or the opposite direction's."""
+        q = self.route.nearest(x, y) if self.route else None
+        d = q[0] if q else math.inf
+        if self.back:
+            q = self.back.nearest(x, y)
+            d = min(d, q[0] if q else math.inf)
+        return d
+
+    def near_track_share(self, path):
+        """nearTrackShare(): the share of the points every 5 m within 4 m of a track."""
+        L = path.length
+        X, Y, _, _ = path.at(np.arange(math.floor(L / 5) + 1) * 5.0)
+        near = sum(1 for x, y in zip(X.tolist(), Y.tolist()) if self.track_dist(x, y) < 4)
+        return near / max(1, len(X))
+
+    def along(self, path):
+        """The street the tram runs in: over 40 % of its points every 10 m within 7 m of our track (no sidewalks of its
+        own: the tram street's footways cover them)."""
+        if not self.route:
+            return False
+        X, Y, _, _ = path.at(np.arange(math.ceil(path.length / 10)) * 10.0)
+        near = 0
+        for x, y in zip(X.tolist(), Y.tolist()):
+            q = self.route.nearest(x, y)
+            near += bool(q) and q[0] < 7
+        return near / len(X) > 0.4
 
     # (the samples every 4 m of each road and the 65 points across ±16 m, read in one go)
     def fit(self):
@@ -821,8 +871,199 @@ class Roads:
                 self.lanes.append({"road": k, "dir": d, "sel": sel, "trim": trim, "path": path,
                                    "from": r["ends"][0 if d > 0 else 1], "to": r["ends"][1 if d > 0 else 0]})
 
+    # ------------------------------------------------------------ footways
+    def build_walks(self, foot):
+        """The constructor's walks, in its order (by the ways' pieces): each OSM footway over 30 m and away from the
+        tracks, cut where it lies on the surveyed carriageway for more than 6 m; and beside each road from 6 m wide (not
+        the tram street, not on a bridge or in a tunnel) a sidewalk each side, 1 m into the first sidewalk, paving or
+        cycle way within 8 m out from the kerb where the survey is about, else 1.5 m beyond the kerb."""
+        S, out = self.survey, []
+        # footways: the survey's class every 2 m (a footway on a bridge: whole)
+        reads = [(pi, path, r, path.at(np.arange(math.floor(path.length / 2) + 1) * 2.0))
+                 for pi, path, r in foot if S is not None and not r.get("b")]
+        cls = (S.class_at(np.concatenate([q[3][0] for q in reads]), np.concatenate([q[3][1] for q in reads]))
+               if reads else [])
+        on_all, k0, runs_of = np.isin(cls, ["road", "parking", "tram"]), 0, {}
+        for pi, path, r, (X, Y, _, _) in reads:
+            on = on_all[k0:k0 + len(X)].tolist()
+            k0 += len(X)
+            keep, cur, i = [], [], 0
+            while i < len(on):
+                j = i
+                while j < len(on) and on[j]:
+                    j += 1
+                if j - i > 3:
+                    if len(cur) > 1:
+                        keep.append(cur)
+                    cur, i = [], j
+                    continue
+                for k in range(i, min(max(j, i + 1), len(on))):
+                    cur.append([float(X[k]), float(Y[k])])
+                i = max(j, i + 1)
+            if len(cur) > 1:
+                keep.append(cur)
+            runs_of[pi] = [Path(pts) for pts in keep]
+        for pi, path, r in foot:
+            for wp in runs_of.get(pi, [path]):
+                if wp.length > 30 and self.near_track_share(wp) < 0.2:
+                    out.append((pi, 0, {"path": wp, "deck": bool(r.get("b")), "way": r["src"], "link": False}))
+        # sidewalks: every 3 m, whether the survey is about, and its classes 0.5-8 m out from each kerb
+        side_roads = [r for r in self.roads if not r["along"] and r["w"] >= 6 and not r["b"] and not r["t"]]
+        D = np.arange(1, 17) * 0.5
+        for road in side_roads:
+            L = road["path"].length
+            s = np.arange(math.floor(L / 3) + 1) * 3.0
+            X, Y, HX, HY = road["path"].at(np.minimum(s, L))
+            cov = S.covered(X, Y) if S is not None else np.zeros(len(X), bool)
+            kb = [self.kerbs(road, v) for v in s.tolist()]
+            for order, side in enumerate((1, -1)):
+                kerb = np.array([k[1] if side > 0 else k[0] for k in kb])
+                off = kerb + side * 1.5
+                c = np.flatnonzero(cov)
+                if len(c):
+                    o = kerb[c, None] + side * D
+                    names = S.class_at((X[c, None] + HY[c, None] * o).ravel(), (Y[c, None] - HX[c, None] * o).ravel())
+                    walk = np.isin(names, ["sidewalk", "paved", "cycle"]).reshape(len(c), len(D))
+                    first = walk.argmax(1)
+                    off[c] = np.where(walk.any(1), o[np.arange(len(c)), first] + side * 1.0, np.nan)
+                runs, cur = [], []
+                for x, y, hx, hy, v in zip(X.tolist(), Y.tolist(), HX.tolist(), HY.tolist(), off.tolist()):
+                    if math.isnan(v):
+                        if len(cur) > 2:
+                            runs.append(cur)
+                        cur = []
+                        continue
+                    cur.append([x + hy * v, y - hx * v])
+                if len(cur) > 2:
+                    runs.append(cur)
+                for pts in runs:
+                    wp = Path(smooth_polyline(pts, 1, 4))
+                    if wp.length > 15 and self.near_track_share(wp) < 0.2:
+                        out.append((road["piece"], 1 + order, {"path": wp, "deck": False, "way": road["src"], "link": False}))
+        out.sort(key=lambda e: (e[0], e[1]))  # (stable: each piece's own runs in order)
+        return [w for _, _, w in out]
+
+    def link_walks(self):
+        """_linkWalks(): each footway's ends joined to the other walks: up to the four nearest within 3 m (else the nearest
+        within 15 m); one under 0.5 m away directly, else by a link walk where the straight way there keeps clear of the
+        tracks (2.8 m)."""
+        C, grid = 5, {}
+        base = list(self.walks)
+        for wi, w in enumerate(base):
+            w["links"] = [[], []]
+            X, Y, _, _ = w["path"].at(np.arange(math.floor(w["path"].length) + 1, dtype=float))
+            for s, (x, y) in enumerate(zip(X.tolist(), Y.tolist())):
+                grid.setdefault(math.floor(x / C) * 100003 + math.floor(y / C), []).append((wi, s, x, y))
+
+        def around(me, x, y, R):
+            best, n, ci, cj = {}, math.ceil(R / C), math.floor(x / C), math.floor(y / C)
+            for i in range(ci - n, ci + n + 1):
+                for j in range(cj - n, cj + n + 1):
+                    for w, s, px, py in grid.get(i * 100003 + j, ()):
+                        if w == me:
+                            continue
+                        d = hyp(px - x, py - y)
+                        if d <= R and (w not in best or d < best[w][2]):
+                            best[w] = (w, s, d, px, py)
+            return sorted(best.values(), key=lambda c: c[2])
+
+        def clear(x0, y0, x1, y1):
+            L = hyp(x1 - x0, y1 - y0)
+            t = 0
+            while t <= L:
+                u = t / (L or 1)
+                if self.track_dist(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u) < 2.8:
+                    return False
+                t += 1
+            return True
+
+        for wi, w in enumerate(base):
+            for e in (0, 1):
+                s0 = w["path"].length if e else 0
+                px, py, _, _ = w["path"].at1(s0)
+                cands = around(wi, px, py, 3)[:4] or around(wi, px, py, 15)[:1]
+                for cw, cs, d, cx, cy in cands:
+                    if d < 0.5:
+                        w["links"][e].append((cw, cs))
+                        continue
+                    if not clear(px, py, cx, cy):
+                        continue
+                    self.walks.append({"path": Path([[px, py], [cx, cy]]), "deck": False, "way": None, "link": True,
+                                       "links": [[(wi, s0)], [(cw, cs)]]})
+                    w["links"][e].append((len(self.walks) - 1, 0))
+
+    def find_doors(self, buildings):
+        """_findDoors(): a building's door where its outline (every 3 m) comes nearest a footway point (every 2 m) within
+        8 m: on that walk, 1.5 m into the building towards its middle."""
+        from scipy.spatial import cKDTree
+        pts, C = [], 5
+        for wi, w in enumerate(self.walks):
+            if w["link"]:
+                continue
+            X, Y, _, _ = w["path"].at(np.arange(math.floor(w["path"].length / 2) + 1) * 2.0)
+            pts += [(wi, s * 2, x, y) for s, (x, y) in enumerate(zip(X.tolist(), Y.tolist()))]
+        self.doors = []
+        if not pts:
+            return
+        P = np.array([(p[2], p[3]) for p in pts])
+        tree = cKDTree(P)
+        for b in buildings:
+            ring = b.get("p")
+            if not ring or len(ring) < 3:
+                continue
+            cx = cy = 0
+            for q in ring:
+                cx += q[0]
+                cy += q[1]
+            cx /= len(ring)
+            cy /= len(ring)
+            fs = []
+            for i in range(len(ring)):
+                a, c = ring[i], ring[(i + 1) % len(ring)]
+                L = hyp(c[0] - a[0], c[1] - a[1])
+                t = 0
+                while t <= L:
+                    fs.append((a[0] + (c[0] - a[0]) * (t / (L or 1)), a[1] + (c[1] - a[1]) * (t / (L or 1))))
+                    t += 3
+            best = None
+            for k, near in enumerate(tree.query_ball_point(fs, 8.001)):
+                fx, fy = fs[k]
+                for m in near:
+                    d = hyp(P[m, 0] - fx, P[m, 1] - fy)
+                    if d > 8:
+                        continue
+                    # (the page's order: the outline's points, then the 5 m cells x, y, then the points in a cell)
+                    key = (d, k, math.floor(P[m, 0] / C), math.floor(P[m, 1] / C), m)
+                    if best is None or key < best[0]:
+                        best = (key, m, fx, fy)
+            if best is None:
+                continue
+            (_, m, fx, fy) = best
+            wi, s, x, y = pts[m]
+            to_c = hyp(cx - fx, cy - fy) or 1
+            self.doors.append({"walk": wi, "s": s, "x": x, "y": y, "ix": fx + ((cx - fx) / to_c) * 1.5,
+                               "iy": fy + ((cy - fy) / to_c) * 1.5})
+
 
 # ---------------------------------------------------------------- the file
+def walk_record(w):
+    """A walk as the file keeps it: its points (cm), whether it is a link (a crossing or a join) or on a bridge's deck
+    (with its way, data.roads' index: the deck's height, src/terrain.js way()), its links at each end ([walk, s cm])."""
+    out = {"p": [cm(v) for v in w["path"].p.ravel().tolist()]}
+    if w["link"]:
+        out["link"] = 1
+    if w["deck"]:
+        out["deck"] = 1
+        out["way"] = w["way"]
+    out["links"] = [[[k, cm(s)] for k, s in e] for e in w["links"]]
+    return out
+
+
+def door_record(d):
+    """A door: [its walk, s, the point on the walk, the point 1.5 m inside the building] (cm)."""
+    return [d["walk"], cm(d["s"]), cm(d["x"]), cm(d["y"]), cm(d["ix"]), cm(d["iy"])]
+
+
 def lane_record(ln):
     """A lane as the file keeps it: its road (the index), direction, lane and points (cm)."""
     return {"road": ln["road"], "dir": ln["dir"], "sel": ln["sel"], "p": [cm(v) for v in ln["path"].p.ravel().tolist()]}
@@ -853,13 +1094,15 @@ def build(ln, log=print):
     survey = Survey(ln)
     route = Route(data["path"], data.get("pathExt"))
     back = Route(data["pathBack"]) if len(data.get("pathBack") or ()) > 1 else None
-    roads = Roads(data, survey, route, back)
-    recs = [road_record(r) for r in roads.roads]
-    fitted = sum(1 for r in roads.roads if r["fitLo"] is not None)
-    log(f"line {ln}: {len(recs)} roads ({fitted} fitted to the survey, {sum(1 for r in roads.roads if r['fitMed'])} with a "
-        f"median, {sum(1 for r in roads.roads if r['trk'])} with tracks), {len(roads.lanes)} lanes, {time.time() - t0:.1f} s")
-    return {"line": str(ln), "version": VERSION, "roads": recs, "lanes": [lane_record(x) for x in roads.lanes],
-            "fitted": fitted}
+    net = Network(data, survey, route, back)
+    recs = [road_record(r) for r in net.roads]
+    fitted = sum(1 for r in net.roads if r["fitLo"] is not None)
+    links = sum(1 for w in net.walks if w["link"])
+    log(f"line {ln}: {len(recs)} roads ({fitted} fitted to the survey, {sum(1 for r in net.roads if r['fitMed'])} with a "
+        f"median, {sum(1 for r in net.roads if r['trk'])} with tracks), {len(net.lanes)} lanes, {len(net.walks)} walks "
+        f"({links} links), {len(net.doors)} doors, {time.time() - t0:.1f} s")
+    return {"line": str(ln), "version": VERSION, "roads": recs, "lanes": [lane_record(x) for x in net.lanes],
+            "walks": [walk_record(w) for w in net.walks], "doors": [door_record(d) for d in net.doors], "fitted": fitted}
 
 
 def write(ln, net):
@@ -869,7 +1112,10 @@ def write(ln, net):
     net["provenance"] = sources.stamp("network.py", {
         "roads": sources.entry("streets", [fitted, 0, n - fitted],
                                "roads: OSM's ways split at their junctions; kerbs fitted to the survey where it has them"),
-        "lanes": sources.single("streets", "osm", len(net["lanes"]), "lanes: each road's, beside its kerbs and tracks")})
+        "lanes": sources.single("streets", "osm", len(net["lanes"]), "lanes: each road's, beside its kerbs and tracks"),
+        "walks": sources.single("streets", "osm", len(net["walks"]),
+                                "walks: OSM's footways, the sidewalks the survey shows beside the roads, their links"),
+        "doors": sources.single("buildings", "osm", len(net["doors"]), "doors: where a building comes nearest a walk")})
     net["attribution"] = sources.attribution(net["provenance"])
     p = os.path.join(ROOT, "data", f"line{ln}.network.json")
     with replacing(p, "w", encoding="utf-8") as f:
@@ -878,12 +1124,21 @@ def write(ln, net):
 
 
 # ---------------------------------------------------------------- the parity with the page
-# (the page's roads and lanes as the file keeps them: src/traffic.js Traffic of the shift started as a player starts it)
+# (the page's network as the file keeps it: src/traffic.js Traffic of the shift started as a player starts it)
 PAGE_ROADS = """async () => {
   const { startShift } = await import('/tools/bench/shift.js');
   await startShift({ timeout: 300 });
-  const cm = (v) => Math.round(v * 100), T = window.traffic;
-  const lanes = T.laneList.map((l) => ({ road: l.k, dir: l.dir, sel: l.sel, p: l.path.p.flatMap(([x, y]) => [cm(x), cm(y)]) }));
+  const cm = (v) => Math.round(v * 100), T = window.traffic, wi = new Map(T.walks.map((w, i) => [w, i]));
+  const pts = (path) => path.p.flatMap(([x, y]) => [cm(x), cm(y)]);
+  const lanes = T.laneList.map((l) => ({ road: l.k, dir: l.dir, sel: l.sel, p: pts(l.path) }));
+  const walks = T.walks.map((w) => {
+    const o = { p: pts(w.path) };
+    if (w.link) o.link = 1;
+    if (w.deck) o.deck = 1;
+    o.links = w.links.map((e) => e.map((x) => [wi.get(x.walk), cm(x.s)]));
+    return o;
+  });
+  const doors = T.doors.map((d) => [wi.get(d.walk), cm(d.s), cm(d.x), cm(d.y), cm(d.ix), cm(d.iy)]);
   const roads = T.roads.map((r) => {
     const o = { p: r.path.p.flatMap(([x, y]) => [cm(x), cm(y)]), w: r.w, ends: r.ends };
     for (const k of ['o', 'b', 't']) if (r[k]) o[k] = r[k];
@@ -893,7 +1148,7 @@ PAGE_ROADS = """async () => {
     if (r.trk) o.trk = r.trk.map((a) => a.map(cm));
     return o;
   });
-  return { roads, lanes };
+  return { roads, lanes, walks, doors };
 }"""
 
 
@@ -937,9 +1192,18 @@ def ident(r):
     return tuple(r["ends"]) if "ends" in r else (r.get("road"), r.get("dir"), r.get("sel"))
 
 
+def comparable(r):
+    """A record as the parity compares it: a door's list as {walk, p}; without what only the file keeps (a deck walk's
+    way: the page keeps the way's height function instead)."""
+    if isinstance(r, list):
+        return {"walk": r[0], "p": r[1:]}
+    return {k: v for k, v in r.items() if k != "way"}
+
+
 def compare(page, built):
-    """The build's records (roads, lanes) against the page's, in order: those the same to the cm (`exact`) and within
-    1 cm (`equal`), and per field those over 1 cm apart (with the largest gap, cm, and the first one)."""
+    """The build's records (roads, lanes, walks, doors) against the page's, in order: those the same to the cm (`exact`)
+    and within 1 cm (`equal`), and per field those over 1 cm apart (with the largest gap, cm, and the first one)."""
+    page, built = [comparable(r) for r in page], [comparable(r) for r in built]
     rep = {"page": len(page), "build": len(built), "exact": 0, "equal": 0, "fields": {}}
     if len(page) != len(built):
         pe, be = {ident(r) for r in page}, {ident(r) for r in built}

@@ -62,15 +62,16 @@ class Geometry(unittest.TestCase):
 
 
 class FakeSurvey:
-    """A survey of straight bands across y: [(y0, y1, class)], first match."""
+    """A survey of straight bands across y: [(y0, y1, class)], first match; or of boxes [(x0, x1, y0, y1, class)]."""
 
     def __init__(self, bands):
         self.bands = bands
 
     def class_at(self, x, y):
         out = np.full(len(y), None, dtype=object)
-        for y0, y1, c in reversed(self.bands):
-            out[(y >= y0) & (y <= y1)] = c
+        for b in reversed(self.bands):
+            x0, x1, y0, y1, c = b if len(b) == 5 else (-np.inf, np.inf, *b)
+            out[(x >= x0) & (x <= x1) & (y >= y0) & (y <= y1)] = c
         return out
 
     def covered(self, x, y):
@@ -82,7 +83,7 @@ class FakeSurvey:
 
 def roads(survey, *ways):
     data = {"roads": [{"p": p, "w": w, "f": 0, "c": 1, **kw} for p, w, kw in ways]}
-    return nw.Roads(data, survey, None, None).roads
+    return nw.Network(data, survey, None, None).roads
 
 
 class Fit(unittest.TestCase):
@@ -123,7 +124,7 @@ class Lanes(unittest.TestCase):
 
     def build(self, w=8, **kw):
         data = {"roads": [{"p": [[0, 0], [100, 0]], "w": w, "f": 0, "c": 1, **kw}]}
-        return nw.Roads(data, self.sv, None, None)
+        return nw.Network(data, self.sv, None, None)
 
     def test_two_way(self):
         R = self.build()
@@ -146,6 +147,44 @@ class Lanes(unittest.TestCase):
         r = {**R.roads[0], "fitLo": [-2.0] * 26, "fitHi": [2.0] * 26, "trk": [[-0.8, 0.8]] * 26}
         self.assertEqual(R.lane_offset(r, 50, 1), 0.8)  # (the band right of the tracks' middle is under 3.2 m)
         self.assertEqual(R.lane_offset(r, 50, -1), 0.8)
+
+
+class Walks(unittest.TestCase):
+    @staticmethod
+    def net(survey, ways, buildings=()):
+        data = {"roads": [{"p": p, "w": w, "f": f, "c": int(not f), **kw} for p, w, f, kw in ways],
+                "buildings": [{"p": b} for b in buildings]}
+        return nw.Network(data, survey, None, None)
+
+    def test_footway_cut_on_the_carriageway(self):
+        n = self.net(FakeSurvey([(80, 120, -50, 50, "road")]), [([[0, 0], [200, 0]], 3, 1, {})])
+        ends = sorted((round(w["path"].p[0][0]), round(w["path"].p[-1][0])) for w in n.walks if not w["link"])
+        self.assertEqual(ends, [(0, 78), (122, 200)])  # (every 2 m: the last point off it on each side)
+
+    def test_short_crossing_kept(self):
+        n = self.net(FakeSurvey([(99, 103, -50, 50, "road")]), [([[0, 0], [200, 0]], 3, 1, {})])
+        self.assertEqual(sum(1 for w in n.walks if not w["link"]), 1)
+
+    def test_sidewalks_on_the_survey(self):
+        sv = FakeSurvey([(-4, 4, "road"), (-7, 7, "sidewalk")])
+        n = self.net(sv, [([[0, 0], [100, 0]], 8, 0, {})])
+        ys = sorted(round(float(np.median(w["path"].p[:, 1])), 2) for w in n.walks if not w["link"])
+        self.assertEqual(ys, [-5.75, 5.75])  # (the kerb at 4.25, the sidewalk from 4.75, 1 m into it)
+
+    def test_ends_joined_and_linked(self):
+        sv = FakeSurvey([(-100, 100, "sidewalk")])
+        n = self.net(sv, [([[0, 0], [60, 0]], 3, 1, {}), ([[60.2, 0], [120, 0]], 3, 1, {}), ([[0, 2], [0, 60]], 3, 1, {})])
+        a = n.walks[0]
+        self.assertIn((1, 0), a["links"][1])  # (0.2 m apart: joined)
+        links = [w for w in n.walks if w["link"]]
+        self.assertTrue(any(w["links"] == [[(0, 0)], [(2, 0)]] for w in links), links)  # (2 m apart: a link walk)
+
+    def test_door(self):
+        sv = FakeSurvey([(-100, 100, "sidewalk")])
+        n = self.net(sv, [([[0, 0], [60, 0]], 3, 1, {})], [[[20, 3], [30, 3], [30, 13], [20, 13]]])
+        d = n.doors[0]
+        self.assertEqual((d["walk"], d["s"], d["x"], d["y"]), (0, 20, 20, 0))
+        self.assertAlmostEqual(math.hypot(d["ix"] - 20, d["iy"] - 3), 1.5)
 
 
 class Compare(unittest.TestCase):
