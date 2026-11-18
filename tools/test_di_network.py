@@ -193,8 +193,11 @@ class Network(unittest.TestCase):
         # #670: DI's fork (50, 0) still where the user answered holds; at the tip's point on the through track matches
         # (within TIP_MATCH: a manhole 1.65 m beside the track at the fork, Podolská); elsewhere changed. `off` is the
         # fork's distance from that point
-        for near, tip, state, off in (((50.0, 0.0), (46.7, -1.65), 'holds', 3.3), ((50.0, 0.0), (50.3, 0.1), 'matches', 0.3),
-                                      ((50.0, 0.0), (50.2, -1.65), 'matches', 0.2), ((54.0, 0.0), (46.7, -1.65), 'changed', 3.3)):
+        # (a fork DI still gives where it did when the user answered holds, however near: the user set the tip apart
+        # from it, #685; it matches where DI moved it there)
+        for near, tip, state, off in (((50.0, 0.0), (46.7, -1.65), 'holds', 3.3), ((50.0, 0.0), (50.3, 0.1), 'holds', 0.3),
+                                      ((54.0, 0.0), (50.3, 0.1), 'matches', 0.3), ((53.7, 0.0), (50.2, -1.65), 'matches', 0.2),
+                                      ((54.0, 0.0), (46.7, -1.65), 'changed', 3.3)):
             net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[(near, tip, 'the switch')])
             self.assertEqual(net.facts['switchTips'], [{'id': 'the switch', 'state': state, 'off': off,
                                                         'at': [round(tip[0], 2), round(tip[1], 2)], 'src': [50.0, 0.0]}], (near, tip))

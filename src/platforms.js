@@ -222,7 +222,16 @@ export function buildStop({ stop, data, route, platforms, group, log, cars = 2 }
   const sign = makeStopSign(stop.name, stop.request, data.stops[stop.i].lines || [String(data.line)]);
   // (on the sidewalk's height, not the track's)
   const onWalk = (m) => ground.later(m.position.x, -m.position.z, () => { m.position.y = ground.surface(m.position.x, -m.position.z); });
-  stop.signPlace = (s) => { place(sign, route, s + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.18, true); if (stop.vienna) onWalk(sign); };
+  // (where the build knows the sign's pole on our side, the user's placed sign or the DTM's, it stands there and stays
+  // whatever the game does to the stop point: a signal pulls it back at Čechův most, the set kept alongside the
+  // platform pushes it 9.5 m on at Královka, where the path begins 5.2 m behind the sign; else half a metre past the
+  // stop point at a fixed offset, #685)
+  const { sign: at, signOff: off } = data.stops[stop.i];
+  stop.signPlace = (s) => {
+    if (off !== undefined) place(sign, route, at, off, 0.18, true);
+    else place(sign, route, s + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.18, true);
+    if (stop.vienna) onWalk(sign);
+  };
   stop.signPlace(stop.target);
   g.add(sign);
   stop.sign = sign;

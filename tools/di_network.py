@@ -796,7 +796,7 @@ class Network:
             at = line.interpolate(s).coords[0]
             if len(t) > 2:
                 self.facts['switchTips'].append({
-                    'id': t[2], 'state': sources.fact_state(at, near, (fx, fy), same),
+                    'id': t[2], 'state': sources.fact_state(at, near, (fx, fy), same, unchanged=lambda a, b: math.dist(a, b) <= END_CLEAR),
                     'off': round(math.dist((fx, fy), at), 2), 'at': [round(tip[0], 2), round(tip[1], 2)],
                     'src': [round(fx, 2), round(fy, 2)]})
             if same((fx, fy), at):

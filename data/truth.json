@@ -2885,15 +2885,20 @@
    {
     "stop": "Královka",
     "towards": "Malovanka",
-    "x": -2919.09,
-    "y": 114.12,
+    "x": -2916.29,
+    "y": 110.13,
     "how": "placed on the map",
     "osm_node": 338859814,
     "gtfs": [
-     -2909.4,
+     -2909.2,
      122.1
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-23.json) on the test host, 2026-11-05 (#258)"
+    "pin": [
+     -2914.7,
+     110.5
+    ],
+    "pinFrom": "DTM",
+    "source": "user, stop-sign review (reports/review/stop-signs-23.json) on the test host, 2026-11-18 (#685)"
    },
    {
     "stop": "Líbeznická",
@@ -3351,15 +3356,20 @@
    {
     "stop": "Výstaviště",
     "towards": "Nádraží Holešovice",
-    "x": 1065.07,
-    "y": 1804.36,
+    "x": 1063.75,
+    "y": 1805.62,
     "how": "placed on the map",
     "osm_node": 4690489335,
     "gtfs": [
-     1074.7,
+     1074.6,
      1816.6
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+    "pin": [
+     1077.6,
+     1812.6
+    ],
+    "pinFrom": "DTM",
+    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-18 (#685)"
    },
    {
     "stop": "Výtoň",

@@ -130,7 +130,8 @@ be retired), changed, and for a fact that confirmed a source agrees or moved (`t
 `sources.OVERRIDES` names the sections, where their facts are and their stable ids). `tools/fact_status.py` lists them
 across the built lines; the weekly housekeeping pass posts those to retire or look at again, and `tools/rebuild.py`
 prints the counts. A fact that corrects a source records what the source said when it was recorded (`postedSpeeds`
-`osm`, a stop sign's `pin`), so a later change of the source can show as changed.
+`osm`, a stop sign's `pin`), so a later change of the source can show as changed, and a source that still gives
+what it gave then holds, however near the fact: the user saw that value and set theirs apart (#685).
 
 Each match is reviewed before it retires (the user, 2026-11-18: "I will need to review each case of new match to make
 sure we get proper fact replacement"): `python -P -E tools/fact_review.py` writes a card per match with a point

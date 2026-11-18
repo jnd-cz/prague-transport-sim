@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "48e8ffb",
- "published": "2026-11-18 16:36",
- "note": "#670, #677: each data/truth.json fact over a source stated against it (provenance.facts); 17 placed stop signs now confirm the DTM's sign (stop points 1.4 m at most along), both switch tips retired (no track moves)",
+ "built_at_commit": "990e8d9",
+ "published": "2026-11-18 20:04",
+ "note": "#685: each stop sign at its pole on the platform (stops[].signOff) where the user placed it or the DTM has it; Královka's (outer track) and Výstaviště's signs placed again by the user",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -10,7 +10,7 @@
   },
   "line17.built.geojson": {
    "size": 163602,
-   "sha256": "7cd329f5a1058762fcb43f8a546a69a389b3913b0ce070cb17954ef9da1a2207"
+   "sha256": "f1badb59318e4311b0f68f1176e91157950bfc43aac91c2fe94db3a9c2b228b4"
   },
   "line17.dtm.json": {
    "size": 9776225,
@@ -33,8 +33,8 @@
    "sha256": "37639a562edfbc7351fb20687417c26da75330a81aa6cfaee19b6f75fd8d253f"
   },
   "line17.json": {
-   "size": 7046153,
-   "sha256": "7ee4011715145aee39f09a1af84b8e836075947e33ac3d2fb51ff6fe733751f2"
+   "size": 7046694,
+   "sha256": "89fbe530c3f01594dbd8b814f058c18c822499bcf2cc2522a35714859ffd9f84"
   },
   "line17.network.json": {
    "size": 9282382,
@@ -89,8 +89,8 @@
    "sha256": "f8d6c742cdf5fc1fbb72144b3a060b742292c6e9160b2fdf839c8b00d101edd0"
   },
   "line22.json": {
-   "size": 7034356,
-   "sha256": "22d6363f0e2fe27a64690782f596ca09add3a93cb70451e5c8f2f1016c869f78"
+   "size": 7034977,
+   "sha256": "280140ee35604ac8dda4bfd0023d9373cf2e8de8d5457a058d2b8f1067124af8"
   },
   "line22.network.json": {
    "size": 10032948,
@@ -118,7 +118,7 @@
   },
   "line23.built.geojson": {
    "size": 75194,
-   "sha256": "3fb7aa53a9c221f10256ab8bdba3575bf0aab8a35f96e95f2756497032224f6a"
+   "sha256": "cb110efe316e3f231bb12088bdba74039c6d4c6c036fd84f0f5acd1a045f06b4"
   },
   "line23.dtm.json": {
    "size": 4602534,
@@ -141,8 +141,8 @@
    "sha256": "e22a186e0531a9b2803131c42402c54b2fdb1961753e18880cad7a0d25bba563"
   },
   "line23.json": {
-   "size": 2713347,
-   "sha256": "fe2498d1149b00b94f557313e2177d325d6ae2f87f37569e1984c288f0719f66"
+   "size": 2713617,
+   "sha256": "f94448f84e5d7f5053d99fbf3806ffd6542f404cf8839f1a930f356226d7a11a"
   },
   "line23.network.json": {
    "size": 3959104,
@@ -193,8 +193,8 @@
    "sha256": "fdf96d606d154cc488870d32e7d5625f79c3149f764e4f58761cde05f861643a"
   },
   "line37.json": {
-   "size": 2540296,
-   "sha256": "b24e5cd9566dcf193d7890057f67627f72e90f097ff8b589500005398483141e"
+   "size": 2540615,
+   "sha256": "bf27cc28f7c52304051e4420a711c04cd5e90e78b060d25f8df5ccfe477d768f"
   },
   "line37.network.json": {
    "size": 4082912,
@@ -245,8 +245,8 @@
    "sha256": "41282e54fe67fc8b905b627c717e482a7dd16476dd4085ab5f202bdfc9e502c9"
   },
   "line9.json": {
-   "size": 6275562,
-   "sha256": "7123fe3800e69fbac1366eef22b4ceb44e2582c77dd80b393a1fa1f0eb194d58"
+   "size": 6276517,
+   "sha256": "4aa67831aea932037d2dcd29a60cd3d72627daaf338e917d4c5d812ac4fc8a15"
   },
   "line9.network.json": {
    "size": 10460170,
