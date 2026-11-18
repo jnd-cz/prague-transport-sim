@@ -12,9 +12,11 @@ import { CELL, GROUND_SNOW, SegmentIndex, pointInRing, signedArea } from './worl
 // at random. What the rules below decide is kept per class with its places (group.userData.treeLog, the
 // lint's tree checks), #649:
 // - a tree inside a building is dropped (courtyard trees are not under a roof);
-// - a tree under TRACK_MIN from a track centre is dropped (the tram's body and its swing); further out its
-//   crown keeps its size and, where it reaches over the tram's band, is lifted above the wire on a longer
-//   trunk, as the limes over Mariánské hradby (the user, 2026-11-17: "make them taller over track");
+// - a tree under TRACK_MIN from a track centre is dropped (the tram's body and its swing); further out a
+//   crown that reaches over the tram's band starts above the wire on a bare trunk and grows taller and wider
+//   than the others, an oval that arches over the track as the limes and chestnuts on Mariánské hradby do (the
+//   user, 2026-11-17: "make them taller over track"; their photos of 2026-11-18: trunks bare to the wire,
+//   crowns half as tall again as wide, meeting over the track);
 // - a crown next to a facade is narrowed, not shrunk, and the tree dropped only when a crown CROWN_MIN wide
 //   does not clear it (the user: "narrower next to buildings");
 // - a row sample near a register tree is that tree again; a sample on a carriageway or a parking lot moves
@@ -25,6 +27,8 @@ const CROWN = 2.6; // icosahedron radius of a tree crown at scale 1 (x 1.1 wide,
 const TRACK_MIN = 2.2; // m from a track centre: the T3's half-width 1.25 m plus about 1 m
 const TRAM_BAND = 1.6; // m from a track centre that a crown under the wire stays out of (body 1.25 m, its swing)
 const WIRE_CLEAR = 6.5; // m over the rail: a crown reaching into the tram's band keeps its underside above this
+const LIFT_TALL = 1.6; // a lifted crown's height over an unlifted one's (k = 1: 7.3 m -> 11.6 m, its top ~18 m over the rail)
+const LIFT_WIDE = 1.2; // and its width (k = 1: 6.3 m -> 7.6 m across, over the track above the wire)
 const CROWN_MIN = 0.8; // m: the narrowest crown radius next to a facade
 const ROW_DUP = 4; // m: a row sample this near a register tree is that tree (the register's spacing ~8 m)
 const ROW_SNAP = 5; // m: how far a row sample on a carriageway may move off it
@@ -57,19 +61,22 @@ export function buildTrees(group, data, ground, trackDist) {
     }
     return 0;
   };
-  // a tree of size k: [x, y, k, z, its crown's centre over z, the crown's width factor], or null
+  // a tree of size k: [x, y, k, z, its crown's bottom and top over z, its radius] (m: the shape any tree model
+  // can take), or null
   const plant = (x, y, z, k) => {
-    const R = CROWN * 1.1 * k, half = CROWN * 1.4 * k;
-    let c = 5.4 * k, w = fit(x, y, z + c - half, R);
+    let R = CROWN * 1.1 * k, half = CROWN * 1.4 * k, b = 5.4 * k - half;
+    let w = fit(x, y, z + b, R);
     if (w && trackDist(x, y) - R * w < TRAM_BAND) {
       const rail = ground.trackOwn?.heightAt(x, y, 10) ?? z;
-      c = Math.max(c, rail + WIRE_CLEAR + half - z);
-      w = fit(x, y, z + c - half, R);
-      if (w) log.lifted.push([x, y]);
+      if (rail + WIRE_CLEAR - z > b) {
+        b = rail + WIRE_CLEAR - z; half *= LIFT_TALL; R *= LIFT_WIDE;
+        w = fit(x, y, z + b, R);
+        if (w) log.lifted.push([x, y]);
+      }
     }
     if (!w) { log.facade.push([x, y]); return null; }
     if (w < 1) log.narrowed.push([x, y]);
-    return [x, y, k, z, c, w];
+    return [x, y, k, z, b, b + 2 * half, R * w];
   };
   const real = data.geo?.trees;
   if (real) {
@@ -139,8 +146,8 @@ export function buildTrees(group, data, ground, trackDist) {
       if (trackDist(x, y) < 6) continue;
       const z = ground.terrain.height(x, y);
       if (under(x, y, z + 1)) continue;
-      const k = 0.7 + r() * 0.7, w = fit(x, y, z + 5.4 * k - CROWN * 1.4 * k, CROWN * 1.1 * k);
-      if (w) trees.push([x, y, k, z, 5.4 * k, w]);
+      const k = 0.7 + r() * 0.7, half = CROWN * 1.4 * k, w = fit(x, y, z + 5.4 * k - half, CROWN * 1.1 * k);
+      if (w) trees.push([x, y, k, z, 5.4 * k - half, 5.4 * k + half, CROWN * 1.1 * k * w]);
     }
   }
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
@@ -156,16 +163,17 @@ export function buildTrees(group, data, ground, trackDist) {
     const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.25, 3, 5), new THREE.MeshLambertMaterial({ color: 0x5b4632 }), trees.length);
     crown.userData.trees = true; // read by the lints
     const place = (i, f) => {
-      const [x, y, k, z, c, w] = trees[i];
-      s.set(k * 1.1 * f * w, k * 1.4 * f, k * 1.1 * f * w);
-      p.set(x, z + c + CROWN * 1.4 * k * (f - 1) * 0.5, -y); // (a thinner crown keeps its top lower, not its bottom)
+      const [x, y, , z, b, t, R] = trees[i], half = (t - b) / 2;
+      s.set(R * f / CROWN, half * f / CROWN, R * f / CROWN);
+      p.set(x, z + b + half + half * (f - 1) * 0.5, -y); // (a thinner crown keeps its top lower, not its bottom)
       m.compose(p, q, s);
       crown.setMatrixAt(i, m);
     };
-    // the trunk reaches 2.4 k under the crown's centre (3 k long under a crown at 5.4 k; a lifted crown's is longer)
-    trees.forEach(([x, y, k, z, c], i) => {
-      const h = c - 2.4 * k;
-      s.set(1, h / 3, 1);
+    // the trunk reaches 0.17 of the crown's height into it (3 k long under a crown at 5.4 k); a lifted crown's
+    // tree is taller and its trunk thicker, by its height over 15 m (an unlifted one is 12.2 m at most)
+    trees.forEach(([x, y, , z, b, t], i) => {
+      const h = b + (t - b) * 0.17, th = Math.max(1, t / 15);
+      s.set(th, h / 3, th);
       p.set(x, z + h / 2, -y);
       m.compose(p, q, s);
       trunk.setMatrixAt(i, m);

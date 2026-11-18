@@ -5,6 +5,7 @@
     python -P -E tools/shot.py --line 17 --s 5064 --view review --ref ../other-checkout
     python -P -E tools/shot.py --line 17 --s 0 --view review --at 3185.9,3756.8 --dist 25   # a place off the route
     python -P -E tools/shot.py --line 17 --s 5064 --view chase --vehicle t3simple --livery sample.t3simple-green
+    python -P -E tools/shot.py --line 22 --s 6330 --view cab --weather snow   # bare crowns, snow on the ground
     python -P -E tools/shot.py --line 37 --s 3420 --view cab --plain --ref .   # as a player sees it (the ground's
                                                                    # tiles, #30) against every tile in detail
 
@@ -83,7 +84,7 @@ def font(size=20):
     return ImageFont.load_default(size)
 
 
-def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45, picks=(), plain=False):
+def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45, picks=(), plain=False, weather='dry'):
     context = browser.new_context(viewport={'width': 1280, 'height': 720}, device_scale_factor=1)
     context.add_init_script('''window.headless = true;
       let state = 158; Math.random = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296);''')
@@ -102,7 +103,7 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
             page.goto(f'{url}/?line={line}&seed=158{keep}', timeout=remaining())
             page.wait_for_function("document.getElementById('loading')?.classList.contains('hidden') && "
                                    "!document.getElementById('menu')?.classList.contains('hidden')", timeout=remaining())
-            page.select_option('#optWeather', 'dry')
+            page.select_option('#optWeather', weather)
             page.select_option('#optObst', 'off')
             if page.locator('#selStop').count():
                 page.select_option('#selStop', index=0)
@@ -187,7 +188,7 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
                 raise RuntimeError('; '.join(errors))
             inputs = [*sorted((root / 'data').glob(f'line{line}.*')), root/'data/truth.json', root/'data/MANIFEST.json']
             info.update(target_xy=target, page_errors=errors, image_sha256=digest(output),
-                        settings={'viewport':[1280,720], 'seed':158, 'trip_index':0, 'weather':'dry'},
+                        settings={'viewport':[1280,720], 'seed':158, 'trip_index':0, 'weather':weather},
                         data_sha256={p.name: digest(p) for p in inputs if p.is_file()})
             return info
     finally:
@@ -221,6 +222,8 @@ def main(argv=None, root=ROOT):
     ap.add_argument('--plain', action='store_true', help='the current checkout without ?keepgeo: the ground as a player sees it (#30)')
     ap.add_argument('--ref-plain', action='store_true', help='the reference without ?keepgeo')
     ap.add_argument('--vehicle', help='the tram model picked in the menu (assets/vehicles.json; default the first)')
+    ap.add_argument('--weather', choices=('dry', 'rain', 'leaves', 'snow'), default='dry',
+                    help="the menu's weather in both pictures (snow: winter, bare crowns; leaves: autumn)")
     ap.add_argument('--livery', help='the livery picked in the menu (#529; default the vehicle\'s own)')
     a = ap.parse_args(argv)
     at = None
@@ -233,7 +236,7 @@ def main(argv=None, root=ROOT):
     if a.line <= 0 or not math.isfinite(a.s) or a.s < 0 or not math.isfinite(a.timeout) or a.timeout <= 0:
         ap.error('s must be finite and nonnegative; timeout must be finite and positive')
     a.out.mkdir(parents=True, exist_ok=True)
-    stem = f'line{a.line}-s{a.s:g}-{a.view}' + (f"-at{at['x']:g}_{at['y']:g}" if at else '') + ''.join(f'-{x}' for x in (a.vehicle, a.livery) if x)
+    stem = f'line{a.line}-s{a.s:g}-{a.view}' + (f"-at{at['x']:g}_{at['y']:g}" if at else '') + ''.join(f'-{x}' for x in (a.vehicle, a.livery, a.weather if a.weather != 'dry' else None) if x)
     picks = (('#optModel', a.vehicle), ('#optLivery', a.livery or ''))
     try:
         reference_rev = (git(root, 'rev-parse', '--verify', a.ref + '^{commit}')
@@ -245,7 +248,7 @@ def main(argv=None, root=ROOT):
             browser, renderer = gpu.launch(pw)
             try:
                 now = capture(browser, root, a.line, a.s, a.view, current, a.timeout, target=at, dist=a.dist, pitch=a.pitch, picks=picks,
-                              plain=a.plain)
+                              plain=a.plain, weather=a.weather)
                 report = {'line': a.line, 's': a.s, 'view': a.view, 'renderer': renderer, 'current': now,
                           'current_commit': git(root, 'rev-parse', 'HEAD'),
                           'working_changes': git(root, 'status', '--porcelain', '--', 'src', 'index.html', 'data/truth.json', 'data/MANIFEST.json')}
@@ -254,7 +257,7 @@ def main(argv=None, root=ROOT):
                     with checkout(root, reference_rev or a.ref, a.cache, a.line) as other:
                         report['reference'] = capture(browser, other, a.line, a.s, a.view, reference, a.timeout,
                                                       pose=now['camera'], target=now['target_xy'], dist=a.dist, pitch=a.pitch, picks=picks,
-                                                      plain=a.ref_plain)
+                                                      plain=a.ref_plain, weather=a.weather)
                         if reference_rev is None:
                             try:
                                 report['reference_commit'] = git(other, 'rev-parse', 'HEAD')
