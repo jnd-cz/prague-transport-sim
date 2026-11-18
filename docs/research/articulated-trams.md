@@ -210,6 +210,45 @@ Sources: https://cs.wikipedia.org/wiki/Tatra_K2 · https://de.wikipedia.org/wiki
   - strassenbahn-online: the steering mechanism for the middle joint was newly developed for the KT4.
 - **Consequence for the solver [D].** Two hinges on one vertical axis allow yaw only. Vertically, the whole car behaves as one rigid beam on its two bogie pivots 8.9 m apart.
 - **Not found.** Exact linkage geometry and ratio [?]; it is probably in I. Köhler, *KT4 – Der Kurzgelenkwagen aus Prag* (GVE 2009). Minimum radius [?]; vertical radii [?].
+
+**The steering linkage, from photos (the user's find, 2026-11-18).** The k-report.net forum thread "Archiv diskuse
+Tramvaje Tatra typů T a K do 15. 10. 2023" (https://www.k-report.net/discus/messages/48/337217.html), posts of
+5–11 October 2023, has:
+- ten photos from under a Potsdam KT4D in the workshop's pit, by a Potsdam tram worker (forum images 1530026–1530035);
+- a removed bogie with its rods (1529888);
+- the joint's lever plates, from Prague, where Potsdam's KT4s were overhauled in early 2017
+  (https://www.prazsketramvaje.cz/obrazky/vozyosobni/potsdam_0251-001.jpg);
+- two photos from the preview of Köhler's book (1530440–1530441);
+- a brass model (1529859).
+
+All 16 are kept in `raw/reference/photos/kt4/`, listed in `raw/reference/SOURCES.md`.
+
+Read off them [M, from the photos; no dimensions]:
+- **The rods.** From each half's bogie two rods run to the joint, one from each side of the bogie frame's end facing
+  the joint, on ball joints (1529888, 1530027). They converge toward the car's centreline as they near the joint
+  (1530031, 1530028). Each rod has a spring link near its joint end: a coil spring in a rubber boot (1530031–1530034).
+  The two rods of a half then pass a cross guide under the floor and go into a canvas-booted box at the joint, one
+  box on either side of the bellows (1530030, 1530033).
+- **The joint.** Two bow-tie-shaped plates turn on the joint's central vertical pin (the prazsketramvaje.cz photo).
+  Their outer ends are arcs that slide in arc guides centred on the pin. One half's rods act on one plate, the other
+  half's on the other, at bolts off the pin; two smaller pins above and below the main one link the plates. With the
+  bogies turning one way, the levers set the angle between the halves: the "scissor joint connecting both bogies"
+  (en.wiki).
+- **The full-scale gauge.** The book's preview shows a full-size frame of the KT4's outline on two bogies with the
+  steered joint. A forum member (2023-10-10) says it was used to check the clearance profile.
+
+What the forum members say:
+- **The spring links** (UT, 2023-10-11): thanks to them the KT4 runs on straight track roughly aligned and calm,
+  without swaying from side to side. Entering a curve, the mechanism takes hold late, only once the bogies have
+  turned noticeably. There is also an emergency lock that fixes the mechanism for lifting the car (rerailing) or
+  when it fails.
+- **Cables tried on the prototype** (Pvvs, 2023-10-11): the functional prototype tried cables instead of rods.
+
+For the solver:
+- The steered joint's `steer` (assumed 0.5: the two halves are equal and the levers symmetric, which puts the joint
+  over the track centreline) acts only past `steerFrom`, the bogies' relative turn below which the springs hold the
+  joint straight.
+- Neither the ratio nor that threshold is measured.
 - **Coupling.** Couplers at both ends [S over-coupler length]. Multiple working: Potsdam ran pairs from 1980 and tried a three-car set in 1983 [S strassenbahn-online].
 
 Sources: https://de.wikipedia.org/wiki/Tatra_KT4 · https://cs.wikipedia.org/wiki/Tatra_KT4 · https://en.wikipedia.org/wiki/Tatra_KT4 · https://ru.wikipedia.org/wiki/Tatra_KT4 · https://strassenbahn-online.de/Betriebshof/Tatra/KT4D/index.html
@@ -304,3 +343,321 @@ Coupler pivot positions: not found for any type.
 | J. Vik, bachelor thesis, ZČU (has a 15T bogie chapter; server was down) | https://dspace.zcu.cz/bitstream/11025/25276/1/BP-Jiri_Vik_kompletni.pdf | unknown |
 | MVB Typenblatt KT4D | https://www.mvbnet.de/files/2021/05/2021_mvb_typenblaetter-fahrzeuge_KT4d.pdf | unknown |
 | Book: I. Köhler, *KT4 – Der Kurzgelenkwagen aus Prag*, GVE 2009 (KT4 joint linkage) | n/a | n/a |
+
+## 12. ForCity Plus: 29T, 30T and 52T (second research run, 2026-11-18)
+
+The user (2026-11-18): the 52T's development is said to come from Bratislava's trams of a similar construction.
+
+Read-only web research, 2026-11-18. Tags: [S] stated by the cited source, [D] derived (arithmetic shown),
+[E] my estimate, [?] not found. No PDFs were opened. The ones that look worth opening are listed at the end
+with their sizes from HEAD requests.
+
+### Bottom line
+
+- **No public source gives section lengths, bogie pivot positions, wheelbases, a pivot limit, a minimum
+  horizontal radius or vertical radii for the 29T, 30T or 52T.** Every source found gives only the overall
+  length, width, wheel diameter (52T) and how each bogie turns. All figures below that are tagged [E] are my
+  estimates.
+- **Layout (all three types).** Five sections and four bogies. The end sections 1 and 5 are saddled: each
+  rests on one bogie under its outer part, and its inner end rests on the joint to section 2 or 4. Sections 2
+  and 4 are short bogie sections. Section 3 floats between them and has no bogie.
+  [S] de.wikipedia, *Škoda ForCity*, ForCity Plus section: https://de.wikipedia.org/wiki/%C5%A0koda_ForCity
+  It describes the floating middle section as a "freischwebendes Mittelteil (Sänfte)".
+  The 52T's short sections 2 and 4 are also [S] in Railvolution:
+  https://www.railvolution.net/news/skoda-presented-first-52t-tram-for-praha
+- **29T/30T inner bogies.** Most sources say they do not pivot. One source says they pivot a limited amount.
+  - Non-pivoting: [S] prazsketramvaje.cz says "Krajní podvozky jsou otočné, vnitřní neotočné."
+    https://www.prazsketramvaje.cz/view.php?cisloclanku=2015080401
+  - Non-pivoting: [S] de.wikipedia says the middle car bodies run on "nicht ausdrehbaren Laufwerken".
+  - Non-pivoting: [S] cs.wikipedia *Tramvaje Škoda* defines ForCity Plus as a combination of pivoting and
+    fixed ("pevných") bogies. https://cs.wikipedia.org/wiki/Tramvaje_%C5%A0koda
+  - Limited pivoting: [S] railway-technology.com calls the two inner bogies "limitedly pivotable" (one powered,
+    one trailing). https://www.railway-technology.com/?p=16793
+  - [E] Both descriptions can be true: the bogie is fixed in yaw but has some elastic yaw give through its
+    secondary suspension and stops.
+- **52T inner bogies: partially pivoting.**
+  - [S] DPP press release: "dvěma částečně otočnými podvozky pod vnitřními podvozkovými články".
+    https://www.dpp.cz/spolecnost/pro-media/tiskove-zpravy/detail/278_2449-nove-tramvaje-pro-prahu-odhaleny-v-hlavnim-meste-zacnou-za-necele-dva-roky-jezdit-prvni-vozy-skoda-forcity-plus-praha-52t
+  - [S] Urban Transport Magazine (German edition): "teilweise schwenkbaren Drehgestellen unter den inneren
+    Fahrwerksgliedern".
+    https://www.urban-transport-magazine.com/neue-strassenbahnen-fuer-prag-enthuellt-forcity-plus-52t/
+  - [S] Railvolution: "limited pivotability".
+  - The first press report in January 2024 still called them fixed. [S] ČT24 (10 Jan 2024): "krajní otočné a
+    prostřední pevné".
+    https://ct24.ceskatelevize.cz/clanek/regiony/nove-prazske-tramvaje-52t-budou-nizkopodlazni-s-peti-clanky-prvni-prijdou-napresrok-344822
+  - All later Škoda and DPP texts say partially pivoting.
+- **Are the 52T inner bogies the 29T/30T inner bogies? No, it is a different design.** [D] from five facts:
+  1. The gauges differ: 1435 mm for the 52T, 1000 mm for the 29T/30T.
+  2. The 52T bogie frames come from the ForCity Smart trams for Ostrava, Plzeň and Brno (39T, 40T, 45T), not
+     from Bratislava. [S] DPP press release: "Podvozkové rámy jsou převzaty z tramvají ForCity Smart pro
+     Ostravu, Plzeň a Brno". [S] de.wikipedia *Škoda 52T*: https://de.wikipedia.org/wiki/%C5%A0koda_52T
+  3. All four 52T bogies are motored. The 29T/30T has one unpowered inner bogie.
+  4. The 52T is 100% low-floor with no step over any bogie. On the 29T/30T, the inner-section seats stand on
+     platforms.
+  5. fdrive.cz calls the 52T inner bogies "special", the end bogies "běžné" (standard).
+     https://fdrive.cz/clanky/praha-se-po-16-letech-docka-novych-tramvaji-umeji-samy-brzdit-pred-prekazkou-11795
+  - Only the body concept was taken from Bratislava. [S] DPP press release: "inspirací byla pětičlánková
+    tramvaj ForCity Plus pro Bratislavu".
+- **52T turning limit and mechanism: [?].** Nothing published gives the angle, whether springs, stops or
+  rubber restore the bogie, or a VDV class. No Škoda patent on a partially pivoting bogie was found; the
+  patents found are listed under "Patents".
+- **Other ForCity Plus types.** Only the 29T, 30T (with their batches 29T3 and 30T3) and the 52T have this
+  layout.
+  - The FCB types 46T (Frankfurt/Oder), 47T (Cottbus) and 48T (Brandenburg) are ForCity Plus but have three
+    sections, two radial bogies and one non-radial bogie, and are 70% low-floor. [S] de.wikipedia
+    *Škoda ForCity*; Railway Gazette search snippet. de.wikipedia's overview table gives them 28.96 m.
+  - The 26T (Miskolc) is ForCity Classic, with fixed bogies and 100% low floor. [S] cs.wikipedia
+    *Tramvaje Škoda*.
+  - The 40T (Plzeň) is ForCity Smart: three sections, four pivoting bogies, 29 m. [S] technickytydenik.cz,
+    via a search snippet.
+  - No "33T" tram exists. 33Tr is a trolleybus.
+
+### Škoda 29T (single-ended) and 30T (double-ended), Bratislava, 1000 mm gauge
+
+**Vehicle**
+
+| item | value | tag / source |
+|---|---|---|
+| sections | 5, named from the cab end A, C01, D, C02, B | [S] prazsketramvaje.cz |
+| length | 32,495 mm without couplers | [S] https://imhd.sk/ba/popis-typu-vozidla/743/%C5%A0koda-29T-ForCity-Plus, https://imhd.sk/ba/popis-typu-vozidla/740/%C5%A0koda-30T-ForCity-Plus, sk.wikipedia |
+| width, height, floor | 2,480 mm; 3,560 mm; 350 mm | [S] imhd.sk |
+| low-floor share | 29T 87%, 30T 89% (prazsketramvaje.cz); 30T 92% (Škoda, Rolling Stock World) | [S] sources differ |
+| raised floor | only over the end bogies, which hide under the floor behind the cabs | [S] prazsketramvaje.cz photo captions |
+| inner-section seats | on platforms one step above the aisle | [S] de.wikipedia *Škoda ForCity* |
+| section lengths A, C01, D, C02, B | not published | [?] |
+| section lengths, estimate | A = B ≈ 10.5 m, C01 = C02 ≈ 3.0 m, D ≈ 5.5 m | [E] from door and bogie layout; check: 10.5·2 + 3.0·2 + 5.5 = 32.5 |
+
+**Bogies**
+
+| bogie | under | turns | powered | position from the front | wheelbase | wheel diameter |
+|---|---|---|---|---|---|---|
+| 1 | A | free ("plne otočné") [S imhd.sk] | yes [S] | ≈3.0 m [E] | ≈1.8 m [E] | 620 mm new, 540 mm worn [S, imhd.sk reader comment only, https://imhd.sk/ba/doc/sk/23204/] |
+| 2 | C01 | not pivoting [S prazsketramvaje.cz, de.wikipedia]; "limitedly pivotable" [S railway-technology.com] | one of bogies 2/3 is powered, which one [?] | ≈ middle of C01, about 12 m [E] | ≈1.8 m [E] | as bogie 1 |
+| 3 | C02 | as bogie 2 | the other of bogies 2/3 is unpowered [S] | ≈20.5 m [E] | ≈1.8 m [E] | as bogie 1 |
+| 4 | B | free [S] | yes [S] | ≈29.5 m [E] | ≈1.8 m [E] | as bogie 1 |
+
+- Three of the four bogies are motored ("Tři podvozky jsou motorové, jeden běžný", prazsketramvaje.cz):
+  6 × 100 kW, two motors per motored bogie [S] imhd.sk.
+- The pantograph is on the second section (C01) [S] prazsketramvaje.cz. That suggests C01's bogie is the
+  powered inner one, but this is unconfirmed [E].
+- The 1.8 m wheelbase is [E]. The only Škoda figure found is 1,800 mm for the ForCity Classic Bergamo bogie,
+  seen in a search snippet. A PRORAIL 2023 paper puts city tram bogies at 1,900 mm or less.
+- de.wikipedia says the ForCity Plus types use classic wheelsets with through axles. It does not say which
+  bogies. With a low aisle between the inner-section platforms, independent wheels or cranked axles are
+  likelier on bogies 2 and 3 [E].
+- Origins:
+  - The middle chain C01–D–C02 is arranged like a ForCity Classic. [S] Škoda reference page, quoted in a
+    search snippet (the page itself would not render): "arrangement of inner components and bogies are similar
+    to the ForCity Classic". https://www.skodagroup.com/reference/tramcar-forcity-plus-bratislava
+  - The design is "based on 15T ForCity Alfa and 26T ForCity Classic" [S] prazsketramvaje.cz, and on the
+    Miskolc 26T [S] railway-technology.com.
+
+**Joints**
+
+| joint | between | carries | yaw | pitch | roll |
+|---|---|---|---|---|---|
+| J1 | A–C01 | inner end of A, which is saddled on C01 [S de.wikipedia] | free [E] | free [E] | [?] |
+| J2 | C01–D | D, which floats [S de.wikipedia] | free [E] | one of J2/J3 is stiff, the other free [E] | constrained at one of J2/J3 at least [E] |
+| J3 | D–C02 | D | free [E] | see J2 [E] | see J2 [E] |
+| J4 | C02–B | inner end of B | free [E] | free [E] | [?] |
+
+- Joint positions: one at each section boundary, ≈10.5 / 13.5 / 19.0 / 22.0 m from the front [E].
+- The only published joint detail is that the joints have gangway bellows and turntable floor plates.
+  [S] imhd.sk: "kĺbovými spojmi, ktoré vybavili prechodovými mechmi s točňami".
+- None of the freedoms are published. The [E] values are the arrangement needed to keep the chain statically
+  determinate.
+
+**Curve radii and couplers**
+
+- Smallest horizontal radius: [?]. Crest and sag radii: [?].
+- Couplers at both ends: covered, folding, "Prague-type" couplers [S] imhd.sk. They are mounted under the cab
+  floor at the front ends and are normally folded behind the front cover [S] prazsketramvaje.cz.
+- [E] As folding couplers, they are deployed by hand.
+- Coupler pivot positions: [?].
+
+**29T versus 30T**
+
+- The 29T has five double doors on the right side and no second cab: section B has seats where the 30T has a
+  cab.
+- The 30T has five doors on each side and two cabs.
+- [S] prazsketramvaje.cz. Running gear is the same as far as the sources say. For the 29T3 and 30T3 batches
+  (2022–24), no source reports a change in running gear [?]. One imhd.sk reader says they have
+  "2 neotočne podvozky".
+
+### Škoda 52T, Prague, 1435 mm gauge
+
+**Vehicle**
+
+| item | value | tag / source |
+|---|---|---|
+| sections | 5, single-ended, 100% low floor, no step even over the bogies | [S] DPP press release; cs.wikipedia |
+| length | 31,990 mm over bumpers | [S] DPP; UTM; en.wikipedia text. The en.wikipedia infobox says 31.8 m, which conflicts. |
+| width; floor | 2,500 mm; 350 mm | [S] DPP |
+| doors | 5 double doors with 1,300 mm clear width: two in each end section between its bogie and the joint, one in section 3 | [S] de.wikipedia *Škoda 52T*; cs.wikipedia (doors in sections 1, 3, 5) |
+| sections 2 and 4 | short, no doors | [S] Railvolution ("two short sections"); [D] from the door layout |
+| joints | short, wider than before | [S] DPP: "krátkými, širšími a prostornými klouby" |
+| section lengths | not published | [?] |
+| section lengths, estimate | 1 = 5 ≈ 10.5 m, 2 = 4 ≈ 2.8 m, 3 ≈ 5.4 m | [E]; check: 10.5·2 + 2.8·2 + 5.4 = 32.0 |
+| difference from the 29T/30T | 0.505 m shorter | [D] 32.495 − 31.990 = 0.505 m. Part of this may come from the different length definitions (without couplers vs over bumpers). |
+
+[E] How the section estimate was built, for section 1 from the front:
+
+- cab ≈ 1.8 m
+- bogie zone ≈ 2.5 m (1.8 m wheelbase plus a 0.64 m wheel)
+- first door ≈ 1.5 m
+- window bay ≈ 3 m
+- second door ≈ 1.5 m
+- end bay ≈ 0.5 m
+
+That totals ≈ 10.8 m. Section 3 is one door plus two seat bays. The short sections take what is left of the
+31.99 m.
+
+**Bogies**
+
+| bogie | under | turns | powered | position from the front | wheelbase | wheel diameter |
+|---|---|---|---|---|---|---|
+| 1 | section 1 | free ("volně otočné", "běžné") [S DPP; fdrive.cz] | yes, both axles [S] | ≈3.0 m [E] | [?], ≈1.8 m [E] | 640 mm new [S DPP, Railvolution, UTM] |
+| 2 | section 2 | partially pivoting ("částečně otočné", "limited pivotability", "special") [S DPP; Railvolution; fdrive.cz]. Angle and mechanism [?] | yes [S] | middle of section 2, ≈11.9 m [E] | [?] | 640 mm [S] |
+| 3 | section 4 | as bogie 2 | yes [S] | ≈20.1 m [E] | [?] | 640 mm [S] |
+| 4 | section 5 | free [S] | yes [S] | ≈29.0 m [E] | [?] | 640 mm [S] |
+
+- All eight axles are powered, and all bogies have wheelsets with axles. [S] Railvolution: "all with
+  wheelsets with axles". de.wikipedia gives Bo'Bo'Bo'Bo' and 8 × 100 kW.
+- Each motor drives the pair of wheels on one side of its bogie. [S] cs.wikipedia, via a fetch summary.
+- The motor type comes from the FCB trams [S] DPP. The bogie frames come from the ForCity Smart 39T, 40T and
+  45T [S] DPP and de.wikipedia.
+- On those ForCity Smart trams all bogies pivot. The Brno 45T has three sections, with two bogies under the
+  middle section and one under each end section. [S] fdrive.cz and technickytydenik.cz, via search snippets.
+
+**Joints**
+
+| joint | between | carries | yaw | pitch | roll |
+|---|---|---|---|---|---|
+| J1 | 1–2 | inner end of section 1, which is saddled [S de.wikipedia *Škoda 52T*: "aufgesattelten Endwagen (jeweils auf einem Drehgestell)"] | free [E] | free [E] | [?] |
+| J2 | 2–3 | floating section 3 [S de.wikipedia: "eines fahrwerkslos dazwischen eingehängt"] | free [E] | one of J2/J3 is stiff [E] | constrained at one of J2/J3 at least [E] |
+| J3 | 3–4 | section 3 | free [E] | see J2 [E] | see J2 [E] |
+| J4 | 4–5 | inner end of section 5 | free [E] | free [E] | [?] |
+
+- Joint positions: ≈10.5 / 13.3 / 18.7 / 21.5 m from the front [E], from the section estimate.
+- None of the 52T joint freedoms are published.
+
+**Turning angles, radii and couplers**
+
+- 52T pivot limit of the inner bogies: [?].
+- [D] End bogie yaw against section 1: about 11–12° in a 20 m curve, about 12° at 18 m.
+  - This uses a = 7.5 m [E], the distance from the bogie pivot to J1, with both points on the track centreline.
+  - Body chord against the tangent at the pivot = asin(a / 2R).
+  - R = 20 m: asin(7.5 / 40) = 10.8°. R = 18 m: asin(7.5 / 36) = 12.0°. R = 25 m: 8.6°.
+  - For comparison, a 2006 ČVUT utility model for an end-section pivoting tram bogie states about ±12° body
+    rotation, and ±15° for classic tram bogies. [S] https://patents.google.com/patent/CZ16360U1/cs
+    It is not a ForCity design.
+- [D] For an inner bogie fixed in yaw at the middle of a short section (half-length 1.4 m [E]), each joint at
+  R = 20 m sits 1.4² / (2·20) = 0.049 m outside the track centreline. A partial pivot would let the bogie
+  follow the track instead of the section.
+- Smallest horizontal radius: [?]. Crest and sag radii: [?].
+- Couplers: [?]. Nothing found on whether the 52T has couplers at both ends, how they are deployed, or where
+  they pivot.
+- Context only, other networks:
+  - The Ostrava 39T tender required a 20 m radius (contract annex on smlouvy.gov.cz, search snippet).
+  - In Brno the smallest standard radius is 20 m, and 18 m in depots (PRORAIL 2023 paper, search snippet).
+
+### Patents (searched; none covers the ForCity Plus partial pivot)
+
+- **EP1741610 / CZ297213** (Škoda Transportation and VÚKV, priority 2005): low-floor articulated tram with
+  rotatable end bogies. https://patents.google.com/patent/EP1741610A3/en
+- **EP2020355** (VÚKV, 2007): low bogie with a downward-cranked axle, with a pivoting and a non-pivoting
+  variant.
+- **CZ304298** (ČKD, 1998): bogie fixed in yaw, with limited rotation through a Z-mechanism.
+- **CZ16360U1** (ČVUT, 2006): pivoting traction bogie for partly low-floor trams, about ±12°.
+- None of these is tied to the 29T, 30T or 52T, and none gives a restoring torque. A search of the Czech
+  patent office (UPV) by owner "Škoda Transportation" was not possible with these tools.
+
+### Documents not opened (URL, title, size from HEAD)
+
+1. https://www.prazsketramvaje.cz/clanky/29t_prospekt.pdf
+   - Škoda 29T ForCity Plus brochure, 731,333 B, dated 2015-08-04.
+   - A search snippet attributes the "limitedly pivotable inner bogies" wording to it.
+   - May contain a side view.
+2. https://www.prazsketramvaje.cz/clanky/30t_prospekt.pdf
+   - 30T brochure, 512,994 B.
+3. https://www.prazsketramvaje.cz/clanky/29t+30t_prospekt.pdf
+   - 29T+30T catalogue, 1,101,363 B.
+4. https://admin.skodagroup.com/wp-content/uploads/2023/04/TRAMVAJ-FORCITY-SMART-BRATISLAVA_Produktovy-list_Skoda_A3_A4_CZ_EN.pdf
+   - Škoda product sheet for the Bratislava ForCity Plus, despite "SMART" in the file name. 3,055,325 B.
+   - Its snippets say "koncové podvozky jsou plně otočné" and mention "basic technical parameters".
+   - The best candidate for a dimensioned side view and a radius figure.
+5. https://admin.skodagroup.com/wp-content/uploads/2023/03/Skoda-catalogue-City-EN.pdf
+   - Škoda City catalogue, 16,831,396 B. The Czech version (…City-CZ.pdf) is 16,825,215 B.
+6. https://wikibus.blob.core.windows.net/sources5121/S%CC%8Ckoda%20trams.pdf
+   - "Škoda trams", origin unknown, 31,257,615 B.
+7. https://dk.upce.cz/bitstreams/35ecbc6a-9812-46ab-a4b1-cc60a2fd9646/download
+   - PRORAIL 2023 paper with a table of bogie yaw angles in 18 m and 20 m curves per tram type. Size unknown:
+     the HEAD request got no answer.
+8. https://spkv.upce.cz/index.php/spkv/article/download/2655/2402/5782
+   - 2025 Česká Třebová paper on active wheelset steering for articulated trams with non-pivoting bogies, in
+     a Škoda context.
+   - The site is behind a bot wall (Anubis). Not bypassed.
+9. https://www.opii.gov.sk/ckfinder/userfiles/files/Obnova%20vozoveho%20parku%20elektriciek%20BA%20-%20Studia%20realizovatelnosti_v_3.docx
+   - Bratislava fleet-renewal feasibility study, 5,365,873 B. May state the DPB tender's curve requirements.
+   - Related: https://www.opii.gov.sk/download/b/zamery/21RV/1_dpb_elektricky_pre_bratislavu.pdf, 902,668 B.
+10. Not online: the print magazine articles de.wikipedia cites for the ForCity Plus design.
+    - H. Hondius, *stadtverkehr* 1-2/2021.
+    - S. Göbel, *stadtverkehr* 5/2024, pp. 30–36.
+
+A practical route to the missing lengths: measure a perpendicular side photo of a 52T or 30T, using the
+1,300 mm door clear width or the 640 mm / 620 mm wheel as scale.
+
+### Source notes
+
+- skodagroup.com pages render only with JavaScript. Their content here comes from search-engine snippets.
+- Wikipedia (cs/de/en) refused or reset connections at times; the pages that did load are cited above.
+- railwaynews.net (https://railwaynews.net/?p=237764) reads as machine-generated text and was not used as
+  evidence.
+- No page contained instructions aimed at AI tools. AI-related text was only site interface:
+  - the wikiwand page title "Loading AI tools";
+  - an "AI a MCP server" navigation link on hlidacstatu.cz;
+  - spkv.upce.cz's bot-protection wall.
+
+## 13. The 14T and the 52T measured on pictures, and the best guesses (2026-11-18)
+
+The user (2026-11-18), on the open questions: "I do not have the information for your user question. Make your best guess for each question based on all material we have found so far." The pictures and documents are kept in `raw/reference/` (`photos/52t/`, `photos/14t/`, `skoda/`), listed in its `SOURCES.md`.
+
+**The 52T, measured on the side view the user sent** (DPP's render of the livery, both sides, 1778 × 1000; `photos/52t/user-52t-sides.jpg`):
+- The upper view: the cab at the right, its end at x 1615, the rear end at 169. 1,446 px = 31.99 m over the bumpers, 22.1 mm a pixel.
+- Positions from the cab end, m [M, ±0.1; a bogie's middle is its fairing's]:
+
+  | element | from the cab end | from the rear end (mirrored) | used |
+  |---|---|---|---|
+  | front end bogie | 2.23 | 2.28 | 2.25 |
+  | joint 1 (bellows' middle) | 9.36 | 9.40 | 9.38 |
+  | inner bogie under section 2 | 11.52 | 11.60 | 11.56 |
+  | joint 2 | 13.69 | 13.74 | 13.72 |
+
+  The rest are mirrored about the middle.
+- Section lengths: the end sections 9.38 m each, the bogie sections 4.34 m each (their bogie in the middle), the carried section 4.55 m (with the middle double door).
+- The wheelbase does not show (the bogies are covered): 1.8 m [E].
+- Škoda's City catalogue (2023, `skoda/skoda-catalogue-city-en.pdf`, the Prague page) words the layout: two swivel bogies under the outermost sections and two partially swivelling ones under the inner sections. Its joints are "short, wide and spacious", without steps.
+- The 29T/30T brochures (2015) call the Bratislava cars' inner bogies "omezeně otočné" / "limitedly pivotable"; neither they nor the catalogue give an angle.
+
+**The 14T, measured on DPP's photo of car 9160** (`photos/14t/dpp-2840-mhd-tram-885a_01.webp`, 894 × 596, nearly side-on in perspective):
+- Method: along the car's side, a point's position is an affine function of (x − 447) / h. Here x is its column, 447 the image's middle, and h the height between the upper and the lower red stripe there. h was fitted along the side as 136.0 − 0.0869 x (212 columns, worst residual 9 px).
+- Scale: section 1's bogie, its wheels 1.88 m apart (the sister 19T's wheelbase, pl.wikipedia), measured from the nose.
+- Measured [M, ±0.3 m near the front, ±0.5 m further]:
+  - section 1: its wheels at 3.18 and 5.06 m;
+  - joints at 6.35, 12.55, 16.86 and 23.22 m;
+  - section 3's wheels at 13.59 and 15.38 m.
+- Check: section 3's wheelbase comes out 1.78 m against 1.88, so the far side reads about 5 % short.
+- Made symmetric about the middle of the 30.25 m body [E]:
+  - section 1: 0 – 6.35 m, its fixed bogie at 4.12 m;
+  - sections 2 and 4: 6.62 m each, carried;
+  - section 3: 12.97 – 17.28 m, its fixed bogie at 15.13 m;
+  - section 5: mirrored.
+
+**Best guesses** (the user, above):
+
+| question | guess | why |
+|---|---|---|
+| the 52T's inner bogies' largest turn | 5° (0.087 rad) | They are "partially" or "limitedly" pivotable. That is more than the ~3° the 2005 patent gives for designs called non-pivoting, and well under the ~12° an end section's bogie needs on 18 m (ČVUT utility model CZ16360U1). A bogie in the middle of a 4.3 m section needs little: the section is nearly the chord between its joints. |
+| the KT4's rod ratio | 0.5 | The two halves are equal and the bow-tie plates symmetric. 0.5 keeps the joint over the track centreline, which the rods are there for ("limits overhang in curves"). |
+| the KT4's springs' threshold (`steerFrom`) | 0.05 rad (~3°) of the bogies' relative turn | "Only at a larger turn of the bogies" (a KT4 driver, k-report.net, 2023-10-11). The joint stays straight on curves wider than ~180 m (8.9 m / 0.05) and steers in street curves (20–50 m: 0.18–0.45 rad). |
+| the 52T's and 14T's wheelbases | 1.8 m and 1.88 m | The 52T's bogie frames come from the ForCity Smart (DPP); Škoda's figure seen for a ForCity bogie is 1.8 m. The 14T has the 19T's (its sister, same length). |
