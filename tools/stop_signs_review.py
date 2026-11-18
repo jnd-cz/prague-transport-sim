@@ -258,13 +258,13 @@ def sign_facts(cards, answers):
                  **({"note": r["note"]} if r.get("note") else {}),
                  "osm_node": c.get("osm_node"), "gtfs": [gtfs["x"], gtfs["y"]] if gtfs else None,
                  "pin": [c["x"], c["y"]], "pinFrom": pin_from,
-                 "line": c["line"], "t": r.get("t", 0)}
+                 "line": c["line"], "issue": c.get("issue", 258), "t": r.get("t", 0)}
             if k not in best or f["t"] > best[k]["t"]:
                 best[k] = f
     out = []
     for f in sorted(best.values(), key=lambda f: (f["stop"], f.get("towards", ""), f.get("from", ""))):
         day = time.strftime("%Y-%m-%d", time.gmtime(f.pop("t") / 1000)) if f.get("t") else "?"
-        f["source"] = f"user, stop-sign review (reports/review/stop-signs-{f.pop('line')}.json) on the test host, {day} (#258)"
+        f["source"] = f"user, stop-sign review (reports/review/stop-signs-{f.pop('line')}.json) on the test host, {day} (#{f.pop('issue')})"
         out.append(f)
     return out
 
@@ -304,7 +304,9 @@ def do_import(lines, reviews):
     for line in lines:
         cp = os.path.join(ROOT, "reports", "review", f"stop-signs-{line}.json")
         if os.path.exists(cp):
-            cards += json.load(open(cp, encoding="utf-8"))["findings"]
+            with open(cp, encoding="utf-8") as fh:
+                d = json.load(fh)
+            cards += [{**c, "issue": d.get("issue", 258)} for c in d["findings"]]  # (the issue the set waited for)
         ap_ = os.path.join(ROOT, reviews, f"line{line}.json")
         if os.path.exists(ap_):
             a = json.load(open(ap_, encoding="utf-8"))

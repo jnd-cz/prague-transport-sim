@@ -1,65 +1,6 @@
 {
  "schema": 1,
- "issue": 685,
+ "issue": 258,
  "over_m": 5.0,
- "findings": [
-  {
-   "kind": "stop sign",
-   "id": "stop-sign-17-Výstaviště-1-again",
-   "line": "17",
-   "stop": "Výstaviště",
-   "towards": "Nádraží Holešovice",
-   "from": "Veletržní palác",
-   "back": false,
-   "x": 1077.6,
-   "y": 1812.6,
-   "s": 17082.1,
-   "mag": 16.9,
-   "status": "review",
-   "pick": true,
-   "marks": [
-    {
-     "x": 1077.6,
-     "y": 1812.6,
-     "label": "DTM stop sign, state 2024",
-     "color": "#ff3b30"
-    },
-    {
-     "x": 1061.2,
-     "y": 1806.4,
-     "label": "OSM stop position",
-     "color": "#3e9dff"
-    },
-    {
-     "x": 1074.6,
-     "y": 1816.6,
-     "label": "timetable (GTFS) point",
-     "color": "#ff9e31"
-    },
-    {
-     "x": 1063.0,
-     "y": 1807.9,
-     "label": "platform's front end (OSM)",
-     "color": "#ffffff"
-    },
-    {
-     "x": 1065.1,
-     "y": 1804.4,
-     "label": "your sign now (data/truth.json)",
-     "color": "#ffd60a"
-    }
-   ],
-   "options": [
-    "the DTM sign (red)",
-    "OSM's stop position (blue)",
-    "the timetable point, GTFS (orange)",
-    "my own mark: place it on the map",
-    "unsure"
-   ],
-   "place_option": "my own mark: place it on the map",
-   "osm_node": 4690489335,
-   "gtfs_s": 17082.1,
-   "info": "Výstaviště (towards Nádraží Holešovice): asked again: the sign your answer put here (yellow) is in question. The pin is the DTM stop sign. Where is the stop sign? Pick the source that is right, or place your own mark."
-  }
- ]
+ "findings": []
 }
