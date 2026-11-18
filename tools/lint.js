@@ -194,6 +194,48 @@ function treesInBuildings(world) {
   return { trunk: check('tree-trunk-outside-buildings', n, trunkIn), crown: check('tree-crown-clear-of-buildings', n, crownIn) };
 }
 
+// Crowns over the tram (#649): a crown whose rim comes within 1.6 m of a track centre (the body, 1.25 m, and its
+// swing) has its underside at least 6.4 m over that track's rail (src/trees.js lifts it to 6.5 m, above the wire).
+function treesOverTram(world, ground) {
+  const crown = [];
+  world.traverse((m) => { if (m.isInstancedMesh && m.userData.trees) crown.push(m); });
+  if (!crown.length || !ground?.trackDist) return check('tree-crown-over-wire', 0, []);
+  const M = new crown[0].matrix.constructor(), bad = [];
+  let n = 0;
+  for (const mesh of crown) for (let i = 0; i < (mesh.userData.total ?? mesh.count); i++) {
+    mesh.getMatrixAt(i, M);
+    const e = M.elements, x = e[12], y = -e[14], r = 2.6 * Math.hypot(e[0], e[1], e[2]), bottom = e[13] - 2.6 * Math.hypot(e[4], e[5], e[6]);
+    n++;
+    const d = ground.trackDist(x, y);
+    if (d - r >= 1.6) continue;
+    const rail = ground.trackOwn?.heightAt(x, y, 10);
+    if (rail === null || rail === undefined) continue;
+    const low = rail + 6.4 - bottom;
+    if (low > 0) bad.push({ x, y, mag: low, info: `crown ${(bottom - rail).toFixed(1)} m over the rail, ${Math.max(0, 1.6 - d + r).toFixed(1)} m into the tram's band` });
+  }
+  return check('tree-crown-over-wire', n, bad);
+}
+
+// What the tree rules decided (src/trees.js treeLog, #649), one check per class with its places, so a rebuild's
+// moves show in --compare: dropped by a track, a facade, a building; row samples that repeat a register tree, that
+// stay on the carriageway or move off it; crowns lifted over the wire or narrowed by a facade.
+function treeDecisions(world) {
+  let log = null;
+  world.traverse((o) => { if (o.userData.treeLog) log = o.userData.treeLog; });
+  const out = {};
+  if (!log) return out;
+  const what = {
+    building: 'tree-dropped-in-building', track: 'tree-dropped-by-track', facade: 'tree-dropped-by-facade',
+    rowDuplicate: 'tree-row-repeats-register', rowOnRoad: 'tree-row-dropped-on-road', rowMoved: 'tree-row-moved-off-road',
+    lifted: 'tree-crown-lifted-over-wire', narrowed: 'tree-crown-narrowed',
+  };
+  const all = Object.values(log).reduce((a, l) => a + l.length, 0);
+  for (const [k, rule] of Object.entries(what)) {
+    out[k] = check(rule, all, (log[k] || []).map(([x, y, x1, y1]) => ({ x, y, mag: x1 === undefined ? 1 : Math.hypot(x1 - x, y1 - y), info: x1 === undefined ? rule : `moved ${Math.hypot(x1 - x, y1 - y).toFixed(1)} m` })));
+  }
+  return out;
+}
+
 // OSM bridge spans on the route without a surveyed deck (Mosty 3D) under the track.
 function bridgesWithoutDeck(g) {
   const real = g.route.ground?.profile?.realDecks || [];
@@ -1196,6 +1238,8 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     noOppositeStop: noOppositeStop(g),
     treeTrunks: trees.trunk,
     treeCrowns: trees.crown,
+    treeOverWire: treesOverTram(world, g.route.ground),
+    ...Object.fromEntries(Object.entries(treeDecisions(world)).map(([k, v]) => [`tree_${k}`, v])),
     bridges: bridgesWithoutDeck(g),
     inventedWalls: syntheticWallsOnStreets(g),
     tramEnvelope: mountedInEnvelope(g),

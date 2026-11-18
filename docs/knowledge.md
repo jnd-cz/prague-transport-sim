@@ -39,6 +39,12 @@ Sections:
   lat/lon (asking those for S-JTSK puts them 6–10 m off: −6.24, −7.67 m at Trojanova; naming a
   `datumTransformation` makes it 170–300 m, 2026-11-05, #258). A new Geoportál layer gets measured both ways
   before use. The current DTM's JVF packages (DI, TI, ZPS) are S-JTSK natively.
+- **The tree rows are lines drawn along a row, not its trees** (#649, near line 22, 2026-11-18): of the 169 rows
+  with register trees along them, 104 lie within 0.5 m of those trees and 141 within 1 m, 6 are 2–4 m off and 6
+  more than 4 m. The other ~1100 rows have no register trees (owners other than the city: the castle's limes),
+  and nothing but imagery places them. The castle's row south of Mariánské hradby runs 2.5 m into the
+  carriageway, its trunks 2.5 m behind the kerb (5 m). A row's samples near a register tree repeat that tree
+  (`src/trees.js` ROW_DUP); samples on a carriageway move to the nearest other ground (ROW_SNAP).
 - **Heights are Bpv** (Baltic after adjustment) in DMR 5G, the DTM survey and Mosty 3D alike: measured,
   the model tops sit 0–0.5 m over the surveyed decks (an ellipsoid mix-up would be ~45 m).
 - Archived track Z is guarded separately from DI geometry by `tools/track_heights.py`; the staging
