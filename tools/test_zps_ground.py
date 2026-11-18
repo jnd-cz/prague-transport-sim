@@ -135,6 +135,11 @@ class Judge(unittest.TestCase):
         zg.judge([square(0, 0, 20, GROUND - 0.1)], ground, ground, zg.cover_union([]), NONE, F,
                  [{"lat": 0.01, "lon": 0.01, "verdict": "survey"}], states=states)
         self.assertEqual(states, {0: ("matches", "fits", "fits")})
+        # the user's held rule giving the same verdict is no source catching up: holds
+        states, rule = {}, {"courtyard": "lidar", "outsideGreen": "survey", "outside": "survey"}
+        zg.judge([square(0, 0, 20, GROUND - 1.8)], ground, lambda E, N: [float("nan")] * len(E), zg.cover_union([]), NONE, F,
+                 [{"lat": 0.01, "lon": 0.01, "verdict": "survey"}], rule=rule, buildings=shapely.Polygon(), states=states)
+        self.assertEqual(states, {0: ("holds", "survey", "rule")})
 
     def test_an_answer_takes_its_own_area_not_the_one_around_it(self):
         """A courtyard's lawn is a hole in the sidewalk around it: the answer is the lawn's, the sidewalk fits."""

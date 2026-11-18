@@ -81,6 +81,7 @@ BED = 2.7              # m: a bed's width (src/world.js), the extent a diamond c
 PAVED_IN = ("embedded", "setts")   # the styles a junction's pieces join across (#574: setts as embedded)
 SURFACE_STYLE = {"setts": "setts", "embedded": "embedded", "panels": "panels", "grass": "grass"}  # answer -> style
 STYLE_MATCH = 0.9      # of an answer's stretch the styles laid without the answers give its style, for it to match (#670)
+DATA_SECTIONS = ("survey", "lidar", "list")  # the sections a source lays (not a rule's, nor the user's marks or answers)
 CROSS_REACH = 6        # m past OSM's carriageway half-width that the survey's road at the axis may still extend it
 BRIDGE_HEAD = 6        # m inside a bridge's ends (OSM's) where a way across still meets the track at grade (on_bridge)
 CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
@@ -476,9 +477,10 @@ def reviewed(data, truth):
 
 def answer_states(data, truth, survey, opens=()):
     """The user's grass and surface answers this line lays (grassReview `grass`, trackSurfaceReview's styles) against
-    the styles laid without them: matches where those give the answer's style over STYLE_MATCH of its stretch (a junction
-    answer: of its place), else holds, with what lays it there (the sections' source: survey, list, user, junction, ...)
-    (#670). {truth.json section: [state entry]}."""
+    the styles laid without them: matches where a source's sections (DATA_SECTIONS: the survey, the lidar, the grassed-
+    track list) give the answer's style over STYLE_MATCH of its stretch (a junction answer: of its place), else holds,
+    with what lays it there most (a rule's or the user's own count for `by`, not for a match) (#670). {truth.json
+    section: [state entry]}."""
     bare = {**truth, "grassReview": {**truth.get("grassReview", {}), "answers": []},
             "trackSurfaceReview": {**truth.get("trackSurfaceReview", {}), "answers": []}}
     without = sections(data, bare, survey, opens)
@@ -491,7 +493,8 @@ def answer_states(data, truth, survey, opens=()):
             if x["style"] == style:
                 by[x.get("source")] = by.get(x.get("source"), 0.0) + max(0.0, min(s1, x["s1"]) - max(s0, x["s0"]))
         sh = sum(by.values()) / (s1 - s0)
-        return {"id": i, "state": "matches" if sh >= STYLE_MATCH else "holds", "style": style, "share": round(sh, 2),
+        data = sum(v for k, v in by.items() if k in DATA_SECTIONS) / (s1 - s0)
+        return {"id": i, "state": "matches" if data >= STYLE_MATCH else "holds", "style": style, "share": round(sh, 2),
                 "by": max(by, key=by.get) if sh > 0 else None}
     return {"grassReview": [entry(r["card"], "grass", r["s0"], r["s1"]) for r in reviewed(data, truth)],
             "trackSurfaceReview": [entry(i, st, s0, s1) for s0, s1, what, st, i in surface_places(data, truth)]}

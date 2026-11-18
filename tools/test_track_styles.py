@@ -171,8 +171,8 @@ class Holes(unittest.TestCase):
 
     @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_an_answer_matches_once_the_styles_without_it_give_its_style(self):
-        # (#670: an embedded junction is embedded without the answer; setts over a stretch or at a junction is not;
-        # grass where the user's own mark already lays grass matches, and without the mark holds)
+        # (#670: an answer matches where a source lays its style without it: DP Praha's grassed-track list does;
+        # the junction rule and the user's own marks lay it too, but they hold)
         ll = lambda x: list(map(float, T.Frame().ll(x, 0.0)))   # noqa: E731
         ans = lambda i, what, a, b, v: {"id": i, "what": what, "line": "x", "between": [ll(a), ll(b)], "answer": v}  # noqa: E731
         truth = {"trackSurfaceReview": {"answers": [ans("st", "stretch", 100, 200, "setts"), ans("jn", "junction", 395, 405, "setts"),
@@ -183,10 +183,17 @@ class Holes(unittest.TestCase):
         data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}],
                 "switches": [{"s": 380, "frog": 12}, {"s": 410, "frog": 12}]}
         got = T.answer_states(data, truth, None)
-        self.assertEqual({e["id"]: e["state"] for e in got["trackSurfaceReview"]}, {"st": "holds", "jn": "holds", "em": "matches"})
+        # (the junction rule lays the embedded junction: no source, so it holds, by the rule)
+        self.assertEqual({e["id"]: (e["state"], e["by"]) for e in got["trackSurfaceReview"]},
+                         {"st": ("holds", None), "jn": ("holds", None), "em": ("holds", "junction")})
         self.assertEqual({e["id"]: (e["state"], e["share"]) for e in got["grassReview"]}, {"g1": ("holds", 0.0), "g2": ("holds", 0.0)})
         truth["trackStyles"] = [{"line": "x", "from": "A", "to": "B", "style": "grass"}]
-        self.assertEqual({e["id"]: e["state"] for e in T.answer_states(data, truth, None)["grassReview"]}, {"g1": "matches", "g2": "matches"})
+        self.assertEqual({e["id"]: (e["state"], e["by"]) for e in T.answer_states(data, truth, None)["grassReview"]},
+                         {"g1": ("holds", "user"), "g2": ("holds", "user")})  # (the user's own mark)
+        del truth["trackStyles"]
+        truth["grassTrack"] = {"stretches": [{"from": "A", "to": "B", "year": 2000}]}  # (DP Praha's list: a source)
+        self.assertEqual({e["id"]: (e["state"], e["by"]) for e in T.answer_states(data, truth, None)["grassReview"]},
+                         {"g1": ("matches", "list"), "g2": ("matches", "list")})
 
     def test_switches_do_not_cut_and_short_pieces_go(self):
         tw = {"switches": [{"s": 100, "frog": 12}], "trackwork": {"trailing": [{"s": 200, "frog": 12}], "crossings": [250.0]}}

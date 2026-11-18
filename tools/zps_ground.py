@@ -243,10 +243,11 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
     tools/geo.Frame (areas in its city frame); facts: data/truth.json surveyGround.places ({lat, lon, verdict});
     changing: the union of OSM's construction sites; rule: data/truth.json surveyGround.heldRule, with buildings (the
     union of OSM's building footprints) for what neither the rails nor DMR 5G decide, else such an area is held.
-    states, a dict: filled with each fact's state by its index (#670): matches where the sources decide as the user
-    did without the answer (the area fits IPR now, or the rails, DMR 5G or the held rule give the same verdict), holds
-    where they do not, with that verdict and what gives it: (state, verdict, by: fits, rails, dmr5g, rule or None); a
-    fact whose point lies in none of these areas is left out (its area is on another line, or gone)."""
+    states, a dict: filled with each fact's state by its index (#670): matches where a source decides as the user did
+    without the answer (the area fits IPR now, or the rails or DMR 5G give the same verdict), holds where none does,
+    the user's held rule included (a rule is no source catching up), with the verdict and what gives it: (state,
+    verdict, by: fits, rails, dmr5g, rule or None); a fact whose point lies in none of these areas is left out (its area
+    is on another line, or gone)."""
     out = {}
     rx, ry, rz = rails
     rtree = shapely.STRtree(shapely.points(rx, ry)) if len(rx) else None
@@ -316,7 +317,7 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
         verdict, by = by_sources(v, r, pin, inside, poly, E, N, g)
         if i in fact_of:
             # the user's verdict holds; the sources' without it says whether it is still needed (#670)
-            decided[i] = ("matches" if verdict == fact_of[i] else "holds", verdict, by)
+            decided[i] = ("matches" if verdict == fact_of[i] and by in ("rails", "dmr5g") else "holds", verdict, by)
             v.clear()
             v.update(kept)
             v["verdict"], v["by"] = fact_of[i], "fact"
