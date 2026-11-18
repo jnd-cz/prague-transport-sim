@@ -1014,6 +1014,11 @@ Review these when realism matters; most move into the build in M2.
 - **Catenary poles** march out past tracks and carriageway to the kerb; a building within 5.5 m gets a
   wall rosette, else bracket arms.
 - **Tram streets**: a road within 2.6 m of a track over 60 % of its length is widened 3.2 m per track.
+- **Cars' curve speeds** (`src/traffic.js` Path.curveSpeeds): 2.5 m/s² sideways on the circle through each lane point
+  and its neighbours, 1 m apart. A few millimetres of noise reads as a curve there. The lanes' points rounded to the cm
+  took the lane points cars drive under 50 km/h on line 22 from 9,161 to 17,206 (5,368 of them slower by over 1 m/s),
+  and the seeded trams came later behind them (late 7.6 → 26 s over 15 seeds). The network file keeps its paths in mm:
+  9,261, none slower by over 1 m/s (`tools/network.py` path_mm, #658).
 - **Pedestrian crossings** (#146): the reported line 17 ZPS sidewalk spans both tracks, 6.3 m along
   and 15.2 m across, with an independently mapped OSM zebra. Its drawn surface was 86–98 mm above
   the rails. Short survey patches crossing track need a nearby transverse mapped pedestrian way or
