@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "bb7fb64",
- "published": "2026-11-18 03:00",
- "note": "#652 bed cells keep their style, #653 survey walls drawn and met by the streets: lines 9, 17, 22, 23, 37 (branch 653-wall-breaklines bb7fb64)",
+ "built_at_commit": "7aa101e",
+ "published": "2026-11-18 10:05",
+ "note": "#664: the weld's ties (one height whatever the order, the survey's steps, lidar corners yield, water and far lidar keep their own): ground of lines 9, 17, 22, 23 and 37",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -25,12 +25,12 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.ground.bin": {
-   "size": 29814817,
-   "sha256": "c833358067f2843f335bcbaec93ce49f29d135e2176cb0022e32a340c9696ae5"
+   "size": 29846390,
+   "sha256": "2256770b95153f88d19c2a03ffcfe8c488ee07ebeb1555009328045a8834fd81"
   },
   "line17.ground.json": {
-   "size": 129336,
-   "sha256": "6766c54433ab02d6ba4fc8c858919ef8b02daad60f952f29250120d8d9fe3ed0"
+   "size": 129065,
+   "sha256": "37639a562edfbc7351fb20687417c26da75330a81aa6cfaee19b6f75fd8d253f"
   },
   "line17.json": {
    "size": 7042820,
@@ -77,12 +77,12 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.ground.bin": {
-   "size": 29676634,
-   "sha256": "aefd3385d78cc1f1683fe3fc1dc2ad74b930e98dd43617fd273a182ad0eb416c"
+   "size": 29686522,
+   "sha256": "c800cfcddba49373986116411b6c938278b4d86318f638153037024a35b771cd"
   },
   "line22.ground.json": {
-   "size": 103689,
-   "sha256": "c562a48d76b47d82afbb77b50246e41cec04510fd3ac8e1ec602a51b22591488"
+   "size": 103525,
+   "sha256": "f8d6c742cdf5fc1fbb72144b3a060b742292c6e9160b2fdf839c8b00d101edd0"
   },
   "line22.json": {
    "size": 7032022,
@@ -125,12 +125,12 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.ground.bin": {
-   "size": 13923904,
-   "sha256": "db2e4536be7a9e43b0ba8e99b17fe85322ad3389ffad7459e54b84122b6154e5"
+   "size": 13930640,
+   "sha256": "4eb215d66ff40dff96d0024a2b72e794c7e63d8ecc98f69662b328f08b44863d"
   },
   "line23.ground.json": {
-   "size": 44057,
-   "sha256": "9e975c15d3802b5e24fcabb1301c3303b5a43da843529458a5796007fc28bdea"
+   "size": 44012,
+   "sha256": "e22a186e0531a9b2803131c42402c54b2fdb1961753e18880cad7a0d25bba563"
   },
   "line23.json": {
    "size": 2711135,
@@ -173,12 +173,12 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.ground.bin": {
-   "size": 12031766,
-   "sha256": "9108a1d4f5e38cce0aec4026c9d69701ac73761c5bcae4b9115bf17919e4878c"
+   "size": 12034180,
+   "sha256": "729ec12d4ad7ef54a16fc00941d2b12c93e930cb24ef8acf8ada1baec61cf121"
   },
   "line37.ground.json": {
-   "size": 51437,
-   "sha256": "b4c8aab2aa956d3ebcbf7ffd878fcd841c91b671b4ef9ca436511299a956b7ea"
+   "size": 51322,
+   "sha256": "fdf96d606d154cc488870d32e7d5625f79c3149f764e4f58761cde05f861643a"
   },
   "line37.json": {
    "size": 2538818,
@@ -221,12 +221,12 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.ground.bin": {
-   "size": 26048480,
-   "sha256": "14c382b80efa22bbc8942163de37874f680b24f8d06d9f2d0b80876539fd6efd"
+   "size": 26059449,
+   "sha256": "11955fc92f93a397404964c29a7907b6c90f61ab79019c0df2a7440cc0561c01"
   },
   "line9.ground.json": {
-   "size": 87957,
-   "sha256": "27f7140021479e15f9bef2d6fd899134ad996e140057abb7de70cbd2cc926699"
+   "size": 87885,
+   "sha256": "41282e54fe67fc8b905b627c717e482a7dd16476dd4085ab5f202bdfc9e502c9"
   },
   "line9.json": {
    "size": 6274216,

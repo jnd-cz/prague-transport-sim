@@ -162,6 +162,84 @@ class Walls(unittest.TestCase):
         got = gm.across_outline(gm.ring_segments(a), np.array([5.0, 5.0, 5.0, 2.0, 0.0]), np.array([0.0, 0.5, 1.0, 0.25, 0.5]))
         self.assertEqual(np.round(got, 3).tolist(), [228.5, 229.25, 230.0, 228.65, 229.0])
 
+    def test_the_weld_ignores_the_corners_order(self):
+        # (#664: two road areas of one rank meet at (0, 0) with their own surfaces, 193.49 and 193.32 m (line 22 by a
+        # bridge's track, (-1114, -537)): the point takes the middle in either order; a terrain corner under them 0.6 m off
+        # is a wall and keeps its own, one 0.2 m off takes the top's; a raised corner of the same rank beside a plain one
+        # takes the middle too; the two sides of a weir keep their levels)
+        cx = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0])
+        cy = np.zeros(9)
+        zc = np.array([193.49, 193.32, 194.0, 193.6, 10.0, 10.2, 10.0, 5.0, 4.0])
+        prio = np.array([2.02, 2.02, 3.0, 3.0, 2.03, 2.03, 3.0, 2.95, 2.95])
+        kind = np.array(["survey", "survey", "terrain", "terrain", "survey", "raised", "terrain", "pool", "pool"], dtype=object)
+        zf, steps, n = gm.weld(cx, cy, zc, prio, kind)
+        self.assertEqual(n, 3)
+        self.assertEqual(np.round(zf, 3).tolist(), [193.405, 193.405, 194.0, 193.405, 10.1, 10.1, 10.1, 5.0, 4.0])
+        o = np.array([1, 0, 3, 2, 6, 5, 4, 8, 7])
+        zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o])
+        self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
+
+    def test_a_corner_on_the_lidar_yields_to_a_surveyed_one_of_its_rank(self):
+        # (#664: a paved yard on the lidar (`g`) and one on its own outline share (0, 0), 0.5 m apart (line 37's pairs, p50
+        # 0.48 m): the surveyed edge holds, in either order, and the report counts the lidar's corner; a rank above still
+        # wins over both)
+        self.assertLess(gm.YIELD, 0.005)  # (under the ranks' 0.01 steps: a yielding corner never passes another rank)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0]), np.zeros(4)
+        zc = np.array([250.5, 250.0, 250.5, 249.0])
+        p = 2.0 + (10 - 2) / 100
+        prio = np.array([p + gm.YIELD, p, p + gm.YIELD, p - 0.01])
+        kind = np.array(["survey"] * 4, dtype=object)
+        label = np.array(["lidar", "survey", "lidar", "survey"], dtype=object)
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind, label)
+        self.assertEqual(np.round(zf, 3).tolist(), [250.0, 250.0, 249.0, 249.0])
+        self.assertEqual(steps["ties"]["lidar corners yielded"], {"over 1 cm": 1, "over 5 cm": 1, "over 20 cm": 1})
+        o = np.array([1, 0, 3, 2])
+        zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o], label[o])
+        self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
+
+    def test_a_lidar_corner_whose_outline_stands_apart_keeps_its_height(self):
+        # (#664: line 37 (3400, 9): the lidar 243.36 m, its area's own outline 248.28, the surveyed edge 248.16: one edge,
+        # welded; (4430, 1469): the lidar 199.94, its outline 199.65, the edge 205.43: two levels, a step)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0]), np.zeros(4)
+        p = 2.0 + (10 - 2) / 100
+        zc = np.array([243.36, 248.16, 199.94, 205.43])
+        prio = np.array([p + gm.YIELD, p, p + gm.YIELD, p])
+        kind = np.array(["survey"] * 4, dtype=object)
+        label = np.array(["lidar", "survey", "lidar", "survey"], dtype=object)
+        zown = np.array([248.28, np.nan, 199.65, np.nan])
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind, label, zown)
+        self.assertEqual(np.round(zf, 3).tolist(), [248.16, 248.16, 199.94, 205.43])
+        self.assertEqual(steps["ties"]["lidar apart"], 1)
+
+    def test_the_water_keeps_its_level_under_a_bank_of_its_rank(self):
+        # (#664: survey water at OSM's level, 184.68 m, and its quay of one rank, 189.97 m, share a point (line 17's Vltava
+        # by (-472, 324)): the quay keeps its top, the water its level, a step for the wall; the middle stood at 187.33)
+        cx, cy = np.zeros(3), np.zeros(3)
+        p = 2.0 + (10 - 2) / 100
+        zc = np.array([184.68, 189.97, 189.5])
+        prio = np.array([p + gm.YIELD, p, 3.0])
+        kind = np.array(["pool", "survey", "terrain"], dtype=object)
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind)
+        self.assertEqual(np.round(zf, 3).tolist(), [184.68, 189.97, 189.97])
+        self.assertEqual(steps["ties"]["pool corners yielded"]["over 20 cm"], 1)
+
+    def test_equal_rank_survey_heights_apart_are_a_step(self):
+        # (#664: line 37's parking areas #3121 and #3130 share (6459.6, 827.4) at 203.19 and 202.06 m: each keeps its own,
+        # and the corners under them take the nearer, a terrain one 0.44 m off welded, one 0.6 m off kept (STEP's wall);
+        # two 0.15 m apart take the middle; a bed's two heights are not the survey's and take theirs as before)
+        cx = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0])
+        cy = np.zeros(9)
+        p = 2.0 + (10 - 2) / 100
+        zc = np.array([203.19, 202.06, 202.5, 202.1, 203.8, 10.0, 10.15, 5.0, 5.3])
+        prio = np.array([p, p, 3.0, p + 0.01, 3.0, p, p, 1.0, 1.0])
+        kind = np.array(["survey", "survey", "terrain", "survey", "terrain", "survey", "survey", "bed", "bed"], dtype=object)
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind)
+        self.assertEqual(np.round(zf, 3).tolist(), [203.19, 202.06, 202.06, 202.06, 203.8, 10.075, 10.075, 5.15, 5.15])
+        self.assertEqual(steps["ties"]["survey steps"], 1)
+        o = np.array([1, 0, 4, 3, 2, 6, 5, 8, 7])
+        zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o])
+        self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
+
 
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
