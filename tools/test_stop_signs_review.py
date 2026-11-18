@@ -47,6 +47,19 @@ class State(unittest.TestCase):
             self.assertEqual(R.sign_state(self.fact(how), None)["state"], "moved", how)
 
 
+class Pole(unittest.TestCase):
+    def test_a_placed_sign_or_a_dtm_signs_point_is_a_pole(self):
+        dtm = [(10.0, 2.0)]
+        f = lambda how, x, y: {"stop": "A", "towards": "B", "x": x, "y": y, "how": how}  # noqa: E731
+        self.assertTrue(R.pole(f(R.PLACED, 50.0, 3.0), dtm))
+        self.assertTrue(R.pole(f(R.BY_SOURCE["DTM"], 10.0, 2.0), dtm))
+        self.assertTrue(R.pole(f(R.OPTIONS[0], 10.1, 2.1), dtm))  # (at the pin, the pin the DTM's)
+        # OSM's stop position on the track's centre line, the GTFS point: no pole
+        self.assertFalse(R.pole(f(R.OPTIONS[0], 30.0, 0.0), dtm))
+        self.assertFalse(R.pole(f(R.BY_SOURCE["OSM"], 30.0, 0.0), dtm))
+        self.assertFalse(R.pole(f(R.OPTIONS[1], 12.0, 2.0), dtm))
+
+
 class Import(unittest.TestCase):
     def test_answers_become_facts(self):
         cards = [card("a", "A", "B"), card("b", "B", "C"), card("c", "C", None, "B"), card("d", "D", "E"),

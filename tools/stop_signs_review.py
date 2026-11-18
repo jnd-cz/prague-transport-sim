@@ -57,6 +57,15 @@ OPTIONS = ["sign at the pin", "sign at the timetable point (GTFS)", "unsure"]
 # would treat DTM as the most accurate so retire only those and if it's missing then keep my answer").
 CONFIRMS = (OPTIONS[0], BY_SOURCE["DTM"], BY_SOURCE["OSM"])
 MATCH = 2.0  # m
+PLACED = "placed on the map"  # (a fact the user placed on the review page's map)
+POLE_AT = 0.2  # m: a fact this near a DTM sign stands at that sign (its pin was the DTM's, or the user confirmed it)
+
+
+def pole(fact, dtm):
+    """Whether a fact's point is a sign's pole on the platform: the user placed it, or it is a DTM sign's point (`dtm`:
+    [(x, y)]). OSM's stop position lies on the track's centre line and the GTFS point anywhere: a sign there keeps
+    the game's fixed place beside the track (#685)."""
+    return fact["how"] == PLACED or any(math.hypot(fact["x"] - x, fact["y"] - y) <= POLE_AT for x, y in dtm)
 
 
 def sign_state(fact, chain):
@@ -225,7 +234,7 @@ def sign_facts(cards, answers):
             src = next((k for k, v in BY_SOURCE.items() if r["v"] == v), None)
             mark = next((m for m in c["marks"] if src and m["label"].startswith(MARK_OF[src])), None)
             if "px" in r:
-                x, y, how = r["px"], r["py"], "placed on the map"
+                x, y, how = r["px"], r["py"], PLACED
             elif mark:
                 x, y, how = mark["x"], mark["y"], r["v"]
             elif r["v"].startswith("sign at the pin"):

@@ -222,7 +222,14 @@ export function buildStop({ stop, data, route, platforms, group, log, cars = 2 }
   const sign = makeStopSign(stop.name, stop.request, data.stops[stop.i].lines || [String(data.line)]);
   // (on the sidewalk's height, not the track's)
   const onWalk = (m) => ground.later(m.position.x, -m.position.z, () => { m.position.y = ground.surface(m.position.x, -m.position.z); });
-  stop.signPlace = (s) => { place(sign, route, s + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.18, true); if (stop.vienna) onWalk(sign); };
+  // (where the build knows the sign's pole, the user's placed sign or the DTM's, it stands at its offset from the track
+  // with the stop point its projection; else half a metre past the stop point at a fixed offset, #685)
+  const off = data.stops[stop.i].signOff;
+  stop.signPlace = (s) => {
+    if (off !== undefined) place(sign, route, s, off, 0.18, true);
+    else place(sign, route, s + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.18, true);
+    if (stop.vienna) onWalk(sign);
+  };
   stop.signPlace(stop.target);
   g.add(sign);
   stop.sign = sign;

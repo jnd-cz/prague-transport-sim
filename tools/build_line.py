@@ -65,6 +65,7 @@ elif LINE != "22":
 DEM_SERVICE = "https://ags.cuzk.gov.cz/arcgis2/rest/services/dmr5g/ImageServer/exportImage"
 DEM_STEP = 10.0     # terrain grid spacing (m)
 DEM_MARGIN = 700.0  # terrain extends this far around the route bbox (m)
+POLE_CLEAR = 1.5    # m from the track's centre: a stop sign's pole nearer stands in the tram's way (half its 2.5 m body, #685)
 
 REFRESH = "--refresh" in sys.argv
 FETCH = "--fetch" in sys.argv  # downloads what raw/ lacks; a cache miss is an error without it (#223)
@@ -84,7 +85,7 @@ from geo import Frame  # noqa: E402
 from gtfs_runs import pair_continuations  # noqa: E402
 from route import path_ext  # noqa: E402
 import sources  # noqa: E402
-from stop_signs_review import sign_state  # noqa: E402  (a stop sign fact's state, #670)
+from stop_signs_review import pole, sign_state  # noqa: E402  (a stop sign fact's state, #670; its pole, #685)
 try:
     import osm_local
 except ImportError:
@@ -985,6 +986,19 @@ def main():
     # since 2024), else OSM's stop position on our own track (the other direction's lies 3-6 m off, on the
     # parallel track, and was taken at 5 stops within 6 m: tools/stop_signs_review.py; within 2 m of 14 of 25),
     # else none (the game: GTFS + STOP_AHEAD).
+    # Where the sign's point is its pole on the platform (the user's placed sign, a DTM sign: stop_signs_review.pole),
+    # the stop keeps its offset from the track too (`signOff`, + left), and the game stands the sign there; nearer the
+    # track's centre than POLE_CLEAR it would stand in the tram's way, and keeps the game's fixed place (#685: the user,
+    # 2026-11-18, "the stop sign placement to the actual place on the platform (where it's available, not decided by
+    # point on a track)").
+    poles, at_track = [], []
+
+    def pole_at(st_, d, side):
+        if d >= POLE_CLEAR:
+            st_["signOff"] = round(d if side > 0 else -d, 2)
+            poles.append(st_["signOff"])
+        else:
+            at_track.append(f"{st_['name']} {d:.2f} m")
     truth_signs = json.load(open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8")).get("stopSigns", {}).get("signs", [])
     spos = overpass("stop_positions", Q_STOPPOS, optional=True)["elements"]
     sp_ = os.path.join(ROOT, "raw", "dtmpoints", f"line{LINE}.signs.json")
@@ -1011,24 +1025,30 @@ def main():
         for q in dtm_signs:
             s, d, side = path.project(q, ref - 45, ref + 45, radius=3)
             if s is not None and d < 6 and side < 0 and abs(s - ref) < 40:
-                near.append((abs(s - ref), s, tuple(q)))
+                near.append((abs(s - ref), s, tuple(q), d, side))
         # the sign the sources give: the build's without the user's (the fact's state, #670)
         chain = ("dtmpoints", *min(near)[2]) if near else ("osm", *min(cand)[2]) if cand else None
         if f:
-            s, d, _ = path.project((f["x"], f["y"]), st_["s"] - 150, st_["s"] + 150, radius=3)
+            s, d, side = path.project((f["x"], f["y"]), st_["s"] - 150, st_["s"] + 150, radius=3)
             if s is not None and d < 8:
                 st_["sign"], st_["signSrc"] = round(s, 1), "truth"
+                if pole(f, dtm_signs):
+                    pole_at(st_, d, side)
                 sign_facts.append(sign_state(f, chain))
                 continue
             print(f"  ! stop sign of {st_['name']} (truth.json) is not beside the route near the stop: {s} {d}")
         if near:
             st_["sign"], st_["signSrc"] = round(min(near)[1], 1), "dtmpoints"
+            pole_at(st_, *min(near)[3:])
         elif osm_s is not None:
             st_["sign"], st_["signSrc"] = round(osm_s, 1), "osm"
     print("stop signs: " + ", ".join(f"{sum(st_.get('signSrc') == k for st_ in stops)} {k}" for k in ("truth", "dtmpoints", "osm"))
           + f", {sum('sign' not in st_ for st_ in stops)} none; the user's: "
           + ", ".join(f"{sum(e['state'] == k for e in sign_facts)} {k}" for k in sources.FACT_STATES
                       if any(e["state"] == k for e in sign_facts)))
+    print(f"stop signs at their pole: {len(poles)}" + (f" ({min(map(abs, poles)):.2f}-{max(map(abs, poles)):.2f} m from the track, "
+          f"{sum(p > 0 for p in poles)} on the left)" if poles else "") + f", {len(stops) - len(poles)} at the game's place"
+          + (f"; a pole too near the track: {', '.join(at_track)}" if at_track else ""))
     # platforms (OSM): where along the route each stop's platform begins and ends, so the game
     # can require the whole set to stand alongside it (and let two sets stop one behind another).
     # Matched around the sign where there is one (Hercovka's timetable point is 86 m short of the sign,
