@@ -6,6 +6,8 @@
   "kinds": ["vehicle", "livery", "sounds", "fleet"],
   "id": "^[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9.-]*$",
   "id_about": "author.package, in lower case: two authors never collide",
+  "path": "^[A-Za-z0-9_][A-Za-z0-9._ -]*(/[A-Za-z0-9_][A-Za-z0-9._ -]*)*$",
+  "path_about": "a listed file's path in its package: folders by /, each name of letters, digits, dots, underscores, hyphens and spaces, starting with a letter, a digit or an underscore. Names are shown on the loading screen and become file names in the browser's store, so nothing else is taken",
   "types": {
     "glb": "model", "gltf": "model", "bin": "model",
     "webp": "image", "png": "image", "jpg": "image", "jpeg": "image",

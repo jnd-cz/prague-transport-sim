@@ -101,7 +101,7 @@ A file's entry in `files`:
 
 | key | what |
 |---|---|
-| `path` | the file's path in the folder |
+| `path` | the file's path in the folder. In a package: folders by `/`, each name of letters, digits, `.`, `_`, `-` and spaces, starting with a letter, a digit or `_` (`path` in `src/packageRules.json`) |
 | `bytes`, `sha256` | its size and SHA-256, checked at an install (a package) and by `tools/test_vehicles.py` (a shipped pack) |
 | `fallback` | an `.ogg`'s: its MP3, which a browser that cannot decode Opus plays instead |
 | `master` | an encoded file's: the recording it was encoded from (`tools/sound_encode.py` reads it; the game does not) |
@@ -263,6 +263,8 @@ above; its `loader` `gltf` or `gltf-rigged`), a `livery` `livery.json`'s (*Liver
   level, wide for now to see what authors bring: the user, 2026-11-13). A car longer than its type's length over the
   coupler faces is offered with a warning: it runs on its type's two pivots until it has a type of its own
   (articulated vehicles: #579). The model is measured at install; at a start the hashes stand for it;
+- a model's links: every `uri` in a `.gltf` or `.glb` is data inside the file or one of the package's listed files
+  beside or below the model (a `.bin`, a texture). A package is its listed files: a model names nothing elsewhere;
 - a livery's slots, a sound pack's events and loops, a fleet's types: among those its vehicle and the game declare.
 
 A package that fails is listed with its reasons and not offered; one with warnings is offered with them. The

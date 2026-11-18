@@ -52,7 +52,8 @@ export async function readZip(buf) {
 }
 
 // ---- the packages in a set of files (path -> bytes): every package.json and the files under its folder
-const safe = (path) => typeof path === 'string' && path && !/^\/|\\|:/.test(path) && !path.split('/').some((s) => s === '' || s === '.' || s === '..');
+// (a listed path: the rules' `path`, plain names in folders; it is shown on the loading screen and names a stored file)
+const safe = (path, r) => typeof path === 'string' && new RegExp(r.path).test(path);
 const ext = (path) => path.split('.').pop().toLowerCase();
 export function unpack(entries) {
   const roots = [...entries.keys()].filter((k) => k === 'package.json' || k.endsWith('/package.json')).map((k) => k.slice(0, -'package.json'.length));
@@ -95,13 +96,43 @@ export function manifestProblems(p, r) {
   else need(req.length === 1, `requires ${JSON.stringify(p.requires)}: wants the one vehicle it is for`);
   need(Array.isArray(p.files) && p.files.length, 'no files listed');
   for (const f of p.files || []) {
-    if (!safe(f.path)) { bad.push(`file ${f.path}: not a path inside the package`); continue; }
+    if (!safe(f.path, r)) { bad.push(`file ${String(f.path).slice(0, 80)}: not a path inside the package (plain names in folders: letters, digits, . _ - and spaces)`); continue; }
     need(r.types[ext(f.path)], `file ${f.path}: .${ext(f.path)} is not a file type the game reads`);
     need(Number.isInteger(f.bytes) && f.bytes >= 0, `file ${f.path}: no bytes`);
     need(/^[0-9a-f]{64}$/.test(f.sha256 ?? ''), `file ${f.path}: no sha256`);
   }
   if (p.thumbnail) need(p.files?.some((f) => f.path === p.thumbnail) && r.types[ext(p.thumbnail)] === 'image', `thumbnail ${p.thumbnail} is not one of its images`);
   return { problems: bad, warnings: warn };
+}
+
+// A model's own links: every `uri` in a glTF (a .gltf, or a .glb's JSON chunk) is data inside the file or one of the
+// package's listed files beside or below the model. A loader fetches what a model names, so a link to anywhere else
+// would be a request from the player's browser: a package is its listed files and nothing more.
+function modelLinks(path, bytes, listed) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), dec = new TextDecoder();
+  let doc;
+  try {
+    if (ext(path) === 'glb') {
+      const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+      if (b.byteLength < 20 || dv.getUint32(0, true) !== 0x46546c67 || dv.getUint32(16, true) !== 0x4e4f534a) throw new Error('no glTF header');
+      const n = dv.getUint32(12, true);
+      if (20 + n > b.byteLength) throw new Error('cut short');
+      doc = JSON.parse(dec.decode(b.subarray(20, 20 + n)));
+    } else doc = JSON.parse(dec.decode(b));
+  } catch (e) { return [`file ${path}: not a glTF model the check can read (${e.message})`]; }
+  const dir = path.slice(0, path.lastIndexOf('/') + 1), bad = [];
+  const walk = (o) => {
+    if (!o || typeof o !== 'object') return;
+    for (const [k, v] of Object.entries(o)) {
+      if (k === 'uri' && typeof v === 'string') {
+        let rel = null;
+        try { rel = decodeURIComponent(v); } catch { /* (not a path) */ }
+        if (!/^data:/i.test(v) && !(rel !== null && listed.has(dir + rel))) bad.push(`file ${path}: links to ${v.slice(0, 80)}, which is neither data in the file nor one of the package's files`);
+      } else walk(v);
+    }
+  };
+  walk(doc);
+  return bad;
 }
 
 // its files against the list: present, of their size and hash, within the caps; files not listed are not kept
@@ -119,6 +150,7 @@ export async function fileProblems(p, files, r) {
   }
   if (total > r.caps.package) bad.push(`${total} bytes, over the package cap of ${r.caps.package}`);
   const listed = new Set((p.files || []).map((f) => f.path).concat('package.json'));
+  for (const f of p.files || []) if (r.types[ext(f.path)] === 'model' && ext(f.path) !== 'bin' && files.get(f.path)) bad.push(...modelLinks(f.path, files.get(f.path), listed));
   const extra = [...files.keys()].filter((k) => !listed.has(k));
   if (extra.length) warn.push(`files not listed, left out: ${extra.join(', ')}`);
   return { problems: bad, warnings: warn };
@@ -308,8 +340,9 @@ export async function fetchEntries(url) {
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
   if (/\.zip($|\?)/i.test(url)) return readZip(await res.arrayBuffer());
   const text = await res.text(), p = JSON.parse(text), entries = new Map([['package.json', new TextEncoder().encode(text)]]);
+  const r = await packageRules();
   for (const f of p.files || []) {
-    if (!safe(f.path)) continue;
+    if (!safe(f.path, r)) continue;
     const r = await fetch(new URL(f.path, new URL(url, location.href)));
     if (r.ok) entries.set(f.path, new Uint8Array(await r.arrayBuffer()));
   }
