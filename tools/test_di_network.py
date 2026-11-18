@@ -190,13 +190,33 @@ class Network(unittest.TestCase):
         self.assertEqual(sum(ed['src'] == 'ortho' for ed in net.edges.values()), 1)
 
     def test_a_user_tip_states_where_dis_fork_is(self):
-        # #670: DI's fork (50, 0) still where the user answered holds; at the tip matches; elsewhere or gone changed
-        for near, tip, state, off in (((50.0, 0.0), (46.7, -1.65), 'holds', 3.69), ((50.0, 0.0), (50.3, 0.1), 'matches', 0.32),
-                                      ((54.0, 0.0), (46.7, -1.65), 'changed', 3.69), ((90.0, 9.0), (89.0, 9.0), 'changed', None)):
+        # #670: DI's fork (50, 0) still where the user answered holds; at the tip's point on the through track matches
+        # (within TIP_MATCH: a manhole 1.65 m beside the track at the fork, Podolská); elsewhere changed. `off` is the
+        # fork's distance from that point
+        for near, tip, state, off in (((50.0, 0.0), (46.7, -1.65), 'holds', 3.3), ((50.0, 0.0), (50.3, 0.1), 'matches', 0.3),
+                                      ((50.0, 0.0), (50.2, -1.65), 'matches', 0.2), ((54.0, 0.0), (46.7, -1.65), 'changed', 3.3)):
             net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[(near, tip, 'the switch')])
             self.assertEqual(net.facts['switchTips'], [{'id': 'the switch', 'state': state, 'off': off,
-                                                        'at': [round(tip[0], 1), round(tip[1], 1)]}], (near, tip))
-        self.assertEqual(net_of([(0, 0), (50, 0)], tips=[((0, 0), (1, 0))]).facts['switchTips'], [])  # no id: not stated
+                                                        'at': [round(tip[0], 2), round(tip[1], 2)], 'src': [50.0, 0.0]}], (near, tip))
+        net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[((50.0, 0.0), (46.7, -1.65))])
+        self.assertEqual(net.facts['switchTips'], [])  # no id: not stated
+
+    def test_a_switch_whose_fork_dis_network_moved_to_the_tip_is_found_by_the_tip(self):
+        # #677: DI's fork when the user answered lay 48.6 m from the pin (Ohrada); the network forks at the pin since,
+        # 0.75 m along the track from it: the switch is found by the tip, stays and matches
+        net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[((98.0, 0.0), (50.75, 0.3), 'Ohrada')])
+        self.assertEqual(net.report['switch tips at their fork already'], 1)
+        self.assertEqual(net.report['switch tips placed'], 0)
+        self.assertEqual([(f['state'], f['off']) for f in net.facts['switchTips']], [('matches', 0.75)])
+        fork = next(n for n in net.nodes if len(net.at[n]) == 3)
+        self.assertAlmostEqual(net.nodes[fork]['xy'][0], 50.0, delta=0.01)
+
+    def test_a_tip_with_no_switch_stops_the_build_with_its_place(self):
+        with self.assertRaisesRegex(SystemExit, 'Nowhere'):
+            net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[((90.0, 9.0), (89.0, 9.0), 'Nowhere')])
+        with self.assertRaisesRegex(SystemExit, 'Too far'):  # its point past the through edge's far end (a crossing)
+            net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), [(70, -30), (70, 30)],
+                   tips=[((50.0, 0.0), (90.0, -1.0), 'Too far')])
 
     def test_a_photo_track_states_how_far_dis_line_is(self):
         branch = turnout(50)

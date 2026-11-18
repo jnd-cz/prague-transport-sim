@@ -43,6 +43,9 @@ import sources  # noqa: E402  (fact_state, #670)
 JOIN = di_tracks.JOIN    # m: record ends this near meet
 ATTACH = 0.5             # m: a lone chain end this near another chain's middle joins it there
 END_CLEAR = 0.5          # m: a split point this near a chain's end is that end
+TIP_MATCH = 1.0          # m: a switch whose fork lies this near the point the user's tip gives it is at that point already
+                         # (as the user's placed stop signs, 2026-11-18, #670: "within 1 meter would be good match"; DI's
+                         # fork at Ohrada lies 0.75 m along the track from the user's pin since #368, Podolská's 0.18 m)
 LOOK = 2.0               # m along an edge for its direction out of a node
 TURN = 16.0              # degrees: two edges at a node continue each other when their directions out of it are within
                          # this of opposite (measured on DI 2026-10-31: of 913 switches' diverging legs against their
@@ -763,36 +766,45 @@ class Network:
     def move_tips(self, tips):
         """A switch whose tip the user placed (data/truth.json trackSources.switchTips: [(near, tip)] in city metres)
         forks at the point of its through track nearest the tip: the through edge splits there and the diverging
-        leg starts at it (Podolská vodárna: 3.3 m east of DI's fork, at the manhole). Each tip's state against DI's fork
-        (#670): matches where the fork lies within END_CLEAR of the tip (the tip has no effect), holds where the fork is
-        still at `near` (DI's fork when the user answered), changed where it is at neither or gone."""
-        same = lambda a, b: math.dist(a, b) <= END_CLEAR  # noqa: E731
+        leg starts at it (Podolská vodárna: 3.3 m east of DI's fork, at the manhole). The switch is the through fork
+        nearest the tip within di_tracks.FORK, else nearest `near` (DI's fork when the user answered): DI's network may
+        have moved its fork since (#677: Ohrada's interlaced switch forks at the user's pin since #368). A fork within
+        TIP_MATCH of that point stays. Each tip's state (#670): matches where the fork lies within TIP_MATCH of that
+        point (the tip has no effect), holds where it is still at `near`, changed where it is at neither. A tip with no
+        switch, or whose point lies past the switch's through edges, stops the build with its place (#677: both tips
+        went unplaced, as counts in the log, before #670 stated them)."""
+        same = lambda a, b: math.dist(a, b) <= TIP_MATCH  # noqa: E731
+        forks = [n for n in self.nodes if self.through(n)]
         for t in tips:
             near, tip = t[0], t[1]
-            forks = [(math.dist(v['xy'], near), n) for n, v in self.nodes.items()
-                     if math.dist(v['xy'], near) <= di_tracks.FORK and self.through(n)]
-            if len(t) > 2:
-                fork = self.nodes[min(forks)[1]]['xy'] if forks else None
-                self.facts['switchTips'].append({
-                    'id': t[2], 'state': sources.fact_state(tip, near, fork, same),
-                    'off': round(math.dist(fork, tip), 2) if fork else None, 'at': [round(tip[0], 1), round(tip[1], 1)]})
-            if not forks:
-                self.report['switch tips without a fork'] += 1
-                continue
-            F = min(forks)[1]
+            place = t[2] if len(t) > 2 else f'at {tip[0]:.1f}, {tip[1]:.1f}'
+            F = None
+            for p in (tip, near):
+                c = [(math.dist(self.nodes[n]['xy'], p), n) for n in forks if math.dist(self.nodes[n]['xy'], p) <= di_tracks.FORK]
+                if c:
+                    F = min(c)[1]
+                    break
+            if F is None:
+                raise SystemExit(f"data/truth.json switchTips: no switch within {di_tracks.FORK:.0f} m of the tip "
+                                 f"or of DI's fork when answered: {place}")
             toe, thr, div = self.through(F)
-            best = None
-            for x in (toe, thr):
-                line = self.edges[x[0]]['line']
-                s = line.project(Point(tip))
-                d = line.distance(Point(tip))
-                if END_CLEAR < s < line.length - END_CLEAR and (best is None or d < best[0]):
-                    best = (d, x, s)
-            if best is None or math.dist(self.nodes[F]['xy'], tip) <= END_CLEAR:
+            fx, fy = self.nodes[F]['xy']
+            # the tip's point: the nearest of the through track's (a manhole beside the track: Podolská)
+            _, x = min(((self.edges[y[0]]['line'].distance(Point(tip)), y) for y in (toe, thr)), key=lambda z: z[0])
+            line = self.edges[x[0]]['line']
+            s = line.project(Point(tip))
+            at = line.interpolate(s).coords[0]
+            if len(t) > 2:
+                self.facts['switchTips'].append({
+                    'id': t[2], 'state': sources.fact_state(at, near, (fx, fy), same),
+                    'off': round(math.dist((fx, fy), at), 2), 'at': [round(tip[0], 2), round(tip[1], 2)],
+                    'src': [round(fx, 2), round(fy, 2)]})
+            if same((fx, fy), at):
                 self.report['switch tips at their fork already'] += 1
                 continue
-            _, x, s = best
-            fx, fy = self.nodes[F]['xy']
+            if not END_CLEAR < s < line.length - END_CLEAR:
+                raise SystemExit(f"data/truth.json switchTips: the tip's point lies past the switch's through edge "
+                                 f"({s:.1f} m of its {line.length:.1f} m, the fork {math.dist((fx, fy), at):.1f} m off): {place}")
             Q = self.split(x[0], s, 'tip')
             # (a tip behind the fork: the branch runs along the through track from the tip to the fork first, a long
             # thin switch, Ohrada; ahead of it, the branch starts at the tip)

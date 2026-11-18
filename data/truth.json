@@ -818,10 +818,7 @@
    {"decision": "stepped-50.1019-14.5029", "place": [50.10191, 14.50286], "lines": [37], "answer": "interlaced", "quote": "same issue as s 6261 m", "source": "stepped-curve review on the test host (reports/reviews/line37.json, #368)", "date": "2026-11-07", "note": "Nádraží Libeň, the same switch's other end; page answer 'unsure'"},
    {"decision": "stepped-50.1222-14.4556", "place": [50.12222, 14.45565], "lines": [17], "answer": "interlaced", "quote": "intarlaced switch here, same case as Čechův most. Additionally the segments up to the junction look like missing, check why", "source": "stepped-curve review on the test host (reports/reviews/line17.json, #368)", "date": "2026-11-07", "note": "Ke Stírce; page answer 'unsure'"}
   ],
-  "switchTips": [
-   {"place": "Podolská vodárna, the eastern switch of the triangle, in Podolská (the curve towards Podolské nábřeží leaves it)", "near": [50.0591611, 14.4197127], "tip": [50.0591777, 14.4197579], "tipFrom": "the manhole north of the switch in the archived technical map (street detail, ctmtp_kod 106200, objectid 982271; raw/dtmpoints, state 2024-06-30), 1.65 m north of the track, 3.3 m east of DI's fork", "rule": "the switch takes the point of its through track nearest the manhole", "quote": "The north curve does look wrong, both the curve itself and the fork point should be further back right next to northern manhole [...] Manhole cover is north of the switch in Podolská street, the eastern point of the triangle.", "source": "Claude Code session 2026-11-03 (#204)", "date": "2026-11-03"},
-   {"place": "Ohrada (Jana Želivského), line 37: the eastern switch of the junction, a long thin forward switch whose branch runs beside the track back towards Biskupcova", "near": [50.0896644, 14.4682863], "tip": [50.0892513, 14.4685098], "tipFrom": "the user's pin on the review page (reports/review/track-forks-37.json, card track-50.09008-14.46808), 48.6 m behind the tip DI's interlaced branch gives", "rule": "the switch takes the point of its through track nearest the pin; its branch runs along the through track from there to DI's fork", "quote": "Wrongly matched di fork in middle of junction, it's a crossing of two tracks. the western fork closely matched with osm, looks fine. The eastern one is all the way back near biskupcova stop, it's one of those long thin forward switches and should be mentioned in truth.json", "source": "review answer 2026-11-05 (#237, PR #312)", "date": "2026-11-05"}
-  ],
+  "switchTips": [],
   "photoTracks": [
    {"place": "Podolská vodárna, the north curve of the triangle (from the eastern switch in Podolská to the switch on Podolské nábřeží)", "exception": true, "points": [[50.0591629, 14.4197586], [50.0591378, 14.4195993], [50.0591339, 14.4195904], [50.05913, 14.4195817], [50.059125, 14.4195699], [50.0591205, 14.4195619], [50.0591159, 14.419554], [50.0591115, 14.419546], [50.0591065, 14.4195387], [50.0590964, 14.4195246], [50.0590911, 14.419518], [50.0590853, 14.4195123], [50.0590759, 14.4195027], [50.0590702, 14.4194972], [50.0590642, 14.4194923], [50.0590483, 14.4194789], [50.059022, 14.4194685], [50.0590154, 14.4194668], [50.0589998, 14.4194633], [50.0589554, 14.4194605]], "measured": "IPR Praha's leaf-off orthophoto (flight 7-8 April 2026, 7 cm/px): every 0.25 m along DI's curve, dark rail lines across it paired 1.435 m apart; 44 track centres over 21 m (one isolated at the curve's start left out), within 3.1 cm of a smooth curve; circles through them 18.3-20.1 m over 6 m, 19.9 m over the whole. The ends are the two switches: the eastern at the northern manhole (switchTips), the western at DI's fork", "why": "DI's line is 19-34 cm off the rails over the first 14 m from the eastern switch and reads 14.6 m over 5 m (16.4 m in the state of 2026-09-30); the archive 16.2 m", "rule": "the curve between the two switches is drawn through these points instead of DI's, joining both switches tangent where it can", "forksConfirmed": {"answer": "DI's fork at both ends", "quote": "Reviewed those two switched, DI fork position looks good as it is, we don't need to move anything.", "source": "Claude Code session 2026-11-06 (#237, PR #312)", "date": "2026-11-06"}, "quote": "I would still take option two, the DI is clearly wrong here for some reason (and inconsistent between versions), so I would force to the ortophoto measured curve and try to join smootly on both ends if possible (smallest angle). Note it as exception.", "source": "Claude Code session 2026-11-03 (#204)", "date": "2026-11-03"}
   ]
@@ -2566,15 +2563,20 @@
    {
     "stop": "Brusnice",
     "towards": "Pražský hrad",
-    "x": -2012.53,
-    "y": 906.55,
-    "how": "placed on the map",
+    "x": -2012.48,
+    "y": 906.54,
+    "how": "the DTM sign (red)",
     "osm_node": 4721894504,
     "gtfs": [
      -2012.5,
      909.4
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.05 m from it",
+    "pin": [
+     -2012.48,
+     906.54
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Bílá labuť",
@@ -2618,30 +2620,40 @@
    {
     "stop": "Dubečská",
     "towards": "Nádraží Zahradní Město",
-    "x": 5443.96,
-    "y": -3230.13,
-    "how": "placed on the map",
+    "x": 5443.77,
+    "y": -3230.76,
+    "how": "the DTM sign (red)",
     "note": "stop sign right at the edge of the platform",
     "osm_node": 3866008501,
     "gtfs": [
      5447.1,
      -3229.3
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.66 m from it",
+    "pin": [
+     5443.77,
+     -3230.76
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Hercovka",
     "towards": "Ke Stírce",
-    "x": 2770.88,
-    "y": 3498.07,
-    "how": "placed on the map",
+    "x": 2770.48,
+    "y": 3498.47,
+    "how": "the DTM sign (red)",
     "note": "pins is placed in the opposite direction",
     "osm_node": 4097081445,
     "gtfs": [
      2689.1,
      3521.6
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-17.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.56 m from it",
+    "pin": [
+     2770.48,
+     3498.47
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Hlavní nádraží",
@@ -2699,29 +2711,39 @@
    {
     "stop": "Jana Masaryka",
     "towards": "Krymská",
-    "x": 1207.48,
-    "y": -1764.85,
-    "how": "placed on the map",
+    "x": 1207.76,
+    "y": -1765.14,
+    "how": "the DTM sign (red)",
     "osm_node": 4721776305,
     "gtfs": [
      1215.8,
      -1768.6
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.4 m from it",
+    "pin": [
+     1207.76,
+     -1765.14
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Jiráskovo náměstí",
     "towards": "Národní divadlo",
-    "x": -677.88,
-    "y": -1160.03,
-    "how": "placed on the map",
+    "x": -677.73,
+    "y": -1159.58,
+    "how": "the DTM sign (red)",
     "note": "towards platforms end",
     "osm_node": 4696978879,
     "gtfs": [
      -678.9,
      -1154.6
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-17.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.48 m from it",
+    "pin": [
+     -677.73,
+     -1159.58
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Karlovo náměstí",
@@ -2804,16 +2826,21 @@
    {
     "stop": "Koh-i-noor",
     "towards": "Slavia - Nádraží Eden",
-    "x": 2602.31,
-    "y": -2567.28,
-    "how": "placed on the map",
+    "x": 2602.2,
+    "y": -2567.36,
+    "how": "the DTM sign (red)",
     "note": "in between both",
     "osm_node": 4721776293,
     "gtfs": [
      2604.1,
      -2564.7
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.13 m from it",
+    "pin": [
+     2602.2,
+     -2567.36
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Krejcárek",
@@ -2897,16 +2924,21 @@
    {
     "stop": "Malostranské náměstí",
     "towards": "Pražské Jezulátko",
-    "x": -1195.47,
-    "y": 234.14,
-    "how": "placed on the map",
+    "x": -1195.66,
+    "y": 232.76,
+    "how": "the DTM sign (red)",
     "note": "orange one is closest",
     "osm_node": 7002486683,
     "gtfs": [
      -1193.4,
      232.3
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 1.4 m from it",
+    "pin": [
+     -1195.66,
+     232.76
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Masarykovo nádraží",
@@ -2976,16 +3008,21 @@
    {
     "stop": "Nádraží Zahradní Město",
     "towards": "Zahradní Město",
-    "x": 5476.5,
-    "y": -3619.43,
-    "how": "placed on the map",
+    "x": 5476.46,
+    "y": -3619.02,
+    "how": "the DTM sign (red)",
     "note": "OSM is closer, GTFS is past platform's end, real stop sign marked and sits in between.",
     "osm_node": 9105335202,
     "gtfs": [
      5474.5,
      -3631.4
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.41 m from it",
+    "pin": [
+     5476.46,
+     -3619.02
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Národní divadlo",
@@ -3003,16 +3040,21 @@
    {
     "stop": "Národní divadlo",
     "towards": "Národní třída",
-    "x": -543.48,
-    "y": -595.14,
-    "how": "placed on the map",
+    "x": -544.69,
+    "y": -596.25,
+    "how": "the DTM sign (red)",
     "note": "hard to see but very close to GTFS point",
     "osm_node": 4714677494,
     "gtfs": [
      -546.7,
      -592.9
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 1.64 m from it",
+    "pin": [
+     -544.69,
+     -596.25
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Olšanské náměstí",
@@ -3056,41 +3098,56 @@
    {
     "stop": "Pobřežní cesta",
     "towards": "Přístaviště",
-    "x": -1790.79,
-    "y": -5722.12,
-    "how": "placed on the map",
+    "x": -1790.86,
+    "y": -5722.01,
+    "how": "the DTM sign (red)",
     "osm_node": 31030377,
     "gtfs": [
      -1793.3,
      -5723.4
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-17.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.14 m from it",
+    "pin": [
+     -1790.86,
+     -5722.01
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Podolská vodárna",
     "towards": "Výtoň",
-    "x": -554.46,
-    "y": -3000.41,
-    "how": "placed on the map",
+    "x": -554.88,
+    "y": -2999.04,
+    "how": "the DTM sign (red)",
     "osm_node": 278467793,
     "gtfs": [
      -557.1,
      -3009.1
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-17.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 1.43 m from it",
+    "pin": [
+     -554.88,
+     -2999.04
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Pohořelec",
     "towards": "Brusnice",
-    "x": -2338.66,
-    "y": 358.79,
-    "how": "placed on the map",
+    "x": -2338.55,
+    "y": 358.93,
+    "how": "the DTM sign (red)",
     "osm_node": 3791255555,
     "gtfs": [
      -2341.0,
      359.1
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.18 m from it",
+    "pin": [
+     -2338.55,
+     358.93
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Pražské Jezulátko",
@@ -3108,15 +3165,20 @@
    {
     "stop": "Právnická fakulta",
     "towards": "Čechův most",
-    "x": -191.2,
-    "y": 475.76,
-    "how": "placed on the map",
+    "x": -190.57,
+    "y": 475.52,
+    "how": "the DTM sign (red)",
     "osm_node": 354684526,
     "gtfs": [
      -208.4,
      469.6
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-17.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.67 m from it",
+    "pin": [
+     -190.57,
+     475.52
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Spojovací",
@@ -3225,30 +3287,40 @@
    {
     "stop": "Vršovické náměstí",
     "towards": "Čechovo náměstí",
-    "x": 2153.09,
-    "y": -2357.9,
-    "how": "placed on the map",
+    "x": 2152.99,
+    "y": -2358.16,
+    "how": "the DTM sign (red)",
     "note": "There's some mix up. White point is close to platform's end. Orange point is far back, close to the opposite direction's stop but on a track in our direction. Blue pin seem to get matched at the start of opposite direction's stop.",
     "osm_node": 4721776300,
     "gtfs": [
      2102.4,
      -2344.0
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.28 m from it",
+    "pin": [
+     2152.99,
+     -2358.16
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Vypich",
     "towards": "Říčanova",
-    "x": -5337.13,
-    "y": -104.75,
-    "how": "placed on the map",
+    "x": -5337.11,
+    "y": -105.27,
+    "how": "the DTM sign (red)",
     "note": "again right at the platform's edge",
     "osm_node": 3476362418,
     "gtfs": [
      -5344.2,
      -103.1
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-22.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-22.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.52 m from it",
+    "pin": [
+     -5337.11,
+     -105.27
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Václavské náměstí",
@@ -3318,15 +3390,20 @@
    {
     "stop": "Čechova čtvrť",
     "towards": "Nádraží Modřany",
-    "x": -2122.01,
-    "y": -9265.44,
-    "how": "placed on the map",
+    "x": -2121.95,
+    "y": -9264.14,
+    "how": "the DTM sign (red)",
     "osm_node": 30079593,
     "gtfs": [
      -2116.7,
      -9268.5
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-17.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 1.3 m from it",
+    "pin": [
+     -2121.95,
+     -9264.14
+    ],
+    "pinFrom": "DTM"
    },
    {
     "stop": "Čechův most",
@@ -3344,15 +3421,20 @@
    {
     "stop": "Čechův most",
     "towards": "Strossmayerovo náměstí",
-    "x": -165,
-    "y": 772.48,
-    "how": "placed on the map",
+    "x": -164.23,
+    "y": 772.17,
+    "how": "the DTM sign (red)",
     "osm_node": 21257811,
     "gtfs": [
      -156.9,
      776.9
     ],
-    "source": "user, stop-sign review (reports/review/stop-signs-17.json) on the test host, 2026-11-05 (#258)"
+    "source": "user, fact-match review (reports/review/fact-matches-17.json) 2026-11-18 (#670): the DTM's sign confirmed in place of the user's, placed 0.83 m from it",
+    "pin": [
+     -164.23,
+     772.17
+    ],
+    "pinFrom": "DTM"
    }
   ]
  },
