@@ -58,7 +58,8 @@ OPTIONS = ["sign at the pin", "sign at the timetable point (GTFS)", "unsure"]
 CONFIRMS = (OPTIONS[0], BY_SOURCE["DTM"], BY_SOURCE["OSM"])
 MATCH = 2.0  # m
 PLACED = "placed on the map"  # (a fact the user placed on the review page's map)
-POLE_AT = 0.2  # m: a fact this near a DTM sign stands at that sign (its pin was the DTM's, or the user confirmed it)
+POLE_AT = 0.2  # m: a fact this near a DTM sign stands at that sign (its pin was the DTM's, or the user confirmed it);
+# a source this near the card's pin is the one the user saw (the pins are kept to 0.1 m)
 
 
 def pole(fact, dtm):
@@ -75,8 +76,9 @@ def sign_state(fact, chain):
     (tools/fact_review.py)."""
     near = lambda a, b: math.hypot(a[0] - b[0], a[1] - b[1]) <= MATCH  # noqa: E731
     now = (chain[1], chain[2]) if chain else None
+    seen = lambda a, b: math.hypot(a[0] - b[0], a[1] - b[1]) <= POLE_AT  # noqa: E731
     state = sources.fact_state((fact["x"], fact["y"]), tuple(fact["pin"]) if fact.get("pin") else None, now, near,
-                               confirms=fact["how"] in CONFIRMS)
+                               confirms=fact["how"] in CONFIRMS, unchanged=seen)
     if state == "matches" and chain[0] != "dtmpoints":
         state = "holds"
     return {"id": sources.fact_id("stopSigns", fact), "state": state, "how": fact["how"], "now": chain[0] if chain else None,

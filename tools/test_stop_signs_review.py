@@ -35,6 +35,8 @@ class State(unittest.TestCase):
         self.assertEqual(R.sign_state(self.fact(R.OPTIONS[1]), ("osm", 0.3, 0.0))["state"], "holds")
         self.assertEqual(R.sign_state(placed, None), {"id": "A → B", "state": "holds", "how": "placed on the map", "now": None,
                                                       "off": None, "at": [0.0, 0.0], "src": None})
+        # placed 1.6 m from the DTM's sign the card showed (its pin): the user set theirs apart, it holds (Královka)
+        self.assertEqual(R.sign_state(self.fact(R.PLACED, pin=[1.6, 0.0]), ("dtmpoints", 1.6, 0.05))["state"], "holds")
         # with the pin recorded: the source still there holds, gone elsewhere changed
         pinned = self.fact("placed on the map", pin=[5.0, 0.0])
         self.assertEqual(R.sign_state(pinned, ("osm", 5.4, 0.0))["state"], "holds")
