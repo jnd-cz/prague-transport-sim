@@ -205,6 +205,8 @@ FACT_STATES = ("holds", "matches", "changed", "agrees", "moved")
 # lists a fact of these that no built file states as not stated.
 OVERRIDES = {
     "postedSpeeds": (("postedSpeeds",), lambda f: f["id"], "tools/osm_speeds.py"),
+    "stopSigns": (("stopSigns", "signs"), lambda f: f"{f['stop']} → {f['towards']}" if f.get("towards")
+                  else f"{f['stop']}, from {f.get('from')}", "tools/build_line.py"),
 }
 
 

@@ -37,6 +37,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
+import sources  # noqa: E402
 
 # A card's answers: the sources it has, the user's own point and unsure (the user, 2026-11-05: "pick which is
 # right: DTM, OSM, GTFS/timetable, other - my own mark", #310). The own mark starts placing on the review page;
@@ -46,6 +47,24 @@ OWN, UNSURE = "my own mark: place it on the map", "unsure"
 MARK_OF = {"DTM": "DTM stop sign", "OSM": "OSM stop position", "GTFS": "timetable (GTFS) point"}  # (the marks' labels)
 # the wording before #310 (answers already given keep importing)
 OPTIONS = ["sign at the pin", "sign at the timetable point (GTFS)", "unsure"]
+# The answers that said the sign the build takes was right (the card's pin was the DTM sign where it had one, else
+# OSM's stop position): a fact with one confirms that source; the others (placed on the map, the GTFS point) correct
+# it. A fact matches its source within MATCH in the plane (the user, 2026-11-18, #670: "within 1 meter would be good
+# match but the actual 2D position on the stop platform matters (for visual purposes), not only the position along the
+# tracks").
+CONFIRMS = (OPTIONS[0], BY_SOURCE["DTM"], BY_SOURCE["OSM"])
+MATCH = 1.0  # m
+
+
+def sign_state(fact, chain):
+    """A stopSigns fact's state against the sign the build takes without it: `chain` (source, x, y) in the city frame,
+    or None (sources.fact_state; `pin` is the card's pin, recorded with the answers imported since #670)."""
+    near = lambda a, b: math.hypot(a[0] - b[0], a[1] - b[1]) <= MATCH  # noqa: E731
+    now = (chain[1], chain[2]) if chain else None
+    state = sources.fact_state((fact["x"], fact["y"]), tuple(fact["pin"]) if fact.get("pin") else None, now, near,
+                               confirms=fact["how"] in CONFIRMS)
+    return {"id": sources.fact_id("stopSigns", fact), "state": state, "how": fact["how"], "now": chain[0] if chain else None,
+            "off": round(math.hypot(fact["x"] - now[0], fact["y"] - now[1]), 2) if now else None}
 OSM, GTFS, END, DTM = "#3e9dff", "#ff9e31", "#ffffff", "#ff3b30"
 # The other direction's stop position lies on the parallel track, 3.1-5.9 m off ours: within 6 m it was taken
 # at 5 stops (Hercovka on 17, Vršovické náměstí on 22: the user, review 2026-11-05), while our direction's
@@ -208,10 +227,13 @@ def sign_facts(cards, answers):
             else:
                 continue  # (unsure, or a placed answer whose point was lost: held)
             k = (c["stop"], c["towards"] or "", c["from"] if not c["towards"] else "")
+            # the pin: the sign the build took then (sign_state's recorded value, #670)
+            pin_from = next((k2 for k2 in ("DTM", "OSM", "GTFS") if any(m["label"].startswith(MARK_OF[k2]) for m in c["marks"])), None)
             f = {"stop": c["stop"], **({"towards": c["towards"]} if c["towards"] else {"from": c["from"]}),
                  "x": round(x, 2), "y": round(y, 2), "how": how,
                  **({"note": r["note"]} if r.get("note") else {}),
                  "osm_node": c.get("osm_node"), "gtfs": [gtfs["x"], gtfs["y"]] if gtfs else None,
+                 "pin": [c["x"], c["y"]], "pinFrom": pin_from,
                  "line": c["line"], "t": r.get("t", 0)}
             if k not in best or f["t"] > best[k]["t"]:
                 best[k] = f
