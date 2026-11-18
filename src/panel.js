@@ -26,8 +26,9 @@ const C = {
   myci: { cs: 'Mycí stroj', en: 'Washing plant', sim: false, src: 'ČKD ckd03 p. 14',
     en_: 'Washing-plant passage: the contactors close with no line voltage, and the drive pedal releases the shoe brakes.',
     cs_: 'Průjezd mycím strojem: stykače sepnou bez napětí v troleji, jízdní pedál uvolní čelisťové brzdy.' },
-  bezp: { cs: 'Bezpečnostní<br>spínač', en: 'Safety<br>switch', sim: true, src: 'ckd24 § 5.3; DPP',
-    en_: 'Rescue brake: drops the safety relay; all track brakes and full shoe brakes, the bell rings.',
+  // (named as the drivers call it: the user, 2026-11-18, "rename the 'Bezpečnostní spínač' to 'Záchranná brzda'")
+  bezp: { cs: 'Záchranná<br>brzda', en: 'Emergency<br>brake', sim: true, src: 'ckd24 § 5.3; DPP',
+    en_: 'Emergency brake: drops the safety relay; all track brakes and full shoe brakes, the bell rings.',
     cs_: 'Záchranná brzda: odpadne bezpečnostní relé, všechny kolejnicové a plné čelisťové brzdy, zvoní zvonek.' },
   havar: { cs: 'Havarijní<br>pojezd', en: 'Emergency<br>drive', sim: false, src: 'DPP textbook p. 8',
     en_: "Emergency drive: cuts this car's 600 V equipment so the coupled car can move it.",
@@ -93,8 +94,8 @@ const C = {
   volt: { cs: 'Voltmetr', en: 'Voltmeter', sim: true, src: 'ckd02 item 49',
     en_: 'Battery voltmeter 0–40 V: about 26 V standing, 28 V charging.', cs_: 'Voltmetr baterie 0–40 V: asi 26 V v klidu, 28 V při nabíjení.' },
   lstrip: { cs: 'Kontrolky', en: 'Lamps', sim: true, src: 'ckd24 § 7.2–7.7',
-    en_: 'Indicators, stop request V, DOORS green when all are closed, BRAKES I / II / TRAIN red while the shoe brakes are on, ACCELERATOR orange while its resistors are in, mirror heating.',
-    cs_: 'Směrovky, znamení V, DVEŘE zelená při všech zavřených, BRZDY I / II / VLAK červené při zabrzděných čelisťových brzdách, ZRYCHLOVAČ oranžová při zařazených odporech, topení zrcátek.' },
+    en_: 'Indicators (green), EXIT (green) lit by a passenger\'s stop request until the doors open, DOORS green when all are closed, BRAKES I / II / TRAIN red while the shoe brakes are on, ACCELERATOR orange while its resistors are in, mirror heating.',
+    cs_: 'Směrovky (zelené), VÝSTUP (zelená) svítí po znamení řidiči od cestujícího do otevření dveří, DVEŘE zelená při všech zavřených, BRZDY I / II / VLAK červené při zabrzděných čelisťových brzdách, ZRYCHLOVAČ oranžová při zařazených odporech, topení zrcátek.' },
   pedals: { cs: 'Pedály', en: 'Pedals', sim: 'aid', src: '#221',
     en_: 'The pedals on the floor: drive above, brake below, P parked; beside them the accelerator 1–99.',
     cs_: 'Pedály na podlaze: jízda nahoře, brzda dole, P zajištěno; vedle zrychlovač 1–99.' },
@@ -109,8 +110,10 @@ const C = {
 const KEYS = { bezp: ['Space', ' ', true], nevyst: ['D', 'd'], dvere2: ['D', 'd'], houk: ['L', 'l', true], zvonek: ['B', 'b'],
   svetl: ['⇧L', 'L'], smer: [', .'], vyhybka: ['Y', 'y', true], vystr: ['/', '/'], kalor: ['K', 'k'], salon: ['H', 'h'],
   vyptop: ['C', 'c', true], pisek: ['A', 'a', true] };
-// the lamp strip, left to right (6921's "ED – OPRAVNY" plate): [lamp, cs, en, the LED's shape]
-const STRIP = [['L', 'Směr vlevo', 'Left', 'arrowL'], ['V', '', '', 'V'], ['D', 'Dveře', 'Doors', 'doors'], ['B1', 'I', 'I', 'brake'],
+// the lamp strip, left to right (6921's "ED – OPRAVNY" plate): [lamp, cs, en, the LED's shape]. V is the stop request,
+// labelled as some cars have it, the first brake lamp too (the user, 2026-11-17: "the V led sign is for Výstup, some
+// trams have this labeled and we can have it too", "The first red brzda I would label 'Brzda I'")
+const STRIP = [['L', 'Směr vlevo', 'Left', 'arrowL'], ['V', 'Výstup', 'Exit', 'V'], ['D', 'Dveře', 'Doors', 'doors'], ['B1', 'Brzda I', 'Brake I', 'brake'],
   ['B2', 'Brzdy II', 'Brakes II', 'brake'], ['BV', 'Vlak', 'Train', 'brake'], ['Z', 'Zrychlovač', 'Accelerator', 'dice5'],
   ['T', 'Topení zrcátka', 'Mirror heat', 'T'], ['R', 'Směr vpravo', 'Right', 'arrowR']];
 // the helper lamps (the game's): [key, colour]
@@ -124,10 +127,10 @@ function ctl(id, x, y, kind, o = {}) {
   const c = C[id], k = KEYS[id];
   let inner = '';
   if (kind === 'btn') inner = `<span class="bezel"><i class="cap ${o.color || 'black'}"></i></span>`;
-  if (kind === 'rot') inner = `<span class="bezel"><i class="knob ${o.color || ''}" data-k="${id}"></i></span>`;
+  if (kind === 'rot') inner = `<span class="bezel">${POS[id] ? marks(id) : ''}<i class="knob ${o.color || ''}" data-k="${id}"></i></span>`;
   if (kind === 'tog') inner = `<span class="tog"><i class="lever" data-k="${id}"></i></span>`;
   if (kind === 'glow') inner = '<span class="glow"><i></i></span>';
-  if (kind === 'cam') inner = `<span class="cam"><span class="marks"><b style="left:42%;top:5%">0</b><b style="left:82%;top:40%">1</b><b style="left:42%;top:76%">2</b></span><i class="handle" data-k="${id}"></i></span>`;
+  if (kind === 'cam') inner = `<span class="cam"><span class="marks">${o.marks === false ? '' : camMarks()}</span><i class="handle" data-k="${id}"></i></span>`;
   const cls = ['ctl', kind, c.sim === true ? '' : 'inert'].join(' ');
   return `<div class="${cls}" data-c="${id}" style="left:${px(x)};top:${px(y)}${o.fs ? `;font-size:${o.fs}px` : ''}">` +
     `<span class="plate ${o.plate || ''}" data-lab="${id}">${lab(id)}</span>${inner}${k && c.sim === true ? `<i class="kb">${k[0]}</i>` : ''}${c.q ? '<i class="q">?</i>' : ''}</div>`;
@@ -161,12 +164,16 @@ function meter(id, x, y, w, h, fig = 9, dense = true) {
     `<rect x="${f(xr + ww * 0.05)}" y="${f(y0 - 1)}" width="${f(wx + ww - xr - ww * 0.05)}" height="2" rx=".4"/></g></svg>`;
   return `<div class="meter" data-c="${id}" style="left:${px(x)};top:${px(y)};width:${px(w)};height:${px(h)}">${s}</div>`;
 }
+// (the arrows green and shorter, the brake lamp's bars beside its ring as on 6921: the user, 2026-11-17, "The arrows for
+// left and right should be green leds I think, can be a bit shorter", "the led symbol parts of |O| can be alongside each
+// other"). V is the open door, two strokes apart, green (the user, 2026-11-18, after a photo of a T3P's panel: "the V (or
+// open door symbol, the two lines are not touching) ... It's green").
 const LED = {
-  arrowL: (l) => `<svg viewBox="0 0 36 14"><path class="off" data-l="${l}" d="M1 7 L10 1 L10 4.5 L35 4.5 L35 9.5 L10 9.5 L10 13 Z"/></svg>`,
-  arrowR: (l) => `<svg viewBox="0 0 36 14"><path class="off" data-l="${l}" d="M35 7 L26 1 L26 4.5 L1 4.5 L1 9.5 L26 9.5 L26 13 Z"/></svg>`,
-  V: (l) => `<svg viewBox="0 0 16 14"><path class="off" data-l="${l}" d="M1 1 L5 1 L8 9 L11 1 L15 1 L10 13 L6 13 Z"/></svg>`,
+  arrowL: (l) => `<svg viewBox="0 0 24 14"><path class="off" data-l="${l}" d="M1 7 L9 1 L9 4.5 L23 4.5 L23 9.5 L9 9.5 L9 13 Z"/></svg>`,
+  arrowR: (l) => `<svg viewBox="0 0 24 14"><path class="off" data-l="${l}" d="M23 7 L15 1 L15 4.5 L1 4.5 L1 9.5 L15 9.5 L15 13 Z"/></svg>`,
+  V: (l) => `<svg viewBox="0 0 16 14"><path class="off" data-l="${l}" d="M1 1 H4.4 L7.2 13 H3.8 Z M15 1 H11.6 L8.8 13 H12.2 Z"/></svg>`,
   doors: (l) => `<svg viewBox="0 0 16 14"><rect class="off" data-l="${l}" x="2" y="1" width="4.5" height="12"/><rect class="off" data-l="${l}" x="9.5" y="1" width="4.5" height="12"/></svg>`,
-  brake: (l) => `<svg viewBox="0 0 30 14"><rect class="off" data-l="${l}" x="1" y="2" width="5" height="10" rx="1"/><circle class="off" data-l="${l}" cx="15" cy="7" r="5"/><rect class="off" data-l="${l}" x="24" y="2" width="5" height="10" rx="1"/></svg>`,
+  brake: (l) => `<svg viewBox="0 0 20 14"><rect class="off" data-l="${l}" x="1" y="2" width="3.4" height="10" rx=".8"/><circle class="off" data-l="${l}" cx="10" cy="7" r="4.6"/><rect class="off" data-l="${l}" x="15.6" y="2" width="3.4" height="10" rx=".8"/></svg>`,
   // the accelerator lamp: five LEDs as a die's five (the user, 2026-11-17)
   dice5: (l) => `<svg viewBox="0 0 14 14">${[[2.6, 2.6], [11.4, 2.6], [7, 7], [2.6, 11.4], [11.4, 11.4]].map(([x, y]) => `<circle class="off" data-l="${l}" cx="${x}" cy="${y}" r="2.1"/>`).join('')}</svg>`,
   T: (l) => `<svg viewBox="0 0 14 14"><path class="off" data-l="${l}" d="M1 1 H13 V4 H8.6 V13 H5.4 V4 H1 Z"/></svg>`,
@@ -195,7 +202,28 @@ function speedo(d) {
 const crank = (w) => `<svg viewBox="0 0 120 110" width="${w}" height="${(w * 110) / 120}"><rect x="8" y="8" width="104" height="94" rx="6" fill="#d8dbd9" stroke="#555"/>` +
   '<text x="60" y="22" class="fig2">VPŘED</text><text x="22" y="62" class="fig2">0</text><text x="60" y="99" class="fig2">VZAD</text>' +
   '<circle cx="60" cy="58" r="15" fill="#2a2d2c"/><rect x="56" y="32" width="8" height="28" rx="3" fill="#1a1c1b"/><circle cx="60" cy="33" r="5.5" fill="#3a3e3c"/></svg>';
-const marks = (x, y, w, list) => `<div class="pos" style="left:${px(x)};top:${px(y)};width:${px(w)}">${list.map((m) => `<span>${m}</span>`).join('')}</div>`;
+// A rotary switch's positions: the label and the knob's angle there (degrees from 3 o'clock, clockwise as CSS turns it),
+// the labels round the knob where its pointer stops (the user, 2026-11-17: "the heater rotary switches (and other rotary
+// ones) should be aligned to the position labels, not turn to another angle"). Those without labels on the car stand as
+// on the user's photos of 6921 (the user, 2026-11-18: "position the unlabeled knobs according to the reference photos"):
+// up off and right on (OFF, ON), as its door switches show: DVEŘE II up with the doors closed, DVEŘE I turned right with
+// the front door open and the doors' lamp dark. OSVĚTLENÍ, the outside lights, at DAY, 45° left (DPP textbook, the T3R.P
+// pages: "zapnuté vnější osvětlení na „den“ - to je vlevo"; the photos, taken in the evening, have it 45° right; the game
+// has no night yet); the saloon's fluorescent lighting at the left, "předvolba" (ibid.). The cams: VYPÍNAČ ŘÍZENÍ's marks
+// 0 up, 1 at 45°, 2 right, its handle at 1; PŘEPÍNAČ OSVĚTLENÍ's marks don't show on the photo, its handle stands
+// diagonal as there.
+const POS = { kalor: [['0', 135], ['1', 105], ['2', 75], ['3', 45]], salon: [['0', 135], ['½', 90], ['1', 45]] };
+const OFF = -90, ON = 0, CAM = [-90, -45, 0], DAY = -135, PRESEL = 180;
+// a cam's marks round its handle, 42 % of the plate from its middle (clear of the handle's tip)
+const camMarks = () => CAM.map((a, i) => {
+  const r = a * Math.PI / 180;
+  return `<b style="left:${(50 + 42 * Math.cos(r)).toFixed(1)}%;top:${(50 + 42 * Math.sin(r)).toFixed(1)}%">${i}</b>`;
+}).join('');
+// the labels round a knob, 2.3 em from its middle (in its bezel)
+const marks = (id) => POS[id].map(([m, a]) => {
+  const at = (f) => `calc(50% + ${(2.3 * f(a * Math.PI / 180)).toFixed(2)}em)`;
+  return `<b class="pos" style="left:${at(Math.cos)};top:${at(Math.sin)}">${m}</b>`;
+}).join('');
 
 // The band's sections, x from the screen's middle at the head straight ahead (design px; the band is 240 high)
 const H = 240, W0 = 1640, PER_RAD = 850; // the design height and width; the band's slide per radian of the head's turn
@@ -210,8 +238,8 @@ function wallSec() {
   return `<div class="wallsurf"></div>
     <div class="sideplate" style="left:900px;top:36px;width:640px;height:178px"></div>
     <div class="crank" data-c="revers" style="left:930px;top:56px">${crank(150)}</div>
-    ${ctl('kalor', 1110, 64, 'rot', { plate: 'y', fs: 15 })}${marks(1110, 166, 75, ['0', '1', '2', '3'])}
-    ${ctl('salon', 1230, 64, 'rot', { fs: 15 })}${marks(1230, 166, 75, ['0', '½', '1'])}
+    ${ctl('kalor', 1110, 64, 'rot', { plate: 'y', fs: 15 })}
+    ${ctl('salon', 1230, 64, 'rot', { fs: 15 })}
     ${ctl('vyptop', 1350, 64, 'btn', { color: 'black', plate: 'y', fs: 15 })}
     <div class="sideplate dark" style="left:1570px;top:26px;width:130px;height:196px"></div>
     ${ctl('pisek', 1592, 44, 'tog', { plate: 'y', fs: 17 })}`;
@@ -250,7 +278,7 @@ function panelSec() {
 function wingSec() {
   return `<div class="surface wing"></div><div class="sill"></div>
     ${ctl('zarivky', 600, 40, 'rot', { fs: 14 })}
-    ${ctl('prepos', 700, 24, 'cam', { plate: 'y', fs: 13 })}
+    ${ctl('prepos', 700, 24, 'cam', { plate: 'y', fs: 13, marks: false })}
     <div class="warnplate" style="left:690px;top:148px;width:130px" data-warn="1"></div>
     <div class="paper" data-c="tt" style="left:880px;top:12px;width:420px;height:212px"><h4><span class="ttLine"></span><span class="ttEnd"></span></h4><table class="tt"></table></div>`;
 }
@@ -316,6 +344,16 @@ function drawPedals(cv, eq, S) {
   c.fillRect(ax, top + h - hp, aw, hp);
   c.fillStyle = '#0b0e0c';
   for (const q of [75, 80, 85, 90, 95]) c.fillRect(ax, top + h - (h * (q - 1)) / 98, aw, 1);
+}
+
+// The stop request (V): a passenger presses "znamení řidiči" in the saloon some way after the last stop, and the lamp
+// stays lit until the doors open (the user, 2026-11-17: "It should be connected to request stop button (znamení
+// řidiči)"). At a request stop where somebody gets off (src/game.js: alightFrac, which also makes the stop needed); the
+// press 20 m to 60 % of the way from the last stop, the same for a stop on every run (no draw from the game's random).
+function requested(game, st, s) {
+  if (!st || !st.request || !(st.alightFrac > 0) || st.served) return false;
+  const prev = game.stops[st.i - 1], from = prev ? prev.target : 0, k = ((st.i + 1) * 2654435761 >>> 0) / 2 ** 32;
+  return s >= from + Math.min(0.6 * (st.target - from), 20 + k * 140);
 }
 
 // ------------------------------------------------------------------ the panel
@@ -567,9 +605,9 @@ export class Panel {
     // the lamp strip (ckd24 § 7.2-7.7)
     const st = game.stops[game.nextStop], blink = !!lamps.lit, ind = lamps.indicate, shoe = !!eq.lamps?.shoe;
     const led = (l, on, cls) => set(`led${l}`, on ? cls : '', (v) => { for (const n of e.led[l]) n.setAttribute('class', v ? `on ${v}` : 'off'); });
-    led('L', (ind === 'left' || ind === 'hazard') && blink, 'w');
-    led('R', (ind === 'right' || ind === 'hazard') && blink, 'w');
-    led('V', !!(st && st.request && st.alightFrac > 0 && st.target - tram.s < 400), 'a');
+    led('L', (ind === 'left' || ind === 'hazard') && blink, 'g');
+    led('R', (ind === 'right' || ind === 'hazard') && blink, 'g');
+    led('V', requested(game, st, tram.s), 'g');
     led('D', game.doorState === 'closed', 'g');
     led('B1', shoe, 'r'); led('B2', shoe, 'r'); led('BV', shoe && tram.cars > 1, 'r');
     led('Z', !!eq.lamps?.acc, 'o');
@@ -581,12 +619,12 @@ export class Panel {
     cl('bezp', 'down', h[' ']); cl('houk', 'down', lamps.held); cl('vyhybka', 'down', h.y); cl('vyptop', 'down', h.c);
     cl('zvonek', 'down', now - this.bellT < 300); cl('nevyst', 'down', game.doorState === 'closing'); cl('nevyst', 'lit', game.doorState === 'closing');
     cl('napeti', 'lit', tram.voltage > 200); cl('vystr', 'lit', ind === 'hazard' && blink);
-    knob('dvere2', game.doorState === 'closed' || game.doorState === 'closing' ? 0 : 60); knob('dvere1', 0);
-    knob('kalor', -60 + game.climate.cab * 40); knob('salon', -45 + game.climate.saloon * 45);
+    knob('dvere2', game.doorState === 'closed' || game.doorState === 'closing' ? OFF : ON); knob('dvere1', OFF);
+    knob('kalor', POS.kalor[game.climate.cab][1]); knob('salon', POS.salon[game.climate.saloon][1]);
     knob('svetl', lamps.high ? -26 : 26); knob('smer', ind === 'left' ? -28 : ind === 'right' ? 28 : 0);
-    knob('pisek', h.a || tram.sanding ? -30 : 20); knob('vystr', ind === 'hazard' ? 70 : 0);
-    knob('vypinac', 35); knob('prepos', -40); knob('osvetl', -40); knob('sterace', -40); knob('nouz', -40); knob('topzrc', -40);
-    knob('havar', 0); knob('couv', -40);
+    knob('pisek', h.a || tram.sanding ? -30 : 20); knob('vystr', ind === 'hazard' ? ON : OFF);
+    knob('vypinac', CAM[1]); knob('prepos', CAM[1]); knob('osvetl', DAY); knob('sterace', OFF); knob('nouz', OFF); knob('topzrc', OFF);
+    knob('havar', OFF); knob('couv', OFF); knob('zarivky', PRESEL);
     // the helper lamps (the game's)
     const ready = st && st.served && st.waiting === 0 && st.alight === 0 && game.clock >= st.sched - 5;
     const help = { speed: game.overspeed, doors: game.doorState !== 'closed', current: tram.drawing, ready,
