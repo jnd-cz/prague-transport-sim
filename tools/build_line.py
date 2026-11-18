@@ -988,14 +988,17 @@ def main():
     # else none (the game: GTFS + STOP_AHEAD).
     # Where the sign's point is its pole on the platform (the user's placed sign, a DTM sign: stop_signs_review.pole),
     # the stop keeps its offset from the track too (`signOff`, + left), and the game stands the sign there; nearer the
-    # track's centre than POLE_CLEAR it would stand in the tram's way, and keeps the game's fixed place (#685: the user,
-    # 2026-11-18, "the stop sign placement to the actual place on the platform (where it's available, not decided by
-    # point on a track)").
-    poles, at_track = [], []
+    # track's centre than POLE_CLEAR it would stand in the tram's way, and on the left of travel it is another track's
+    # (a T3's doors are on the right): those keep the game's fixed place (#685: the user, 2026-11-18, "the stop sign
+    # placement to the actual place on the platform (where it's available, not decided by point on a track)"; at
+    # Královka, the one pole on the left, "now on the wrong track ... the DTM data being correct on the middle track").
+    poles, at_track, other_side = [], [], []
 
     def pole_at(st_, d, side):
-        if d >= POLE_CLEAR:
-            st_["signOff"] = round(d if side > 0 else -d, 2)
+        if side > 0:
+            other_side.append(f"{st_['name']} {d:.2f} m")
+        elif d >= POLE_CLEAR:
+            st_["signOff"] = round(-d, 2)
             poles.append(st_["signOff"])
         else:
             at_track.append(f"{st_['name']} {d:.2f} m")
@@ -1046,9 +1049,10 @@ def main():
           + f", {sum('sign' not in st_ for st_ in stops)} none; the user's: "
           + ", ".join(f"{sum(e['state'] == k for e in sign_facts)} {k}" for k in sources.FACT_STATES
                       if any(e["state"] == k for e in sign_facts)))
-    print(f"stop signs at their pole: {len(poles)}" + (f" ({min(map(abs, poles)):.2f}-{max(map(abs, poles)):.2f} m from the track, "
-          f"{sum(p > 0 for p in poles)} on the left)" if poles else "") + f", {len(stops) - len(poles)} at the game's place"
-          + (f"; a pole too near the track: {', '.join(at_track)}" if at_track else ""))
+    print(f"stop signs at their pole: {len(poles)}" + (f" ({min(map(abs, poles)):.2f}-{max(map(abs, poles)):.2f} m from the track)"
+          if poles else "") + f", {len(stops) - len(poles)} at the game's place"
+          + (f"; a pole too near the track: {', '.join(at_track)}" if at_track else "")
+          + (f"; a pole on the left, another track's: {', '.join(other_side)}" if other_side else ""))
     # platforms (OSM): where along the route each stop's platform begins and ends, so the game
     # can require the whole set to stand alongside it (and let two sets stop one behind another).
     # Matched around the sign where there is one (Hercovka's timetable point is 86 m short of the sign,
