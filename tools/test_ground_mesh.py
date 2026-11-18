@@ -179,6 +179,24 @@ class Walls(unittest.TestCase):
         zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o])
         self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
 
+    def test_a_corner_on_the_lidar_yields_to_a_surveyed_one_of_its_rank(self):
+        # (#664: a paved yard on the lidar (`g`) and one on its own outline share (0, 0), 0.5 m apart (line 37's pairs, p50
+        # 0.48 m): the surveyed edge holds, in either order, and the report counts the lidar's corner; a rank above still
+        # wins over both)
+        self.assertLess(gm.LIDAR_TIE, 0.005)  # (under the ranks' 0.01 steps: a lidar corner never passes another rank)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0]), np.zeros(4)
+        zc = np.array([250.5, 250.0, 250.5, 249.0])
+        p = 2.0 + (10 - 2) / 100
+        prio = np.array([p + gm.LIDAR_TIE, p, p + gm.LIDAR_TIE, p - 0.01])
+        kind = np.array(["survey"] * 4, dtype=object)
+        label = np.array(["lidar", "survey", "lidar", "survey"], dtype=object)
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind, label)
+        self.assertEqual(np.round(zf, 3).tolist(), [250.0, 250.0, 249.0, 249.0])
+        self.assertEqual(steps["ties"]["lidar corners yielded"], {"over 1 cm": 1, "over 5 cm": 1, "over 20 cm": 1})
+        o = np.array([1, 0, 3, 2])
+        zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o], label[o])
+        self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
+
 
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
