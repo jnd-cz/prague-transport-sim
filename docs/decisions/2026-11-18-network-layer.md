@@ -1,6 +1,7 @@
 # The network as a layer the build makes (#658)
 
-Status: **proposed** (2026-11-18). The questions for the user are at the end.
+Status: **accepted** with the user's answers (Claude Code session 2026-11-18), quoted at the end: (a) the port, heights
+stored, one file a line.
 
 ## Why
 
@@ -135,7 +136,11 @@ seeded `u3,redruns,traffic,stops` should not move outside main's spread.
 6. Signals: stop lines, heads, pedestrian heads.
 7. Start reads only the layer. The lookups are trimmed to the window again, and the test of the reads is added.
 
-## Questions for the user
+## The user's answers (2026-11-18, PR #665)
+
+To 1: "sounds good, go ahead with the port". To 2: "yes". To 3: "yes".
+
+The questions were:
 
 1. Where is the network built: (a) ported to Python in the build, beside `placement.py` (recommended), or (b) the
    page's code moved into modules without Three.js and run by the build in headless Chromium?
