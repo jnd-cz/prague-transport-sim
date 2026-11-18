@@ -94,6 +94,9 @@ class Stamp(unittest.TestCase):
         self.assertEqual([st(65, None, 70), st(65, None, None)], ["holds", "holds"])  # nothing recorded: no change seen
         near = lambda a, b: abs(a - b) <= 1  # noqa: E731
         self.assertEqual([st(10, 3, 10.8, near), st(10, 3, 3.5, near), st(10, 3, 6, near)], ["matches", "holds", "changed"])
+        # the source as when the user answered holds, even within the fact's tolerance: the user set theirs apart from it
+        self.assertEqual([st(10, 9.5, 9.5, near), st(10, 9.5, 9.6, near), st(10, 9.5, 9.6, near, unchanged=near)],
+                         ["holds", "matches", "holds"])
         self.assertEqual([st(10, 10, 10.5, near, confirms=True), st(10, 10, 12, near, confirms=True),
                           st(10, 10, None, confirms=True)], ["agrees", "moved", "moved"])
 

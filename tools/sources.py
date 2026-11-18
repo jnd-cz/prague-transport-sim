@@ -232,12 +232,18 @@ def fact_id(section, fact):
     return OVERRIDES[section][1](fact)
 
 
-def fact_state(fact, recorded, now, same=None, confirms=False):
+def fact_state(fact, recorded, now, same=None, confirms=False, unchanged=None):
     """The state of a fact whose value is `fact`, recorded when the source said `recorded` (None: not recorded), where
-    the source now says `now` (None: nothing there). `same(a, b)`: within the kind's tolerance (default: equal)."""
+    the source now says `now` (None: nothing there). `same(a, b)`: within the kind's tolerance (default: equal);
+    `unchanged(a, b)`: the source says what it said when the user answered (default: equal). A correction whose
+    source is unchanged holds, even within the tolerance of the fact: the user saw that value and set theirs apart
+    (#685: Královka's sign, placed 1.6 m from the DTM's the user judged misplaced); a match is a source that moved."""
     same = same or (lambda a, b: a == b)
+    unchanged = unchanged or (lambda a, b: a == b)
     if confirms:
         return "agrees" if now is not None and same(now, fact) else "moved"
+    if recorded is not None and now is not None and unchanged(now, recorded):
+        return "holds"
     if now is not None and same(now, fact):
         return "matches"
     if recorded is None or (now is not None and same(now, recorded)):

@@ -35,6 +35,8 @@ class State(unittest.TestCase):
         self.assertEqual(R.sign_state(self.fact(R.OPTIONS[1]), ("osm", 0.3, 0.0))["state"], "holds")
         self.assertEqual(R.sign_state(placed, None), {"id": "A → B", "state": "holds", "how": "placed on the map", "now": None,
                                                       "off": None, "at": [0.0, 0.0], "src": None})
+        # placed 1.6 m from the DTM's sign the card showed (its pin): the user set theirs apart, it holds (Královka)
+        self.assertEqual(R.sign_state(self.fact(R.PLACED, pin=[1.6, 0.0]), ("dtmpoints", 1.6, 0.05))["state"], "holds")
         # with the pin recorded: the source still there holds, gone elsewhere changed
         pinned = self.fact("placed on the map", pin=[5.0, 0.0])
         self.assertEqual(R.sign_state(pinned, ("osm", 5.4, 0.0))["state"], "holds")
@@ -45,6 +47,36 @@ class State(unittest.TestCase):
             self.assertEqual(R.sign_state(self.fact(how), ("dtmpoints", 0.2, -0.1))["state"], "agrees", how)
             self.assertEqual(R.sign_state(self.fact(how), ("osm", 3.0, 0.0))["state"], "moved", how)
             self.assertEqual(R.sign_state(self.fact(how), None)["state"], "moved", how)
+
+
+class Again(unittest.TestCase):
+    def test_an_answered_stop_asked_again_gets_a_card_of_its_own(self):
+        path = [(0.0, 0.0), (200.0, 0.0)]
+        stops = [{"name": "A", "s": 50.0}, {"name": "B", "s": 150.0}]
+        dtm = [(70.0, -2.5)]  # (20 m past A's timetable point, on the right: a card without the fact)
+        fact = {"stop": "A", "towards": "B", "x": 52.0, "y": -2.2, "how": R.PLACED}
+        a = lambda cards: [c for c in cards if c["stop"] == "A"]  # noqa: E731  (B, without a DTM sign, has its own card)
+        self.assertEqual(a(R.review("17", path, stops, [], dtm, [fact], 5.0)[0]), [])
+        cards = a(R.review("17", path, stops, [], dtm, [fact], 5.0, again={"A → B"})[0])
+        self.assertEqual([c["id"] for c in cards], ["stop-sign-17-A-1-again"])
+        self.assertIn({"x": 52.0, "y": -2.2, "label": "your sign now (data/truth.json)", "color": R.YOURS}, cards[0]["marks"])
+        self.assertIn(R.OWN, cards[0]["options"])
+        # its answer replaces the fact (the newest per stop)
+        new = R.sign_facts(cards, {"17": [{"kind": "stop sign", "id": "stop-sign-17-A-1-again", "v": R.OWN, "px": 49.0, "py": -2.4, "t": 5}]})
+        self.assertEqual([(f["stop"], f["towards"], f["x"], f["how"]) for f in new], [("A", "B", 49.0, R.PLACED)])
+
+
+class Pole(unittest.TestCase):
+    def test_a_placed_sign_or_a_dtm_signs_point_is_a_pole(self):
+        dtm = [(10.0, 2.0)]
+        f = lambda how, x, y: {"stop": "A", "towards": "B", "x": x, "y": y, "how": how}  # noqa: E731
+        self.assertTrue(R.pole(f(R.PLACED, 50.0, 3.0), dtm))
+        self.assertTrue(R.pole(f(R.BY_SOURCE["DTM"], 10.0, 2.0), dtm))
+        self.assertTrue(R.pole(f(R.OPTIONS[0], 10.1, 2.1), dtm))  # (at the pin, the pin the DTM's)
+        # OSM's stop position on the track's centre line, the GTFS point: no pole
+        self.assertFalse(R.pole(f(R.OPTIONS[0], 30.0, 0.0), dtm))
+        self.assertFalse(R.pole(f(R.BY_SOURCE["OSM"], 30.0, 0.0), dtm))
+        self.assertFalse(R.pole(f(R.OPTIONS[1], 12.0, 2.0), dtm))
 
 
 class Import(unittest.TestCase):
