@@ -245,14 +245,14 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
     union of OSM's building footprints) for what neither the rails nor DMR 5G decide, else such an area is held.
     states, a dict: filled with each fact's state by its index (#670): matches where the sources decide as the user
     did without the answer (the area fits IPR now, or the rails, DMR 5G or the held rule give the same verdict), holds
-    where they do not; a fact whose point lies in none of these areas is left out (its area is on another line, or
-    gone)."""
+    where they do not, with that verdict and what gives it: (state, verdict, by: fits, rails, dmr5g, rule or None); a
+    fact whose point lies in none of these areas is left out (its area is on another line, or gone)."""
     out = {}
     rx, ry, rz = rails
     rtree = shapely.STRtree(shapely.points(rx, ry)) if len(rx) else None
     hits = {}
     fact_of = facts_to_areas(areas, facts, frame, hits)
-    decided = {}  # area index: (state, what the sources decide) for the areas the user answered
+    decided = {}  # area index: (state, what the sources decide, by which) for the areas the user answered
 
     def by_sources(v, r, pin, inside, poly, E, N, g):
         """The verdict the sources and the rules give an area off IPR, and by which (None: by its size or cover)."""
@@ -303,20 +303,20 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
         if ok.sum() < 3:
             v["verdict"] = "fits"  # (nothing to compare: outside IPR)
             if i in fact_of:  # (the user's verdict decides nothing here)
-                decided[i] = ("matches", "fits")
+                decided[i] = ("matches", "fits", "fits")
             continue
         off = float(np.median(d[ok]))
         v["offset"], v["spread"] = round(off, 2), round(float(np.percentile(np.abs(d[ok] - off), 80)), 2)
         if abs(off) < OFFSET:
             v["verdict"] = "fits"
             if i in fact_of:  # the survey fits IPR now: the user's verdict decides nothing
-                decided[i] = ("matches", "fits")
+                decided[i] = ("matches", "fits", "fits")
             continue
         kept = dict(v)
         verdict, by = by_sources(v, r, pin, inside, poly, E, N, g)
         if i in fact_of:
             # the user's verdict holds; the sources' without it says whether it is still needed (#670)
-            decided[i] = ("matches" if verdict == fact_of[i] else "holds", verdict)
+            decided[i] = ("matches" if verdict == fact_of[i] else "holds", verdict, by)
             v.clear()
             v.update(kept)
             v["verdict"], v["by"] = fact_of[i], "fact"

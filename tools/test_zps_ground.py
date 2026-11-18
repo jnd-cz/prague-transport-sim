@@ -128,13 +128,13 @@ class Judge(unittest.TestCase):
             states = {}
             facts = [{"lat": 0.01, "lon": 0.01, "verdict": said}, {"lat": 5.0, "lon": 5.0, "verdict": "survey"}]
             v = zg.judge([square(0, 0, 20, GROUND - 1.8)], ground, ground, zg.cover_union([]), rails, F, facts, states=states)[0]
-            self.assertEqual(states, {0: (state, "lidar")}, said)
+            self.assertEqual(states, {0: (state, "lidar", "rails")}, said)
             self.assertEqual((v["verdict"], v["by"]), (said, "fact"))
             self.assertNotIn("rails", v)  # (the area's report is as before #670)
         states = {}
         zg.judge([square(0, 0, 20, GROUND - 0.1)], ground, ground, zg.cover_union([]), NONE, F,
                  [{"lat": 0.01, "lon": 0.01, "verdict": "survey"}], states=states)
-        self.assertEqual(states, {0: ("matches", "fits")})
+        self.assertEqual(states, {0: ("matches", "fits", "fits")})
 
     def test_an_answer_takes_its_own_area_not_the_one_around_it(self):
         """A courtyard's lawn is a hole in the sidewalk around it: the answer is the lawn's, the sidewalk fits."""

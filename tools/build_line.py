@@ -1243,8 +1243,9 @@ def main():
         # all leave there, the tram waits and departs as the second line
         out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
     # the facts applied over DI on the whole network (data/truth.json switchTips, photoTracks: di_network.py) that lie
-    # on this line's tracks, with their state (#670)
-    on_tracks = [path] + ([Polyline(back_pts)] if len(back_pts) > 1 else [])
+    # on the tracks this line draws (its route both ways and the others: a switch's legs), with their state (#670)
+    on_tracks = [path] + ([Polyline(back_pts)] if len(back_pts) > 1 else []) + [
+        Polyline([q[:2] for q in t["p"]]) for t in track_lines if len(t.get("p") or []) > 1]
     di_facts = {k: [e for e in v if any(pl.project(e["at"])[1] <= 15 for pl in on_tracks)] for k, v in net.facts.items()}
     one = sources.single
     by = lambda ranges: [round(sum(b - a for a, b, s in ranges if s == k)) for k in ("ortho", "di", "dtmp", "osm")]

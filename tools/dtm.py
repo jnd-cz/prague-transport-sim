@@ -401,7 +401,7 @@ ground_verdicts = zps_ground.judge(areas, lambda E, N: _ipr.sample(E, N), _older
                                    zps_ground.cover_union([], _buildings), _ground_states)
 # stated: the answers on this line's areas; an answer of this line whose point lies in none of them, changed
 ground_facts = [{"id": sources.fact_id("surveyGround", f), "state": _ground_states[k][0], "verdict": f["verdict"],
-                 "sources": _ground_states[k][1]} if k in _ground_states else
+                 "sources": _ground_states[k][1], "by": _ground_states[k][2]} if k in _ground_states else
                 {"id": sources.fact_id("surveyGround", f), "state": "changed", "verdict": f["verdict"], "sources": None}
                 for k, f in enumerate(_ground_facts) if k in _ground_states or str(f.get("line")) == str(LINE)]
 ground_moved = zps_ground.apply(areas, ground_verdicts)

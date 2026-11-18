@@ -477,19 +477,22 @@ def reviewed(data, truth):
 def answer_states(data, truth, survey, opens=()):
     """The user's grass and surface answers this line lays (grassReview `grass`, trackSurfaceReview's styles) against
     the styles laid without them: matches where those give the answer's style over STYLE_MATCH of its stretch (a junction
-    answer: of its place), else holds (#670). {truth.json section: [state entry]}."""
+    answer: of its place), else holds, with what lays it there (the sections' source: survey, list, user, junction, ...)
+    (#670). {truth.json section: [state entry]}."""
     bare = {**truth, "grassReview": {**truth.get("grassReview", {}), "answers": []},
             "trackSurfaceReview": {**truth.get("trackSurfaceReview", {}), "answers": []}}
     without = sections(data, bare, survey, opens)
 
-    def share(s0, s1, style):
+    def entry(i, style, s0, s1):
         if s1 - s0 < 1:  # (a place, not a stretch)
             s0, s1 = (s0 + s1) / 2 - 0.5, (s0 + s1) / 2 + 0.5
-        return sum(max(0.0, min(s1, x["s1"]) - max(s0, x["s0"])) for x in without if x["style"] == style) / (s1 - s0)
-
-    def entry(i, style, s0, s1):
-        sh = share(s0, s1, style)
-        return {"id": i, "state": "matches" if sh >= STYLE_MATCH else "holds", "style": style, "share": round(sh, 2)}
+        by = {}
+        for x in without:
+            if x["style"] == style:
+                by[x.get("source")] = by.get(x.get("source"), 0.0) + max(0.0, min(s1, x["s1"]) - max(s0, x["s0"]))
+        sh = sum(by.values()) / (s1 - s0)
+        return {"id": i, "state": "matches" if sh >= STYLE_MATCH else "holds", "style": style, "share": round(sh, 2),
+                "by": max(by, key=by.get) if sh > 0 else None}
     return {"grassReview": [entry(r["card"], "grass", r["s0"], r["s1"]) for r in reviewed(data, truth)],
             "trackSurfaceReview": [entry(i, st, s0, s1) for s0, s1, what, st, i in surface_places(data, truth)]}
 

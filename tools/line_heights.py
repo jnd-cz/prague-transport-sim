@@ -1180,8 +1180,9 @@ def write_line(line, lookup, chs):
         join_ends(data['tracks'])
     data['heights'] = heights
     data['heightSource'] = src_ranges
-    # the user's structures no source maps that lie on this line's tracks, with their state (#670)
-    on = [shapely.LineString(data[k]) for k in ('path', 'pathBack') if len(data.get(k) or []) > 1]
+    # the user's structures no source maps that lie on the tracks this line draws, with their state (#670)
+    on = [shapely.LineString([q[:2] for q in p]) for p in [data.get('path'), data.get('pathBack')]
+          + [t['p'] for t in data['tracks']] if len(p or []) > 1]
     structs = [{k: v for k, v in f.items() if k != 'ends'} for f in ha.STRUCTURE_FACTS
                if any(t.distance(shapely.LineString(f['ends'])) <= 15 for t in on)]
     data['provenance'] = sources.stamp('line_heights.py', {
