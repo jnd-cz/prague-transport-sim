@@ -162,6 +162,23 @@ class Walls(unittest.TestCase):
         got = gm.across_outline(gm.ring_segments(a), np.array([5.0, 5.0, 5.0, 2.0, 0.0]), np.array([0.0, 0.5, 1.0, 0.25, 0.5]))
         self.assertEqual(np.round(got, 3).tolist(), [228.5, 229.25, 230.0, 228.65, 229.0])
 
+    def test_the_weld_ignores_the_corners_order(self):
+        # (#664: two road areas of one rank meet at (0, 0) with their own surfaces, 193.49 and 193.32 m (line 22 by a
+        # bridge's track, (-1114, -537)): the point takes the middle in either order; a terrain corner under them 0.6 m off
+        # is a wall and keeps its own, one 0.2 m off takes the top's; a raised corner of the same rank beside a plain one
+        # takes the middle too; the two sides of a weir keep their levels)
+        cx = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0])
+        cy = np.zeros(9)
+        zc = np.array([193.49, 193.32, 194.0, 193.6, 10.0, 10.2, 10.0, 5.0, 4.0])
+        prio = np.array([2.02, 2.02, 3.0, 3.0, 2.03, 2.03, 3.0, 2.95, 2.95])
+        kind = np.array(["survey", "survey", "terrain", "terrain", "survey", "raised", "terrain", "pool", "pool"], dtype=object)
+        zf, steps, n = gm.weld(cx, cy, zc, prio, kind)
+        self.assertEqual(n, 3)
+        self.assertEqual(np.round(zf, 3).tolist(), [193.405, 193.405, 194.0, 193.405, 10.1, 10.1, 10.1, 5.0, 4.0])
+        o = np.array([1, 0, 3, 2, 6, 5, 4, 8, 7])
+        zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o])
+        self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
+
 
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):

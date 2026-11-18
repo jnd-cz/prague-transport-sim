@@ -439,6 +439,52 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
 
 
 # ---------------------------------------------------------------- the build
+def weld(cx, cy, zc, prio, kind):
+    """The corners' heights welded at each point: (each corner's height, the steps kept by pair, the points). A point takes
+    its top-priority corners' height, the middle of their range where they differ (two survey areas of one rank that each
+    take their own outline's surface: line 22's roads #16 and #23 by a bridge's track at (-1114, -537), 193.49 and 193.32
+    m). It took the first top corner's before, the order of the partition's pieces: drawing the survey's walls reordered
+    them and moved that corner 0.17 m, #664. A corner below the top keeps its own height where it differs by more than its
+    pair's STEP (a kerb, a wall, the water); the pair is judged against the lowest top corner's kind."""
+    key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
+    uk, inv = np.unique(key, return_inverse=True)
+    top_p = np.full(len(uk), np.inf)
+    np.minimum.at(top_p, inv, prio)
+    is_top = prio == top_p[inv]
+    tops = np.flatnonzero(is_top)
+    lo, hi = np.full(len(uk), np.inf), np.full(len(uk), -np.inf)
+    np.minimum.at(lo, inv[tops], zc[tops])
+    np.maximum.at(hi, inv[tops], zc[tops])
+    with np.errstate(invalid="ignore"):  # (a point whose top corners have no height: NaN, as before)
+        top_z = np.where(np.isfinite(lo) & np.isfinite(hi), (lo + hi) / 2, np.nan)
+    # (each point's lowest top corner, by height then kind: whatever the corners' order)
+    o = tops[np.lexsort((kind[tops], zc[tops], inv[tops]))]
+    first = np.full(len(uk), -1)
+    first[inv[o[::-1]]] = o[::-1]
+    top_kind = kind[first]
+    dz = zc - top_z[inv]
+    pk, pt = kind == "pool", top_kind[inv] == "pool"
+    pair = np.where(pk & pt, "weir", np.where(pk, "water", np.where(pt, "bank", np.where(kind == "plot", "plot",
+                    np.where((kind == "raised") != (top_kind[inv] == "raised"), "kerb",
+                             np.where((kind == "terrain") != (top_kind[inv] == "terrain"), "wall", ""))))))
+    lim = np.array([STEP.get(p, np.inf) for p in pair]) if len(pair) else np.zeros(0)
+    # (a weir's two sides share the water's priority: both are top, each keeps its own level more than STEP off the
+    # middle; welded to the first's, the second's triangles sloped 1.5 m up to the weir at Šítkovský)
+    step = (~is_top | (pair == "weir")) & (np.abs(dz) > lim)
+    zf = np.where(step, zc, top_z[inv])
+    steps = {p: {"corners": int((step & (pair == p)).sum()),
+                 "|dz| at shared corners, p50 / p90 / p99 / max m": [round(float(np.percentile(np.abs(dz[(pair == p) & ~is_top]), q)), 3)
+                                                                     for q in (50, 90, 99, 100)] if ((pair == p) & ~is_top).any() else None}
+             for p in STEP}
+    # (the points whose top corners differ: where the middle is taken, by the lowest top corner's kind)
+    rng = hi - lo
+    ties = {f"over {c} cm": {str(k): int(v) for k, v in zip(*np.unique(top_kind[rng > c / 100], return_counts=True))}
+            for c in (1, 5, 20)}
+    ties["max m"] = round(float(np.nanmax(rng[np.isfinite(rng)])), 3) if np.isfinite(rng).any() else 0.0
+    steps["ties"] = ties
+    return zf, steps, len(uk)
+
+
 def build(ln, mesh=None, threads=8, log=print):
     import bed_surface
     import ground_partition as gp
@@ -736,31 +782,7 @@ def build(ln, mesh=None, threads=8, log=print):
 
     # the weld
     t1 = time.time()
-    key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
-    uk, inv = np.unique(key, return_inverse=True)
-    top_p = np.full(len(uk), np.inf)
-    np.minimum.at(top_p, inv, prio)
-    is_top = prio == top_p[inv]
-    top_z = np.full(len(uk), np.nan)
-    first = np.full(len(uk), -1)
-    tops = np.flatnonzero(is_top)
-    first[inv[tops[::-1]]] = tops[::-1]  # (the first top corner of each vertex)
-    top_z = zc[first]
-    top_kind = kind[first]
-    dz = zc - top_z[inv]
-    pk, pt = kind == "pool", top_kind[inv] == "pool"
-    pair = np.where(pk & pt, "weir", np.where(pk, "water", np.where(pt, "bank", np.where(kind == "plot", "plot",
-                    np.where((kind == "raised") != (top_kind[inv] == "raised"), "kerb",
-                             np.where((kind == "terrain") != (top_kind[inv] == "terrain"), "wall", ""))))))
-    lim = np.array([STEP.get(p, np.inf) for p in pair]) if len(pair) else np.zeros(0)
-    # (a weir's two sides share the water's priority: both are top, and the second took the first's level, its triangles
-    # sloping 1.5 m up to the weir at Šítkovský)
-    step = (~is_top | (pair == "weir")) & (np.abs(dz) > lim)
-    zf = np.where(step, zc, top_z[inv])
-    steps = {p: {"corners": int((step & (pair == p)).sum()),
-                 "|dz| at shared corners, p50 / p90 / p99 / max m": [round(float(np.percentile(np.abs(dz[(pair == p) & ~is_top]), q)), 3)
-                                                                     for q in (50, 90, 99, 100)] if ((pair == p) & ~is_top).any() else None}
-             for p in STEP}
+    zf, steps, n_points = weld(cx, cy, zc, prio, kind)
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
     vkey = np.stack([np.round(cx * Q).astype(np.int64), np.round(cy * Q).astype(np.int64), zq], 1)
@@ -797,7 +819,7 @@ def build(ln, mesh=None, threads=8, log=print):
     if len(sf):
         area[sf] = [pieces["survey"][owners[o][1]]["c"] for o in owner[tf[sf]].tolist()]
     fcls_id = np.array([CLASS_IDS[c] for c in tcls])
-    log(f"  weld: {len(uk):,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items()]}, "
+    log(f"  weld: {n_points:,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items() if p != 'ties']}, ties over 1 cm {steps['ties']['over 1 cm']}, "
         f"{time.time() - t1:.0f} s")
 
     # the kept terrain triangles, as they are
