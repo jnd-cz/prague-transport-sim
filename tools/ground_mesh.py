@@ -252,38 +252,6 @@ def ring_segments(a):
     return np.asarray(segs, float).reshape(-1, 2, 3)
 
 
-OFF_LIDAR = 1.0  # m: a street area's outline this far off IPR's ground (its points' median) is off the lidar (#653)
-
-
-def off_lidar(D, areas, ipr=None):
-    """The survey areas (of `areas`) whose outline's points stand more than OFF_LIDAR off IPR's ground (their median):
-    on a structure or under one. The generated street surface follows IPR (#512); on line 37 a walled terrace's sidewalk
-    (area 2962, (7590, 743)) lay 2.5-4.5 m under its own outline, and with its walls drawn from theirs, a pit (#653).
-    5-52 street areas a line over 0.5 m, 2-30 over 1 m (2026-11-17 data)."""
-    if not len(areas):
-        return set()
-    from geo import Frame
-    if ipr is None:
-        from ipr_dtm import IprDtm
-        ipr = IprDtm()
-    F_ = Frame()
-    ids, pts = [], []
-    for a in np.asarray(areas).tolist():
-        r = [q for q in D["areas"][a]["r"] if q[2] is not None]
-        ids += [int(a)] * len(r)
-        pts += [q[:3] for q in r]
-    if not pts:
-        return set()
-    ids, pts = np.asarray(ids), np.asarray(pts, float)
-    d = pts[:, 2] - np.asarray(ipr.sample(pts[:, 0] + F_.E0, pts[:, 1] + F_.N0), float)
-    out = set()
-    for a in np.unique(ids).tolist():
-        da = d[(ids == a) & np.isfinite(d)]
-        if len(da) >= 3 and abs(np.median(da)) > OFF_LIDAR:
-            out.add(a)
-    return out
-
-
 def snap_to_walls(D, x, y, z, street):
     """Heights `z` of points (x, y) with each `street` one on a level-0 survey wall's or stairs' outline set to the
     outline's height there (along the edge it lies on, between its ends), the nearest within WALL_SNAP of its own. The
@@ -683,11 +651,8 @@ def build(ln, mesh=None, threads=8, log=print):
         deck = shapely.union_all(shapely.buffer(np.asarray(spans, dtype=object), BRIDGE_NEAR, cap_style="flat"))
         shapely.prepare(deck)
         on_span = shapely.contains_xy(deck, cx[m], cy[m])
-    # (a street area whose outline stands off IPR's ground, on a structure or under one, keeps its own outline's surface,
-    # as the page drew it before #509: the street surface follows IPR, #653)
-    off = np.isin(sa, list(off_lidar(D, np.unique(sa[np.isin(sc, list(STREETS_ROAD | STREETS_WALK))]))))
     for kd, cls in (("road", STREETS_ROAD), ("sidewalk", STREETS_WALK)):
-        mm = np.isin(sc, list(cls)) & ~on_span & ~off
+        mm = np.isin(sc, list(cls)) & ~on_span
         if mm.any():
             zs[mm] = streets.at(kd, cx[m][mm], cy[m][mm])
     # (a lawn, a yard, a railway yard on the lidar ground (`g`, tools/zps_inside.py) has surveyed heights on its outline

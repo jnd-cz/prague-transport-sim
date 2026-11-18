@@ -163,16 +163,6 @@ class Walls(unittest.TestCase):
         self.assertEqual(np.round(got, 3).tolist(), [228.5, 229.25, 230.0, 228.65, 229.0])
 
 
-    def test_a_street_area_off_the_lidar(self):
-        # (#653: a sidewalk 3 m over IPR's ground, on a terrace, is off it; one 0.4 m over it is not, nor one without heights)
-        from types import SimpleNamespace
-        ipr = SimpleNamespace(sample=lambda x, y: np.full(len(np.atleast_1d(x)), 200.0))
-        sq = lambda z: [[0, 0, z], [5, 0, z], [5, 5, z], [0, 5, z]]  # noqa: E731
-        D = {"areas": [{"c": "sidewalk", "l": 0, "r": sq(203.0)}, {"c": "sidewalk", "l": 0, "r": sq(200.4)},
-                       {"c": "sidewalk", "l": 0, "r": [[0, 0, None], [5, 0, None], [5, 5, None]]}]}
-        self.assertEqual(gm.off_lidar(D, [0, 1, 2], ipr), {0})
-
-
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
         # (a lawn on the lidar ground takes the city mesh's height: its triangles under the classes above, "under")
