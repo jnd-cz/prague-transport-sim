@@ -1560,8 +1560,27 @@ def fit_mouths(ln, built, log=print):
                 V[v, 2] = int(round(to[h] * Q))
                 n += 1
                 break
-    log(f"  tunnel mouths: {len(mouths)}, {len(moved)} street points brought down, {n} vertices with them")
-    return {"mouths": len(mouths), "points": len(moved), "vertices": n}
+    walls = weld_coincident(built)
+    log(f"  tunnel mouths: {len(mouths)}, {len(moved)} street points brought down, {n} vertices with them, {walls} "
+        f"step walls between two of them gone")
+    return {"mouths": len(mouths), "points": len(moved), "vertices": n, "walls gone": walls}
+
+
+def weld_coincident(built):
+    """Vertices at one position (mm) as one, and the triangles that loses (a step's wall between two vertices both brought
+    down onto the tunnel road: fit_mouths) dropped with their names. The file holds each position once, as decode() reads
+    it. Returns the triangles dropped."""
+    V, F = built["V"], built["F"]
+    u, inv = np.unique(V, axis=0, return_inverse=True)
+    if len(u) == len(V):
+        return 0
+    F2 = inv.ravel()[F]
+    good = (F2[:, 0] != F2[:, 1]) & (F2[:, 1] != F2[:, 2]) & (F2[:, 0] != F2[:, 2])
+    built["V"], built["F"] = u, F2[good]
+    for k in ("cls", "draw", "area"):
+        if built.get(k) is not None:
+            built[k] = built[k][good]
+    return int((~good).sum())
 
 
 def write(ln, built, rep):
