@@ -54,10 +54,19 @@ class Survey(unittest.TestCase):
 
     def test_smaller_wins_between_equal_ranks_and_not_ground_left_out(self):
         D = {"areas": [{"c": "road", "l": 0, "r": sq(0, 0, 10, 10)}, {"c": "road", "l": 0, "r": sq(2, 2, 4, 4)},
-                       {"c": "wall", "l": 0, "r": sq(0, 0, 1, 1)}, {"c": "road", "l": 1, "r": sq(0, 0, 3, 3)}]}
+                       {"c": "roof", "l": 0, "r": sq(0, 0, 1, 1)}, {"c": "road", "l": 1, "r": sq(0, 0, 3, 3)}]}
         p = gp.survey_pieces(D, shapely.box(-100, -100, 100, 100))
         self.assertEqual(sorted(round(q["g"].area) for q in p), [4, 96])
         self.assertEqual({q["area"] for q in p}, {0, 1})
+
+    def test_a_wall_is_drawn_under_what_outranks_it(self):
+        # (#653: a level-0 wall is a piece, drawn from its own outline as the page drew it before #509; a road over it
+        # holds the overlap; another level's wall is not one)
+        D = {"areas": [{"c": "road", "l": 0, "r": sq(0, 0, 10, 10)}, {"c": "wall", "l": 0, "r": sq(9, 0, 11, 10)},
+                       {"c": "wall", "l": 1, "r": sq(20, 0, 21, 10)}]}
+        p = gp.survey_pieces(D, shapely.box(-100, -100, 100, 100))
+        by = {q["area"]: round(q["g"].area) for q in p}
+        self.assertEqual(by, {0: 100, 1: 10})
 
     def test_clipped_to_the_box(self):
         D = {"areas": [{"c": "road", "l": 0, "r": sq(-5, 0, 5, 10)}]}
