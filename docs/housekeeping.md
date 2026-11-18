@@ -37,9 +37,9 @@ starts from the new baseline anyway.
    - a dated issue whose day has come: who takes it;
    - a file that grew over 15 % in a week, or passed 2000 lines: noted for the next architecture review;
    - CI's median over 2 minutes, or runs that failed;
-   - a fact a source now matches: retire it, deleted from `data/truth.json` in a PR that quotes it and names the
-     snapshot that matches (the user, 2026-11-18: "git history is good enough"); one that changed or moved: look at
-     the place again.
+   - a fact a source now matches: its review card (`tools/fact_review.py`, DATA.md "Facts over a source") for the
+     user to answer, and the retired ones in a PR that names the snapshot that matches (the user, 2026-11-18: "git
+     history is good enough"); one that changed or moved: look at the place again.
 3. Post: `python -I tools/repo_health.py --post 291`, then one comment with the proposals, numbered, so
    the user answers by number. The pass changes nothing itself.
 

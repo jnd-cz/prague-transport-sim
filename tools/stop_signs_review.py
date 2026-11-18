@@ -49,22 +49,30 @@ MARK_OF = {"DTM": "DTM stop sign", "OSM": "OSM stop position", "GTFS": "timetabl
 OPTIONS = ["sign at the pin", "sign at the timetable point (GTFS)", "unsure"]
 # The answers that said the sign the build takes was right (the card's pin was the DTM sign where it had one, else
 # OSM's stop position): a fact with one confirms that source; the others (placed on the map, the GTFS point) correct
-# it. A fact matches its source within MATCH in the plane (the user, 2026-11-18, #670: "within 1 meter would be good
-# match but the actual 2D position on the stop platform matters (for visual purposes), not only the position along the
-# tracks").
+# it. A placed fact matches the DTM's sign within MATCH in the plane, and only the DTM's: OSM's stop position lies on
+# the track's centre line, 2-3 m across from the pole (the user, 2026-11-18, #670: "within 1 meter would be good match
+# but the actual 2D position on the stop platform matters (for visual purposes), not only the position along the
+# tracks"; then, on pictures of the signs 1.3-1.6 m from the DTM's: "I would extend the tolerance to 2 meters because
+# in your images I can see Čechova čtvrť, Malostranské náměstí, Podolská vodárna, Národní divadlo look right too", "I
+# would treat DTM as the most accurate so retire only those and if it's missing then keep my answer").
 CONFIRMS = (OPTIONS[0], BY_SOURCE["DTM"], BY_SOURCE["OSM"])
-MATCH = 1.0  # m
+MATCH = 2.0  # m
 
 
 def sign_state(fact, chain):
     """A stopSigns fact's state against the sign the build takes without it: `chain` (source, x, y) in the city frame,
-    or None (sources.fact_state; `pin` is the card's pin, recorded with the answers imported since #670)."""
+    or None (sources.fact_state; `pin` is the card's pin, recorded with the answers imported since #670). A correction
+    matches only the DTM's sign (MATCH). `at` and `src`: the fact's point and the source's, for the review of a match
+    (tools/fact_review.py)."""
     near = lambda a, b: math.hypot(a[0] - b[0], a[1] - b[1]) <= MATCH  # noqa: E731
     now = (chain[1], chain[2]) if chain else None
     state = sources.fact_state((fact["x"], fact["y"]), tuple(fact["pin"]) if fact.get("pin") else None, now, near,
                                confirms=fact["how"] in CONFIRMS)
+    if state == "matches" and chain[0] != "dtmpoints":
+        state = "holds"
     return {"id": sources.fact_id("stopSigns", fact), "state": state, "how": fact["how"], "now": chain[0] if chain else None,
-            "off": round(math.hypot(fact["x"] - now[0], fact["y"] - now[1]), 2) if now else None}
+            "off": round(math.hypot(fact["x"] - now[0], fact["y"] - now[1]), 2) if now else None,
+            "at": [round(fact["x"], 2), round(fact["y"], 2)], "src": [round(now[0], 2), round(now[1], 2)] if now else None}
 OSM, GTFS, END, DTM = "#3e9dff", "#ff9e31", "#ffffff", "#ff3b30"
 # The other direction's stop position lies on the parallel track, 3.1-5.9 m off ours: within 6 m it was taken
 # at 5 stops (Hercovka on 17, Vršovické náměstí on 22: the user, review 2026-11-05), while our direction's

@@ -25,15 +25,20 @@ class State(unittest.TestCase):
     def test_a_correction_against_the_sign_the_sources_give(self):
         placed = self.fact("placed on the map")
         self.assertEqual(R.sign_state(placed, ("dtmpoints", 0.6, 0.6)),
-                         {"id": "A → B", "state": "matches", "how": "placed on the map", "now": "dtmpoints", "off": 0.85})
-        # in the plane: 1.2 m across the platform is not the same sign, wherever it lies along the track
-        self.assertEqual(R.sign_state(placed, ("osm", 0.0, 1.2))["state"], "holds")
-        self.assertEqual(R.sign_state(placed, None), {"id": "A → B", "state": "holds", "how": "placed on the map", "now": None, "off": None})
+                         {"id": "A → B", "state": "matches", "how": "placed on the map", "now": "dtmpoints", "off": 0.85,
+                          "at": [0.0, 0.0], "src": [0.6, 0.6]})
+        # in the plane, within 2 m of the DTM's sign (the user, 2026-11-18): 1.6 m along or across matches, 2.5 m holds
+        self.assertEqual(R.sign_state(placed, ("dtmpoints", 0.0, 1.6))["state"], "matches")
+        self.assertEqual(R.sign_state(placed, ("dtmpoints", 2.5, 0.0))["state"], "holds")
+        # only the DTM's: OSM's stop position on the track's centre line never retires the user's sign
+        self.assertEqual(R.sign_state(placed, ("osm", 0.3, 0.0))["state"], "holds")
+        self.assertEqual(R.sign_state(self.fact(R.OPTIONS[1]), ("osm", 0.3, 0.0))["state"], "holds")
+        self.assertEqual(R.sign_state(placed, None), {"id": "A → B", "state": "holds", "how": "placed on the map", "now": None,
+                                                      "off": None, "at": [0.0, 0.0], "src": None})
         # with the pin recorded: the source still there holds, gone elsewhere changed
         pinned = self.fact("placed on the map", pin=[5.0, 0.0])
         self.assertEqual(R.sign_state(pinned, ("osm", 5.4, 0.0))["state"], "holds")
         self.assertEqual(R.sign_state(pinned, ("osm", 9.0, 0.0))["state"], "changed")
-        self.assertEqual(R.sign_state(self.fact(R.OPTIONS[1]), ("osm", 0.3, 0.0))["state"], "matches")
 
     def test_a_confirmation_agrees_or_the_source_moved(self):
         for how in R.CONFIRMS:
