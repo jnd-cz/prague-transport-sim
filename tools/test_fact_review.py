@@ -68,6 +68,7 @@ class Truth(unittest.TestCase):
         self.assertEqual(json.loads(t)["trackSources"]["switchTips"], [{"place": "Q", "near": [5, 6], "tip": [7, 8]}])
         self.assertEqual(t.replace('{"place": "P", "near": [1, 2], "tip": [3, 4]},\n                                 ', ""), t)
         self.assertEqual(json.loads(FR.drop(TRUTH, ("trackSources", "switchTips"), 1))["trackSources"]["switchTips"][0]["place"], "P")
+        self.assertIn('"switchTips": [],\n', FR.drop(t, ("trackSources", "switchTips"), 0))  # the last one: []
         # everything outside the item unchanged
         self.assertTrue(t.startswith(TRUTH[:TRUTH.index('{"place"')]))
         self.assertTrue(t.endswith(TRUTH[TRUTH.index('],\n  "other"'):]))
