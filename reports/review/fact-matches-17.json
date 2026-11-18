@@ -1,0 +1,312 @@
+{
+ "schema": 1,
+ "issue": 670,
+ "line": "17",
+ "title": "Facts a source now matches: retire them?",
+ "findings": [
+  {
+   "kind": "fact match",
+   "id": "fact-stopSigns-Podolská vodárna → Výtoň",
+   "section": "stopSigns",
+   "fact": "Podolská vodárna → Výtoň",
+   "line": "17",
+   "lines": [
+    "17"
+   ],
+   "x": -554.46,
+   "y": -3000.41,
+   "place": [
+    50.0599658,
+    14.4193658
+   ],
+   "mag": 143,
+   "status": "review",
+   "marks": [
+    {
+     "x": -554.46,
+     "y": -3000.41,
+     "label": "your placed stop sign",
+     "color": "#ffd60a"
+    },
+    {
+     "x": -554.88,
+     "y": -2999.04,
+     "label": "the DTM's sign (state 2024)",
+     "color": "#ff3b30"
+    }
+   ],
+   "options": [
+    "retire: the DTM sign is right (mine becomes a confirmation of it)",
+    "keep my fact",
+    "unsure"
+   ],
+   "info": "Podolská vodárna → Výtoň: the DTM's sign (state 2024) lies 1.43 m from your placed stop sign (data/truth.json stopSigns); without it the build takes the DTM's sign (state 2024). Is the source right? \"retire: the DTM sign is right (mine becomes a confirmation of it)\" or keep yours."
+  },
+  {
+   "kind": "fact match",
+   "id": "fact-stopSigns-Čechova čtvrť → Nádraží Modřany",
+   "section": "stopSigns",
+   "fact": "Čechova čtvrť → Nádraží Modřany",
+   "line": "17",
+   "lines": [
+    "17"
+   ],
+   "x": -2122.01,
+   "y": -9265.44,
+   "place": [
+    50.0022393,
+    14.4096195
+   ],
+   "mag": 130,
+   "status": "review",
+   "marks": [
+    {
+     "x": -2122.01,
+     "y": -9265.44,
+     "label": "your placed stop sign",
+     "color": "#ffd60a"
+    },
+    {
+     "x": -2121.95,
+     "y": -9264.14,
+     "label": "the DTM's sign (state 2024)",
+     "color": "#ff3b30"
+    }
+   ],
+   "options": [
+    "retire: the DTM sign is right (mine becomes a confirmation of it)",
+    "keep my fact",
+    "unsure"
+   ],
+   "info": "Čechova čtvrť → Nádraží Modřany: the DTM's sign (state 2024) lies 1.3 m from your placed stop sign (data/truth.json stopSigns); without it the build takes the DTM's sign (state 2024). Is the source right? \"retire: the DTM sign is right (mine becomes a confirmation of it)\" or keep yours."
+  },
+  {
+   "kind": "fact match",
+   "id": "fact-stopSigns-Čechův most → Strossmayerovo náměstí",
+   "section": "stopSigns",
+   "fact": "Čechův most → Strossmayerovo náměstí",
+   "line": "17",
+   "lines": [
+    "17"
+   ],
+   "x": -165,
+   "y": 772.48,
+   "place": [
+    50.0940493,
+    14.4175683
+   ],
+   "mag": 83,
+   "status": "review",
+   "marks": [
+    {
+     "x": -165,
+     "y": 772.48,
+     "label": "your placed stop sign",
+     "color": "#ffd60a"
+    },
+    {
+     "x": -164.23,
+     "y": 772.17,
+     "label": "the DTM's sign (state 2024)",
+     "color": "#ff3b30"
+    }
+   ],
+   "options": [
+    "retire: the DTM sign is right (mine becomes a confirmation of it)",
+    "keep my fact",
+    "unsure"
+   ],
+   "info": "Čechův most → Strossmayerovo náměstí: the DTM's sign (state 2024) lies 0.83 m from your placed stop sign (data/truth.json stopSigns); without it the build takes the DTM's sign (state 2024). Is the source right? \"retire: the DTM sign is right (mine becomes a confirmation of it)\" or keep yours."
+  },
+  {
+   "kind": "fact match",
+   "id": "fact-stopSigns-Právnická fakulta → Čechův most",
+   "section": "stopSigns",
+   "fact": "Právnická fakulta → Čechův most",
+   "line": "17",
+   "lines": [
+    "17"
+   ],
+   "x": -191.2,
+   "y": 475.76,
+   "place": [
+    50.0913742,
+    14.4177711
+   ],
+   "mag": 67,
+   "status": "review",
+   "marks": [
+    {
+     "x": -191.2,
+     "y": 475.76,
+     "label": "your placed stop sign",
+     "color": "#ffd60a"
+    },
+    {
+     "x": -190.57,
+     "y": 475.52,
+     "label": "the DTM's sign (state 2024)",
+     "color": "#ff3b30"
+    }
+   ],
+   "options": [
+    "retire: the DTM sign is right (mine becomes a confirmation of it)",
+    "keep my fact",
+    "unsure"
+   ],
+   "info": "Právnická fakulta → Čechův most: the DTM's sign (state 2024) lies 0.67 m from your placed stop sign (data/truth.json stopSigns); without it the build takes the DTM's sign (state 2024). Is the source right? \"retire: the DTM sign is right (mine becomes a confirmation of it)\" or keep yours."
+  },
+  {
+   "kind": "fact match",
+   "id": "fact-stopSigns-Hercovka → Ke Stírce",
+   "section": "stopSigns",
+   "fact": "Hercovka → Ke Stírce",
+   "line": "17",
+   "lines": [
+    "17"
+   ],
+   "x": 2770.88,
+   "y": 3498.07,
+   "place": [
+    50.1219209,
+    14.4530436
+   ],
+   "mag": 56,
+   "status": "review",
+   "marks": [
+    {
+     "x": 2770.88,
+     "y": 3498.07,
+     "label": "your placed stop sign",
+     "color": "#ffd60a"
+    },
+    {
+     "x": 2770.48,
+     "y": 3498.47,
+     "label": "the DTM's sign (state 2024)",
+     "color": "#ff3b30"
+    }
+   ],
+   "options": [
+    "retire: the DTM sign is right (mine becomes a confirmation of it)",
+    "keep my fact",
+    "unsure"
+   ],
+   "info": "Hercovka → Ke Stírce: the DTM's sign (state 2024) lies 0.56 m from your placed stop sign (data/truth.json stopSigns); without it the build takes the DTM's sign (state 2024). Is the source right? \"retire: the DTM sign is right (mine becomes a confirmation of it)\" or keep yours."
+  },
+  {
+   "kind": "fact match",
+   "id": "fact-stopSigns-Jiráskovo náměstí → Národní divadlo",
+   "section": "stopSigns",
+   "fact": "Jiráskovo náměstí → Národní divadlo",
+   "line": "17",
+   "lines": [
+    "17"
+   ],
+   "x": -677.88,
+   "y": -1160.03,
+   "place": [
+    50.0762071,
+    14.4141516
+   ],
+   "mag": 48,
+   "status": "review",
+   "marks": [
+    {
+     "x": -677.88,
+     "y": -1160.03,
+     "label": "your placed stop sign",
+     "color": "#ffd60a"
+    },
+    {
+     "x": -677.73,
+     "y": -1159.58,
+     "label": "the DTM's sign (state 2024)",
+     "color": "#ff3b30"
+    }
+   ],
+   "options": [
+    "retire: the DTM sign is right (mine becomes a confirmation of it)",
+    "keep my fact",
+    "unsure"
+   ],
+   "info": "Jiráskovo náměstí → Národní divadlo: the DTM's sign (state 2024) lies 0.48 m from your placed stop sign (data/truth.json stopSigns); without it the build takes the DTM's sign (state 2024). Is the source right? \"retire: the DTM sign is right (mine becomes a confirmation of it)\" or keep yours."
+  },
+  {
+   "kind": "fact match",
+   "id": "fact-switchTips-Podolská vodárna, the eastern switch of the triangle, in Podolská (the curve towards Podolské nábřeží leaves it)",
+   "section": "switchTips",
+   "fact": "Podolská vodárna, the eastern switch of the triangle, in Podolská (the curve towards Podolské nábřeží leaves it)",
+   "line": "17",
+   "lines": [
+    "17"
+   ],
+   "x": -538.6,
+   "y": -3091.07,
+   "place": [
+    50.0591777,
+    14.4197578
+   ],
+   "mag": 17,
+   "status": "review",
+   "marks": [
+    {
+     "x": -538.6,
+     "y": -3091.07,
+     "label": "your switch tip",
+     "color": "#ffd60a"
+    },
+    {
+     "x": -538.6,
+     "y": -3092.73,
+     "label": "DI's fork",
+     "color": "#ff3b30"
+    }
+   ],
+   "options": [
+    "retire: the source is right (delete my fact)",
+    "keep my fact",
+    "unsure"
+   ],
+   "info": "Podolská vodárna, the eastern switch of the triangle, in Podolská (the curve towards Podolské nábřeží leaves it): DI's fork lies 0.17 m from your switch tip (data/truth.json switchTips); without it the build takes DI's fork. Is the source right? \"retire: the source is right (delete my fact)\" or keep yours."
+  },
+  {
+   "kind": "fact match",
+   "id": "fact-stopSigns-Pobřežní cesta → Přístaviště",
+   "section": "stopSigns",
+   "fact": "Pobřežní cesta → Přístaviště",
+   "line": "17",
+   "lines": [
+    "17"
+   ],
+   "x": -1790.79,
+   "y": -5722.12,
+   "place": [
+    50.0342064,
+    14.4074491
+   ],
+   "mag": 14,
+   "status": "review",
+   "marks": [
+    {
+     "x": -1790.79,
+     "y": -5722.12,
+     "label": "your placed stop sign",
+     "color": "#ffd60a"
+    },
+    {
+     "x": -1790.86,
+     "y": -5722.01,
+     "label": "the DTM's sign (state 2024)",
+     "color": "#ff3b30"
+    }
+   ],
+   "options": [
+    "retire: the DTM sign is right (mine becomes a confirmation of it)",
+    "keep my fact",
+    "unsure"
+   ],
+   "info": "Pobřežní cesta → Přístaviště: the DTM's sign (state 2024) lies 0.14 m from your placed stop sign (data/truth.json stopSigns); without it the build takes the DTM's sign (state 2024). Is the source right? \"retire: the DTM sign is right (mine becomes a confirmation of it)\" or keep yours."
+  }
+ ]
+}
