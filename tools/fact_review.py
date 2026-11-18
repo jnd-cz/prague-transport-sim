@@ -44,10 +44,10 @@ def card_id(section, fid):
     return f"fact-{section}-{fid}"
 
 
-def cards(facts):
+def cards(facts, frame=None):
     """{line: [card]}: a card per fact in state `matches` whose state gives its point, on the first line it matches
-    on, the farthest first (`mag`: cm)."""
-    frame, out = Frame(), {}
+    on, the farthest first (`mag`: cm). `frame`: the city frame (tools/geo.py), for each card's lat, lon."""
+    frame, out = frame or Frame(), {}
     for f in facts:
         d = f.get("detail") or {}
         if f["state"] != "matches" or not d.get("at"):

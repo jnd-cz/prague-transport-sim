@@ -41,6 +41,16 @@ TRUTH = """{
 """
 
 
+class Frame:
+    """The city frame's lat, lon without raw/proj/'s grid (CI has no raw/)."""
+    def ll(self, x, y):
+        return 50.0 + y / 111e3, 14.4 + x / 71e3
+
+
+def cards(facts):
+    return FR.cards(facts, Frame())
+
+
 def fact(section, fid, state, at=None, src=None, off=None, lines=(("22", None),)):
     d = {k: v for k, v in (("at", at), ("src", src), ("off", off)) if v is not None}
     return {"section": section, "id": fid, "state": state, "detail": d, "lines": [[ln, s or state] for ln, s in lines]}
@@ -48,7 +58,7 @@ def fact(section, fid, state, at=None, src=None, off=None, lines=(("22", None),)
 
 class Cards(unittest.TestCase):
     def test_a_card_per_match_with_a_point_farthest_first(self):
-        got = FR.cards([
+        got = cards([
             fact("stopSigns", "A → B", "matches", [10.0, 2.0], [10.5, 2.0], 0.5, lines=(("22", None), ("23", None))),
             fact("stopSigns", "C → D", "matches", [0.0, 0.0], [0.0, 1.4], 1.4),
             fact("switchTips", "P", "matches", [3.0, 4.0], [3.1, 4.0], 0.1, lines=(("17", "holds"), ("37", None))),
@@ -79,14 +89,14 @@ class Truth(unittest.TestCase):
         self.assertEqual(t, TRUTH)
 
     def test_retired_stop_sign_confirms_the_dtm_sign_other_facts_go(self):
-        card = FR.cards([fact("stopSigns", "A → B", "matches", [10.0, 2.0], [10.5, 2.25], 0.56)])["22"][0]
+        card = cards([fact("stopSigns", "A → B", "matches", [10.0, 2.0], [10.5, 2.25], 0.56)])["22"][0]
         t = FR.retire(TRUTH, card, "2026-11-19")
         f = json.loads(t)["stopSigns"]["signs"][0]
         self.assertEqual((f["x"], f["y"], f["how"], f["pin"], f["pinFrom"]), (10.5, 2.25, R.BY_SOURCE["DTM"], [10.5, 2.25], "DTM"))
         self.assertIn("fact-match review", f["source"])
         self.assertIn(R.BY_SOURCE["DTM"], R.CONFIRMS)  # (a confirmation now: agrees while the DTM keeps the sign)
         self.assertEqual(json.loads(t)["stopSigns"]["signs"][1], json.loads(TRUTH)["stopSigns"]["signs"][1])
-        tip = FR.cards([fact("switchTips", "Q", "matches", [7.0, 8.0], [7.1, 8.0], 0.1)])["22"][0]
+        tip = cards([fact("switchTips", "Q", "matches", [7.0, 8.0], [7.1, 8.0], 0.1)])["22"][0]
         self.assertEqual([f["place"] for f in json.loads(FR.retire(TRUTH, tip, "2026-11-19"))["trackSources"]["switchTips"]], ["P"])
 
     def test_import_retires_what_the_user_answered_retire(self):
@@ -95,7 +105,7 @@ class Truth(unittest.TestCase):
                 os.makedirs(os.path.join(root, d))
             with open(os.path.join(root, "data", "truth.json"), "w", encoding="utf-8", newline="\n") as fh:
                 fh.write(TRUTH)
-            by_line = FR.cards([fact("stopSigns", "A → B", "matches", [10.0, 2.0], [10.5, 2.0], 0.5),
+            by_line = cards([fact("stopSigns", "A → B", "matches", [10.0, 2.0], [10.5, 2.0], 0.5),
                                 fact("stopSigns", "C → D", "matches", [0.0, 0.0], [0.0, 1.4], 1.4),
                                 fact("switchTips", "P", "matches", [3.0, 4.0], [3.1, 4.0], 0.1)])
             FR.write_sets(by_line, root)
