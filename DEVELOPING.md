@@ -333,6 +333,19 @@ their levels and height-accuracy classes); the JSON report retains their vertice
 Both tools accept `--cache DIR`. If an old blob is missing, populate the cache with `snapshot.py data-fetch`
 in a separate checkout of that reference; comparisons never restore over the working data.
 
+**Pictures in a PR** (#662): GitHub takes uploaded pictures only from its web page (drag and drop into a comment);
+`gh` and the API have no upload. A session puts them in its branch instead, so the PR shows them and main never
+carries them:
+
+1. Shrink each picture to a JPEG of at most about 200 KB (#662's seven: 27–209 KB) and commit them as
+   `docs/reviews/issueN-<what>.jpg` in a commit of their own. Push.
+2. Link them from the PR's body by that commit's full SHA, not the branch, which is deleted at the merge:
+   `![desktop](https://raw.githubusercontent.com/jnd-cz/prague-transport-sim/<sha>/docs/reviews/issueN-desktop.jpg)`.
+   A phone's portrait shot goes in as `<img src="…" width="320" alt="…">`.
+3. Remove them in the next commit (`git rm docs/reviews/issueN-*`) and push. The squash merge then adds nothing
+   to main. The links keep working after the merge: `refs/pull/N/head` keeps the commit (#662's still load
+   with its branch deleted).
+
 **The limits against real rides** (#451): `python -P -E tools/rides_limits.py --lines 22,23` maps the GPS rides in
 `raw/reference/rides/` (`RIDES`, the ones in a line's direction) onto each line's track and lists where a ride went
 more than 3 km/h over our limit for 10 m or more, with what sets the limit there, and per stretch a quickest run at our
