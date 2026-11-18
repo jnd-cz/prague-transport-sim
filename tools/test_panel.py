@@ -6,7 +6,9 @@ port, 1600 x 900). Checks:
 - the heaters' knobs point at their position labels in every position (src/panel.js POS), the control switch's
   handle at its mark 1 (CAM);
 - the cab frame leaves the mirror's picture out while it is shown, and covers it when the mirror is off (src/cabframe.js);
-- with the head turned all the way left, the cab's rear wall stands at the screen's left edge (src/cabframe.js REAR)."""
+- with the head turned all the way left, the cab's rear wall stands at the screen's left edge (src/cabframe.js REAR);
+- every figure of every meter, the panel's and the compact strips', lies inside its plate and off its unit letter, in the
+  page's font and in Arial, as wide as a phone's Roboto (src/panel.js meter(), #691)."""
 import argparse
 import faulthandler
 import functools
@@ -62,6 +64,27 @@ KNOBS = """async () => {
   out.push({ id: 'vypinac', k: 1, label: '1', knob: Math.round(Math.atan2(m.b, m.a) * 180 / Math.PI), toLabel: Math.round(Math.atan2(ly - cy, lx - cx) * 180 / Math.PI) });
   return out;
 }"""
+# each meter's figures: how far past the plate (in the meter's own units) and whether on the unit letter; the compact
+# strips shown for it, the label font given or the page's
+METERS = """async (font) => {
+  const st = document.createElement('style'), cmp = [...document.querySelectorAll('#dash .cmp')], out = [];
+  if (font) st.textContent = `#dash, #pSheet, #pTip { --f-label: ${font} !important; }`;
+  document.head.appendChild(st);
+  for (const c of cmp) c.style.display = 'block';
+  await new Promise((r) => requestAnimationFrame(() => r()));
+  const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  for (const m of document.querySelectorAll('#dash .meter')) {
+    const pl = m.querySelector('.pl'), p = pl.getBoundingClientRect(), u = m.querySelector('.unit').getBoundingClientRect();
+    const k = p.width / pl.getBBox().width, where = m.closest('.cl') ? 'landscape' : m.closest('.cp') ? 'portrait' : 'panel';
+    for (const t of m.querySelectorAll('.fig')) {
+      const r = t.getBoundingClientRect(), off = Math.max(p.left - r.left, r.right - p.right, p.top - r.top, r.bottom - p.bottom, 0) / k;
+      out.push({ m: `${m.dataset.c} ${where}`, fig: t.textContent, off: +off.toFixed(2), onUnit: overlap(r, u) });
+    }
+  }
+  for (const c of cmp) c.style.display = '';
+  st.remove();
+  return out;
+}"""
 # the cab frame's canvas at the middle of the mirror's picture and at the screen's left edge
 PIXELS = """(rect) => {
   const cv = document.getElementById('cabFrame'), g = cv.getContext('2d'), k = cv.width / innerWidth;
@@ -104,6 +127,7 @@ def main():
             page.mouse.move(8, 200)
             r["request"] = page.evaluate(REQUEST)
             r["knobs"] = page.evaluate(KNOBS)
+            r["meters"] = {font or "page": page.evaluate(METERS, font) for font in ("", "Arial, sans-serif")}
             page.keyboard.down("q")
             page.wait_for_timeout(2500)
             r["left"] = page.evaluate(PIXELS)
@@ -128,6 +152,10 @@ def main():
         d = (k["knob"] - k["toLabel"] + 180) % 360 - 180
         if abs(d) > 6:
             fails.append(f"{k['id']} at {k['label']}: the knob points {d}° off its label")
+    for font, figs in r["meters"].items():
+        for g in figs:
+            if g["off"] > 0.05 or g["onUnit"]:
+                fails.append(f"{g['m']} meter, {font} font: {g['fig']} {g['off']} past its plate{' and on its unit' if g['onUnit'] else ''}")
     m, n = r["left"], r["noMirror"]
     if r["left"]["z"] != "6":
         fails.append(f"the mirror's frame is not over the HUD (z-index {m['z']})")

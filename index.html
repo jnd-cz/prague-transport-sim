@@ -100,7 +100,9 @@
   select, button { font: inherit; background: #2c3631; color: var(--ink); border: 1px solid #4a5a50; border-radius: 6px; padding: 7px 10px; }
   button.primary { background: #b5161c; border-color: #d43; font-weight: 700; padding: 10px 26px; cursor: pointer; font-size: 16px; }
   button.primary:hover { background: #cf2026; }
-  #pausePanel { position: fixed; top: calc(40% + 36px); left: 50%; transform: translateX(-50%); display: none; gap: 10px; z-index: 5; }
+  /* (three buttons with ⛶, #691: in a row where they fit, else wrapped round the middle) */
+  #pausePanel { position: fixed; top: calc(40% + 36px); left: 50%; transform: translateX(-50%); display: none; gap: 10px; z-index: 5;
+    width: max-content; max-width: calc(100vw - 16px); flex-wrap: wrap; justify-content: center; }
   #pausePanel.show { display: flex; }
   .checks { display: flex; gap: 18px; flex-wrap: wrap; margin: 6px 0 16px; font-size: 13px; }
   .keys { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 12px; font-size: 13px; margin: 14px 0; color: #cfd6c9; }
