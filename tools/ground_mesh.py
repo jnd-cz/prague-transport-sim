@@ -1493,6 +1493,77 @@ def decode_one(blob, layout, draw=False, area=False):
     return (V, out) + ((names["draw"],) if draw else ()) + ((names["area"],) if area else ())
 
 
+# ---------------------------------------------------------------- the road tunnels' mouths
+MOUTH_FIT = {"road", "parking", "paved", "sidewalk", "cycle", "island", "median", "tram"}  # (src/structures.js until #682)
+MOUTH_OVER, MOUTH_ON, MOUTH_NEAR = 0.3, 0.05, 5  # m, m, mm
+
+
+def fit_mouths(ln, built, log=print):
+    """The survey's street areas round a road tunnel's mouth often take the portal's crown into their outline (a road
+    area at the Letenský tunel ran 191-206 m: a grey ramp across the opening). In each mouth's footprint (3 m out of it
+    to its depth inward, its width + 1.5 m to each side: tools/ground_at.py Ground.mouths), a vertex of a street triangle
+    (MOUTH_FIT, as the page's lookup holds it: not a wall, not upright) more than MOUTH_OVER over the tunnel road comes
+    down to MOUTH_ON over it, and every vertex at one of those points (within MOUTH_NEAR in plan and height: a lawn, a
+    bed or a step's wall sharing the corner) with it. The page did this at load until #682 (src/structures.js mouthFix);
+    the tunnel road's height comes from the ground as it was before (its portals: the lowest ground out of the mouth).
+    Changes built["V"]; returns the counts."""
+    import ground_at
+    import network
+    L, V, F, cls, area = built["L"], built["V"], built["F"], built["cls"], built["area"]
+    if not any(r.get("t") and r.get("c") and not r.get("z") for r in L.get("roads") or []):
+        return {"mouths": 0}
+    L = {**L, "roads": [dict(r) for r in L["roads"]]}
+    network.widen_tram_streets(L)  # (the roads as the page has them: a tram street is wider, src/streets.js)
+    blob, layout = encode_tiles(V, F, cls, built.get("draw"), area)
+    mouths = ground_at.Ground(ln, L, file=(layout, blob)).mouths()
+    if not mouths:
+        return {"mouths": 0}
+    x, y, z = V[:, 0] / Q, V[:, 1] / Q, V[:, 2] / Q
+    # (the lookup's triangles: no walls, none upright)
+    a, b, c = F[:, 0], F[:, 1], F[:, 2]
+    flat = ~(((x[a] == x[b]) & (y[a] == y[b])) | ((x[b] == x[c]) & (y[b] == y[c])) | ((x[a] == x[c]) & (y[a] == y[c])))
+    street = (cls != CLASS_IDS["wall"]) & flat & np.isin(area.astype(str), sorted(MOUTH_FIT))
+    cand = np.zeros(len(V), bool)
+    cand[F[street].ravel()] = True
+    near = np.zeros(len(V), bool)
+    for m in mouths:
+        r = m["D"] + m["w"] + 5
+        near |= (np.abs(x - m["p"][0]) <= r) & (np.abs(y - m["p"][1]) <= r)
+    moved = {}  # vertex -> its new height (m)
+    for v in np.flatnonzero(cand & near).tolist():
+        for m in mouths:
+            d = (x[v] - m["p"][0]) * m["hx"] + (y[v] - m["p"][1]) * m["hy"]
+            lat = (x[v] - m["p"][0]) * m["nx"] + (y[v] - m["p"][1]) * m["ny"]
+            if d < -3 or d > m["D"] or abs(lat) > m["w"] + 1.5:
+                continue
+            zt = m["zAt"](d) + MOUTH_ON
+            if float(np.float32(z[v])) > zt + MOUTH_OVER:
+                moved[v] = zt
+                break
+    if not moved:
+        return {"mouths": len(mouths), "points": 0, "vertices": 0}
+    # every vertex at a moved point follows it (the page: each drawn vertex within MOUTH_NEAR of a moved one)
+    P = V[list(moved)]
+    to = np.array(list(moved.values()))
+    from scipy.spatial import cKDTree
+    tree = cKDTree(P.astype(float))
+    idx = np.flatnonzero(near)
+    hits = tree.query_ball_point(V[idx].astype(float), MOUTH_NEAR * math.sqrt(3) + 1e-6)
+    n = 0
+    for v, hs in zip(idx.tolist(), hits):
+        if v in moved:
+            V[v, 2] = int(round(moved[v] * Q))
+            n += 1
+            continue
+        for h in sorted(hs):
+            if (np.abs(V[v] - P[h]) <= MOUTH_NEAR).all():
+                V[v, 2] = int(round(to[h] * Q))
+                n += 1
+                break
+    log(f"  tunnel mouths: {len(mouths)}, {len(moved)} street points brought down, {n} vertices with them")
+    return {"mouths": len(mouths), "points": len(moved), "vertices": n}
+
+
 def write(ln, built, rep):
     import sources
     from atomic import replacing
@@ -1619,6 +1690,9 @@ def main(argv=None):
         for ln in lines:
             built = build(ln, a.mesh, a.threads)
             rep = built["rep"]
+            t1 = time.time()
+            rep["tunnel mouths"] = fit_mouths(ln, built)
+            rep["seconds"]["mouths"] = round(time.time() - t1, 1)
             t1 = time.time()
             rep["error"] = raster_error(built, ln)
             rep["seconds"]["error"] = round(time.time() - t1, 1)

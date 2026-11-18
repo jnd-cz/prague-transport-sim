@@ -35,8 +35,8 @@ function makeShelter() {
 // the top of rail (src/heights.js), kerb faces where it starts, ends and breaks: triangles into pos/col. A cross-section
 // within STRIP_CLEAR m of a drawn track's axis is left out with the segments beside it (#581: at Bílá Hora's loop the
 // first stop's own platform ran as one straight box across the loop's tracks, at Spojovací OSM's platform A crossed
-// one). Returns the metres left out. `zo`: the street's surface at the outer kerb of each cross-section, read at the load
-// (settlePlatforms: Start reads no lookup past the window, #658).
+// one). Returns the metres left out. `zo`: the street's surface at the outer kerb of each cross-section, the build's
+// (tools/network.py heights, #682: Start reads no lookup past the window, #658).
 const STRIP_CLEAR = 0.8;
 // the strip's cross-sections along its track, about every 2 m
 const sections = (s0, s1) => { const n = Math.max(2, Math.ceil((s1 - s0) / 2)), out = []; for (let k = 0; k <= n; k++) out.push(s0 + ((s1 - s0) * k) / n); return out; };
@@ -95,39 +95,15 @@ function across(pl) {
   return { inner, outer: pl.area ? Math.min(inner + 6, Math.max(inner + 2, far)) : inner + (pl.w || Math.max(2.4, Math.min(3.5, pl.gtfs ? far + 1 - inner : 2 * far - 2 * inner))) };
 }
 
-// What the platforms stand on, read at the end of the load while every tile's lookup is held (src/main.js; the window
-// drops those past it from there, #658): the street's surface at each strip's outer kerb (a platform the survey does not
-// draw), under a Vienna-type platform's sign on the opposite path and under an opposite platform's shelter, onto its
-// network record (zo, zs, zh).
-export function settlePlatforms(data, route, backRoute) {
-  const ground = route.ground, net = new Map((data.network?.platforms || []).map((r) => [r.i, r]));
-  for (const [i, pl] of (data.platforms || []).entries()) {
-    const N = net.get(i), rt = pl.path === 'back' ? backRoute : pl.path ? route : null;
-    if (!N || !rt) continue;
-    const kerb = pl.side < 0 ? pl.vienna ?? null : null;
-    if (kerb === null && !N.surveyed) {
-      const { outer } = across(pl);
-      N.zo = sections(pl.s0, pl.s1).map((s) => { const O = rt.offset(s, pl.side * outer); return ground.surface(O.x, O.y); });
-    }
-    if (kerb !== null && rt === backRoute && !pl.ours && !pl.twin) {
-      const at = pl.stop ? rt.nearest(pl.stop[0], pl.stop[1]).s : pl.s1 - 0.5, o = rt.offset(at, pl.side * (kerb + 0.8));
-      N.zs = ground.surface(o.x, o.y);
-    }
-    if (pl.shelter && rt === backRoute && !pl.ours) {
-      const m = rt.offset((pl.s0 + pl.s1) / 2, pl.side * ((kerb !== null ? kerb + 2 : across(pl).outer) - 0.6));
-      N.zh = ground.trackAt(m.x, m.y);
-    }
-  }
-}
-
 // Tram platforms of both directions from OSM (tools/platforms.py), each along the path the build put it on, built as a
 // strip curved along it from 1.5 m off the track centre out to its width, 0.18 m over top of rail (src/heights.js), kerb
 // faces on both sides. Where the surveyed streets (DTM) have a platform, island or sidewalk there, the survey draws it.
 // The opposite direction's platforms get a stop sign at their head and a shelter where OSM has one. The stop type
 // (Vienna: the kerb's offset) is the build's (tools/placement.py vienna), and whether the survey draws a platform too
-// (data/lineN.network.json, tools/network.py Stops); the heights its strip and a Vienna-type one's sign stand on were
-// read at the load (settlePlatforms): Start reads no survey (#658). Returns game.platforms ({ rt, back, s0, s1, side, inner, outer, ours, kerb, surveyed,
-// ... }: src/traffic.js reads it); `log` collects the strips left out over tracks (platformGaps).
+// (data/lineN.network.json, tools/network.py Stops); so are the heights the strip's outer kerb, a Vienna-type one's sign
+// and a shelter stand on (its record's zo, zs, zh in cm, tools/network.py heights, #682): Start reads no ground (#658).
+// Returns game.platforms ({ rt, back, s0, s1, side, inner, outer, ours, kerb, surveyed, ... }: src/traffic.js reads it);
+// `log` collects the strips left out over tracks (platformGaps).
 export function buildPlatforms({ data, route, backRoute, group, log }) {
   const ground = route.ground, net = new Map((data.network?.platforms || []).map((r) => [r.i, r]));
   const pos = [], col = [];
@@ -142,7 +118,7 @@ export function buildPlatforms({ data, route, backRoute, group, log }) {
     const ours = pl.ours ? { s0: pl.ours[0], s1: pl.ours[1] } : null;
     const N = net.get(i);
     if (!N) throw new Error(`line ${data.line}: platform ${pl.name} is not in the network (python -P -E tools/network.py --lines ${data.line})`);
-    const plat = { rt, back: rt !== route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter, ours, twin: !!pl.twin, unused: !!pl.unused, zs: N.zs, zh: N.zh };
+    const plat = { rt, back: rt !== route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter, ours, twin: !!pl.twin, unused: !!pl.unused, zs: N.zs / 100, zh: N.zh / 100 };
     platforms.push(plat);
     if (pl.also) also.push([plat, pl.also]);
     // (a Vienna-type stop on the doors' side: no platform on the road, the sidewalk is the platform)
@@ -150,7 +126,7 @@ export function buildPlatforms({ data, route, backRoute, group, log }) {
     if (plat.kerb !== null) { plat.inner = plat.kerb; plat.outer = plat.kerb + 2; plat.surveyed = true; continue; }
     plat.surveyed = N.surveyed; // (its middle a platform, island or sidewalk of the survey)
     if (plat.surveyed) continue;
-    const left = platformStrip(rt, s0, s1, side, inner, outer, ground, pos, col, cTop, cKerb, N.zo);
+    const left = platformStrip(rt, s0, s1, side, inner, outer, ground, pos, col, cTop, cKerb, N.zo?.map((v) => v / 100));
     if (left) log.platformGaps.push(`${pl.name} ${pl.code ?? ''}: ${left.toFixed(0)} m over a track left out`);
   }
   // A platform both paths tie on (they run over its track the same way: line 9 from Řepy to Motol) serves both: the

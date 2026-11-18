@@ -14,7 +14,6 @@ import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
 import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor, soundPacksFor } from './vehicles.js';
 import { Traffic } from './traffic.js';
-import { settlePlatforms } from './platforms.js';
 import { Autopilot } from './autopilot.js';
 import { junctionTurns, indicating } from './indicators.js';
 import { signalsAt } from './lamps.js';
@@ -116,6 +115,7 @@ try {
   const r = await load.get(`data/line${lineId}.network.json`);
   if (!r.ok) throw new Error(`line ${lineId}: no network file (data/line${lineId}.network.json, tools/network.py): ${r.status}`);
   data.network = await r.json();
+  if (!(data.network.version >= 2)) throw new Error(`line ${lineId}: the network file has no heights (built before #682): python -P -E tools/network.py --lines ${lineId}`);
   built[`line${lineId}.network.json`] = data.network;
 }
 // wait for the rest before the build steps, which block the page
@@ -1235,19 +1235,12 @@ function poseMirror(mirrorCam) {
 }
 
 load.finish();
-settleNetwork();
+// What Start places from the network (data/lineN.network.json, tools/network.py, #658) stands on the heights the build
+// read from the ground file (tools/network.py heights, #682): from here the bridges' and road tunnels' ways run between
+// the build's heights at their chains' ends (during the load each read its own); the heads and the platforms read theirs
+// from their records. The window drops the lookups past it, and Start reads none of them.
+for (const [k, a, b] of data.network.ways) { const w = data.allRoads[k].way; if (w) ground.wayEnds.set(w, [a / 100, b / 100]); }
 groundTiles.trim = true; // (the world is placed: from here the window drops the tiles past it)
-
-// What Start places from the network (data/lineN.network.json, tools/network.py, #658) stands on the settled ground,
-// read now while every tile's lookup is held and the tunnels' mouths are fitted: the bridges' and road tunnels' ends,
-// the signal heads, the platforms' strips and the signs on Vienna-type platforms. From here the window drops the lookups
-// past it, and Start reads none of them.
-function settleNetwork() {
-  const N = data.network;
-  ground.settleWays(data.roads);
-  for (const h of [...N.heads, ...N.pedHeads]) h.z = ground.surface(h.p[0] / 100, h.p[1] / 100);
-  settlePlatforms(data, route, data.pathBack?.length > 1 ? new Route(data.pathBack) : null);
-}
 // review mode (?review, src/review.js): the checks' findings on the map, no shift
 let review = null;
 if (params.has('review')) {

@@ -120,78 +120,8 @@ export function roadPortalMouths(list) {
 // footprint, street vertices above the tunnel road come down onto it (in place: the height lookup
 // holds the same points). Lawns and the hill over the throat are left alone.
 const MOUTH_FIT = new Set(['road', 'parking', 'paved', 'sidewalk', 'cycle', 'island', 'median', 'tram']);
-// The same for the ground file (#509): its street vertices inside a mouth's footprint over the tunnel road come down onto
-// it, in the lookup (its survey street triangles' vertices) and then every drawn vertex at one of those points, whatever
-// its group, tile by tile as they come (#30): the file is one welded surface, a lawn, a bed or a step's wall shares a street's vertex there, and drawn on
-// its own it kept that corner up, a crack, cars and walkers standing 2.5-17.7 m off what was drawn (#632: groundDrawn
-// at the Strahov tunnel's mouths, lines 9, 17, 22, 23). Only the squares and cells near a mouth are read.
-const MOUTH_NEAR = 0.005; // m: a drawn vertex (32-bit) this near a moved one in plan and height is it
-export function mouthFix(mouths) {
-  if (!mouths.length) return null;
-  const into = (x, y, z) => {
-    for (const m of mouths) {
-      const [d, lat] = m.loc(x, y);
-      if (d < -3 || d > m.D || Math.abs(lat) > m.w + 1.5) continue;
-      const zt = m.zAt(d) + 0.05;
-      if (z > zt + 0.3) return zt;
-    }
-    return null;
-  };
-  const boxes = mouths.map((m) => { const r = m.D + m.w + 5; return [m.p[0] - r, m.p[1] - r, m.p[0] + r, m.p[1] + r]; });
-  // the points moved: 2 cm cells -> [x, y, z before, z after]
-  const moved = new Map(), C = 0.02, key = (i, j) => i * 1048576 + j;
-  const fix = { points: 0, drawn: 0 };
-  // a tile's lookup: its street points in a mouth come down (each point once, whichever tile held it first)
-  fix.lookup = (lk) => {
-    const done = new Set();
-    for (const [bx0, by0, bx1, by1] of boxes) {
-      const i0 = Math.max(0, Math.floor((bx0 - lk.x0) / lk.cell)), i1 = Math.min(lk.nx - 1, Math.floor((bx1 - lk.x0) / lk.cell));
-      const j0 = Math.max(0, Math.floor((by0 - lk.y0) / lk.cell)), j1 = Math.min(lk.ny - 1, Math.floor((by1 - lk.y0) / lk.cell));
-      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-        const k = j * lk.nx + i;
-        for (let s = lk.start[k], e = lk.start[k + 1]; s < e; s++) {
-          const t = lk.tris[s];
-          if (!MOUTH_FIT.has(lk.areas[lk.ta[t]])) continue;
-          for (let c = 0; c < 3; c++) {
-            const v = lk.tv[3 * t + c];
-            if (done.has(v)) continue;
-            done.add(v);
-            const x = lk.vx[v] + lk.x0, y = lk.vy[v] + lk.y0, z = into(x, y, lk.vz[v]);
-            if (z === null) continue;
-            const kk = key(Math.round(x / C), Math.round(y / C)), at = moved.get(kk) || [];
-            if (!at.some((q) => Math.abs(q[0] - x) <= MOUTH_NEAR && Math.abs(q[1] - y) <= MOUTH_NEAR && Math.abs(q[2] - lk.vz[v]) <= MOUTH_NEAR)) {
-              at.push([x, y, lk.vz[v], z]);
-              moved.set(kk, at);
-              fix.points++;
-            }
-            lk.vz[v] = z;
-          }
-        }
-      }
-    }
-  };
-  // a tile's mesh arrays (positions from its corner [bx, by]): every drawn vertex at a moved point follows it
-  fix.meshes = (ms, [bx, by]) => {
-    if (!moved.size) return;
-    for (const mesh of ms) {
-      const P = mesh.pos;
-      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-      for (let v = 0; v < P.length; v += 3) { const x = P[v] + bx, y = by - P[v + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-      if (!boxes.some((q) => q[0] <= x1 && q[2] >= x0 && q[1] <= y1 && q[3] >= y0)) continue;
-      for (let v = 0; v < P.length; v += 3) {
-        const x = P[v] + bx, y = by - P[v + 2], z = P[v + 1], ci = Math.round(x / C), cj = Math.round(y / C);
-        let to = null;
-        for (let a = -1; a <= 1 && to === null; a++) for (let b = -1; b <= 1 && to === null; b++) {
-          for (const q of moved.get(key(ci + a, cj + b)) || []) {
-            if (Math.abs(q[0] - x) <= MOUTH_NEAR && Math.abs(q[1] - y) <= MOUTH_NEAR && Math.abs(q[2] - z) <= MOUTH_NEAR) { to = q[3]; break; }
-          }
-        }
-        if (to !== null) { P[v + 1] = to; fix.drawn++; }
-      }
-    }
-  };
-  return fix;
-}
+// (The ground file's street vertices in a mouth come down the same way in the build: tools/ground_mesh.py fit_mouths,
+// #682. Here only the survey's outlines, which the page keeps for its kerbs and crossings.)
 export function fitDtmToMouths(dtm, mouths) {
   if (!mouths.length || dtm.mouthsFitted) return;
   dtm.mouthsFitted = true;

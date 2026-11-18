@@ -162,8 +162,8 @@ export class Traffic {
     this.roads = [];
     this.walks = [];
     // what a road's cars and walkers stand on: the street surface, or on a bridge (OSM bridge tag) the deck it lies on,
-    // exactly as the road is drawn (ground.way: the span of the whole chain of its ways, its ends read at the load,
-    // settleWays); in a road tunnel its floor between the portals
+    // exactly as the road is drawn (ground.way: the span of the whole chain of its ways, its ends the build's,
+    // tools/network.py heights, #682); in a road tunnel its floor between the portals
     this.surfaceFn = (r) => {
       if (!r.b && !r.t) return (x, y) => ground.surface(x, y);
       const src = ways[r.way], w = ground.way(src.way || src.p, !r.t, !!r.t);
@@ -970,8 +970,8 @@ export class Traffic {
       if (!s) throw new Error(`line ${this.game.data.line}: the network binds signal ${i}, the game has none such: the network is older than the data (python -P -E tools/network.py --lines ${this.game.data.line})`);
       return s;
     };
-    // (each head on the street's surface, read at the load: src/main.js settleNetwork)
-    const head = (h) => ({ x: h.p[0] / 100, z: -h.p[1] / 100, h: h.z, face: h.face / 1000 });
+    // (each head on the street's surface, the build's: tools/network.py heights, #682)
+    const head = (h) => ({ x: h.p[0] / 100, z: -h.p[1] / 100, h: h.z / 100, face: h.face / 1000 });
     this.lightLanes = [];
     this.lightSigs = [];
     for (const L of N.lights) {

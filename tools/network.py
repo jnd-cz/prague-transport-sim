@@ -69,7 +69,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-VERSION = 1
+VERSION = 2  # (2: the heights Start stands things on, #682)
 
 
 # ---------------------------------------------------------------- the page's arithmetic
@@ -369,16 +369,21 @@ class TerrainGrid:
 class Survey:
     """The page's survey reads: classAt (GroundLookup.survey's class), covered and classUnder, for arrays of points."""
 
-    def __init__(self, ln, terrain=None):
-        with open(os.path.join(ROOT, "data", f"line{ln}.ground.json"), encoding="utf-8") as f:
-            self.layout = json.load(f)
-        with open(os.path.join(ROOT, "data", f"line{ln}.ground.bin"), "rb") as f:
-            self.blob = f.read()
+    def __init__(self, ln, terrain=None, file=None):
+        """`file`: the ground file as (layout, blob) in memory (tools/ground_mesh.py reads the ground it is building)."""
+        if file:
+            self.layout, self.blob = file
+        else:
+            with open(os.path.join(ROOT, "data", f"line{ln}.ground.json"), encoding="utf-8") as f:
+                self.layout = json.load(f)
+            with open(os.path.join(ROOT, "data", f"line{ln}.ground.bin"), "rb") as f:
+                self.blob = f.read()
         self.T = self.layout["tile"]
         self.E0, self.N0 = self.layout["origin"]
         self.tiles = {(t["e"], t["n"]): t for t in self.layout["tiles"]}
         self.names = [""]  # the survey's classes (0: none)
         self.ids = {"": 0}
+        self.kinds = []  # the file's classes ('terrain', 'survey', 'bed', 'plot'): GroundLookup.kinds
         self.cache = {}
         with open(os.path.join(ROOT, "data", f"line{ln}.dtm.json"), encoding="utf-8") as f:
             dtm = json.load(f)
@@ -392,7 +397,7 @@ class Survey:
         V, tris, area = decode_tile(self.blob[t["offset"]:t["offset"] + t["bytes"]], t["layout"])
         x0, y0 = t["e"] * self.T - self.E0, t["n"] * self.T - self.N0
         vx, vy = V[:, 0], V[:, 1]
-        TV, TA = [], []
+        TV, TA, TK = [], [], []
         for c, F in tris.items():
             if c == "wall":
                 continue
@@ -401,10 +406,14 @@ class Survey:
                   ((vx[a] == vx[d]) & (vy[a] == vy[d])))
             names = area.get(c)
             ids = (np.array([self._id(s) for s in names], np.int32) if names is not None else np.zeros(len(F), np.int32))
+            if c not in self.kinds:
+                self.kinds.append(c)
             TV.append(F[~up])
             TA.append(ids[~up])
+            TK.append(np.full(int((~up).sum()), self.kinds.index(c), np.int8))
         TV = np.vstack(TV) if TV else np.zeros((0, 3), np.int64)
         TA = np.concatenate(TA) if TA else np.zeros(0, np.int32)
+        TK = np.concatenate(TK) if TK else np.zeros(0, np.int8)
         # (the 10 m cells the survey's triangles touch, from their corners as decoded)
         cover = set()
         sv = TV[TA > 0]
@@ -434,8 +443,8 @@ class Survey:
         cell = (gj0[tri] + k // wi[tri]) * side + gi0[tri] + k % wi[tri]
         order = np.argsort(cell, kind="stable")
         start = np.searchsorted(cell[order], np.arange(side * side + 1))
-        out = {"x0": x0, "y0": y0, "lx": lx, "ly": ly, "lz": lz, "TV": TV, "TA": TA, "cover": cover, "side": side,
-               "start": start, "tris": tri[order]}
+        out = {"x0": x0, "y0": y0, "lx": lx, "ly": ly, "lz": lz, "TV": TV, "TA": TA, "TK": TK, "cover": cover,
+               "side": side, "start": start, "tris": tri[order]}
         self.cache[key] = out
         return out
 
@@ -451,8 +460,13 @@ class Survey:
     def survey(self, x, y):
         """(class id per point, 0 where the ground is not the survey's or there is none; its height, NaN off the
         ground): GroundLookup.survey, the highest triangle holding the point (the first of equals)."""
+        return self.hit(x, y)[:2]
+
+    def hit(self, x, y):
+        """survey()'s two and the file's class of that triangle (an index into self.kinds, -1 off the ground):
+        GroundLookup.height is the height, .kind the class, .bedOffSurvey a 'bed' with no survey class."""
         x, y = np.asarray(x, float), np.asarray(y, float)
-        cid, zz = np.zeros(len(x), np.int32), np.full(len(x), np.nan)
+        cid, zz, kk = np.zeros(len(x), np.int32), np.full(len(x), np.nan), np.full(len(x), -1, np.int8)
         ke, kn = self._keys(x, y)
         for e, n in set(zip(ke.tolist(), kn.tolist())):
             if (e, n) not in self.tiles:
@@ -486,7 +500,8 @@ class Survey:
             first = np.r_[True, pt[1:] != pt[:-1]]
             cid[m[pt[first]]] = g["TA"][t[first]]
             zz[m[pt[first]]] = z[first]
-        return cid, zz
+            kk[m[pt[first]]] = g["TK"][t[first]]
+        return cid, zz, kk
 
     def class_at(self, x, y):
         """dtm.classAt: the survey's class names per point (None off the survey)."""
@@ -1626,10 +1641,56 @@ class Stops:
         return out
 
 
+# ---------------------------------------------------------------- the heights
+def sections(s0, s1):
+    """src/platforms.js sections: a strip's cross-sections along its track, about every 2 m."""
+    n = max(2, math.ceil((s1 - s0) / 2))
+    return [s0 + (s1 - s0) * k / n for k in range(n + 1)]
+
+
+def heights(g, data, sg, st):
+    """The heights Start stands things on (#682), from the ground file as the page reads it (tools/ground_at.py), so
+    that Start reads no ground: {"ways": [[a way of each bridge's and road tunnel's chain (data.roads' index), the
+    heights at the chain's two ends]], "heads", "pedHeads": each head's street surface, "platforms": {i: zo, zs, zh}}.
+    The platforms' as src/platforms.js settlePlatforms read them until #682: the street's surface at the outer kerb of each
+    cross-section of a strip the survey does not draw (zo), under a Vienna-type platform's sign on the opposite path (zs)
+    and the track's height under an opposite platform's shelter (zh)."""
+    ends, done, ways = g.way_ends(), set(), []
+    for k in sorted(ends):
+        c = g.way_of[k]
+        if c not in done:
+            done.add(c)
+            ways.append([k, *ends[k]])
+    out = {"ways": ways}
+    for key, hs in (("heads", sg.heads), ("pedHeads", sg.ped_heads)):
+        out[key] = g.surface_many([cm(x) / 100 for x, _, _ in hs], [cm(y) / 100 for _, y, _ in hs])
+    plats = {}
+    for p in st.platforms:
+        if p.get("shared"):
+            continue
+        pl, rt, z = data["platforms"][p["i"]], p["rt"], {}
+        if p["kerb"] is None and not p["surveyed"]:
+            pts = [Stops.offset(rt, s, p["side"] * p["outer"]) for s in sections(p["s0"], p["s1"])]
+            z["zo"] = g.surface_many([q[0] for q in pts], [q[1] for q in pts])
+        if p["kerb"] is not None and p["back"] and not pl.get("ours") and not pl.get("twin"):
+            at = rt.nearest(pl["stop"][0], pl["stop"][1])[1] if pl.get("stop") else p["s1"] - 0.5
+            z["zs"] = g.surface(*Stops.offset(rt, at, p["side"] * (p["kerb"] + 0.8)))
+        if pl.get("shelter") and p["back"] and not pl.get("ours"):
+            z["zh"] = g.track_at(*Stops.offset(rt, (p["s0"] + p["s1"]) / 2, p["side"] * (p["outer"] - 0.6)))
+        if z:
+            plats[p["i"]] = z
+    out["platforms"] = plats
+    return out
+
+
 # ---------------------------------------------------------------- the file
-def platform_record(p):
-    """A placed OSM platform: its index `i` in data.platforms, `name` and whether the survey draws it."""
-    return {"i": p["i"], "name": p["name"], "surveyed": p["surveyed"]}
+def platform_record(p, z=None):
+    """A placed OSM platform: its index `i` in data.platforms, `name`, whether the survey draws it and the heights it
+    stands on (heights(), cm)."""
+    out = {"i": p["i"], "name": p["name"], "surveyed": p["surveyed"]}
+    for k, v in (z or {}).items():
+        out[k] = [cm(a) for a in v] if isinstance(v, list) else cm(v)
+    return out
 
 
 def walk_record(w):
@@ -1685,6 +1746,8 @@ def build(ln, log=print):
     net = Network(data, survey, route, back)
     sg = Signals(data, survey, route, back, net)
     st = Stops(data, survey, route, back)
+    import ground_at
+    z = heights(ground_at.Ground(ln, data, survey=survey), data, sg, st)
     recs = [road_record(r) for r in net.roads]
     fitted = sum(1 for r in net.roads if r["fitLo"] is not None)
     links = sum(1 for w in net.walks if w["link"])
@@ -1694,14 +1757,16 @@ def build(ln, log=print):
         f"{len(sg.heads)} heads, {time.time() - t0:.1f} s")
     return {"line": str(ln), "version": VERSION, "roads": recs, "lanes": [lane_record(x) for x in net.lanes],
             "walks": [walk_record(w) for w in net.walks], "doors": [door_record(d) for d in net.doors],
+            "ways": [[k, cm(a), cm(b)] for k, a, b in z["ways"]],
             "lights": [{**x, "back": cm(x["back"])} for x in sg.lights],
-            "heads": [{"p": [cm(x), cm(y)], "face": js_round(f * 1000)} for x, y, f in sg.heads],
+            "heads": [{"p": [cm(x), cm(y)], "z": cm(h), "face": js_round(f * 1000)} for (x, y, f), h in zip(sg.heads, z["heads"])],
             "lightSigs": [{"sig": i} for i in sg.light_sigs],
             "pedCross": [{"p": [cm(c["x"]), cm(c["y"])], "c": [js_round(c["cx"] * 1e4), js_round(c["cy"] * 1e4)],
                           "sig": c["sig"], "along": c["along"], "heads": c["heads"]} for c in sg.ped_cross],
-            "pedHeads": [{"p": [cm(x), cm(y)], "face": js_round(f * 1000)} for x, y, f in sg.ped_heads],
+            "pedHeads": [{"p": [cm(x), cm(y)], "z": cm(h), "face": js_round(f * 1000)}
+                         for (x, y, f), h in zip(sg.ped_heads, z["pedHeads"])],
             "overBridge": sg.over,
-            "platforms": [platform_record(p) for p in st.platforms if not p.get("shared")],
+            "platforms": [platform_record(p, z["platforms"].get(p["i"])) for p in st.platforms if not p.get("shared")],
             "stops": [{"stand": s["stand"], "outer": [None if o is None else cm(o) for o in s["outer"]]} for s in st.stops],
             "fitted": fitted}
 

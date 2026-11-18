@@ -60,8 +60,8 @@ function drawNames(layout) {
 
 // The ground's tiles: which are held, their lookups and meshes. `make(meshes, box)` (src/groundDraw.js attachGround) turns a
 // tile's mesh arrays into the scene's meshes and returns them, `drop(meshes)` takes them out; `makeCoarse(coarse, box)`
-// makes a tile's far ground (#30), kept for every tile and hidden while its detail is drawn; `fix` brings a tile's
-// lookup and mesh arrays down into the road tunnels' mouths (src/structures.js mouthFix). A tile's meshes wait in `ready` and
+// makes a tile's far ground (#30), kept for every tile and hidden while its detail is drawn (the road tunnels' mouths are
+// in the file, tools/ground_mesh.py fit_mouths, #682). A tile's meshes wait in `ready` and
 // join the scene one a frame (flush), nearest first, so their uploads to the GPU fall in different frames.
 export class GroundTiles {
   constructor(file, styles, keep = false) {
@@ -81,7 +81,7 @@ export class GroundTiles {
       { styles, names: drawNames(L), cell: LOOKUP_CELL, unit: L.unit, tile: L.tile });
     this.lookup = new TiledLookup(this);
     this.times = { decode: 0, lookup: 0, meshes: 0, jobs: 0, make: 0, makeMax: 0 }; // (ms: the workers', the page thread's)
-    this.make = this.drop = this.makeCoarse = this.fix = null;
+    this.make = this.drop = this.makeCoarse = null;
     this.trim = false; // (set once the world is built and placed: from then on the window drops tiles)
     this.last = -Infinity;
   }
@@ -106,7 +106,6 @@ export class GroundTiles {
       this.times.jobs++;
       if (r.lookup) {
         const lk = new GroundLookup(r.lookup);
-        this.fix?.lookup(lk);
         this.lookups.set(key, lk);
         const w = this.waiting.get(key);
         this.waiting.delete(key);
@@ -127,7 +126,6 @@ export class GroundTiles {
   _make(key, ms) {
     if (this.drawn.has(key) || !this.make) return;
     const t0 = performance.now(), box = this.box(this.tiles.get(key));
-    this.fix?.meshes(ms, box);
     this.drawn.set(key, this.make(ms, box));
     const c = this.coarse.get(key);
     if (c && c.isObject3D) c.visible = false;
