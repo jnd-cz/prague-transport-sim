@@ -32,7 +32,7 @@ class PageParity(unittest.TestCase):
                 browser.close()
         for part in nw.PARTS:
             with self.subTest(part):
-                rep = nw.compare(page[part], built[part])
+                rep = nw.compare(page[part], nw.as_page(part, built[part], page["cars"]))
                 self.assertGreater(len(built[part]), 0)
                 # (the page keeps its pedestrian heads only in their poles' 32-bit matrices: within the rounding there)
                 same = rep["equal"] if part == "pedHeads" else rep["exact"]

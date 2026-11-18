@@ -213,6 +213,17 @@ class Signals(unittest.TestCase):
         self.assertIsNone(s.osm_stop(lane, 60, 0))  # (on the junction's own node: no stop line)
 
 
+class Stops(unittest.TestCase):
+    def test_set_lengths_from_the_page(self):
+        L = nw.set_lengths()
+        self.assertEqual(L[1], 15.2)
+        self.assertAlmostEqual(L[2], 30.24)  # (two cars, the couplers overlapping 0.16 m)
+
+    def test_stops_by_set(self):
+        recs = [{"stand": [True, False], "outer": [310, None]}]
+        self.assertEqual(nw.as_page("stops", recs, 2), [{"stand": False, "outer": None}])
+
+
 class Compare(unittest.TestCase):
     def test_finds_moves(self):
         a = [{"p": [0, 0, 100, 0], "w": 8, "ends": ["0,0", "1,0"], "hi": [425, 425]}]

@@ -5,9 +5,9 @@
     python -P -E tools/network.py --lines 9,17,22,23,37 --parity
                                     # also the page's own network (headless Chromium), compared with the build's
 
-Steps 2-4 and 6 of the design note (docs/decisions/2026-11-18-network-layer.md): the roads, their lanes, the footways,
-the doors and the signals. The page's rules are ported whole and in its order, so that the build's network is the page's
-(--parity):
+Steps 2-6 of the design note (docs/decisions/2026-11-18-network-layer.md): the roads, their lanes, the footways, the
+doors, the signals and what the platforms and stops read of the survey. The page's rules are ported whole and in its
+order, so that the build's network is the page's (--parity):
 - src/streets.js widenTramStreets: a road with tracks along it is 3.2 m wider a track (the page does it at load);
 - the vehicle ways split at every node another way shares (the junctions), each piece smoothed (src/route.js
   smoothPolyline: every 3 m, over 6 m);
@@ -22,7 +22,10 @@ the doors and the signals. The page's rules are ported whole and in its order, s
 - the signals (src/game.js `_initSignals`, `_initGauntlets`, `_crossRoad`; src/traffic.js `_bindSignals`, `_stopLine`,
   `_bindPedHeads`): the game's signals bound to the lanes ending at their junctions, each lane's stop line (OSM's where
   data/lineN.signals.json has one, else the junction's edge, never on a zebra) and its head; the pedestrian heads at
-  OSM's signalled crossings.
+  OSM's signalled crossings;
+- src/platforms.js `buildPlatforms`, `buildStop`: whether the survey draws each OSM platform, and for each of our stops
+  with each set's stop point (src/game.js `_stopZone`) whether it draws the stand-in platform and where its platform's
+  edge holds the shelter.
 
 The survey is read as the page reads it: the ground file's triangles (data/lineN.ground.*, tools/ground_mesh.py), the
 highest holding the point and the survey's class under it (src/groundFile.js GroundLookup.survey), the 10 m cells the
@@ -41,7 +44,11 @@ The file, data/lineN.network.json, positions in cm (a path flat x, y):
   'cross'), its `head`, the stop line `back` m before the lane's end and where it came from (`src`: osm, edge, short);
 - `heads`: each car signal head's `p` and `face` (mrad); `lightSigs`: the signals with lanes, in order;
 - `pedCross`: each signalled crossing's node `p`, its walking direction `c` (×10⁴), `sig`, `along` and `heads`;
-  `pedHeads`: their heads' `p` and `face`.
+  `pedHeads`: their heads' `p` and `face`;
+- `platforms`: each placed OSM platform's index `i` in data.platforms, its `name` and whether the survey draws it
+  (`surveyed`: no strip of the page's);
+- `stops`: each of our stops (data.stops), by the set (1 car, 2 cars): `stand`, whether its stand-in platform is drawn,
+  and `outer`, the shelter's outer edge (cm right of the track) where our OSM platform stands, else null.
 """
 import argparse
 import json
@@ -56,7 +63,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 VERSION = 1
-PARTS = ("roads", "lanes", "walks", "doors", "lights", "heads", "lightSigs", "pedCross", "pedHeads")  # (what the layer holds so far, in the note's steps)
+PARTS = ("roads", "lanes", "walks", "doors", "lights", "heads", "lightSigs", "pedCross", "pedHeads", "platforms", "stops")  # (what the layer holds so far, in the note's steps)
 
 
 # ---------------------------------------------------------------- the page's arithmetic
@@ -1473,6 +1480,107 @@ class Signals:
         return max_back, "edge"
 
 
+# ---------------------------------------------------------------- the platforms and our stops
+def set_lengths():
+    """{cars: the set's length over couplers} as src/tram.js gives it (Tram.length: T3.length a car, COUPLING_GAP =
+    -T3.couplerOverlap between them), for the consists the menu offers (index.html optCars)."""
+    import re
+    with open(os.path.join(ROOT, "src", "tram.js"), encoding="utf-8") as f:
+        js = f.read()
+    length = float(re.search(r"^\s*length:\s*([\d.]+),", js, re.M).group(1))
+    overlap = float(re.search(r"^\s*couplerOverlap:\s*([\d.]+),", js, re.M).group(1))
+    return {cars: length * cars + (-overlap) * (cars - 1) for cars in (1, 2)}
+
+
+SURVEYED = {"platform", "island", "sidewalk"}  # (where the survey draws the platform: no strip of the page's)
+
+
+class Stops:
+    """What src/platforms.js reads of the survey (buildPlatforms, buildStop): whether the survey draws each OSM platform
+    off the doors' kerb (its middle a platform, island or sidewalk), and for each of our stops, with the stop point each
+    set gives it (src/game.js _stopZone), whether the survey draws its stand-in platform and how far out the shelter
+    stands (no further than the surveyed platform's edge)."""
+
+    def __init__(self, data, survey, route, back):
+        self.data, self.survey, self.route, self.back = data, survey, route, back
+        self.platforms = []  # (the page's game.platforms: each placed OSM platform, then the ones both paths share)
+        also = []
+        for i, pl in enumerate(data.get("platforms") or []):
+            if "path" not in pl:
+                raise ValueError("the platforms have no placement (tools/placement.py, #419)")
+            rt = (back if pl["path"] == "back" else route) if pl["path"] else None
+            if not rt:
+                continue
+            s0, s1, side, far = pl["s0"], pl["s1"], pl["side"], pl.get("far")
+            inner = 1.5
+            outer = (min(inner + 6, max(inner + 2, far)) if pl.get("area") else
+                     inner + (pl.get("w") or max(2.4, min(3.5, far + 1 - inner if pl.get("gtfs") else 2 * far - 2 * inner))))
+            plat = {"i": i, "rt": rt, "back": rt is not route, "s0": s0, "s1": s1, "side": side, "inner": inner,
+                    "outer": outer, "name": pl.get("name"),
+                    "ours": {"s0": pl["ours"][0], "s1": pl["ours"][1]} if pl.get("ours") else None}
+            self.platforms.append(plat)
+            if pl.get("also"):
+                also.append((plat, pl["also"]))
+            if side < 0 and "vienna" not in pl:
+                raise ValueError(f"platform {pl.get('name')}: no stop type from the build (tools/placement.py vienna)")
+            plat["kerb"] = pl["vienna"] if side < 0 else None
+            if plat["kerb"] is not None:
+                plat.update(inner=plat["kerb"], outer=plat["kerb"] + 2, surveyed=True)
+                continue
+            mx, my = self.offset(rt, (s0 + s1) / 2, side * (inner + outer) / 2)
+            plat["surveyed"] = self.class_at(mx, my) in SURVEYED
+        for plat, lst in also:
+            for a in lst:
+                art = back if a["path"] == "back" else route
+                if art:
+                    self.platforms.append({**plat, "rt": art, "back": art is not route, "s0": a["s0"], "s1": a["s1"],
+                                           "side": a["side"], "ours": None, "shared": True})
+        self.stops = [self.stop(i, s) for i, s in enumerate(data["stops"])]
+
+    @staticmethod
+    def offset(rt, s, lateral):
+        """Route.offset(): the point `lateral` m left of the route at s (its heading the chord over ±3 m)."""
+        x, y, _, _ = rt.at(s)
+        hx, hy = rt.heading(s, 3)
+        return x - hy * lateral, y + hx * lateral
+
+    def class_at(self, x, y):
+        return self.survey.class_at(np.array([x]), np.array([y]))[0]
+
+    def stop(self, i, st):
+        """buildStop()'s survey reads for each set: {"stand": whether the survey draws the stand-in platform (none of
+        ours there, no Vienna type), "outer": the shelter's outer edge (m right of the track) where our OSM platform
+        stands, else None}, lists by cars."""
+        out = {"stand": [], "outer": []}
+        for cars, L in set_lengths().items():
+            target = min(st["sign"] if st.get("sign") is not None else st["s"] + 6, self.route.length - 2)
+            if "p0" in st and st["p1"] - st["p0"] >= 15:
+                hi = st["p1"] + 4
+                lo = min(hi - 8, st["p0"] + L - 3 if st["p1"] - st["p0"] + 3 >= L else st["p1"] - 8)
+                target = max(lo + 2.5, min(target, hi - 3))
+            osm = next((p for p in self.platforms if not p["back"] and p["side"] < 0 and p["s0"] < target - 8
+                        and p["s1"] > target - 20), None) or \
+                next((p for p in self.platforms if p["back"] and p["ours"] and p["ours"]["s0"] < target - 8
+                      and p["ours"]["s1"] > target - 20), None)
+            kerb = osm["kerb"] if osm else st["vienna"]
+            ax, ay = self.offset(self.route, target - 30 / 2 - 1, -2.8)
+            out["stand"].append(not osm and kerb is None and self.class_at(ax, ay) not in SURVEYED)
+            outer = osm["outer"] if osm else None
+            if osm:
+                lat, last = osm["inner"] + 0.5, None
+                while lat <= osm["outer"] + 0.01:
+                    ox, oy = self.offset(self.route, target - 12, -lat)
+                    if self.class_at(ox, oy) == "platform":
+                        last = lat
+                    elif last is not None:
+                        break
+                    lat += 0.25
+                if last is not None:
+                    outer = min(outer, last + 0.25)
+            out["outer"].append(outer)
+        return out
+
+
 # ---------------------------------------------------------------- the file
 def walk_record(w):
     """A walk as the file keeps it: its points (cm), whether it is a link (a crossing or a join) or on a bridge's deck
@@ -1524,6 +1632,7 @@ def build(ln, log=print):
     back = Route(data["pathBack"]) if len(data.get("pathBack") or ()) > 1 else None
     net = Network(data, survey, route, back)
     sg = Signals(data, survey, route, back, net)
+    st = Stops(data, survey, route, back)
     recs = [road_record(r) for r in net.roads]
     fitted = sum(1 for r in net.roads if r["fitLo"] is not None)
     links = sum(1 for w in net.walks if w["link"])
@@ -1538,7 +1647,10 @@ def build(ln, log=print):
             "lightSigs": [{"sig": i} for i in sg.light_sigs],
             "pedCross": [{"p": [cm(c["x"]), cm(c["y"])], "c": [js_round(c["cx"] * 1e4), js_round(c["cy"] * 1e4)],
                           "sig": c["sig"], "along": c["along"], "heads": c["heads"]} for c in sg.ped_cross],
-            "pedHeads": [{"p": [cm(x), cm(y)], "face": js_round(f * 1000)} for x, y, f in sg.ped_heads], "fitted": fitted}
+            "pedHeads": [{"p": [cm(x), cm(y)], "face": js_round(f * 1000)} for x, y, f in sg.ped_heads],
+            "platforms": [{"i": p["i"], "name": p["name"], "surveyed": p["surveyed"]} for p in st.platforms if not p.get("shared")],
+            "stops": [{"stand": s["stand"], "outer": [None if o is None else cm(o) for o in s["outer"]]} for s in st.stops],
+            "fitted": fitted}
 
 
 def write(ln, net):
@@ -1555,7 +1667,9 @@ def write(ln, net):
         "lights": sources.entry("signals", [sum(x["src"] == "osm" for x in net["lights"]),
                                             sum(x["src"] != "osm" for x in net["lights"])],
                                 "lanes bound to a signal: OSM's stop line, else the junction's edge"),
-        "pedHeads": sources.single("signals", "osm", len(net["pedHeads"]), "pedestrian heads at OSM's signalled crossings")})
+        "pedHeads": sources.single("signals", "osm", len(net["pedHeads"]), "pedestrian heads at OSM's signalled crossings"),
+        "platforms": sources.single("stops", "osm", len(net["platforms"]), "OSM's platforms the survey draws"),
+        "stops": sources.single("stops", "osm", len(net["stops"]), "our stops' stand-in platforms and shelters by the survey")})
     net["attribution"] = sources.attribution(net["provenance"])
     p = os.path.join(ROOT, "data", f"line{ln}.network.json")
     with replacing(p, "w", encoding="utf-8") as f:
@@ -1565,8 +1679,9 @@ def write(ln, net):
 
 # ---------------------------------------------------------------- the parity with the page
 # (the page's network as the file keeps it: src/traffic.js Traffic of the shift started as a player starts it)
-PAGE_ROADS = """async () => {
+PAGE_ROADS = """async (cars) => {
   const { startShift } = await import('/tools/bench/shift.js');
+  if (cars) document.getElementById('optCars').value = String(cars); // (the menu's set; else the line's own)
   await startShift({ timeout: 300 });
   const cm = (v) => Math.round(v * 100), T = window.traffic, wi = new Map(T.walks.map((w, i) => [w, i]));
   const pts = (path) => path.p.flatMap(([x, y]) => [cm(x), cm(y)]);
@@ -1608,13 +1723,15 @@ PAGE_ROADS = """async () => {
     if (r.trk) o.trk = r.trk.map((a) => a.map(cm));
     return o;
   });
-  return { roads, lanes, walks, doors, lights, heads, lightSigs, pedCross, pedHeads };
+  const G = window.game, platforms = G.platforms.filter((p) => !p.shared).map((p) => ({ name: p.name, surveyed: p.surveyed }));
+  const stops = G.stops.map((s) => ({ stand: s.standIn, outer: s.shelterOuter == null ? null : cm(s.shelterOuter) }));
+  return { roads, lanes, walks, doors, lights, heads, lightSigs, pedCross, pedHeads, platforms, stops, cars: G.tram.cars };
 }"""
 
 
-def page_roads(lines, browser=None):
+def page_roads(lines, browser=None, cars=None):
     """{line: {part: the page's records}} from headless Chromium (tools/headless.py's page; `browser`, else one launched on the
-    GPU, tools/gpu.py)."""
+    GPU, tools/gpu.py), the shift started with `cars` (else the line's own set)."""
     import faulthandler
 
     from headless import load_page, serve, stop_server
@@ -1629,14 +1746,14 @@ def page_roads(lines, browser=None):
             with sync_playwright() as pw:
                 b = gpu.launch(pw)[0]
                 try:
-                    return page_roads(lines, b)
+                    return page_roads(lines, b, cars)
                 finally:
                     b.close()
         for ln in lines:
             page, errors, load = load_page(browser, url, ln, 600, {"keepgeo": False})
             if isinstance(load, dict):
                 raise RuntimeError(f"line {ln}: the load failed: {load} {errors[:3]}")
-            out[ln] = page.evaluate(PAGE_ROADS)
+            out[ln] = page.evaluate(PAGE_ROADS, cars)
             page.close()
     finally:
         stop_server(server)
@@ -1652,12 +1769,21 @@ def ident(r):
     return tuple(r["ends"]) if "ends" in r else (r.get("road"), r.get("dir"), r.get("sel"))
 
 
+FILE_ONLY = {"way", "i"}  # (a deck walk's way: the page keeps its height function; a platform's index in the line data)
+
+
 def comparable(r):
-    """A record as the parity compares it: a door's list as {walk, p}; without what only the file keeps (a deck walk's
-    way: the page keeps the way's height function instead)."""
+    """A record as the parity compares it: a door's list as {walk, p}; without what only the file keeps."""
     if isinstance(r, list):
         return {"walk": r[0], "p": r[1:]}
-    return {k: v for k, v in r.items() if k != "way"}
+    return {k: v for k, v in r.items() if k not in FILE_ONLY}
+
+
+def as_page(part, recs, cars):
+    """The build's records of a part as the page has them for its set: a stop's survey reads for `cars`."""
+    if part == "stops":
+        return [{"stand": r["stand"][cars - 1], "outer": r["outer"][cars - 1]} for r in recs]
+    return recs
 
 
 def compare(page, built):
@@ -1711,6 +1837,7 @@ def main(argv=None):
     ap.add_argument("--lines", default="9,17,22,23,37")
     ap.add_argument("--parity", action="store_true", help="also compare with the page's own roads (headless Chromium)")
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--cars", type=int, choices=(1, 2), help="--parity: the page's shift with this set (else the line's own)")
     a = ap.parse_args(argv)
     lines = [s.strip() for s in a.lines.split(",") if s.strip()]
     built = {}
@@ -1722,12 +1849,13 @@ def main(argv=None):
     if a.parity:
         from baseline_store import HeavyJob
         with HeavyJob("network parity"):
-            page = page_roads(lines)
+            page = page_roads(lines, cars=a.cars)
         bad = 0
         for ln in lines:
             for part in PARTS:
-                rep = compare(page[ln][part], built[ln][part])
-                print(f"line {ln} {part}: {json.dumps(rep, ensure_ascii=False)}")
+                rep = compare(page[ln][part], as_page(part, built[ln][part], page[ln]["cars"]))
+                print(f"line {ln} {part}{' (' + str(page[ln]['cars']) + ' cars)' if part == 'stops' else ''}: "
+                      f"{json.dumps(rep, ensure_ascii=False)}")
                 bad += rep["equal"] != rep["page"] or rep["page"] != rep["build"]
         return 1 if bad else 0
     return 0
