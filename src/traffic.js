@@ -153,10 +153,11 @@ export class Traffic {
     // The network the build made (tools/network.py, data/lineN.network.json, #658): the roads (OSM's ways split at their
     // junctions, smoothed, fitted to the survey's kerbs and medians, the tracks on them), their lanes, the footways (OSM's
     // and the sidewalks the survey shows beside the roads, linked across the streets), the doors, the signals bound to
-    // the lanes and their heads. Start builds none of it and reads no survey. (Positions in cm.)
+    // the lanes and their heads. Start builds none of it and reads no survey. (Positions in cm, a path's points in mm.)
     const N = data.network, ways = data.allRoads || data.roads;
     if (!N?.lanes) throw new Error(`line ${data.line}: no network (data/line${data.line}.network.json): python -P -E tools/network.py --lines ${data.line}`);
-    const pts = (a) => { const out = []; for (let i = 0; i < a.length; i += 2) out.push([a[i] / 100, a[i + 1] / 100]); return out; };
+    // (a path's points in mm: in cm a straight lane zigzagged enough for curveSpeeds to slow the cars on it)
+    const pts = (a) => { const out = []; for (let i = 0; i < a.length; i += 2) out.push([a[i] / 1000, a[i + 1] / 1000]); return out; };
     const m = (a) => a.map((v) => v / 100);
     this.roads = [];
     this.walks = [];

@@ -30,11 +30,11 @@ START = """async () => {
   });
   const { startShift } = await import('/tools/bench/shift.js');
   try { await startShift({ timeout: 300 }); } finally { for (const u of undo) u(); }
-  const T = window.traffic, cm = (v) => Math.round(v * 100);
+  const T = window.traffic, mm = (v) => Math.round(v * 1000);
   return { reads, missed, held: window.groundTiles.lookups.size, tiles: window.groundTiles.tiles.size,
     n: { roads: T.roads.length, lanes: T.laneList.length, walks: T.walks.length, doors: T.doors.length, lights: T.lightLanes.length,
          pedCross: T.pedCross.length, heads: T.lights.count, pedHeads: T.pedLights.count },
-    lanes: T.laneList.map((l) => [l.k, l.dir, l.sel, cm(l.path.p[0][0]), cm(l.path.p[0][1]), l.path.p.length]) };
+    lanes: T.laneList.map((l) => [l.k, l.dir, l.sel, mm(l.path.p[0][0]), mm(l.path.p[0][1]), l.path.p.length]) };
 }"""
 
 

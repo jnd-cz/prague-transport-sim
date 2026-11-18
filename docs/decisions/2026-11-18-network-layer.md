@@ -163,6 +163,9 @@ The questions were:
   track) settles once its tile's lookup comes (`ground.later`). Cars and walkers read the ground where they are, which
   is always in the window. Heights can move into the layer once the build makes the settled surface (the mouths in the
   ground file).
+- **Paths in mm, not cm.** In cm a straight lane's points zigzag enough for the cars' curve speeds to read curves
+  (docs/knowledge.md, cars' curve speeds): on line 22 the seeded trams came 26 s late against main's 7.6 (15 seeds) and
+  hit a car twice. The rest stays in cm. The files are 4.0-10.5 MB raw, 0.97-2.34 MB brotli.
 - **Measured** (`tools/bench/network_layer.py`):
   - Start takes 0.4-1.1 s on the five lines, against 2.1-6.5 s.
   - The lookups held after it are 9-17 MB, against 48-120 MB.

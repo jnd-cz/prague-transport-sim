@@ -31,7 +31,7 @@ highest holding the point and the survey's class under it (src/groundFile.js Gro
 survey covers (`covered`), and data/lineN.dtm.json's underground areas (src/terrain.js classUnder). The arithmetic is
 the page's, in its order, with Math.hypot as V8 computes it (js_hypot).
 
-The file, data/lineN.network.json, positions and heights in cm (a path flat x, y):
+The file, data/lineN.network.json, positions in cm, a path's points `p` in mm (flat x, y: path_mm):
 - `roads`: each with its points `p`, its OSM tags (`w` with the tracks, `o`, `b`, `t`, `tram`, `ln`, `lf`, `lb`), its
   junctions' keys `ends` (src/traffic.js key()), and where the survey fitted it its kerbs `lo`, `hi` and median `med`
   (from the centre line, + right, every 4 m), and the tracks on it `trk`; on a bridge or in a tunnel its OSM `way`
@@ -101,6 +101,17 @@ def js_round(v):
 
 def cm(v):
     return js_round(v * 100)
+
+
+def mm(v):
+    return js_round(v * 1000)
+
+
+def path_mm(path):
+    """A path's points in mm, flat x, y. (In cm a straight lane zigzagged up to 5 mm and the cars' curve speeds,
+    src/traffic.js curveSpeeds, read it as curves: on line 22 the lane points cars take under 50 km/h went from 9161 to
+    17206, and the seeded runs' trams came later; in mm 9261, none slower by over 1 m/s.)"""
+    return [mm(v) for v in path.p.ravel().tolist()]
 
 
 def smooth_polyline(pts, step=1.0, radius=6.0):
@@ -1622,9 +1633,9 @@ def platform_record(p):
 
 
 def walk_record(w):
-    """A walk as the file keeps it: its points (cm), whether it is a link (a crossing or a join) or on a bridge's deck
+    """A walk as the file keeps it: its points (mm), whether it is a link (a crossing or a join) or on a bridge's deck
     (with its way, data.roads' index: the deck's height, src/terrain.js way()), its links at each end ([walk, s cm])."""
-    out = {"p": [cm(v) for v in w["path"].p.ravel().tolist()]}
+    out = {"p": path_mm(w["path"])}
     if w["link"]:
         out["link"] = 1
     if w["deck"]:
@@ -1640,13 +1651,13 @@ def door_record(d):
 
 
 def lane_record(ln):
-    """A lane as the file keeps it: its road (the index), direction, lane and points (cm)."""
-    return {"road": ln["road"], "dir": ln["dir"], "sel": ln["sel"], "p": [cm(v) for v in ln["path"].p.ravel().tolist()]}
+    """A lane as the file keeps it: its road (the index), direction, lane and points (mm)."""
+    return {"road": ln["road"], "dir": ln["dir"], "sel": ln["sel"], "p": path_mm(ln["path"])}
 
 
 def road_record(r):
-    """A road as the file keeps it (positions in cm)."""
-    out = {"p": [cm(v) for v in r["path"].p.ravel().tolist()], "w": r["w"], "ends": r["ends"]}
+    """A road as the file keeps it (its points in mm, the rest in cm)."""
+    out = {"p": path_mm(r["path"]), "w": r["w"], "ends": r["ends"]}
     for k in ("o", "b", "t"):
         if r[k]:
             out[k] = r[k]
