@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "86b3c40",
- "published": "2026-11-18 10:38",
- "note": "#612: line 37's posted speed from Ohrada down to Krejcárek 65 over OSM's 60 (data/truth.json postedSpeeds)",
+ "built_at_commit": "fb5cfd3",
+ "published": "2026-11-18 14:08",
+ "note": "#658: the network layer (data/lineN.network.json, tools/network.py) of lines 9, 17, 22, 23 and 37: roads, lanes, footways, doors, signals, platforms' and stops' survey answers; paths in mm",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -35,6 +35,10 @@
   "line17.json": {
    "size": 7042820,
    "sha256": "b28f93f1daaaab6c4dba62f13f3ac2345f828080e9aa40a75f5ef933d777803a"
+  },
+  "line17.network.json": {
+   "size": 9282382,
+   "sha256": "03495c9bea4ef1a0baa2c775958c3af2b6b252dd134728260831601bc5385b4e"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -88,6 +92,10 @@
    "size": 7032022,
    "sha256": "18aab29229ee385920b51c2ed412ffcaac82c30b952230e0ff43e8b0e66c18c0"
   },
+  "line22.network.json": {
+   "size": 10032948,
+   "sha256": "6479d89cd953f0f3a9d1f5c35c98ef9e8f687c6e2897130bb53ef2c45192b7df"
+  },
   "line22.streets.bin": {
    "size": 5451982,
    "sha256": "7f00b4932308d36f09afea80cf742fc09af3218b7ff0c8adff606eba95326443"
@@ -135,6 +143,10 @@
   "line23.json": {
    "size": 2711135,
    "sha256": "d6fbfb5eb652ca27af7a52b46901ed664901e1b0e987b1372cbbf74c09be6f83"
+  },
+  "line23.network.json": {
+   "size": 3959104,
+   "sha256": "af29d3c63e7357915817a0b94e8172b77f94d2af2d84632bafefbf29ff34540f"
   },
   "line23.streets.bin": {
    "size": 2472771,
@@ -184,6 +196,10 @@
    "size": 2538829,
    "sha256": "32f3b61f08e5ced8b84320e7afa2555e6787e94ce0c816b565b4cc3301b697f7"
   },
+  "line37.network.json": {
+   "size": 4082912,
+   "sha256": "9acdbcbfb4d41f198cde58382cbecc01738d3858b9aa369b663b1641f8f70ada"
+  },
   "line37.streets.bin": {
    "size": 2581731,
    "sha256": "c38fef511ce8b90168ec103b7e6805a7152604e98b8de111938bf55e5000e866"
@@ -231,6 +247,10 @@
   "line9.json": {
    "size": 6274216,
    "sha256": "1ba4b0d41766a258f0c5198d02e2c7985540f2ca61db7decef826a8ce6da5b64"
+  },
+  "line9.network.json": {
+   "size": 10460170,
+   "sha256": "996a10c19b85617ca99132d6112e2fd89ca43dcf0db0756684ea845b8a614ee5"
   },
   "line9.streets.bin": {
    "size": 6076977,

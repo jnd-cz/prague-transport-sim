@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The network as a layer the build makes (#658): what each shift's Start built from the survey, built once here.
 
-    python -P -E tools/network.py --lines 37                    # data/line37.network.json
-    python -P -E tools/network.py --lines 9,17,22,23,37 --parity
-                                    # also the page's own network (headless Chromium), compared with the build's
+    python -P -E tools/network.py --lines 37                    # data/line37.network.json (after ground_mesh.py)
 
-Steps 2-6 of the design note (docs/decisions/2026-11-18-network-layer.md): the roads, their lanes, the footways, the
-doors, the signals and what the platforms and stops read of the survey. The page's rules are ported whole and in its
-order, so that the build's network is the page's (--parity):
+The design note (docs/decisions/2026-11-18-network-layer.md): the roads, their lanes, the footways, the doors, the
+signals, and what the platforms and stops read of the survey. The page builds none
+of it (src/traffic.js, src/platforms.js read the file): its rules were ported here whole and in its order, and before
+the page's went its network and this one were the same to the cm on lines 9, 17, 22, 23 and 37 (#667, #668):
 - src/streets.js widenTramStreets: a road with tracks along it is 3.2 m wider a track (the page does it at load);
 - the vehicle ways split at every node another way shares (the junctions), each piece smoothed (src/route.js
   smoothPolyline: every 3 m, over 6 m);
@@ -32,10 +31,11 @@ highest holding the point and the survey's class under it (src/groundFile.js Gro
 survey covers (`covered`), and data/lineN.dtm.json's underground areas (src/terrain.js classUnder). The arithmetic is
 the page's, in its order, with Math.hypot as V8 computes it (js_hypot).
 
-The file, data/lineN.network.json, positions in cm (a path flat x, y):
+The file, data/lineN.network.json, positions in cm, a path's points `p` in mm (flat x, y: path_mm):
 - `roads`: each with its points `p`, its OSM tags (`w` with the tracks, `o`, `b`, `t`, `tram`, `ln`, `lf`, `lb`), its
   junctions' keys `ends` (src/traffic.js key()), and where the survey fitted it its kerbs `lo`, `hi` and median `med`
-  (from the centre line, + right, every 4 m), and the tracks on it `trk`;
+  (from the centre line, + right, every 4 m), and the tracks on it `trk`; on a bridge or in a tunnel its OSM `way`
+  (data.roads' index: the chain its height function spans, src/terrain.js way());
 - `lanes`: each lane's `road` (its index), `dir`, `sel` (the lane of its direction) and points `p`;
 - `walks`: each walk's points `p`, `link` for a crossing or a join, `deck` (with its `way`, data.roads' index) on a
   bridge, and its `links` at each end ([walk, s]);
@@ -45,10 +45,17 @@ The file, data/lineN.network.json, positions in cm (a path flat x, y):
 - `heads`: each car signal head's `p` and `face` (mrad); `lightSigs`: the signals with lanes, in order;
 - `pedCross`: each signalled crossing's node `p`, its walking direction `c` (×10⁴), `sig`, `along` and `heads`;
   `pedHeads`: their heads' `p` and `face`;
+- `overBridge`: the signals (data.signals' indexes) over a bridge, on the road under it: the game leaves them out;
 - `platforms`: each placed OSM platform's index `i` in data.platforms, its `name` and whether the survey draws it
   (`surveyed`: no strip of the page's);
 - `stops`: each of our stops (data.stops), by the set (1 car, 2 cars): `stand`, whether its stand-in platform is drawn,
   and `outer`, the shelter's outer edge (cm right of the track) where our OSM platform stands, else null.
+
+No heights: what Start places stands on the drawn ground, the page reading it at load while every tile's lookup is held
+(src/main.js settleNetwork), or once its tile's lookup comes (ground.later). The ground file is not yet the settled
+surface: the page fits the road tunnels' mouths into it and blends the track's profile beside the route (measured
+against the page, the file's heights stood up to 7.8 m off at a head by the Blanka tunnel's mouth, 2.8 m at a bridge's
+abutment beside the route).
 """
 import argparse
 import json
@@ -63,7 +70,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 VERSION = 1
-PARTS = ("roads", "lanes", "walks", "doors", "lights", "heads", "lightSigs", "pedCross", "pedHeads", "platforms", "stops")  # (what the layer holds so far, in the note's steps)
 
 
 # ---------------------------------------------------------------- the page's arithmetic
@@ -95,6 +101,17 @@ def js_round(v):
 
 def cm(v):
     return js_round(v * 100)
+
+
+def mm(v):
+    return js_round(v * 1000)
+
+
+def path_mm(path):
+    """A path's points in mm, flat x, y. (In cm a straight lane zigzagged up to 5 mm and the cars' curve speeds,
+    src/traffic.js curveSpeeds, read it as curves: on line 22 the lane points cars take under 50 km/h went from 9161 to
+    17206, and the seeded runs' trams came later; in mm 9261, none slower by over 1 m/s.)"""
+    return [mm(v) for v in path.p.ravel().tolist()]
 
 
 def smooth_polyline(pts, step=1.0, radius=6.0):
@@ -326,10 +343,33 @@ LOOKUP_CELL = 16  # m (src/groundFile.js: a tile's lookup grid)
 GRID = 2.0  # m: this lookup's own grid of candidates (the answer is the page's: every triangle holding the point)
 
 
+class TerrainGrid:
+    """src/terrain.js Terrain: the line's coarse terrain grid (data.terrain: int16 in base64, rows going south), heights
+    on the two triangles of each cell as the page draws them; what answers past the ground file's tiles."""
+
+    def __init__(self, t):
+        import base64
+        raw = np.frombuffer(base64.b64decode(t["data"]), "<i2").astype(float)
+        self.h = (t["base"] + raw * t["scale"]).astype(np.float32).astype(float)
+        self.x0, self.y0, self.dx, self.dy, self.nx, self.ny = t["x0"], t["y0"], t["dx"], t["dy"], t["nx"], t["ny"]
+
+    def height(self, x, y):
+        x, y = np.asarray(x, float), np.asarray(y, float)
+        fx, fy = (x - self.x0) / self.dx, (y - self.y0) / self.dy
+        ix, iy = np.floor(fx).astype(np.int64), np.floor(fy).astype(np.int64)
+        tx, ty = fx - ix, fy - iy
+
+        def cell(i, j):
+            return self.h[np.clip(j, 0, self.ny - 1) * self.nx + np.clip(i, 0, self.nx - 1)]
+
+        a, b, c, d = cell(ix, iy), cell(ix + 1, iy), cell(ix, iy + 1), cell(ix + 1, iy + 1)
+        return np.where(tx + ty <= 1, a + (b - a) * tx + (c - a) * ty, d + (c - d) * (1 - tx) + (b - d) * (1 - ty))
+
+
 class Survey:
     """The page's survey reads: classAt (GroundLookup.survey's class), covered and classUnder, for arrays of points."""
 
-    def __init__(self, ln):
+    def __init__(self, ln, terrain=None):
         with open(os.path.join(ROOT, "data", f"line{ln}.ground.json"), encoding="utf-8") as f:
             self.layout = json.load(f)
         with open(os.path.join(ROOT, "data", f"line{ln}.ground.bin"), "rb") as f:
@@ -343,6 +383,7 @@ class Survey:
         with open(os.path.join(ROOT, "data", f"line{ln}.dtm.json"), encoding="utf-8") as f:
             dtm = json.load(f)
         self.under = [(a["c"], np.asarray(a["r"], float)[:, :2]) for a in dtm["areas"] if a["l"] < 0 and len(a.get("r") or ()) > 2]
+        self.grid = TerrainGrid(terrain) if terrain else None
 
     def _tile(self, key):
         if key in self.cache:
@@ -1142,12 +1183,14 @@ class Signals:
         self.bind()
 
     def over_bridge(self, s):
-        """profile.overBridge(): well inside a span and over 3 m above the ground under it (the road underneath's)."""
+        """profile.overBridge(): well inside a span and over 3 m above the ground under it (the road underneath's):
+        dtm.heightAt, else the ground's (the highest triangle there), past the tiles the terrain grid."""
         if not any(a + 8 < s < b - 8 for a, b in self.profile.bridges):
             return False
         x, y, _, _ = self.route.at(s)
-        cid, z = self.survey.survey([x], [y])
-        return self.profile.height(s) - float(z[0]) > 3  # (dtm.heightAt where the survey is, else the ground's height)
+        _, z = self.survey.survey([x], [y])
+        zg = float(z[0]) if not np.isnan(z[0]) or self.survey.grid is None else float(self.survey.grid.height([x], [y])[0])
+        return self.profile.height(s) - zg > 3
 
     def live(self):
         built = self.data.get("signals") or []
@@ -1331,6 +1374,8 @@ class Signals:
             if n:
                 self.light_sigs.append(sig["i"])
         self.bind_peds()
+        # (the signals over a bridge on the road under it: the game leaves them out)
+        self.over = [k for k, d in enumerate(self.data.get("signals") or []) if not d.get("drop") and self.over_bridge(d["cross"])]
 
     def bind_peds(self):
         """_bindPedHeads(): at each OSM signalled crossing (data.osmSignals.peds) of one of the game's signals (its
@@ -1516,7 +1561,7 @@ class Stops:
             outer = (min(inner + 6, max(inner + 2, far)) if pl.get("area") else
                      inner + (pl.get("w") or max(2.4, min(3.5, far + 1 - inner if pl.get("gtfs") else 2 * far - 2 * inner))))
             plat = {"i": i, "rt": rt, "back": rt is not route, "s0": s0, "s1": s1, "side": side, "inner": inner,
-                    "outer": outer, "name": pl.get("name"),
+                    "outer": outer, "name": pl.get("name"), "stop": pl.get("stop"), "twin": bool(pl.get("twin")),
                     "ours": {"s0": pl["ours"][0], "s1": pl["ours"][1]} if pl.get("ours") else None}
             self.platforms.append(plat)
             if pl.get("also"):
@@ -1582,10 +1627,15 @@ class Stops:
 
 
 # ---------------------------------------------------------------- the file
+def platform_record(p):
+    """A placed OSM platform: its index `i` in data.platforms, `name` and whether the survey draws it."""
+    return {"i": p["i"], "name": p["name"], "surveyed": p["surveyed"]}
+
+
 def walk_record(w):
-    """A walk as the file keeps it: its points (cm), whether it is a link (a crossing or a join) or on a bridge's deck
+    """A walk as the file keeps it: its points (mm), whether it is a link (a crossing or a join) or on a bridge's deck
     (with its way, data.roads' index: the deck's height, src/terrain.js way()), its links at each end ([walk, s cm])."""
-    out = {"p": [cm(v) for v in w["path"].p.ravel().tolist()]}
+    out = {"p": path_mm(w["path"])}
     if w["link"]:
         out["link"] = 1
     if w["deck"]:
@@ -1601,16 +1651,18 @@ def door_record(d):
 
 
 def lane_record(ln):
-    """A lane as the file keeps it: its road (the index), direction, lane and points (cm)."""
-    return {"road": ln["road"], "dir": ln["dir"], "sel": ln["sel"], "p": [cm(v) for v in ln["path"].p.ravel().tolist()]}
+    """A lane as the file keeps it: its road (the index), direction, lane and points (mm)."""
+    return {"road": ln["road"], "dir": ln["dir"], "sel": ln["sel"], "p": path_mm(ln["path"])}
 
 
 def road_record(r):
-    """A road as the file keeps it (positions in cm)."""
-    out = {"p": [cm(v) for v in r["path"].p.ravel().tolist()], "w": r["w"], "ends": r["ends"]}
+    """A road as the file keeps it (its points in mm, the rest in cm)."""
+    out = {"p": path_mm(r["path"]), "w": r["w"], "ends": r["ends"]}
     for k in ("o", "b", "t"):
         if r[k]:
             out[k] = r[k]
+    if r["b"] or r["t"]:
+        out["way"] = r["src"]  # (data.roads' index: the chain its height function spans, src/terrain.js way())
     for k in ("tram", "ln", "lf", "lb"):
         if r[k] is not None:
             out[k] = r[k]
@@ -1627,7 +1679,7 @@ def road_record(r):
 def build(ln, log=print):
     t0 = time.time()
     data = load_line(ln)
-    survey = Survey(ln)
+    survey = Survey(ln, data.get("terrain"))
     route = Route(data["path"], data.get("pathExt"))
     back = Route(data["pathBack"]) if len(data.get("pathBack") or ()) > 1 else None
     net = Network(data, survey, route, back)
@@ -1648,7 +1700,8 @@ def build(ln, log=print):
             "pedCross": [{"p": [cm(c["x"]), cm(c["y"])], "c": [js_round(c["cx"] * 1e4), js_round(c["cy"] * 1e4)],
                           "sig": c["sig"], "along": c["along"], "heads": c["heads"]} for c in sg.ped_cross],
             "pedHeads": [{"p": [cm(x), cm(y)], "face": js_round(f * 1000)} for x, y, f in sg.ped_heads],
-            "platforms": [{"i": p["i"], "name": p["name"], "surveyed": p["surveyed"]} for p in st.platforms if not p.get("shared")],
+            "overBridge": sg.over,
+            "platforms": [platform_record(p) for p in st.platforms if not p.get("shared")],
             "stops": [{"stand": s["stand"], "outer": [None if o is None else cm(o) for o in s["outer"]]} for s in st.stops],
             "fitted": fitted}
 
@@ -1677,187 +1730,15 @@ def write(ln, net):
     return p
 
 
-# ---------------------------------------------------------------- the parity with the page
-# (the page's network as the file keeps it: src/traffic.js Traffic of the shift started as a player starts it)
-PAGE_ROADS = """async (cars) => {
-  const { startShift } = await import('/tools/bench/shift.js');
-  if (cars) document.getElementById('optCars').value = String(cars); // (the menu's set; else the line's own)
-  await startShift({ timeout: 300 });
-  const cm = (v) => Math.round(v * 100), T = window.traffic, wi = new Map(T.walks.map((w, i) => [w, i]));
-  const pts = (path) => path.p.flatMap(([x, y]) => [cm(x), cm(y)]);
-  const lanes = T.laneList.map((l) => ({ road: l.k, dir: l.dir, sel: l.sel, p: pts(l.path) }));
-  const walks = T.walks.map((w) => {
-    const o = { p: pts(w.path) };
-    if (w.link) o.link = 1;
-    if (w.deck) o.deck = 1;
-    o.links = w.links.map((e) => e.map((x) => [wi.get(x.walk), cm(x.s)]));
-    return o;
-  });
-  const doors = T.doors.map((d) => [wi.get(d.walk), cm(d.s), cm(d.x), cm(d.y), cm(d.ix), cm(d.iy)]);
-  // (a signal by its index in the line data: the game's are copies of its entries)
-  const ds = window.game.data.signals, si = (sig) => ds.findIndex((d) => d.cross === sig.cross && d.s0 === sig.s0);
-  const lights = T.lightLanes.map((l) => ({ lane: l.id, sig: si(l.light.sig), kind: l.light.kind, head: l.light.head, back: cm(l.light.back), src: l.light.src }));
-  // (a head where the first lane bound to it put it)
-  const heads = [];
-  for (const l of T.lightLanes) {
-    if (heads[l.light.head]) continue;
-    const L = l.path.length, e = l.path.at(Math.min(L, L - l.light.back + 4));
-    heads[l.light.head] = { p: [cm(e.x + e.hy * 2.2), cm(e.y - e.hx * 2.2)], face: Math.round(Math.atan2(-e.hx, e.hy) * 1000) };
-  }
-  const lightSigs = T.lightSigs.map((L) => ({ sig: si(L.sig) }));
-  const pedCross = (T.pedCross || []).map((c) => ({ p: [cm(c.x), cm(c.y)], c: [Math.round(c.cx * 1e4), Math.round(c.cy * 1e4)], sig: si(c.sig), along: c.along, heads: c.heads }));
-  // (the pedestrian heads as their poles stand: 32-bit, within a cm)
-  const pedHeads = [], pole = T.pedLights?.group.children[0];
-  for (let i = 0; i < (T.pedLights?.count ?? 0); i++) {
-    const M = new pole.matrix.constructor();
-    pole.getMatrixAt(i, M);
-    const e = M.elements;
-    pedHeads.push({ p: [cm(e[12]), cm(-e[14])], face: Math.round(Math.atan2(e[8], e[0]) * 1000) });
-  }
-  const roads = T.roads.map((r) => {
-    const o = { p: r.path.p.flatMap(([x, y]) => [cm(x), cm(y)]), w: r.w, ends: r.ends };
-    for (const k of ['o', 'b', 't']) if (r[k]) o[k] = r[k];
-    for (const k of ['tram', 'ln', 'lf', 'lb']) if (r[k] != null) o[k] = r[k];
-    if (r.fitLo) { o.lo = r.fitLo.map(cm); o.hi = r.fitHi.map(cm); }
-    if (r.fitMed) o.med = r.fitMed.map((a) => a.map(cm));
-    if (r.trk) o.trk = r.trk.map((a) => a.map(cm));
-    return o;
-  });
-  const G = window.game, platforms = G.platforms.filter((p) => !p.shared).map((p) => ({ name: p.name, surveyed: p.surveyed }));
-  const stops = G.stops.map((s) => ({ stand: s.standIn, outer: s.shelterOuter == null ? null : cm(s.shelterOuter) }));
-  return { roads, lanes, walks, doors, lights, heads, lightSigs, pedCross, pedHeads, platforms, stops, cars: G.tram.cars };
-}"""
-
-
-def page_roads(lines, browser=None, cars=None):
-    """{line: {part: the page's records}} from headless Chromium (tools/headless.py's page; `browser`, else one launched on the
-    GPU, tools/gpu.py), the shift started with `cars` (else the line's own set)."""
-    import faulthandler
-
-    from headless import load_page, serve, stop_server
-    faulthandler.dump_traceback_later(900 * len(lines) + 600, exit=True)
-    out = {}
-    server, url = serve(0)
-    try:
-        if browser is None:
-            from playwright.sync_api import sync_playwright
-
-            import gpu
-            with sync_playwright() as pw:
-                b = gpu.launch(pw)[0]
-                try:
-                    return page_roads(lines, b, cars)
-                finally:
-                    b.close()
-        for ln in lines:
-            page, errors, load = load_page(browser, url, ln, 600, {"keepgeo": False})
-            if isinstance(load, dict):
-                raise RuntimeError(f"line {ln}: the load failed: {load} {errors[:3]}")
-            out[ln] = page.evaluate(PAGE_ROADS, cars)
-            page.close()
-    finally:
-        stop_server(server)
-        faulthandler.cancel_dump_traceback_later()
-    return out
-
-
-POSITIONS = ("p", "lo", "hi", "med", "trk", "face")  # (the fields in cm or mrad: a gap of 1 is the rounding's)
-
-
-def ident(r):
-    """A record's identity where the lists' lengths differ: a road's junctions, a lane's road, direction and lane."""
-    return tuple(r["ends"]) if "ends" in r else (r.get("road"), r.get("dir"), r.get("sel"))
-
-
-FILE_ONLY = {"way", "i"}  # (a deck walk's way: the page keeps its height function; a platform's index in the line data)
-
-
-def comparable(r):
-    """A record as the parity compares it: a door's list as {walk, p}; without what only the file keeps."""
-    if isinstance(r, list):
-        return {"walk": r[0], "p": r[1:]}
-    return {k: v for k, v in r.items() if k not in FILE_ONLY}
-
-
-def as_page(part, recs, cars):
-    """The build's records of a part as the page has them for its set: a stop's survey reads for `cars`."""
-    if part == "stops":
-        return [{"stand": r["stand"][cars - 1], "outer": r["outer"][cars - 1]} for r in recs]
-    return recs
-
-
-def compare(page, built):
-    """The build's records (roads, lanes, walks, doors) against the page's, in order: those the same to the cm (`exact`)
-    and within 1 cm (`equal`), and per field those over 1 cm apart (with the largest gap, cm, and the first one)."""
-    page, built = [comparable(r) for r in page], [comparable(r) for r in built]
-    rep = {"page": len(page), "build": len(built), "exact": 0, "equal": 0, "fields": {}}
-    if len(page) != len(built):
-        pe, be = {ident(r) for r in page}, {ident(r) for r in built}
-        rep["only page"] = sorted(pe - be, key=str)[:10]
-        rep["only build"] = sorted(be - pe, key=str)[:10]
-        return rep
-
-    def flat(v):
-        if v is None:
-            return None
-        if v and isinstance(v[0], list):
-            return [len(v)] + [len(a) for a in v] + [x for a in v for x in a]
-        return v
-
-    for i, (a, b) in enumerate(zip(page, built)):
-        rep["exact"] += a == b
-        same = True
-        for k in sorted(set(a) | set(b)):
-            va, vb = a.get(k), b.get(k)
-            if va == vb:
-                continue
-            if k in POSITIONS:
-                fa, fb = flat(va), flat(vb)
-                if fa is not None and fb is not None and len(fa) == len(fb):
-                    gap = max(abs(x - y) for x, y in zip(fa, fb))
-                    if gap <= 1:
-                        continue
-                else:
-                    gap = None
-            else:
-                gap = None
-            same = False
-            f = rep["fields"].setdefault(k, {"roads": 0, "max cm": 0, "first": None})
-            f["roads"] += 1
-            if gap is not None:
-                f["max cm"] = max(f["max cm"], gap)
-            if f["first"] is None:
-                f["first"] = {"i": i, "id": ident(a), "page": str(va)[:120], "build": str(vb)[:120]}
-        rep["equal"] += same
-    return rep
-
-
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--lines", default="9,17,22,23,37")
-    ap.add_argument("--parity", action="store_true", help="also compare with the page's own roads (headless Chromium)")
     ap.add_argument("--no-write", action="store_true")
-    ap.add_argument("--cars", type=int, choices=(1, 2), help="--parity: the page's shift with this set (else the line's own)")
     a = ap.parse_args(argv)
-    lines = [s.strip() for s in a.lines.split(",") if s.strip()]
-    built = {}
-    for ln in lines:
+    for ln in [s.strip() for s in a.lines.split(",") if s.strip()]:
         net = build(ln)
-        built[ln] = {k: net[k] for k in PARTS}
         if not a.no_write:
             print(write(ln, net))
-    if a.parity:
-        from baseline_store import HeavyJob
-        with HeavyJob("network parity"):
-            page = page_roads(lines, cars=a.cars)
-        bad = 0
-        for ln in lines:
-            for part in PARTS:
-                rep = compare(page[ln][part], as_page(part, built[ln][part], page[ln]["cars"]))
-                print(f"line {ln} {part}{' (' + str(page[ln]['cars']) + ' cars)' if part == 'stops' else ''}: "
-                      f"{json.dumps(rep, ensure_ascii=False)}")
-                bad += rep["equal"] != rep["page"] or rep["page"] != rep["build"]
-        return 1 if bad else 0
     return 0
 
 

@@ -737,7 +737,9 @@ export function makeGround(route, terrain, profile, dtm = null) {
       return n && n.d < 22 && profile.onBridge(n.s) ? profile.heightAt(n.s, n.l) - profile.lift(n.s, n.l) - 0.012 : null;
     },
     // height function of an OSM way (its ribbon is drawn 0.12 above): ground level, or on a bridge
-    // the deck it lies on, else a straight span between the ground at its two ends
+    // the deck it lies on, else a straight span between the ground at its two ends. A chain's ends are read once and
+    // kept (wayEnds): settleWays reads every bridge's and tunnel's at the end of the load, while every tile's lookup is
+    // held, and Start's traffic takes them from there (it reads no lookup past the window, #658)
     way(line, isBridge, isTunnel = false) {
       if (isTunnel) {
         // a road tunnel (line: the whole chain of its ways, chainTunnels): graded along its length
@@ -756,7 +758,7 @@ export function makeGround(route, terrain, profile, dtm = null) {
         // (an end cut off by the edge of the imported roads (line.open false) is deep under the hill)
         const deep = (p) => this.at(p[0], p[1]) - 8;
         const [oa, ob] = line.open || [true, true];
-        const ha = oa ? portal(line[0], line[1]) : deep(line[0]), hb = ob ? portal(line[line.length - 1], line[line.length - 2]) : deep(line[line.length - 1]);
+        const [ha, hb] = this._ends(line, () => [oa ? portal(line[0], line[1]) : deep(line[0]), ob ? portal(line[line.length - 1], line[line.length - 2]) : deep(line[line.length - 1])]);
         return (x, y) => {
           let best = Infinity, s = 0;
           for (let i = 1; i < line.length; i++) {
@@ -777,10 +779,13 @@ export function makeGround(route, terrain, profile, dtm = null) {
       const L = acc[acc.length - 1] || 1, a = line[0], b = line[line.length - 1];
       // (an end cut off by the edge of the imported roads (line.open false, mid-river) takes the other's)
       const [oa, ob] = line.open || [true, true];
-      let ha = this.at(a[0], a[1]), hb = this.at(b[0], b[1]);
-      if (!oa && ob) ha = hb;
-      else if (oa && !ob) hb = ha;
-      else if (!oa && !ob) ha = hb = Math.max(ha, hb); // (both: one of them is likely mid-river)
+      const [ha, hb] = this._ends(line, () => {
+        let ha = this.at(a[0], a[1]), hb = this.at(b[0], b[1]);
+        if (!oa && ob) ha = hb;
+        else if (oa && !ob) hb = ha;
+        else if (!oa && !ob) ha = hb = Math.max(ha, hb); // (both: one of them is likely mid-river)
+        return [ha, hb];
+      });
       const model = this.model;
       return (x, y) => {
         let best = Infinity, s = 0;
@@ -796,6 +801,20 @@ export function makeGround(route, terrain, profile, dtm = null) {
         if (d !== null) return d - 0.12;
         return m !== null ? m : Math.max(span, zg); // (never under the ground)
       };
+    },
+    wayEnds: new Map(), // (a bridge's or road tunnel's chain -> the heights at its two ends, settleWays')
+    _ends(line, read) {
+      const e = this.wayEnds.get(line) ?? read();
+      if (this._settling) this.wayEnds.set(line, e);
+      return e;
+    },
+    // every bridge's and road tunnel's ends read and kept (the end of the load: every tile's lookup held, the tunnels'
+    // mouths fitted); during the load each call reads its own, as the world is built
+    settleWays(roads) {
+      this.wayEnds.clear();
+      this._settling = true;
+      for (const r of roads) if ((r.b || r.t) && r.p?.length > 1) this.way(r.way || r.p, !r.t, !!r.t);
+      this._settling = false;
     },
     // height of a track (its rails' foot) at (x, y): within 6 m of our route, ours and the opposite
     // one (4.5 m apart on the Modřany corridor), the track profile across the street (heightAt, #197: the

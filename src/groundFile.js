@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The prebuilt ground (data/lineN.ground.bin + .json, tools/ground_mesh.py, #508): fetched with the line's files, in
 // tiles of the S-JTSK grid (`layout.tile` m, tools/geo.py TILE, #30), each decoded on its own in a pool of workers
-// (src/groundWorker.js). At load every tile's height lookup is decoded and kept: the world is placed on it, and Start
-// reads it along the whole line (#654). Only the tiles in the window are drawn in detail: within WINDOW_NEAR of the
-// camera, and of the route ahead of the tram (WINDOW_AHEAD). Past them to the fog's end the far ground: each tile's own
-// on a coarse grid.
+// (src/groundWorker.js). At load every tile's height lookup is decoded: the world is placed on it. Then only the tiles
+// in the window keep their lookup, and only they are drawn in detail: within WINDOW_NEAR of the camera, and of the route
+// ahead of the tram (WINDOW_AHEAD). Past them to the fog's end the far ground: each tile's own on a coarse grid. Start
+// reads no lookup past the window: the network and the heights of what it places come from the build
+// (data/lineN.network.json, tools/network.py, #658), and what stands off the track settles when its tile's lookup comes
+// (later).
 // `?keepgeo` and `?bot` keep every tile, lookup and meshes: the checks read the whole line.
 // The lookup (GroundTiles.lookup) is one index of the drawn triangles that cars, walkers, stops, kerbs, the camera and
 // the lints read (#509); where no tile is held it answers null, and the 10 m grid answers (src/main.js useGroundLookup).
@@ -70,6 +72,7 @@ export class GroundTiles {
     [this.E0, this.N0] = L.origin;
     this.tiles = new Map(L.tiles.map((t) => [`${t.e},${t.n}`, t]));
     this.lookups = new Map(); // key -> GroundLookup
+    this.waiting = new Map(); // key -> what waits for that tile's lookup (later)
     this.drawn = new Map(); // key -> the scene's meshes
     this.coarse = new Map(); // key -> the far ground's mesh (or, before the world is built, its arrays)
     this.ready = []; // [key, mesh arrays]: made one a frame
@@ -105,6 +108,9 @@ export class GroundTiles {
         const lk = new GroundLookup(r.lookup);
         this.fix?.lookup(lk);
         this.lookups.set(key, lk);
+        const w = this.waiting.get(key);
+        this.waiting.delete(key);
+        for (const fn of w || []) fn();
       }
       if (r.coarse) this._coarse(key, r.coarse);
       if (r.meshes) this.ready.push([key, r.meshes]);
@@ -140,6 +146,15 @@ export class GroundTiles {
   }
   // every tile's lookup (the world is placed on it) and its far ground
   loadLookups() { return Promise.all([...this.tiles.keys()].map((k) => this._want(k, false))); }
+  // fn() now where (x, y)'s tile holds its lookup, else once it comes (the window reaches it); where the file has no tile
+  // there, now (the 10 m grid answers). What Start places off the track settles on the drawn ground this way, without
+  // reading a lookup past the window (#658)
+  later(x, y, fn) {
+    const k = this.keyAt(x, y);
+    if (this.lookups.has(k) || !this.tiles.has(k)) { fn(); return; }
+    if (!this.waiting.has(k)) this.waiting.set(k, []);
+    this.waiting.get(k).push(fn);
+  }
   // the tiles whose square comes within `r` of a point, nearest the first point first
   near(points, r) {
     const out = new Map(), [x0, y0] = points[0] || [0, 0];
@@ -156,11 +171,9 @@ export class GroundTiles {
     }
     return new Set([...out].sort((a, b) => a[1] - b[1]).map((e) => e[0]));
   }
-  // The window: the tiles within `r` of the points held with their lookup and meshes; with `trim`, the meshes of those
-  // past r + WINDOW_KEEP dropped (their far ground shown again). Resolves when the window's tiles are ready (made by
-  // flush). Every tile's lookup stays (48 MB on line 37, 120 on line 17: tools/bench/ground_tiles.py; all held at the load
-  // anyway): Start reads the survey along the whole line (the platforms the survey draws, traffic's footways), and with
-  // the lookups gone past the window 30 of line 37's 40 platforms were judged unsurveyed and drawn twice (#654)
+  // The window: the tiles within `r` of the points held with their lookup and meshes; with `trim`, those past
+  // r + WINDOW_KEEP dropped (their far ground shown again). Resolves when the window's tiles are ready (made by flush).
+  // (#657 kept every lookup while Start read the survey along the whole line, 48-120 MB; it reads none since #658)
   update(points, r) {
     const want = this.keep ? new Set(this.tiles.keys()) : this.near(points, r), jobs = [], queued = new Set(this.ready.map((e) => e[0]));
     for (const k of want) if (!this.drawn.has(k) && !queued.has(k)) jobs.push(this._want(k, true));
@@ -174,6 +187,7 @@ export class GroundTiles {
         const c = this.coarse.get(k);
         if (c && c.isObject3D) c.visible = true;
       }
+      for (const k of this.lookups.keys()) if (!hold.has(k) && !this.busy.has(k)) this.lookups.delete(k);
     }
     return Promise.all(jobs);
   }

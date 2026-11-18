@@ -30,6 +30,8 @@ From the partition (tools/ground_partition.py partition(): survey, bed, plot and
 5. **The file.** data/lineN.ground.bin: vertices in mm (x, y from the box's corner, z over its base) along a Hilbert
    curve, as zigzag varint differences; per class, its triangles' indexes as differences (encode()). lineN.ground.json: the
    layout, the counts, the provenance. Decoded by decode() (and by the page, #509).
+6. **The network.** data/lineN.network.json (tools/network.py, #658): it reads the survey from this file, so it is built
+   again after it, every time.
 
 The report (reports/ground-mesh/lineN.json): triangles per class against what the page draws today, the error against
 IPR's 1 m raster by distance band, the fallback levels, the steps by pair, the file's size raw, gzip and brotli, the
@@ -1622,6 +1624,9 @@ def main(argv=None):
             rep["seconds"]["error"] = round(time.time() - t1, 1)
             if not a.no_write:
                 write(ln, built, rep)
+                # (the network reads the survey from this file: built after it, every time, #658)
+                import network
+                rep["network"] = network.write(ln, network.build(ln, log=lambda m: print(m, flush=True)))
             if not a.no_write:
                 import ground_partition as gp
                 wins = {k: w for k, (l2, w) in gp.place_windows({ln: built["L"]}).items() if l2 == ln}

@@ -181,7 +181,7 @@ export class Game {
   }
 
   _buildStop(stop) {
-    buildStop({ stop, data: this.data, route: this.route, platforms: this.platforms, group: this.objects, log: this });
+    buildStop({ stop, data: this.data, route: this.route, platforms: this.platforms, group: this.objects, log: this, cars: this.tram.cars });
   }
 
   _initSignals() {
@@ -191,8 +191,11 @@ export class Game {
     const built = this.data.signals?.some((d) => d.rule) ? this.data.signals : null;
     const own = this._placeSignals(built ? (this.data.signalsRaw || []) : this.data.signals);
     // grade separation: where our track is on a bridge, the junctions and their traffic lights
-    // belong to the road underneath (e.g. the Modřany estakáda), not to the tram
-    const live = (list) => list.filter((d) => !d.drop && !this.profile.overBridge(d.cross)).map((d) => ({ ...d }));
+    // belong to the road underneath (e.g. the Modřany estakáda), not to the tram (the build's answer, by the signal's
+    // crossing: tools/network.py over_bridge, #658: Start reads no ground past the window). Each of the build's keeps its
+    // index in the data (`i`): the network's lanes are bound to it (src/traffic.js _loadSignals)
+    const over = new Set((this.data.network?.overBridge || []).map((i) => this.data.signals[i].cross));
+    const live = (list) => list.map((d, i) => ({ ...d, i: list === built ? i : undefined })).filter((d) => !d.drop && !over.has(d.cross));
     let placed;
     if (built) {
       placed = live(built).map((d) => ({ ...d, head: d.head !== undefined ? this.stops[d.head] : undefined }));
