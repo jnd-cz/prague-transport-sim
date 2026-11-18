@@ -6,7 +6,8 @@ import { riggedReady, riggedIds, loadRigged, makeRiggedSet, setRiggedLine, poseR
 import { localUrl } from './localFiles.js';
 import { makeSimpleSet, poseSimple, ROUTE_BOX, MIRROR_EYE } from './t3simple.js';
 import { vehicles, byId, fileUrl, variantOf, fleetNumbers, liveries, liveryVehicle, liveryUrl } from './vehicles.js';
-import { hangConsist } from './consist.js';
+import { hangConsist, poseSection } from './consist.js';
+import { placeUnit } from './articulated.js';
 import { signalsAt } from './lamps.js';
 import { CAR_PITCH, VEHICLE_TYPES } from './tram.js';
 import { drawCallSignal, drawSwitchSignal } from './ledPanels.js';
@@ -569,19 +570,16 @@ export function setNextStop(model, next) {
 // Put each car of a set on the track (`at(s)` -> [x, y, track bed height, roll]): each car rests on its two bogie
 // pivots, so it yaws, pitches and leans with them, wheels on the rail heads. The hybrid and the built-in car hang
 // each next car on the coupling and pose their bogies, wheels and couplers (src/consist.js); the still models (the
-// classic, a tier-1 glTF) stand their cars CAR_PITCH apart, the body 0.6 m behind the coupler face, on their pivots.
+// classic, a tier-1 glTF) stand their cars CAR_PITCH apart, the body 0.6 m behind the coupler face, on their pivots
+// (their type's running gear, src/articulated.js).
 export function placeConsist(model, sFront, at) {
   const u = model.userData;
   if (u.kind !== 'classic' && u.kind !== 'gltf') { hangConsist(model, sFront, at); return; }
-  const { bogie, bodyFront } = u;
+  const T = VEHICLE_TYPES.T3;
   u.cars.forEach((car, k) => {
-    const c = sFront - k * CAR_PITCH - 0.6 - bodyFront; // car origin (midway between the bogies)
-    const [ax, ay, za, ra = 0] = at(c + bogie), [bx, by, zb, rb = 0] = at(c - bogie);
-    car.position.set((ax + bx) / 2, (za + zb) / 2 + RAIL_TOP, -(ay + by) / 2);
+    const c = sFront - k * CAR_PITCH - 0.6 - u.bodyFront; // car origin (midway between the bogies)
     car.rotation.order = 'YXZ'; // heading, then pitch, then the lean into a canted curve
-    car.rotation.y = Math.atan2(ax - bx, -(ay - by));
-    car.rotation.x = -Math.atan2(za - zb, 2 * bogie);
-    car.rotation.z = -(ra + rb) / 2;
+    poseSection(car, placeUnit(T, c + T.length / 2, at).sections[0], RAIL_TOP);
   });
 }
 
