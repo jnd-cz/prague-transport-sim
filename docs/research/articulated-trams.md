@@ -221,6 +221,8 @@ Tramvaje Tatra typů T a K do 15. 10. 2023" (https://www.k-report.net/discus/mes
 - two photos from the preview of Köhler's book (1530440–1530441);
 - a brass model (1529859).
 
+All 16 are kept in `raw/reference/photos/kt4/`, listed in `raw/reference/SOURCES.md`.
+
 Read off them [M, from the photos; no dimensions]:
 - **The rods.** From each half's bogie two rods run to the joint, one from each side of the bogie frame's end facing
   the joint, on ball joints (1529888, 1530027). They converge toward the car's centreline as they near the joint
