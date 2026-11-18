@@ -119,11 +119,30 @@ def truth_structures(root, structures, ids, width=6):
     return unary_union([structures, *corridors]), ids + ['truth:' + f['id'] for f in facts]
 
 
+COVERED = 0.9  # of a user's structure's length the sources map for its fact to match (#670)
+
+
+def structure_states(root, mapped):
+    """Each user's structure (data/truth.json trackHeights.structures) against what the sources map (`mapped`: OSM's
+    structure mask, Mosty 3D's bridges and the survey's decks, without the user's): matches where they cover COVERED
+    of its length from 'from' to 'to', else holds (#670). `cover`: the share; `ends`: from and to in city metres."""
+    path = root / 'data/truth.json'
+    truth = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+    frame, out = Frame(), []
+    for f in truth.get('trackHeights', {}).get('structures', []):
+        x, y = frame.xy([f['from'][0], f['to'][0]], [f['from'][1], f['to'][1]])
+        line = shapely.LineString(list(zip(x, y)))
+        share = line.intersection(mapped).length / line.length if line.length else 0.0
+        out.append({'id': f['id'], 'state': 'matches' if share >= COVERED else 'holds', 'cover': round(share, 2),
+                    'ends': [[round(float(v), 1) for v in p] for p in line.coords]})
+    return out
+
+
 def bridge_structures(structures, ids, paths, current, archive, terrain):
     """Track on a Mosty 3D bridge, decided from the heights where it enters and leaves (tools/track_bridges.py, #192),
-    added to the OSM structure mask."""
+    added to the OSM structure mask; and the bridges' own mask (None without one)."""
     geom, found, pieces = track_bridges.mask(track_bridges.decide(paths, current, archive, terrain))
-    return (unary_union([structures, geom]) if found else structures), ids + found, pieces
+    return (unary_union([structures, geom]) if found else structures), ids + found, pieces, (geom if found else None)
 
 
 POOL = 20000  # samples: fewer are decided in this process (a worker takes a few seconds to start with the decks)
@@ -215,12 +234,15 @@ def stage(review):
     provenance, _, archived_paths = archive_data()
     current, archive = Segments(paths), Segments(archived_paths)
     structures, structure_ids, tunnels = structure_mask(separate_tunnels=True)
+    osm_mapped = structures  # (what OSM maps, before the user's structures: their state, #670)
     structures, structure_ids = truth_structures(ROOT, structures, structure_ids)
     terrain = Terrain()
-    structures, structure_ids, bridge_pieces = bridge_structures(structures, structure_ids, paths, current, archive,
-                                                                 terrain)
+    structures, structure_ids, bridge_pieces, bridges = bridge_structures(structures, structure_ids, paths, current,
+                                                                          archive, terrain)
     took('sources, structures and bridges')
     decks = load_decks(ROOT)
+    structure_facts = structure_states(ROOT, unary_union([osm_mapped, *([bridges] if bridges is not None else []),
+                                                          *decks.polygons]))
     context = load_context(decks)
     area = unary_union([d['polygon'] for d in districts])
     took('decks and OSM tracks')
@@ -366,6 +388,7 @@ def stage(review):
         'frame': {'crs': 'EPSG:5514', 'origin': list(Frame().to_jtsk(0, 0)), 'height_datum': 'Bpv'},
         'scope': 'height proposals at DI midpoint samples <=5m; topology and game integration are #20',
         'structure_hint_osm_ways': structure_ids,
+        'structure_facts': structure_facts,
         'mosty3d_structures': bridge_pieces,
         'known_conflicting_archive_ids': sorted(conflicts),
         'evidence': review,

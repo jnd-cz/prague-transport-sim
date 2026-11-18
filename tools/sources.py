@@ -209,6 +209,7 @@ OVERRIDES = {
                   else f"{f['stop']}, from {f.get('from')}", "tools/build_line.py"),
     "switchTips": (("trackSources", "switchTips"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
     "photoTracks": (("trackSources", "photoTracks"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
+    "structures": (("trackHeights", "structures"), lambda f: f["id"], "tools/import_track_heights.py, through tools/line_heights.py"),
 }
 
 
