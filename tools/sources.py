@@ -201,7 +201,8 @@ def stamp(tool, lists, prev=None, root=ROOT, facts=None):
 FACT_STATES = ("holds", "matches", "changed", "agrees", "moved")
 
 # The data/truth.json sections whose facts override a source (#670): where their facts are in the file, each fact's
-# stable id (its own id, else its place: never an array index), and the tool that states them. tools/fact_status.py
+# stable id (its own id, else its place: never an array index), the tool that states them, and which of them the build
+# applies where not all (the others, such as a "not grass" answer, only keep a review card away). tools/fact_status.py
 # lists a fact of these that no built file states as not stated.
 OVERRIDES = {
     "postedSpeeds": (("postedSpeeds",), lambda f: f["id"], "tools/osm_speeds.py"),
@@ -211,15 +212,20 @@ OVERRIDES = {
     "photoTracks": (("trackSources", "photoTracks"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
     "structures": (("trackHeights", "structures"), lambda f: f["id"], "tools/import_track_heights.py, through tools/line_heights.py"),
     "surveyGround": (("surveyGround", "places"), lambda f: f"{f['lat']},{f['lon']}", "tools/dtm.py (zps_ground.judge)"),
+    "grassReview": (("grassReview", "answers"), lambda f: f["id"], "tools/track_styles.py",
+                    lambda f: f.get("answer") == "grass"),
+    "trackSurfaceReview": (("trackSurfaceReview", "answers"), lambda f: f["id"], "tools/track_styles.py",
+                           lambda f: f.get("answer") in ("setts", "embedded", "panels", "grass")),
 }
 
 
 def overriding(truth, section):
-    """The facts of an OVERRIDES section in data/truth.json (as loaded), in file order."""
+    """The facts of an OVERRIDES section in data/truth.json (as loaded) that the build applies, in file order."""
     v = truth
     for k in OVERRIDES[section][0]:
         v = (v or {}).get(k) if isinstance(v, dict) else None
-    return v or []
+    applies = OVERRIDES[section][3] if len(OVERRIDES[section]) > 3 else None
+    return [f for f in v or [] if applies is None or applies(f)]
 
 
 def fact_id(section, fact):

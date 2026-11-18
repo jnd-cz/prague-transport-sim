@@ -169,6 +169,25 @@ class Holes(unittest.TestCase):
         self.assertEqual(got, [(100, 200, "setts"), (377, 425, "setts")])
         self.assertEqual(spans_of(T.sections(data, {}, None)), [(147, 165, "embedded"), (377, 425, "embedded")])
 
+    @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
+    def test_an_answer_matches_once_the_styles_without_it_give_its_style(self):
+        # (#670: an embedded junction is embedded without the answer; setts over a stretch or at a junction is not;
+        # grass where the user's own mark already lays grass matches, and without the mark holds)
+        ll = lambda x: list(map(float, T.Frame().ll(x, 0.0)))   # noqa: E731
+        ans = lambda i, what, a, b, v: {"id": i, "what": what, "line": "x", "between": [ll(a), ll(b)], "answer": v}  # noqa: E731
+        truth = {"trackSurfaceReview": {"answers": [ans("st", "stretch", 100, 200, "setts"), ans("jn", "junction", 395, 405, "setts"),
+                                                    ans("em", "junction", 395, 405, "embedded"), ans("ch", "change", 50, 50, "changes")]},
+                 "grassReview": {"answers": [{"id": "g1", "lines": ["x"], "between": [ll(450), ll(550)], "answer": "grass"},
+                                             {"id": "g2", "lines": ["x"], "between": [ll(20), ll(90)], "answer": "grass"},
+                                             {"id": "n", "lines": ["x"], "between": [ll(20), ll(90)], "answer": "not grass"}]}}
+        data = {"line": "x", "path": [[0.0, 0.0], [600.0, 0.0]], "stops": [{"name": "A", "s": 0.0}, {"name": "B", "s": 600.0}],
+                "switches": [{"s": 380, "frog": 12}, {"s": 410, "frog": 12}]}
+        got = T.answer_states(data, truth, None)
+        self.assertEqual({e["id"]: e["state"] for e in got["trackSurfaceReview"]}, {"st": "holds", "jn": "holds", "em": "matches"})
+        self.assertEqual({e["id"]: (e["state"], e["share"]) for e in got["grassReview"]}, {"g1": ("holds", 0.0), "g2": ("holds", 0.0)})
+        truth["trackStyles"] = [{"line": "x", "from": "A", "to": "B", "style": "grass"}]
+        self.assertEqual({e["id"]: e["state"] for e in T.answer_states(data, truth, None)["grassReview"]}, {"g1": "matches", "g2": "matches"})
+
     def test_switches_do_not_cut_and_short_pieces_go(self):
         tw = {"switches": [{"s": 100, "frog": 12}], "trackwork": {"trailing": [{"s": 200, "frog": 12}], "crossings": [250.0]}}
         self.assertEqual(spans_of(styled("ballast", **tw)), [(0, 600, "ballast")])   # (open ballast through the switches)

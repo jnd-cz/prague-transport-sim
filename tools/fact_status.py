@@ -68,7 +68,7 @@ def collect(root=ROOT, files=None, truth=None):
                 s["state"] = min(s["states"].values(), key=ORDER.index)
     known = set()
     out = []
-    for section, (_, _, tool) in sources.OVERRIDES.items():
+    for section, (_, _, tool, *_) in sources.OVERRIDES.items():
         for f in sources.overriding(truth, section):
             k = (section, str(sources.fact_id(section, f)))
             known.add(k)

@@ -63,6 +63,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 from route import Route  # noqa: E402
+import sources  # noqa: E402
 import track_beds  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -79,6 +80,7 @@ DIAMOND_MIN = 20       # degrees: another track crossing ours more shallowly is 
 BED = 2.7              # m: a bed's width (src/world.js), the extent a diamond covers on ours
 PAVED_IN = ("embedded", "setts")   # the styles a junction's pieces join across (#574: setts as embedded)
 SURFACE_STYLE = {"setts": "setts", "embedded": "embedded", "panels": "panels", "grass": "grass"}  # answer -> style
+STYLE_MATCH = 0.9      # of an answer's stretch the styles laid without the answers give its style, for it to match (#670)
 CROSS_REACH = 6        # m past OSM's carriageway half-width that the survey's road at the axis may still extend it
 BRIDGE_HEAD = 6        # m inside a bridge's ends (OSM's) where a way across still meets the track at grade (on_bridge)
 CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
@@ -472,6 +474,26 @@ def reviewed(data, truth):
     return out
 
 
+def answer_states(data, truth, survey, opens=()):
+    """The user's grass and surface answers this line lays (grassReview `grass`, trackSurfaceReview's styles) against
+    the styles laid without them: matches where those give the answer's style over STYLE_MATCH of its stretch (a junction
+    answer: of its place), else holds (#670). {truth.json section: [state entry]}."""
+    bare = {**truth, "grassReview": {**truth.get("grassReview", {}), "answers": []},
+            "trackSurfaceReview": {**truth.get("trackSurfaceReview", {}), "answers": []}}
+    without = sections(data, bare, survey, opens)
+
+    def share(s0, s1, style):
+        if s1 - s0 < 1:  # (a place, not a stretch)
+            s0, s1 = (s0 + s1) / 2 - 0.5, (s0 + s1) / 2 + 0.5
+        return sum(max(0.0, min(s1, x["s1"]) - max(s0, x["s0"])) for x in without if x["style"] == style) / (s1 - s0)
+
+    def entry(i, style, s0, s1):
+        sh = share(s0, s1, style)
+        return {"id": i, "state": "matches" if sh >= STYLE_MATCH else "holds", "style": style, "share": round(sh, 2)}
+    return {"grassReview": [entry(r["card"], "grass", r["s0"], r["s1"]) for r in reviewed(data, truth)],
+            "trackSurfaceReview": [entry(i, st, s0, s1) for s0, s1, what, st, i in surface_places(data, truth)]}
+
+
 def sections(data, truth, survey, opens=(), track="ours"):
     """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479), the
     paved track embedded at junctions and road crossings (#546), and the junctions the user's surface answers lay in
@@ -699,6 +721,8 @@ def main():
             tr["bed"] = bs[i]
         else:
             tr.pop("bed", None)
+    data["provenance"] = sources.stamp("track_styles.py", {}, data.get("provenance"),
+                                       facts=answer_states(data, truth, survey, opens))
     data["lift"] = lift_series(data, data["styles"], offsets(truth))
     if "stylesBack" in data:
         data["liftBack"] = lift_series(data, data["stylesBack"], offsets(truth))
