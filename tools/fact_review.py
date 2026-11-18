@@ -128,6 +128,8 @@ def drop(text, path, index):
         s = items[index - 1][2]
     elif len(items) > 1:
         e = items[1][1]
+    else:  # (the last one: the list reads [])
+        s, e = text.rindex("[", 0, s) + 1, text.index("]", e)
     return text[:s] + text[e:]
 
 
