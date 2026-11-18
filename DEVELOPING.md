@@ -315,7 +315,7 @@ python -I tools/datadiff.py --line 17 zps --at=-2489,-8331 --radius 5
 python -I tools/datadiff.py --line 17 dtm --ref '5d6c427^'
 ```
 
-`shot.py` writes individual PNGs, a labelled pair and camera/data hashes to `reports/shots/`.
+`shot.py` writes individual PNGs, a labelled pair and camera/data hashes to `reports/shots/`. The small things drawn near the camera (`src/nearbatch.js`) are refilled round the captured camera before the picture, and the JSON keeps each set's range and drawn count (`near`); two captures of one checkout are the same picture (`tools/test_shot.py`, #689).
 Views: `cab` (default), `chase`, `review`. The tram is paused at `s`, traffic and HUD are hidden;
 review uses `&at=` at that route point. Both sides use the current view's exact camera, so a changed
 profile cannot move the comparison camera. It starts its own free-port servers, one view at a time.

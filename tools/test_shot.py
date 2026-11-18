@@ -152,5 +152,25 @@ class Shots(unittest.TestCase):
         self.assertTrue((output/'line17-s5064-cab-snow-pair.png').exists())
 
 
+class SameCheckout(unittest.TestCase):
+    """Two captures of the real game in one checkout at one camera are the same picture (#689: a pair once differed in
+    its trees). Needs data/ (python -I tools/snapshot.py data-fetch)."""
+    ROOT = Path(__file__).resolve().parent.parent
+
+    @unittest.skipUnless((ROOT / 'data' / 'line17.json').is_file(), 'needs data/: python -I tools/snapshot.py data-fetch')
+    def test_two_captures_of_one_checkout_are_pixel_equal(self):
+        with sync_playwright() as pw, tempfile.TemporaryDirectory() as tmp:
+            browser, _ = gpu.launch(pw, quiet=True)
+            try:
+                shots = [capture(browser, self.ROOT, 23, 0, 'cab', Path(tmp) / f'{k}.png', 240) for k in range(2)]
+            finally:
+                browser.close()
+            with Image.open(Path(tmp) / '0.png') as a, Image.open(Path(tmp) / '1.png') as b:
+                self.assertEqual(a.tobytes(), b.tobytes(), 'two captures of one checkout differ')
+            self.assertEqual(shots[0]['near'], shots[1]['near'])
+            self.assertTrue(all(s['fill_from_camera'] == 0 for s in shots[0]['near'].values() if s['fill_from_camera'] is not None),
+                            shots[0]['near'])
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
