@@ -14,6 +14,7 @@ import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
 import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor, soundPacksFor } from './vehicles.js';
 import { Traffic } from './traffic.js';
+import { settlePlatforms } from './platforms.js';
 import { Autopilot } from './autopilot.js';
 import { junctionTurns, indicating } from './indicators.js';
 import { signalsAt } from './lamps.js';
@@ -109,6 +110,14 @@ try {
   const r = await load.get(`data/line${lineId}.dtmpoints.json`);
   if (r.ok) { const j = await r.json(); data.dtmPoints = j.points; built[`line${lineId}.dtmpoints.json`] = j.provenance ? j : { attribution: 'Street furniture: DTM Praha (archive), data base © IPR Praha (CC BY 4.0).' }; }
 } catch { /* none for this line */ }
+// the network the build made (tools/network.py, #658): the traffic's roads, lanes, footways and doors, the signals
+// bound to the lanes, what the platforms read of the survey, the heights of what Start places. Start builds none of it.
+{
+  const r = await load.get(`data/line${lineId}.network.json`);
+  if (!r.ok) throw new Error(`line ${lineId}: no network file (data/line${lineId}.network.json, tools/network.py): ${r.status}`);
+  data.network = await r.json();
+  built[`line${lineId}.network.json`] = data.network;
+}
 // wait for the rest before the build steps, which block the page
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
 const truth = await loadHeightFacts();
@@ -122,6 +131,7 @@ const groundLookups = groundTiles.loadLookups();
 await Promise.all(vehicles.filter((v) => v.preload).flatMap((v) => v.files.map((f) => load.get(fileUrl(v, f.path)))));
 await load.begin('terrain');
 // (dev switch for comparing lint runs: ?notunnels)
+data.allRoads = data.roads; // (the network's ways by their index: tools/network.py)
 if (params.has('notunnels')) data.roads = data.roads.filter((r) => !r.t);
 chainTunnels(data.roads); // road tunnels and bridges: heights between their real portals / abutments
 // the track beyond both termini as the build walked it, so a two-car set standing at the first stop is on rails
@@ -257,6 +267,7 @@ function useGroundLookup(ground, lk) {
     return zb !== null ? zb + BED_BELOW - ROAD_BELOW : at(x, y, deck);
   };
   ground.surface = (x, y) => { const t = ground.dtm?.surfaceAt(x, y); return t ? t.z : ground.at(x, y) + 0.12; };
+  ground.later = (x, y, fn) => lk.g.later(x, y, fn); // (once (x, y)'s tile holds its lookup: src/groundFile.js)
 }
 
 // The world is built once (in the loading step 'world'); the weather only sets the sky, the light, the
@@ -1223,7 +1234,19 @@ function poseMirror(mirrorCam) {
 }
 
 load.finish();
+settleNetwork();
 groundTiles.trim = true; // (the world is placed: from here the window drops the tiles past it)
+
+// What Start places from the network (data/lineN.network.json, tools/network.py, #658) stands on the settled ground,
+// read now while every tile's lookup is held and the tunnels' mouths are fitted: the bridges' and road tunnels' ends,
+// the signal heads, the platforms' strips and the signs on Vienna-type platforms. From here the window drops the lookups
+// past it, and Start reads none of them.
+function settleNetwork() {
+  const N = data.network;
+  ground.settleWays(data.roads);
+  for (const h of [...N.heads, ...N.pedHeads]) h.z = ground.surface(h.p[0] / 100, h.p[1] / 100);
+  settlePlatforms(data, route, data.pathBack?.length > 1 ? new Route(data.pathBack) : null);
+}
 // review mode (?review, src/review.js): the checks' findings on the map, no shift
 let review = null;
 if (params.has('review')) {

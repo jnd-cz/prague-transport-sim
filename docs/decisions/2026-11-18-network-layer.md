@@ -146,3 +146,24 @@ The questions were:
    page's code moved into modules without Three.js and run by the build in headless Chromium?
 2. Heights stored in the layer from the build's ground (recommended), or read from the drawn ground as now?
 3. One file a line now, split by tile only when lines share a city network: agreed?
+
+## How it went (2026-11-18)
+
+- **Steps 2-6** (#667, #668): the port, every part the page's to the cm on lines 9, 17, 22, 23 and 37.
+- **The page switched in one step** (step 7, the user: "go with the switch as recommended"), after the parity held. The
+  page's own builders went.
+- **Heights: read from the drawn ground at the load, not stored.** Answer 2 chose stored heights. Measured against the
+  page, the ground file is not yet the surface the page settles things on:
+  - the page fits the road tunnels' mouths into it (src/structures.js mouthFix);
+  - beside the route, the page's `ground.at` takes the track's profile.
+  The file's heights stood up to 7.8 m off at a pedestrian head by the Blanka tunnel's mouth (line 17), 2.2 m at a
+  tunnel's portal and 2.8 m at a bridge's abutment beside the route. The page therefore reads them itself at the end of
+  the load, while every tile's lookup is held: the bridges' and tunnels' ends, the signal heads, the platforms' strips and
+  signs. What moves with the set or the signals (our stops' signs and shelters, a signal on a pole past 9 m from the
+  track) settles once its tile's lookup comes (`ground.later`). Cars and walkers read the ground where they are, which
+  is always in the window. Heights can move into the layer once the build makes the settled surface (the mouths in the
+  ground file).
+- **Measured** (`tools/bench/network_layer.py`):
+  - Start takes 0.4-1.1 s on the five lines, against 2.1-6.5 s.
+  - The lookups held after it are 9-17 MB, against 48-120 MB.
+  - No read at Start misses a tile.

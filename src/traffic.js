@@ -4,7 +4,6 @@
 // (ahead of us on our track, and oncoming on the opposite track). Everything fades in and out
 // instead of popping.
 import * as THREE from 'three';
-import { smoothPolyline } from './route.js';
 import { makeCar, makeCrowd, makeT3, placeConsist, poseT3, setNextStop, makeTrafficLights, makePedLights, disposeModel } from './models.js';
 import { T3, COUPLING_GAP, CAR_PITCH } from './tram.js';
 import { setRiggedLevel, FULL_IN, FULL_OUT } from './rigged.js';
@@ -122,15 +121,6 @@ const CAR_HALF = 2.2, TRACK_ZONE = 5.2, YIELD_GAP = 1.5;
 // still turning onto it counts (#100; at 60°, cos 0.5, it did not until it had straightened out)
 const CAR_ALIGN = 0.3;
 
-// lanes per direction: as OSM tags them (lanes:forward / lanes:backward, or lanes on a one-way road,
-// or half of lanes from 4 on a two-way one), else one; turn lanes at junctions are not modelled
-function lanesOf(src, dir) {
-  if (src.o) return src.ln || 1;
-  const own = dir > 0 ? src.lf : src.lb;
-  if (own) return own;
-  return src.ln >= 4 ? Math.floor(src.ln / 2) : 1;
-}
-
 // stand a car on the drawn street surface hf(x, y) (ground level, or the deck of the bridge its road
 // is on): pitch with the slope, roll with the camber
 export function carPose(hf, x, y, hx, hy) {
@@ -160,24 +150,22 @@ export class Traffic {
       if (this.back) d = Math.min(d, this.back.distance(x, y));
       return d;
     };
-    const nearTrackShare = (path, off = 0) => {
-      let near = 0, n = 0;
-      for (let s = 0; s <= path.length; s += 5) {
-        const p = path.at(s);
-        n++;
-        if (this.trackDist(p.x + p.hy * off, p.y - p.hx * off) < 4) near++;
-      }
-      return near / Math.max(1, n);
-    };
-
+    // The network the build made (tools/network.py, data/lineN.network.json, #658): the roads (OSM's ways split at their
+    // junctions, smoothed, fitted to the survey's kerbs and medians, the tracks on them), their lanes, the footways (OSM's
+    // and the sidewalks the survey shows beside the roads, linked across the streets), the doors, the signals bound to
+    // the lanes and their heads. Start builds none of it and reads no survey. (Positions in cm.)
+    const N = data.network, ways = data.allRoads || data.roads;
+    if (!N?.lanes) throw new Error(`line ${data.line}: no network (data/line${data.line}.network.json): python -P -E tools/network.py --lines ${data.line}`);
+    const pts = (a) => { const out = []; for (let i = 0; i < a.length; i += 2) out.push([a[i] / 100, a[i + 1] / 100]); return out; };
+    const m = (a) => a.map((v) => v / 100);
     this.roads = [];
     this.walks = [];
-    // what a road's cars and walkers stand on: the street surface, or on a bridge (OSM bridge tag)
-    // the deck it lies on, exactly as the road is drawn (ground.way)
+    // what a road's cars and walkers stand on: the street surface, or on a bridge (OSM bridge tag) the deck it lies on,
+    // exactly as the road is drawn (ground.way: the span of the whole chain of its ways, its ends read at the load,
+    // settleWays); in a road tunnel its floor between the portals
     this.surfaceFn = (r) => {
-      if (r.t) { const w = ground.way(r.way || r.p, false, true); return (x, y) => w(x, y) + 0.12; } // a road tunnel
-      if (!r.b) return (x, y) => ground.surface(x, y);
-      const w = ground.way(r.way || r.p, true); // (the span of the whole way, as drawn)
+      if (!r.b && !r.t) return (x, y) => ground.surface(x, y);
+      const src = ways[r.way], w = ground.way(src.way || src.p, !r.t, !!r.t);
       return (x, y) => w(x, y) + 0.12;
     };
     this.cell = 60;
@@ -190,119 +178,25 @@ export class Traffic {
         this.index.get(kk).push([kind, k, s]);
       }
     };
-    // OSM roads meet at shared nodes, usually in the middle of a way, not only at its ends:
-    // split every vehicle road at each point it shares with another road, so the network has
-    // real junctions (cars used to vanish where a way simply continued past a junction)
-    const vkey = (p) => `${p[0]},${p[1]}`;
-    const uses = new Map();
-    for (const r of data.roads) {
-      if (r.f || r.p.length < 2) continue;
-      for (const p of new Set(r.p.map(vkey))) uses.set(p, (uses.get(p) || 0) + 1);
-    }
-    const pieces = [];
-    for (const r of data.roads) {
-      if (r.p.length < 2) continue;
-      if (r.f) { pieces.push(r); continue; }
-      let cur = [r.p[0]];
-      for (let i = 1; i < r.p.length; i++) {
-        cur.push(r.p[i]);
-        if (i < r.p.length - 1 && (uses.get(vkey(r.p[i])) || 0) > 1) { pieces.push({ ...r, p: cur, way: r.way || r.p }); cur = [r.p[i]]; }
-      }
-      pieces.push({ ...r, p: cur, way: r.way || r.p });
-    }
-    // centre lines of all vehicle ways (20 m cells), for splitting a carriageway two ways share
-    this.wayIdx = new Map();
-    for (const r of pieces) {
-      if (r.f || !r.c || r.p.length < 2) continue;
-      for (let i = 1; i < r.p.length; i++) {
-        const sg = { a: r.p[i - 1], b: r.p[i], src: r };
-        const x0 = Math.min(sg.a[0], sg.b[0]), x1 = Math.max(sg.a[0], sg.b[0]), y0 = Math.min(sg.a[1], sg.b[1]), y1 = Math.max(sg.a[1], sg.b[1]);
-        for (let ix = Math.floor(x0 / 20); ix <= Math.floor(x1 / 20); ix++) for (let iy = Math.floor(y0 / 20); iy <= Math.floor(y1 / 20); iy++) {
-          const k = ix * 100003 + iy;
-          if (!this.wayIdx.has(k)) this.wayIdx.set(k, []);
-          this.wayIdx.get(k).push(sg);
-        }
-      }
-    }
-    this.jpos = new Map(); // junction key -> [x, y]
-    for (const r of pieces) {
-      if (r.p.length < 2) continue;
-      const path = new Path(r.p.length > 2 ? smoothPolyline(r.p, 3, 6).pts : r.p);
-      if (path.length < (r.f ? 15 : 2)) continue;
-      if (r.f) {
-        if (r.t) continue; // (pedestrian underpasses: nobody walks under the ground here)
-        // footways running along the tracks are platforms/verges: nobody strolls there; a footway lying
-        // on the surveyed carriageway for more than 6 m is cut there (crossing a street is fine)
-        const dtm = r.b ? null : this.ground.dtm, keepRuns = [];
-        if (dtm) {
-          const smp = [];
-          for (let s = 0; s <= path.length; s += 2) { const q = path.at(s), c = dtm.classAt(q.x, q.y); smp.push({ q, on: c === 'road' || c === 'parking' || c === 'tram' }); }
-          let cur = [];
-          for (let i = 0; i < smp.length; i++) {
-            let j = i;
-            while (j < smp.length && smp[j].on) j++;
-            if (j - i > 3) { if (cur.length > 1) keepRuns.push(cur); cur = []; i = j - 1; continue; }
-            for (let k = i; k < Math.max(j, i + 1) && k < smp.length; k++) cur.push([smp[k].q.x, smp[k].q.y]);
-            i = Math.max(j, i + 1) - 1;
-          }
-          if (cur.length > 1) keepRuns.push(cur);
-        }
-        for (const wp of dtm ? keepRuns.map((pts) => new Path(pts)) : [path]) {
-          if (wp.length > 30 && nearTrackShare(wp) < 0.2) { this.walks.push({ path: wp, off: 0, hf: this.surfaceFn(r), deck: !!r.b }); addIndex('w', this.walks.length - 1, wp); }
-        }
-        continue;
-      }
-      // cars only on public vehicle roads: no driveways, service yards or courtyards
-      if (!r.c || r.w < 5) continue;
-      if (r.t) r.way = r.way || r.p; // (a tunnel: its whole chain of ways, chainTunnels)
-      let near = 0, n = 0;
-      for (let s = 0; s < path.length; s += 10) { const p = path.at(s); n++; if (route.distance(p.x, p.y) < 7) near++; }
-      // the street the tram runs in: an ordinary part of the network (its cars drive alongside us),
-      // its sidewalks get no extra walkers (the tram street's own footways cover them)
-      const along = near / n > 0.4;
-      const road = { src: r, path, w: r.w, o: r.o || 0, tram: r.tram, b: r.b || 0, t: r.t || 0, ln: r.ln, lf: r.lf, lb: r.lb, hf: this.surfaceFn(r), ends: [key(r.p[0]), key(r.p[r.p.length - 1])] };
-      this._fitRoad(road);
-      this._trackLats(road);
-      this.jpos.set(road.ends[0], r.p[0]); this.jpos.set(road.ends[1], r.p[r.p.length - 1]);
+    for (const R of N.roads) {
+      const road = { path: new Path(pts(R.p)), w: R.w, o: R.o || 0, tram: R.tram, b: R.b || 0, t: R.t || 0, ln: R.ln, lf: R.lf, lb: R.lb,
+        ends: R.ends, way: R.way, fitLo: R.lo ? m(R.lo) : null, fitHi: R.hi ? m(R.hi) : null, fitMed: R.med ? R.med.map(m) : null,
+        trk: R.trk ? R.trk.map(m) : null };
+      road.hf = this.surfaceFn(road);
       this.roads.push(road);
-      if (path.length >= 15) addIndex('r', this.roads.length - 1, path); // spawn only on real streets
-      if (along) continue;
-      // sidewalks: 1.5 m beyond each kerb (the surveyed one where it exists, so walkers are not in
-      // the lanes the cars drive)
-      // (not along a bridge: only the carriageway is drawn there, its footways are OSM ways of their own;
-      // not along a road tunnel: nobody walks under the hill beside the cars)
-      if (r.w >= 6 && !r.b && !r.t) for (const side of [1, -1]) {
-        // where the survey covers the street, on its sidewalk: the first sidewalk / paving within 8 m out
-        // from the kerb, 1 m into it (else no path there: walkers used to stroll on parking strips and
-        // carriageway where the kerb fit missed); elsewhere 1.5 m beyond the kerb
-        const dtm = this.ground.dtm, runs = [];
-        let cur = [];
-        for (let s = 0; s <= path.length; s += 3) {
-          const p = path.at(Math.min(s, path.length)), k = this.kerbs(road, s);
-          const kerb = side > 0 ? k.hi : k.lo;
-          let off = kerb + side * 1.5;
-          if (dtm && dtm.covered(p.x, p.y)) {
-            off = null;
-            for (let d = 0.5; d <= 8; d += 0.5) {
-              const o = kerb + side * d, c = dtm.classAt(p.x + p.hy * o, p.y - p.hx * o);
-              if (c === 'sidewalk' || c === 'paved' || c === 'cycle') { off = o + side * 1.0; break; }
-            }
-          }
-          if (off === null) { if (cur.length > 2) runs.push(cur); cur = []; continue; }
-          cur.push([p.x + p.hy * off, p.y - p.hx * off]);
-        }
-        if (cur.length > 2) runs.push(cur);
-        for (const pts of runs) {
-          const walk = new Path(smoothPolyline(pts, 1, 4).pts);
-          if (walk.length > 15 && nearTrackShare(walk) < 0.2) { this.walks.push({ path: walk, off: 0, hf: road.hf, deck: !!road.b }); addIndex('w', this.walks.length - 1, walk); }
-        }
-      }
+      if (road.path.length >= 15) addIndex('r', this.roads.length - 1, road.path); // spawn only on real streets
     }
-    this._buildLanes();
-    this._linkWalks();
-    this._findDoors(data.buildings || []);
-    this._bindSignals();
-    this._bindPedHeads();
+    // (a link walk, a crossing or a join, stands on the street's surface: its hf null)
+    for (const W of N.walks) {
+      const walk = { path: new Path(pts(W.p)), off: 0, hf: W.link ? null : W.deck ? this.surfaceFn({ b: 1, way: W.way }) : (x, y) => ground.surface(x, y), deck: !!W.deck };
+      if (W.link) walk.link = true;
+      else addIndex('w', this.walks.length, walk.path);
+      this.walks.push(walk);
+    }
+    N.walks.forEach((W, i) => { this.walks[i].links = W.links.map((e) => e.map(([k, s]) => ({ walk: this.walks[k], s: s / 100 }))); });
+    this._loadLanes(N, pts);
+    this._loadDoors(N);
+    this._loadSignals(N);
 
     this.cars = [];
     this.walkers = [];
@@ -368,183 +262,12 @@ export class Traffic {
     this.spawnTimer = 3;
   }
 
-  // Where the surveyed DTM carriageway is known, fit the road to it: every 4 m, scan across the
-  // OSM centre line for the carriageway it lies in (a track bed in the middle of a divided street
-  // counts, so both halves belong to it; else the nearest carriageway within 8 m) and keep its two
-  // kerb lines, smoothed along the road. Junction squares and plazas (much wider than the street)
-  // and places without DTM keep the OSM centre line and width.
-  _fitRoad(road) {
-    const dtm = this.ground.dtm;
-    if (!dtm || road.b) return; // (the survey's classes are those of the ground level)
-    // (a road tunnel: the underground survey of its floor, where there is one)
-    const classAt = road.t ? (x, y) => dtm.classUnder(x, y) : (x, y) => dtm.classAt(x, y);
-    const L = road.path.length, n = Math.floor(L / 4) + 1;
-    const lo = new Array(n).fill(null), hi = new Array(n).fill(null), med = new Array(n).fill(null);
-    let any = false;
-    for (let i = 0; i < n; i++) {
-      const p = road.path.at(Math.min(L, i * 4));
-      if (!road.t && !dtm.covered(p.x, p.y)) continue;
-      // (1 carriageway; 2 tram area, part of the street only between carriageway; 3 parking, part of it
-      // but no lane: trimmed at the edges like a tram bed at the side; 4 a median between the two directions'
-      // carriageways of a two-way road mapped as one way, #555: part of the street, each direction on its side.
-      // A one-way road's carriageway ends at it)
-      const on = [];
-      for (let l = -16; l <= 16; l += 0.5) {
-        const c = classAt(p.x + p.hy * l, p.y - p.hx * l);
-        on.push(c === 'road' ? 1 : c === 'tram' ? 2 : c === 'parking' ? 3 : c === 'median' && !road.o ? 4 : 0);
-      }
-      // the run around the centre (index 32), else the nearest within 8 m
-      let k = 32;
-      for (let d = 0; d <= 16 && !on[k]; d++) k = on[32 + d] ? 32 + d : on[32 - d] ? 32 - d : 32;
-      if (!on[k]) continue;
-      let a = k, b = k;
-      // single 0.5 m holes (paint, a manhole cover area) don't end the carriageway
-      while (a > 0 && (on[a - 1] || (a > 1 && on[a - 2]))) a--;
-      while (b < on.length - 1 && (on[b + 1] || (b < on.length - 2 && on[b + 2]))) b++;
-      while (a < b && on[a] !== 1) a++; // a track bed or parking at the side is not for cars
-      while (b > a && on[b] !== 1) b--;
-      if (on[a] !== 1) continue;
-      // (the median, the run of 4s nearest the centre between the two edges; it is no carriageway in the width)
-      let m0 = -1, m1 = -1;
-      for (let j = a; j <= b; j++) {
-        if (on[j] !== 4) continue;
-        let e = j;
-        while (e < b && on[e + 1] === 4) e++;
-        if (m0 < 0 || Math.abs((j + e) / 2 - 32) < Math.abs((m0 + m1) / 2 - 32)) { m0 = j; m1 = e; }
-        j = e;
-      }
-      const width = (b - a) * 0.5 + 0.5 - (m0 >= 0 ? (m1 - m0 + 1) * 0.5 : 0);
-      if (width > Math.max(road.w * 2.2, road.w + 9) || a === 0 || b === on.length - 1) continue; // junction, plaza
-      lo[i] = a * 0.5 - 16.25;
-      hi[i] = b * 0.5 - 15.75;
-      if (m0 >= 0) med[i] = [m0 * 0.5 - 16.25, m1 * 0.5 - 15.75];
-      // another way running alongside inside the same surveyed carriageway (a divided street mapped
-      // as two ways, a slip lane): each takes its own side, split halfway between the centre lines
-      for (const o of this._parallelWays(road, p)) {
-        if (o > 1 && o < hi[i]) hi[i] = Math.max(o / 2, lo[i] + 2.5);
-        if (o < -1 && o > lo[i]) lo[i] = Math.min(o / 2, hi[i] - 2.5);
-      }
-      any = true;
-    }
-    if (!any) return;
-    // fill the gaps (blend back to the OSM line over 12 m), then smooth over ±8 m
-    const fill = (arr, def) => arr.map((v, i) => {
-      if (v !== null) return v;
-      let best = def, bd = 4;
-      for (let d = 1; d < 4; d++) {
-        if (arr[i - d] != null && d < bd) { best = def + (arr[i - d] - def) * (1 - d / 4); bd = d; }
-        if (arr[i + d] != null && d < bd) { best = def + (arr[i + d] - def) * (1 - d / 4); bd = d; }
-      }
-      return best;
-    });
-    // smoothed over ±20 m, and moving sideways at most 0.4 m per 4 m (a fitted kerb jumping at a bus
-    // bay or a driveway made the lane kink on a straight road)
-    const smooth = (arr) => arr.map((_, i) => { let s = 0, m = 0; for (let d = -5; d <= 5; d++) if (arr[i + d] !== undefined) { const w = 6 - Math.abs(d); s += arr[i + d] * w; m += w; } return s / m; });
-    const limit = (arr) => {
-      for (let i = 1; i < arr.length; i++) arr[i] = Math.max(arr[i - 1] - 0.4, Math.min(arr[i - 1] + 0.4, arr[i]));
-      for (let i = arr.length - 2; i >= 0; i--) arr[i] = Math.max(arr[i + 1] - 0.4, Math.min(arr[i + 1] + 0.4, arr[i]));
-      return arr;
-    };
-    road.fitLo = limit(smooth(fill(lo, -road.w / 2)));
-    road.fitHi = limit(smooth(fill(hi, road.w / 2)));
-    // the divider of each direction where the survey has a median (#555): its edge on that side, the middle of the
-    // carriageway elsewhere, eased in at 0.4 m per 4 m like the kerbs (no lane jumping sideways at a median's nose)
-    if (med.some((m) => m)) {
-      const mid = road.fitLo.map((v, i) => (v + road.fitHi[i]) / 2);
-      road.fitMed = [limit(med.map((m, i) => m ? m[0] : mid[i])), limit(med.map((m, i) => m ? m[1] : mid[i]))];
-    } else road.fitMed = null;
-  }
-  // lateral offsets (+ = right) of other vehicle ways running alongside `road` at point p (within 12 m,
-  // heading within ~35°), from the centre-line index built in the constructor
-  _parallelWays(road, p) {
-    const out = [], cx = Math.floor(p.x / 20), cy = Math.floor(p.y / 20), seen = new Set();
-    for (let i = cx - 1; i <= cx + 1; i++) for (let j = cy - 1; j <= cy + 1; j++) {
-      for (const sg of this.wayIdx.get(i * 100003 + j) || []) {
-        if (sg.src === road.src || !!sg.src.b !== !!road.b || !!sg.src.t !== !!road.t || seen.has(sg)) continue;
-        seen.add(sg);
-        const dx = sg.b[0] - sg.a[0], dy = sg.b[1] - sg.a[1], l = Math.hypot(dx, dy) || 1;
-        if (Math.abs((dx * p.hx + dy * p.hy) / l) < 0.82) continue;
-        // where the line through p across the road meets this segment
-        const nx = p.hy, ny = -p.hx, den = dx * ny - dy * nx;
-        if (Math.abs(den) < 1e-9) continue;
-        const t = ((p.x - sg.a[0]) * ny - (p.y - sg.a[1]) * nx) / den;
-        if (t < 0 || t > 1) continue;
-        const qx = sg.a[0] + dx * t, qy = sg.a[1] + dy * t, off = (qx - p.x) * nx + (qy - p.y) * ny;
-        if (Math.abs(off) < 12) out.push(off);
-      }
-    }
-    return out;
-  }
-  // Tram tracks running along a road (ours and the opposite one), every 4 m: their lateral offsets from
-  // the road's centre line (+ = right). Where both lie in the carriageway, the line between them divides
-  // the two directions; in a narrow street a car's lane then lies on the track of its own direction.
-  _trackLats(road) {
-    const L = road.path.length, n = Math.floor(L / 4) + 1, out = new Array(n);
-    let any = false;
-    for (let i = 0; i < n; i++) {
-      const p = road.path.at(Math.min(L, i * 4)), lats = [];
-      for (const rt of [this.route, this.back]) {
-        if (!rt) continue;
-        const q = rt.nearest(p.x, p.y);
-        if (!q || q.d > road.w / 2 + 6) continue;
-        const h = rt.at(q.s);
-        if (Math.abs(h.hx * p.hx + h.hy * p.hy) < 0.85) continue; // crossing, not along
-        lats.push((h.x - p.x) * p.hy - (h.y - p.y) * p.hx);
-      }
-      out[i] = lats;
-      if (lats.length) any = true;
-    }
-    road.trk = any ? out : null;
-  }
-  tracksAt(r, s) {
-    if (!r.trk) return [];
-    return r.trk[Math.max(0, Math.min(r.trk.length - 1, Math.round(s / 4)))] || [];
-  }
-
-  // the two kerb lines of a road at s (m from its centre line, + = right of the road's direction):
-  // fitted to the surveyed carriageway where it exists, else the OSM width
-  kerbs(r, s) {
-    if (!r.fitLo) return { lo: -r.w / 2, hi: r.w / 2 };
-    const f = Math.max(0, Math.min(r.fitLo.length - 1, s / 4)), i = Math.floor(f), j = Math.min(r.fitLo.length - 1, i + 1), u = f - i;
-    return { lo: r.fitLo[i] * (1 - u) + r.fitLo[j] * u, hi: r.fitHi[i] * (1 - u) + r.fitHi[j] * u };
-  }
-
-  // lateral position (+ = right of the driving direction) of a car on a road at s. Right-hand
-  // traffic: 1.8 m in from the right kerb, but never closer than 1.2 m to the middle of a two-way
-  // road; one-way roads from 7 m wide have two lanes.
-  // Lane k (0 = the right one) of n: 1.7 m in from the right kerb, the others 3 m further each (less
-  // where the band is narrower), never past the divider: the middle of a two-way road, a surveyed median's edge
-  // (#555), or the line between the two tracks where both lie in the carriageway (then in a narrow street the lane lies
-  // on the track of its own direction: the Vyšehrad tunnel), or the left kerb of a one-way road.
-  laneOffset(r, s, dir, k = 0) {
-    let { lo, hi } = this.kerbs(r, s);
-    let tk = this.tracksAt(r, s).filter((t) => t > lo - 0.5 && t < hi + 0.5);
-    if (dir < 0) { [lo, hi] = [-hi, -lo]; tk = tk.map((t) => -t); } // the car's own right/left
-    const n = lanesOf(r, dir);
-    // (a median between the two directions, #555: its edge on the car's own side is the divider)
-    let div;
-    if (r.o) div = lo;
-    else if (r.fitMed) {
-      const [mL, mR] = r.fitMed, f = Math.max(0, Math.min(mL.length - 1, s / 4)), i = Math.floor(f), j = Math.min(mL.length - 1, i + 1), u = f - i;
-      div = Math.max(lo, Math.min(hi, dir < 0 ? -(mL[i] * (1 - u) + mL[j] * u) : mR[i] * (1 - u) + mR[j] * u));
-    }
-    else if (tk.length >= 2) div = (Math.min(...tk) + Math.max(...tk)) / 2;
-    else div = (lo + hi) / 2;
-    const band = Math.max(0.1, hi - div), step = n > 1 ? Math.max(2.6, Math.min(3.25, (band - 1.7) / (n - 0.5))) : 0;
-    // too narrow for a lane beside the track: on the track of its own direction (right of the divider)
-    const own = tk.filter((t) => t > div);
-    if (band < 3.2 && own.length) return Math.min(...own);
-    const right = hi - Math.min(1.7, band / 2);
-    return Math.max(right - k * step, div + Math.min(1.1, band / 2));
-  }
-
   // ------------------------------------------------------------------ lane graph
-  // Every road gets one lane per driving direction (two on one-way roads from 7 m wide): a smooth
-  // curve of its own at the lane position (laneOffset: fitted to the surveyed kerbs where they
-  // exist), trimmed back from both junctions. A car follows its lane's own tangent, so it never
-  // moves sideways; through a junction a connector curve leads from the end of one lane to the
-  // start of the next.
-  _buildLanes() {
+  // Every road has one lane per driving direction (and per OSM lane), as the build laid it (tools/network.py
+  // build_lanes: beside the surveyed kerbs, a median or the tracks' middle, trimmed back from both junctions, smoothed).
+  // A car follows its lane's own tangent, so it never moves sideways; through a junction a connector curve leads from
+  // the end of one lane to the start of the next.
+  _loadLanes(N, pts) {
     this.laneList = [];
     this.lanesFrom = new Map(); // junction key -> lanes starting there
     this.lanesTo = new Map();   // junction key -> lanes ending there
@@ -552,30 +275,20 @@ export class Traffic {
     this.conflicts = new Map();
     this.laneGrid = new Map(); // lane points in 4 m cells (is a point in a lane?)
     const push = (m, k, v) => { if (!m.has(k)) m.set(k, []); m.get(k).push(v); };
-    this.roads.forEach((r, k) => {
-      r.lanes = [];
-      const L = r.path.length, trim = Math.min(5, L * 0.2);
-      const dirs = r.o ? [r.o] : [1, -1];
-      for (const dir of dirs) for (let sel = 0; sel < lanesOf(r, dir); sel++) {
-        const pts = [], n = Math.max(2, Math.ceil((L - 2 * trim) / 2));
-        for (let i = 0; i <= n; i++) {
-          const u = trim + ((L - 2 * trim) * i) / n, sr = dir > 0 ? u : L - u;
-          const p = r.path.at(sr), hx = p.hx * dir, hy = p.hy * dir, off = this.laneOffset(r, sr, dir, sel);
-          pts.push([p.x + hy * off, p.y - hx * off]);
-        }
-        const path = new Path(pts.length > 3 ? smoothPolyline(pts, 1, 6).pts : pts);
-        const lane = { id: this.laneList.length, road: r, k, dir, sel, trim, path, from: r.ends[dir > 0 ? 0 : 1], to: r.ends[dir > 0 ? 1 : 0] };
-        this.laneList.push(lane);
-        r.lanes.push(lane);
-        for (const q of path.p) {
-          const key = Math.floor(q[0] / 4) * 100003 + Math.floor(q[1] / 4);
-          if (!this.laneGrid.has(key)) this.laneGrid.set(key, []);
-          this.laneGrid.get(key).push(q);
-        }
-        push(this.lanesFrom, lane.from, lane);
-        push(this.lanesTo, lane.to, lane);
+    for (const r of this.roads) r.lanes = [];
+    for (const L of N.lanes) {
+      const r = this.roads[L.road], k = L.road, dir = L.dir, path = new Path(pts(L.p)), trim = Math.min(5, r.path.length * 0.2);
+      const lane = { id: this.laneList.length, road: r, k, dir, sel: L.sel, trim, path, from: r.ends[dir > 0 ? 0 : 1], to: r.ends[dir > 0 ? 1 : 0] };
+      this.laneList.push(lane);
+      r.lanes.push(lane);
+      for (const q of path.p) {
+        const key = Math.floor(q[0] / 4) * 100003 + Math.floor(q[1] / 4);
+        if (!this.laneGrid.has(key)) this.laneGrid.set(key, []);
+        this.laneGrid.get(key).push(q);
       }
-    });
+      push(this.lanesFrom, lane.from, lane);
+      push(this.lanesTo, lane.to, lane);
+    }
   }
 
   // whether a connector passes within a car's width of the last (end) or first 5 m of a lane, where a
@@ -1214,234 +927,68 @@ export class Traffic {
     c.s = over;
   }
 
-  // The footway network. The walks are pieces (OSM footways, the sidewalks of each street side, cut
-  // where the survey has no sidewalk; line 17: 3 262, median 64 m) and a walker used to pace one piece
-  // to and fro. Their ends lie close to other pieces (line 17: 69 % within 3 m, 92 % within 15 m), so
-  // every end links to the other walks passing within 3 m of it, else to the nearest one within 15 m
-  // (across a side street), by a short straight link walk, never across the tram's tracks.
-  // walk.links = [at its start, at its end], each a list of { walk, s }; a link walk (walk.link) is a
-  // walk of its own, linked at both ends. (Links leave from ends only: one passing the middle of a
-  // walk is taken by walkers coming along that link, not by those walking past.)
-  _linkWalks() {
-    const C = 5, grid = new Map();
-    const base = this.walks.slice();
-    for (const w of base) {
-      w.links = [[], []];
-      for (let s = 0; s <= w.path.length; s += 1) {
-        const p = w.path.at(s), kk = Math.floor(p.x / C) * 100003 + Math.floor(p.y / C);
-        if (!grid.has(kk)) grid.set(kk, []);
-        grid.get(kk).push([w, s, p.x, p.y]);
-      }
-    }
-    // the nearest point of every other walk within R of (x, y), nearest first
-    const around = (self, x, y, R) => {
-      const best = new Map(), n = Math.ceil(R / C), ci = Math.floor(x / C), cj = Math.floor(y / C);
-      for (let i = ci - n; i <= ci + n; i++) for (let j = cj - n; j <= cj + n; j++) {
-        for (const [w, s, px, py] of grid.get(i * 100003 + j) || []) {
-          if (w === self) continue;
-          const d = Math.hypot(px - x, py - y);
-          if (d <= R && (!best.has(w) || d < best.get(w).d)) best.set(w, { walk: w, s, d, x: px, y: py });
-        }
-      }
-      return [...best.values()].sort((a, b) => a.d - b.d);
-    };
-    const clear = (x0, y0, x1, y1) => {
-      const L = Math.hypot(x1 - x0, y1 - y0);
-      for (let t = 0; t <= L; t += 1) if (this.trackDist(x0 + (x1 - x0) * (t / (L || 1)), y0 + (y1 - y0) * (t / (L || 1))) < TRACK_CLEAR) return false;
-      return true;
-    };
-    let joined = 0, crossings = 0;
-    for (const w of base) for (const e of [0, 1]) {
-      const s0 = e ? w.path.length : 0, p = w.path.at(s0);
-      let cands = around(w, p.x, p.y, 3).slice(0, 4);
-      if (!cands.length) cands = around(w, p.x, p.y, 15).slice(0, 1);
-      for (const c of cands) {
-        if (c.d < 0.5) { w.links[e].push({ walk: c.walk, s: c.s }); joined++; continue; }
-        if (!clear(p.x, p.y, c.x, c.y)) continue;
-        const lw = { path: new Path([[p.x, p.y], [c.x, c.y]]), off: 0, hf: null, link: true, links: [[{ walk: w, s: s0 }], [{ walk: c.walk, s: c.s }]] };
-        this.walks.push(lw);
-        w.links[e].push({ walk: lw, s: 0 });
-        if (c.d > 3) crossings++; else joined++;
-      }
-    }
-    const open = base.reduce((a, w) => a + (w.links[0].length ? 0 : 1) + (w.links[1].length ? 0 : 1), 0);
-    console.log(`footways: ${base.length} walks, ${joined} joins, ${crossings} street crossings, ${open} of ${base.length * 2} ends open`);
-  }
-
-  // Doors: where a building meets the footway network, the nearest walk point within 8 m of its
-  // footprint (OSM footprints), for walkers to come out of and go into; later also metro exits and
-  // stations from the detailed data (more entries of the same kind). this.doors: { walk, s, x, y, ix,
-  // iy } (ix, iy: 1.5 m inside the building), by 50 m cell in this.doorIdx; walk.doors: those on it, by s.
-  _findDoors(buildings) {
-    const C = 5, grid = new Map();
-    for (const w of this.walks) {
-      if (w.link) continue;
-      w.doors = [];
-      for (let s = 0; s <= w.path.length; s += 2) {
-        const p = w.path.at(s), kk = Math.floor(p.x / C) * 100003 + Math.floor(p.y / C);
-        if (!grid.has(kk)) grid.set(kk, []);
-        grid.get(kk).push([w, s, p.x, p.y]);
-      }
-    }
+  // The footway network, as the build linked it (tools/network.py link_walks): the walks are pieces (OSM footways, the
+  // sidewalks of each street side, cut where the survey has no sidewalk) and every end links to the other walks passing
+  // within 3 m of it, else to the nearest one within 15 m (across a side street), by a short straight link walk, never
+  // across the tram's tracks. walk.links = [at its start, at its end], each a list of { walk, s }; a link walk
+  // (walk.link) is a walk of its own, linked at both ends.
+  // Doors: where a building meets the footway network (tools/network.py find_doors), for walkers to come out of and go
+  // into. this.doors: { walk, s, x, y, ix, iy } (ix, iy: 1.5 m inside the building), by 50 m cell in this.doorIdx;
+  // walk.doors: those on it, by s.
+  _loadDoors(N) {
+    for (const w of this.walks) if (!w.link) w.doors = [];
     this.doors = [];
     this.doorIdx = new Map();
-    for (const b of buildings) {
-      const ring = b.p;
-      if (!ring || ring.length < 3) continue;
-      let cx = 0, cy = 0;
-      for (const q of ring) { cx += q[0]; cy += q[1]; }
-      cx /= ring.length; cy /= ring.length;
-      let best = null;
-      for (let i = 0; i < ring.length; i++) {
-        const a = ring[i], c = ring[(i + 1) % ring.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]);
-        for (let t = 0; t <= L; t += 3) {
-          const fx = a[0] + (c[0] - a[0]) * (t / (L || 1)), fy = a[1] + (c[1] - a[1]) * (t / (L || 1));
-          const ci = Math.floor(fx / C), cj = Math.floor(fy / C);
-          for (let u = ci - 2; u <= ci + 2; u++) for (let v = cj - 2; v <= cj + 2; v++) {
-            for (const [w, s, px, py] of grid.get(u * 100003 + v) || []) {
-              const d = Math.hypot(px - fx, py - fy);
-              if (d <= 8 && (!best || d < best.d)) best = { walk: w, s, x: px, y: py, d, fx, fy };
-            }
-          }
-        }
-      }
-      if (!best) continue;
-      const toC = Math.hypot(cx - best.fx, cy - best.fy) || 1;
-      const door = { walk: best.walk, s: best.s, x: best.x, y: best.y, ix: best.fx + ((cx - best.fx) / toC) * 1.5, iy: best.fy + ((cy - best.fy) / toC) * 1.5 };
+    for (const [k, s, x, y, ix, iy] of N.doors) {
+      const door = { walk: this.walks[k], s: s / 100, x: x / 100, y: y / 100, ix: ix / 100, iy: iy / 100 };
       this.doors.push(door);
-      best.walk.doors.push(door);
+      door.walk.doors.push(door);
       const kk = `${Math.floor(door.x / 50)},${Math.floor(door.y / 50)}`;
       if (!this.doorIdx.has(kk)) this.doorIdx.set(kk, []);
       this.doorIdx.get(kk).push(door);
     }
     for (const w of this.walks) w.doors?.sort((a, b) => a.s - b.s);
-    console.log(`doors: ${this.doors.length} of ${buildings.length} buildings on the footway network`);
   }
 
-  // D2, traffic lights. The junction controllers are the street signals' (game._runController); every
-  // lane-graph junction within 25 m of such a signal's crossing point is that signal's, and each lane
-  // ending there is an approach: 'along' the tram street (green with the trams going straight, the
-  // opposite direction's GO; amber while it blinks) or 'cross' (green in the cross phase, 3 s amber,
-  // 3 s all red). lane.light = { sig, kind, head }; a car signal head at each approach's stop line,
-  // 2.2 m right of the lane. (On-demand and single-track signals have no car approaches.)
-  _bindSignals() {
-    const heads = [], osmStops = this.game.data.osmSignals?.stop || [];
+  // D2, traffic lights. The junction controllers are the street signals' (game._runController); the build bound each
+  // lane ending at a junction of such a signal to it (tools/network.py Signals: the game's signals, each lane's stop
+  // line `back` m before its end, OSM's or the junction's edge, never on a zebra): 'along' the tram street (green with
+  // the trams going straight, the opposite direction's GO; amber while it blinks) or 'cross' (green in the cross phase,
+  // 3 s amber, 3 s all red). lane.light = { sig, kind, head, back, src }; a car signal head 4 m past each stop line,
+  // 2.2 m right of the lane, on the street's surface (read at the load). (On-demand and single-track signals have no car
+  // approaches.)
+  // Pedestrian signal heads at OSM's signalled crossings (data/lineN.signals.json) of one of our signals: one on each
+  // kerb of the street the node lies on, facing the people waiting across. Phases as _pedRed: walking across the tram
+  // street (or a road along it) with the cross phase, across a side street with the trams going straight.
+  // this.pedCross: [{ x, y, cx, cy, sig, along, heads }].
+  _loadSignals(N) {
+    // (a signal by its index in the line data: game.js keeps it on each of its signals)
+    const sigOf = new Map(this.game.signals.filter((s) => s.i !== undefined).map((s) => [s.i, s]));
+    const sig = (i) => {
+      const s = sigOf.get(i);
+      if (!s) throw new Error(`line ${this.game.data.line}: the network binds signal ${i}, the game has none such: the network is older than the data (python -P -E tools/network.py --lines ${this.game.data.line})`);
+      return s;
+    };
+    // (each head on the street's surface, read at the load: src/main.js settleNetwork)
+    const head = (h) => ({ x: h.p[0] / 100, z: -h.p[1] / 100, h: h.z, face: h.face / 1000 });
     this.lightLanes = [];
     this.lightSigs = [];
-    for (const sig of this.game.signals) {
-      if (!sig.xroad || sig.gauntlet || sig.demand) continue;
-      const P = this.route.at(sig.cross), h = this.route.heading(sig.cross, 6);
-      let n = 0;
-      for (const [key, pos] of this.jpos) {
-        // (up to 50 m off where OSM has a stop line on the approach: the bridge end at Palackého
-        // náměstí is 35 m from the crossing point)
-        const far = Math.hypot(pos[0] - P.x, pos[1] - P.y);
-        if (far > 50) continue;
-        for (const lane of this.lanesTo.get(key) || []) {
-          if (lane.light) continue;
-          if (far > 25 && this._stopLine(lane, 'cross', P, osmStops).src !== 'osm') continue;
-          // (a piece inside the junction, starting within it too, is no approach: its cars are in it;
-          // OSM splits a junction into several nodes)
-          const st = lane.path.at(0);
-          if (Math.hypot(st.x - P.x, st.y - P.y) < 25) continue;
-          const end = lane.path.at(lane.path.length);
-          const kind = Math.abs(end.hx * h.hx + end.hy * h.hy) > 0.7 ? 'along' : 'cross';
-          const { back, src } = this._stopLine(lane, kind, P, osmStops);
-          // (the head 4 m past the stop line, never past the lane's end: the surveyed signal poles of the
-          // technical map stand a median 4.2 m past the OSM stop line, 10-90 % −0.7 to +7.1 m, line 17,
-          // tools/bench/heads.js; on the line they were 5.5 m off)
-          const e = lane.path.at(Math.min(lane.path.length, lane.path.length - back + 4));
-          const x = e.x + e.hy * 2.2, y = e.y - e.hx * 2.2, face = Math.atan2(-e.hx, e.hy);
-          // lanes side by side share a head (within 4 m, facing the same way)
-          let head = heads.findIndex((o) => Math.hypot(o.x - x, o.z + y) < 4 && Math.cos(o.face - face) > 0.9);
-          if (head < 0) { head = heads.length; heads.push({ x, z: -y, h: this.ground.surface(x, y), face }); }
-          lane.light = { sig, kind, head, back, src };
-          this.lightLanes.push(lane);
-          n++;
-        }
-      }
-      if (n) this.lightSigs.push({ sig, x: P.x, y: P.y, hx: h.hx, hy: h.hy });
+    for (const L of N.lights) {
+      const lane = this.laneList[L.lane];
+      lane.light = { sig: sig(L.sig), kind: L.kind, head: L.head, back: L.back / 100, src: L.src };
+      this.lightLanes.push(lane);
     }
-    this.lights = makeTrafficLights(heads);
+    for (const { sig: i } of N.lightSigs) {
+      const s = sig(i), P = this.route.at(s.cross), h = this.route.heading(s.cross, 6);
+      this.lightSigs.push({ sig: s, x: P.x, y: P.y, hx: h.hx, hy: h.hy });
+    }
+    this.lights = makeTrafficLights(N.heads.map(head));
     this.group.add(this.lights.group);
+    this.pedCross = N.pedCross.map((c) => ({ x: c.p[0] / 100, y: c.p[1] / 100, cx: c.c[0] / 1e4, cy: c.c[1] / 1e4, sig: sig(c.sig), along: c.along, heads: c.heads }));
+    this.pedLights = makePedLights(N.pedHeads.map(head));
+    this.group.add(this.pedLights.group);
     const osm = this.lightLanes.filter((l) => l.light.src === 'osm').length;
-    console.log(`traffic lights: ${heads.length} car heads at ${this.lightSigs.length} junctions (stop lines: ${osm} from OSM, ${this.lightLanes.length - osm} at the junction edge)`);
-  }
-
-  // Where an approach's stop line is, as `back` m before its lane's end (the lanes run on to 5 m short
-  // of the OSM junction node, the middle of the junction: the heads stood in it, one on the tracks at
-  // Palackého náměstí). An OSM traffic_signals node on the approach in its last 40 m (mappers put them
-  // at the stop line, with the direction they serve): there (src 'osm'). Else the edge of the junction:
-  // back from the end until the line is clear of the streets crossing it (half their width + 1.5 m) and,
-  // crossing the tram street, 4.5 m clear of the tracks (src 'edge').
-  // ...and never on a zebra: a crossing (OSM footway with zebra paint, 3 m wide) under the waiting car's
-  // front or ahead of it, up to 4 m into the junction, pushes it back to 2 m before the crossing's middle (13 of 56
-  // approaches with a zebra had the cars' front bumper on it; OSM stop nodes too, mapped on the
-  // crossing node)
-  _stopLine(lane, kind, P, osmStops) {
-    const r = this._stopLineAt(lane, kind, P, osmStops), path = lane.path, L = path.length;
-    if (r.src === 'short') return r;
-    this.zebras ||= this.game.data.roads.filter((z) => z.z).map((z) => z.p);
-    const e = path.at(L), pts = path.p.concat([[e.x + e.hx * 4, e.y + e.hy * 4]]);
-    let stop = L - r.back, acc = 0;
-    for (let i = 1; i < pts.length; i++) {
-      const a = pts[i - 1], b = pts[i], sl = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      if (acc + sl > stop - 6) {
-        for (const z of this.zebras) for (let j = 1; j < z.length; j++) {
-          const c = z[j - 1], d = z[j], rx = b[0] - a[0], ry = b[1] - a[1], sx = d[0] - c[0], sy = d[1] - c[1], den = rx * sy - ry * sx;
-          if (Math.abs(den) < 1e-9) continue;
-          const t = ((c[0] - a[0]) * sy - (c[1] - a[1]) * sx) / den, u = ((c[0] - a[0]) * ry - (c[1] - a[1]) * rx) / den;
-          if (t >= 0 && t <= 1 && u >= 0 && u <= 1 && acc + t * sl > stop - 2.5) stop = Math.min(stop, acc + t * sl - 2);
-        }
-      }
-      acc += sl;
-    }
-    return { ...r, back: Math.min(L - 1, Math.max(r.back, L - stop)) };
-  }
-
-  _stopLineAt(lane, kind, P, osmStops) {
-    const path = lane.path, L = path.length, maxBack = Math.max(0, Math.min(40, L - 3));
-    if (L < 12) return { back: L, src: 'short' }; // (cars stop at its start: see the car loop)
-    let best = null;
-    const J = this.jpos.get(lane.to);
-    for (const o of osmStops) {
-      // (a node on the junction node itself is the older one-per-junction tagging: no stop line)
-      if (Math.hypot(o.x - P.x, o.y - P.y) > 70 || (J && Math.hypot(o.x - J[0], o.y - J[1]) < 6)) continue;
-      for (let b = 0; b <= maxBack; b += 0.5) {
-        const q = path.at(L - b), d = Math.hypot(o.x - q.x, o.y - q.y);
-        if (d < 4.5 && (o.both || o.hx * q.hx + o.hy * q.hy > 0.7) && (!best || d < best.d)) best = { d, back: b };
-      }
-    }
-    if (best) return { back: best.back, src: 'osm' };
-    const end = path.at(L), cross = [];
-    for (const r of this.roads) {
-      if (r === lane.road || r.t || r.b) continue;
-      const pts = r.path.p;
-      let near = false;
-      for (const p of pts) if (Math.hypot(p[0] - P.x, p[1] - P.y) < 35) { near = true; break; }
-      if (!near) continue;
-      cross.push(r);
-    }
-    const distTo = (r, x, y) => {
-      const pts = r.path.p;
-      let m = Infinity, cos = 1;
-      for (let i = 1; i < pts.length; i++) {
-        const a = pts[i - 1], b = pts[i], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-9;
-        const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)), d = Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y);
-        if (d < m) { m = d; cos = Math.abs((dx * end.hx + dy * end.hy) / Math.sqrt(l2)); }
-      }
-      return cos < 0.7 ? m : Infinity; // (only a street crossing ours: not its own continuation)
-    };
-    for (let b = 0; b <= maxBack; b += 0.5) {
-      const q = path.at(L - b);
-      // (not where the lane runs along the rails, a shared lane before it turns across: the line walked
-      // back 38 m there, nearly to the lane's start, line 17 s 14839)
-      const n = this.route.nearest(q.x, q.y), h = n && this.route.at(n.s), alongRails = h && Math.abs(q.hx * h.hx + q.hy * h.hy) > 0.8;
-      if (kind === 'cross' && !alongRails && this.trackDist(q.x, q.y) < 4.5) continue;
-      if (cross.some((r) => distTo(r, q.x, q.y) < r.w / 2 + 1.5)) continue;
-      return { back: b, src: 'edge' };
-    }
-    return { back: maxBack, src: 'edge' };
+    console.log(`traffic lights: ${N.heads.length} car heads at ${this.lightSigs.length} junctions (stop lines: ${osm} from OSM, ${this.lightLanes.length - osm} at the junction edge); pedestrian signals: ${N.pedHeads.length} heads at ${this.pedCross.length} crossings`);
   }
 
   // the light an approach shows: 'green' | 'amber' | 'red' | 'redamber' (the last 2 s before green)
@@ -1451,49 +998,6 @@ export class Traffic {
     if (t >= Y.cross && t < Y.C - 6) return 'green';
     if (t >= Y.C - 6 && t < Y.C - 3) return 'amber';
     return t >= Y.cross - 2 && t < Y.cross ? 'redamber' : 'red';
-  }
-
-  // Pedestrian signal heads at the OSM signalled crossings (data.osmSignals.peds) belonging to one of our
-  // tram signals (its crossing point or stop point within 45 m): one head on each kerb of the street the
-  // node lies on, facing the people waiting across. The crossing runs across that street's nearest car
-  // road (its half width + 0.6 m out from the node). Phases as _pedRed: walking across the tram street
-  // (or a road along it, the zebras from Palackého náměstí's island) with the cross phase, across a side
-  // street with the trams going straight. this.pedCross: [{ x, y, cx, cy, sig, along, heads }].
-  _bindPedHeads() {
-    const heads = [], nodes = this.game.data.osmSignals?.peds || [];
-    this.pedCross = [];
-    const sigs = this.game.signals.filter((s) => !s.gauntlet && s.cycle);
-    for (const o of nodes) {
-      if (this.pedCross.some((c) => Math.hypot(c.x - o.x, c.y - o.y) < 3)) continue;
-      let sig = null, best = 45;
-      for (const s of sigs) for (const sp of [s.cross, s.s]) { const q = this.route.at(sp), d = Math.hypot(q.x - o.x, q.y - o.y); if (d < best) { best = d; sig = s; } }
-      if (!sig) continue;
-      // the street it crosses: the nearest car road within 6 m
-      let road = null, rd = 6, rh = null;
-      for (const r of this.roads) {
-        const P = r.path.p;
-        for (let i = 1; i < P.length; i++) {
-          const a = P[i - 1], b = P[i], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-9;
-          const t = Math.max(0, Math.min(1, ((o.x - a[0]) * dx + (o.y - a[1]) * dy) / l2)), d = Math.hypot(a[0] + dx * t - o.x, a[1] + dy * t - o.y);
-          if (d < rd) { rd = d; road = r; const l = Math.sqrt(l2); rh = [dx / l, dy / l]; }
-        }
-      }
-      if (!road) continue;
-      const cx = -rh[1], cy = rh[0], half = road.w / 2 + 0.6; // walking direction: across the road
-      const h = this.route.heading(sig.cross, 6), along = Math.abs(cx * h.hx + cy * h.hy) > 0.6;
-      const ids = [];
-      for (const side of [1, -1]) {
-        const x = o.x + cx * half * side, y = o.y + cy * half * side;
-        if (this.trackDist(x, y) < 1.8) continue; // (not on the rails)
-        const fx = -cx * side, fy = -cy * side; // faces the opposite kerb
-        ids.push(heads.length);
-        heads.push({ x, z: -y, h: this.ground.surface(x, y), face: Math.atan2(fx, -fy) });
-      }
-      if (ids.length) this.pedCross.push({ x: o.x, y: o.y, cx, cy, sig, along, heads: ids });
-    }
-    this.pedLights = makePedLights(heads);
-    this.group.add(this.pedLights.group);
-    console.log(`pedestrian signals: ${heads.length} heads at ${this.pedCross.length} crossings`);
   }
 
   // a crossing's pedestrian aspect (green while its walkers may go)

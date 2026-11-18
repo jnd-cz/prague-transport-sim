@@ -2,9 +2,9 @@
 """The ground's tiles streamed round the camera (src/groundFile.js GroundTiles, #30): line 37 loaded as a player loads it
 (no ?keepgeo) and the window moved along its route every STEP m (tools/bench/ground_tiles.py's drive): at every step
 each tile within the detail's reach of the camera is drawn in detail and each within the fog's end at least far, fewer
-tiles are drawn than the file has, every tile keeps its lookup, and the height lookup answers on the route. A shift
-started with the window at the line's far end judges as many platforms surveyed as the first (Start reads the survey
-along the whole line: with the lookups gone past the window, 30 of 40 were judged unsurveyed and drawn twice, #654).
+tiles are drawn than the file has, fewer keep their lookup, and the height lookup answers on the route. A shift
+started with the window at the line's far end judges as many platforms surveyed as the first (Start reads no survey: the
+build's network says, #658; with the lookups gone past the window Start judged 30 of 40 unsurveyed, #654).
 
     python -P -E tools/test_ground_tiles.py
 A browser test (it loads the game, about a minute). Skipped without line 37's data (python -I tools/snapshot.py
@@ -67,7 +67,7 @@ class Window(unittest.TestCase):
         self.assertEqual([x["s"] for x in steps if x["bare"]], [])
         self.assertTrue(all(x["coarse"] > 0 for x in steps))
         self.assertTrue(all(x["drawn"] < x["tiles"] for x in steps), [(x["s"], x["drawn"], x["tiles"]) for x in steps])
-        self.assertTrue(all(x["lookups"] == x["tiles"] for x in steps), [(x["s"], x["lookups"], x["tiles"]) for x in steps])
+        self.assertTrue(all(x["lookups"] < x["tiles"] for x in steps), [(x["s"], x["lookups"], x["tiles"]) for x in steps])
         self.assertGreater(first, 0)
         self.assertEqual(again, first)
         self.assertEqual(r["all"]["drawn"], r["all"]["tiles"])  # (every tile at the end: the drive's last step)

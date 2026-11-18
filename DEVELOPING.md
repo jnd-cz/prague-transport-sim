@@ -481,17 +481,18 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   beds, the building plots, the water and the terrain welded into one mesh that meets the tracks; the page draws the
   beds the file does not hold (on structures) and the decks, and builds no ground of its own (#510). The file is 500 m
   tiles on the S-JTSK grid, each decoded on its own in a pool of workers (`src/groundFile.js`, #30): every tile's height
-  lookup at load, kept (Start reads the survey along the whole line, #654), and only the tiles within the fog's end of
-  the camera and of 1 km of route ahead drawn in detail. `?keepgeo` and `?bot` keep every tile's meshes too. `tools/bench/ground_tiles.py` drives the window along a line:
-  what is held, each tile's time, any tile missing in view. `tools/bench/network_layer.py` times the network Start
-  builds from those lookups (roads, lanes, footways, doors, signals, platforms), counts its survey reads and sizes it as
-  data ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658). `tools/network.py` builds that
-  network once, after `tools/ground_mesh.py`, into `data/lineN.network.json`: the page's rules ported, reading the
-  survey as the page does (the ground file's triangles). It holds the roads (fitted to the survey's kerbs and medians,
-  the tracks on them), their lanes, the footways with their links, the doors, the signals bound to the lanes with
-  their stop lines and heads, and what the platforms and stops read of the survey (the note's steps 2-6); `--parity`
-  compares them with the page's own (headless; `--cars 1` for the other set), the same to the cm on lines 9, 17, 22, 23
-  and 37 (`tools/test_network_parity.py` on line 17).
+  lookup at load, then only those within the fog's end of the camera and of 1 km of route ahead, drawn in detail (9-17
+  MB of lookups held, 48-120 MB before #658). `?keepgeo` and `?bot` keep every tile's lookup and meshes. `tools/bench/ground_tiles.py` drives the window along a line:
+  what is held, each tile's time, any tile missing in view.
+- **The network** (the traffic's roads, lanes, footways and doors, the signals bound to the lanes, what the platforms and
+  stops read of the survey) is built once, after `tools/ground_mesh.py`, by `tools/network.py` into
+  `data/lineN.network.json` ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658). Start
+  builds none of it and reads no lookup past the window: what it places stands on the drawn ground, its heights read at
+  the end of the load while every lookup is held (`src/main.js` settleNetwork), or once its tile's lookup comes
+  (`ground.later`). A change to a traffic rule is a change to `tools/network.py` and a rebuild of the file. The page's
+  rules were ported whole: before they went, its network and the build's were the same to the cm on lines 9, 17, 22, 23
+  and 37 (#667, #668). `tools/test_network_layer.py` holds Start to it; `tools/bench/network_layer.py` times Start and
+  counts its reads.
 - **Buildings:** the type is read from the OSM tag under each LOD2 building, its roof shape and size;
   Mosty 3D sets the deck height on tagged bridges.
 - **Outdoor temperature:** Prague now comes from Open-Meteo, hourly.

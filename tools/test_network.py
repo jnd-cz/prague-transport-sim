@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""tools/network.py: the page's arithmetic and survey reads, the roads' rules on a made-up survey, the comparison, and
-the parity with the page (tools/test_network_parity.py).
+"""tools/network.py: the page's arithmetic and survey reads, the roads' rules on a made-up survey, and
+the terrain grid. The page holding the file: tools/test_network_layer.py.
 
     python -P -E tools/test_network.py
 """
@@ -219,20 +219,14 @@ class Stops(unittest.TestCase):
         self.assertEqual(L[1], 15.2)
         self.assertAlmostEqual(L[2], 30.24)  # (two cars, the couplers overlapping 0.16 m)
 
-    def test_stops_by_set(self):
-        recs = [{"stand": [True, False], "outer": [310, None]}]
-        self.assertEqual(nw.as_page("stops", recs, 2), [{"stand": False, "outer": None}])
 
-
-class Compare(unittest.TestCase):
-    def test_finds_moves(self):
-        a = [{"p": [0, 0, 100, 0], "w": 8, "ends": ["0,0", "1,0"], "hi": [425, 425]}]
-        self.assertEqual(nw.compare(a, a)["exact"], 1)
-        b = [{**a[0], "hi": [425, 427]}]
-        rep = nw.compare(a, b)
-        self.assertEqual((rep["exact"], rep["equal"], rep["fields"]["hi"]["max cm"]), (0, 0, 2))
-        self.assertEqual(nw.compare(a, [{**a[0], "hi": [425, 426]}])["equal"], 1)
-        self.assertIn("only page", nw.compare(a + a, b))
+class Heights(unittest.TestCase):
+    def test_terrain_grid_on_the_cells_triangles(self):  # (what the over-bridge test reads past the ground's tiles)
+        import base64
+        raw = np.array([0, 10, 20, 40], "<i2")  # (2 x 2: rows going south, 0.1 m units over the base)
+        g = nw.TerrainGrid({"data": base64.b64encode(raw.tobytes()).decode(), "base": 100, "scale": 0.1,
+                            "x0": 0, "y0": 0, "dx": 10, "dy": -10, "nx": 2, "ny": 2})
+        self.assertEqual(np.round(g.height([0, 10, 0, 5, 9], [0, 0, -10, -2.5, -9]), 3).tolist(), [100, 101, 102, 101, 103.5])
 
 
 if __name__ == "__main__":
