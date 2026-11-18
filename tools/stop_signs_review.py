@@ -82,7 +82,7 @@ def sign_state(fact, chain):
     return {"id": sources.fact_id("stopSigns", fact), "state": state, "how": fact["how"], "now": chain[0] if chain else None,
             "off": round(math.hypot(fact["x"] - now[0], fact["y"] - now[1]), 2) if now else None,
             "at": [round(fact["x"], 2), round(fact["y"], 2)], "src": [round(now[0], 2), round(now[1], 2)] if now else None}
-OSM, GTFS, END, DTM = "#3e9dff", "#ff9e31", "#ffffff", "#ff3b30"
+OSM, GTFS, END, DTM, YOURS = "#3e9dff", "#ff9e31", "#ffffff", "#ff3b30", "#ffd60a"
 # The other direction's stop position lies on the parallel track, 3.1-5.9 m off ours: within 6 m it was taken
 # at 5 stops (Hercovka on 17, Vršovické náměstí on 22: the user, review 2026-11-05), while our direction's
 # node lies on our track (under 1.5 m) at all 174 stops of the 5 lines. Hercovka's own is 86 m past the GTFS point.
@@ -160,8 +160,10 @@ def side(path, s, x, y):
     return (bx - ax) * (y - ay) - (by - ay) * (x - ax)
 
 
-def review(line, path, stops, nodes, dtm, facts, over, back=False):
-    """Cards for one direction's stops on its path; and per stop what each source says (for the summary)"""
+def review(line, path, stops, nodes, dtm, facts, over, back=False, again=()):
+    """Cards for one direction's stops on its path; and per stop what each source says (for the summary). `again`:
+    the ids of answered stops (sources.fact_id) the user wants to answer again: a card of their own (id "...-again",
+    shown unanswered) with the sign the user's fact puts there; its answer replaces the fact on --import (#685)."""
     rows, findings, seen = [], [], {}
     tag, dirn = ("back-", " (the other direction)") if back else ("", "")
     for k, st in enumerate(stops):
@@ -186,7 +188,8 @@ def review(line, path, stops, nodes, dtm, facts, over, back=False):
         sid = f"stop-sign-{line}-{tag}{st['name']}-{seen[st['name']]}"
         fact = next((f for f in facts if f["stop"] == st["name"] and (f.get("towards") == nxt if nxt else f.get("from") == prv)), None)
         rows.append({"gtfs": st["s"], "osm": o[1] if o else None, "dtm": m[1] if m else None, "fact": bool(fact)})
-        if fact or (m and abs(m[1] - ref) <= over):
+        redo = bool(fact) and sources.fact_id("stopSigns", {"stop": st["name"], **({"towards": nxt} if nxt else {"from": prv})}) in again
+        if not redo and (fact or (m and abs(m[1] - ref) <= over)):
             continue
         gx, gy = at(path, st["s"])
         marks = []
@@ -207,6 +210,10 @@ def review(line, path, stops, nodes, dtm, facts, over, back=False):
         else:
             why = "no DTM sign beside the track"
         towards = nxt or "end"
+        if redo:
+            sid += "-again"
+            marks.append({"x": round(fact["x"], 1), "y": round(fact["y"], 1), "label": "your sign now (data/truth.json)", "color": YOURS})
+            why = "asked again: the sign your answer put here (yellow) is in question."
         opts = [BY_SOURCE[k] for k, have in (("DTM", m), ("OSM", o), ("GTFS", True)) if have] + [OWN, UNSURE]
         findings.append({"kind": "stop sign", "id": sid, "line": line, **key, "x": round(px, 1), "y": round(py, 1), "s": round(ps, 1),
                          "mag": round(abs(m[1] - ref), 1) if m else 10, "status": "review", "pick": True, "marks": marks,
@@ -319,6 +326,9 @@ def main():
     ap.add_argument("--over", type=float, default=5.0, help="m along the track: list stops differing by more")
     ap.add_argument("--import", dest="imp", action="store_true", help="the user's answers into data/truth.json")
     ap.add_argument("--reviews", default=os.path.join("reports", "reviews"))
+    ap.add_argument("--issue", type=int, default=258, help="the issue the cards wait for (the review directory lists them there)")
+    ap.add_argument("--again", default="", help="answered stops to review again, ';'-separated ids as fact_status.py "
+                                                 "names them ('Výstaviště → Nádraží Holešovice'): the user's word")
     args = ap.parse_args()
     if args.imp:
         return do_import(args.lines.split(","), args.reviews)
@@ -337,14 +347,15 @@ def main():
             dirs.append(("other direction", back, back_stops(line, path, back), True))
         findings = []
         for name, p_, st_, b in dirs:
-            f, rows = review(line, p_, st_, nodes, dtm, facts, args.over, back=b)
+            f, rows = review(line, p_, st_, nodes, dtm, facts, args.over, back=b,
+                             again={x.strip() for x in args.again.split(";") if x.strip()})
             findings += f
             dd = [r["dtm"] - (r["osm"] if r["osm"] is not None else r["gtfs"]) for r in rows if r["dtm"] is not None]
             print(f"line {line}{' ' + name if name else ''}: {len(rows)} stops; the user's sign {sum(r['fact'] for r in rows)}, "
                   f"DTM sign {len(dd)} (DTM - OSM/GTFS median {statistics.median(dd) if dd else float('nan'):+.1f} m, "
                   f"over {args.over:.0f} m {sum(abs(x) > args.over for x in dd)}), OSM {sum(r['osm'] is not None for r in rows)}; "
                   f"{len(f)} to review")
-        out = {"schema": 1, "issue": 258, "over_m": args.over, "findings": findings}
+        out = {"schema": 1, "issue": args.issue, "over_m": args.over, "findings": findings}
         with replacing(os.path.join(ROOT, "reports", "review", f"stop-signs-{line}.json"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(out, ensure_ascii=False, indent=1) + "\n")
 

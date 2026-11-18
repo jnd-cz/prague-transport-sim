@@ -1,6 +1,65 @@
 {
  "schema": 1,
- "issue": 258,
+ "issue": 685,
  "over_m": 5.0,
- "findings": []
+ "findings": [
+  {
+   "kind": "stop sign",
+   "id": "stop-sign-23-Královka-1-again",
+   "line": "23",
+   "stop": "Královka",
+   "towards": "Malovanka",
+   "from": null,
+   "back": false,
+   "x": -2914.7,
+   "y": 110.5,
+   "s": 6.5,
+   "mag": 6.5,
+   "status": "review",
+   "pick": true,
+   "marks": [
+    {
+     "x": -2914.7,
+     "y": 110.5,
+     "label": "DTM stop sign, state 2024",
+     "color": "#ff3b30"
+    },
+    {
+     "x": -2922.5,
+     "y": 109.4,
+     "label": "OSM stop position",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2909.2,
+     "y": 122.1,
+     "label": "timetable (GTFS) point",
+     "color": "#ff9e31"
+    },
+    {
+     "x": -2907.8,
+     "y": 123.8,
+     "label": "platform's front end (OSM)",
+     "color": "#ffffff"
+    },
+    {
+     "x": -2919.1,
+     "y": 114.1,
+     "label": "your sign now (data/truth.json)",
+     "color": "#ffd60a"
+    }
+   ],
+   "options": [
+    "the DTM sign (red)",
+    "OSM's stop position (blue)",
+    "the timetable point, GTFS (orange)",
+    "my own mark: place it on the map",
+    "unsure"
+   ],
+   "place_option": "my own mark: place it on the map",
+   "osm_node": 338859814,
+   "gtfs_s": 18.6,
+   "info": "Královka (towards Malovanka): asked again: the sign your answer put here (yellow) is in question. The pin is the DTM stop sign. Where is the stop sign? Pick the source that is right, or place your own mark."
+  }
+ ]
 }

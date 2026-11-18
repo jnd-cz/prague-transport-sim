@@ -47,6 +47,23 @@ class State(unittest.TestCase):
             self.assertEqual(R.sign_state(self.fact(how), None)["state"], "moved", how)
 
 
+class Again(unittest.TestCase):
+    def test_an_answered_stop_asked_again_gets_a_card_of_its_own(self):
+        path = [(0.0, 0.0), (200.0, 0.0)]
+        stops = [{"name": "A", "s": 50.0}, {"name": "B", "s": 150.0}]
+        dtm = [(70.0, -2.5)]  # (20 m past A's timetable point, on the right: a card without the fact)
+        fact = {"stop": "A", "towards": "B", "x": 52.0, "y": -2.2, "how": R.PLACED}
+        a = lambda cards: [c for c in cards if c["stop"] == "A"]  # noqa: E731  (B, without a DTM sign, has its own card)
+        self.assertEqual(a(R.review("17", path, stops, [], dtm, [fact], 5.0)[0]), [])
+        cards = a(R.review("17", path, stops, [], dtm, [fact], 5.0, again={"A → B"})[0])
+        self.assertEqual([c["id"] for c in cards], ["stop-sign-17-A-1-again"])
+        self.assertIn({"x": 52.0, "y": -2.2, "label": "your sign now (data/truth.json)", "color": R.YOURS}, cards[0]["marks"])
+        self.assertIn(R.OWN, cards[0]["options"])
+        # its answer replaces the fact (the newest per stop)
+        new = R.sign_facts(cards, {"17": [{"kind": "stop sign", "id": "stop-sign-17-A-1-again", "v": R.OWN, "px": 49.0, "py": -2.4, "t": 5}]})
+        self.assertEqual([(f["stop"], f["towards"], f["x"], f["how"]) for f in new], [("A", "B", 49.0, R.PLACED)])
+
+
 class Pole(unittest.TestCase):
     def test_a_placed_sign_or_a_dtm_signs_point_is_a_pole(self):
         dtm = [(10.0, 2.0)]
