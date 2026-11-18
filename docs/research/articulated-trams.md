@@ -210,6 +210,43 @@ Sources: https://cs.wikipedia.org/wiki/Tatra_K2 · https://de.wikipedia.org/wiki
   - strassenbahn-online: the steering mechanism for the middle joint was newly developed for the KT4.
 - **Consequence for the solver [D].** Two hinges on one vertical axis allow yaw only. Vertically, the whole car behaves as one rigid beam on its two bogie pivots 8.9 m apart.
 - **Not found.** Exact linkage geometry and ratio [?]; it is probably in I. Köhler, *KT4 – Der Kurzgelenkwagen aus Prag* (GVE 2009). Minimum radius [?]; vertical radii [?].
+
+**The steering linkage, from photos (the user's find, 2026-11-18).** The k-report.net forum thread "Archiv diskuse
+Tramvaje Tatra typů T a K do 15. 10. 2023" (https://www.k-report.net/discus/messages/48/337217.html), posts of
+5–11 October 2023, has:
+- ten photos from under a Potsdam KT4D in the workshop's pit, by a Potsdam tram worker (forum images 1530026–1530035);
+- a removed bogie with its rods (1529888);
+- the joint's lever plates, from Prague, where Potsdam's KT4s were overhauled in early 2017
+  (https://www.prazsketramvaje.cz/obrazky/vozyosobni/potsdam_0251-001.jpg);
+- two photos from the preview of Köhler's book (1530440–1530441);
+- a brass model (1529859).
+
+Read off them [M, from the photos; no dimensions]:
+- **The rods.** From each half's bogie two rods run to the joint, one from each side of the bogie frame's end facing
+  the joint, on ball joints (1529888, 1530027). They converge toward the car's centreline as they near the joint
+  (1530031, 1530028). Each rod has a spring link near its joint end: a coil spring in a rubber boot (1530031–1530034).
+  The two rods of a half then pass a cross guide under the floor and go into a canvas-booted box at the joint, one
+  box on either side of the bellows (1530030, 1530033).
+- **The joint.** Two bow-tie-shaped plates turn on the joint's central vertical pin (the prazsketramvaje.cz photo).
+  Their outer ends are arcs that slide in arc guides centred on the pin. One half's rods act on one plate, the other
+  half's on the other, at bolts off the pin; two smaller pins above and below the main one link the plates. With the
+  bogies turning one way, the levers set the angle between the halves: the "scissor joint connecting both bogies"
+  (en.wiki).
+- **The full-scale gauge.** The book's preview shows a full-size frame of the KT4's outline on two bogies with the
+  steered joint. A forum member (2023-10-10) says it was used to check the clearance profile.
+
+What the forum members say:
+- **The spring links** (UT, 2023-10-11): thanks to them the KT4 runs on straight track roughly aligned and calm,
+  without swaying from side to side. Entering a curve, the mechanism takes hold late, only once the bogies have
+  turned noticeably. There is also an emergency lock that fixes the mechanism for lifting the car (rerailing) or
+  when it fails.
+- **Cables tried on the prototype** (Pvvs, 2023-10-11): the functional prototype tried cables instead of rods.
+
+For the solver:
+- The steered joint's `steer` (assumed 0.5: the two halves are equal and the levers symmetric, which puts the joint
+  over the track centreline) acts only past `steerFrom`, the bogies' relative turn below which the springs hold the
+  joint straight.
+- Neither the ratio nor that threshold is measured.
 - **Coupling.** Couplers at both ends [S over-coupler length]. Multiple working: Potsdam ran pairs from 1980 and tried a three-car set in 1983 [S strassenbahn-online].
 
 Sources: https://de.wikipedia.org/wiki/Tatra_KT4 · https://cs.wikipedia.org/wiki/Tatra_KT4 · https://en.wikipedia.org/wiki/Tatra_KT4 · https://ru.wikipedia.org/wiki/Tatra_KT4 · https://strassenbahn-online.de/Betriebshof/Tatra/KT4D/index.html

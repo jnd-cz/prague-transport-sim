@@ -9,6 +9,7 @@
   section its length between its pins, a section on one fixed or limited bogie on the track's heading there, the
   15T's sections each on two axles of their bogies a wheelbase apart, the KT4's joint on the track (its rods split
   the bogies' turning evenly), the 52T's front support where its front puts it (it is placed from its second section);
+  the KT4 with its rods' springs holding the joint straight below a turn of 0.05 rad: straight on a 300 m curve;
 - a joint limit below a curve's angle holds its section there, its bogie off the track;
 - the running gear's checks: every type passes, gear that cannot be placed is refused;
 - on every line's route (in plan), each metre, every type: its joints' largest angle, none past a limit, the pins in
@@ -110,6 +111,11 @@ SYNTH = """async () => {
     const tight = { ...TYPES.KT8D5, joints: TYPES.KT8D5.joints.map((j) => ({ ...j, yaw: 0.05 })) }, H = A.placeUnit(tight, 60, at);
     out.held = { joints: H.joints, off: Math.max(...H.bogies.map((b) => b.off)), pins: pins(tight, H) };
   }
+  // the KT4's rods held straight by their springs until the bogies' turn passes steerFrom: straight on a 300 m curve
+  // (the bogies 0.03 rad apart), steering on a 25 m one
+  { const kt4 = { ...TYPES.KT4, joints: [{ ...TYPES.KT4.joints[0], steerFrom: 0.05 }] };
+    out.steerFrom = { wide: A.placeUnit(kt4, 60, curve(300)).joints[0].yaw, tight: A.placeUnit(kt4, 60, curve(25)).joints[0].yaw,
+      even: A.placeUnit(TYPES.KT4, 60, curve(25)).joints[0].yaw }; }
   // gear that cannot be placed
   const f = (at) => ({ at, turn: 'free', wheelbase: 1.8 });
   const bad = {
@@ -206,6 +212,9 @@ def main():
     h = r["held"]
     if not (h["joints"][0]["held"] and abs(abs(h["joints"][0]["yaw"]) - 0.05) < 1e-9 and h["off"] > 0.05 and h["pins"] < 1e-6):
         fails.append(f"a joint past its limit is not held there with its bogie off the track: {h}")
+    sf = r["steerFrom"]
+    if abs(sf["wide"]) > 1e-9 or not 0 < abs(sf["tight"]) < abs(sf["even"]):
+        fails.append(f"the KT4's steered joint with steerFrom 0.05: not straight on a 300 m curve, or not steering less on a 25 m one: {sf}")
     for name, problems in r["refused"].items():
         if not problems:
             fails.append(f"gear {name} not refused")

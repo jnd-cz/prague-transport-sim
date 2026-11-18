@@ -10,7 +10,10 @@
 //             pivots }): on one pin shared by both sections (the KT8D5, the K2), or with pivots: 'axles' one pivot over
 //             each axle, the section ahead on the front one and the one behind on the rear one, and no pin between
 //             them (the 15T). steer: a joint with no bogie whose angle rods from the two sections' bogies set (the
-//             KT4): the rear section's yaw against the front's is steer × the rear bogie's turn against the front one's
+//             KT4): the rear section's yaw against the front's is steer × the rear bogie's turn against the front one's,
+//             once that turn is past steerFrom (rad, default 0): the rods' spring links hold the joint straight below it
+//             (a KT4 driver's account: the mechanism takes hold late, only at a larger turn of the bogies, so the car
+//             runs straight and calm on straight track; k-report.net, 2023-10-11, docs/research/articulated-trams.md)
 // Positions are along the vehicle in m from its front coupler face, on straight track. A bogie turns 'free' (a pivot),
 // 'limited' (springs or stops: to maxAngle against its section) or 'fixed' (not at all). The user, 2026-11-13 (PR #577):
 // "The sections are usually coupled freely but it can be pivoted at different places, and some bogies can have smaller
@@ -128,6 +131,7 @@ export function gearProblems(type) {
   J.forEach((j, k) => {
     if (!(j.at > S[k].from && j.at < S[k + 1].to)) bad.push(`joint ${k}: at ${j.at} is not between sections ${k} and ${k + 1}`);
     if (j.steer != null && (j.bogie || !(Math.abs(j.steer) <= 1))) bad.push(`joint ${k}: a steered joint needs no bogie under it and a steer between -1 and 1`);
+    if (j.steerFrom !== undefined && !(j.steerFrom >= 0)) bad.push(`joint ${k}: steerFrom ${j.steerFrom} is no angle of 0 or more`);
     if (j.bogie?.pivots !== undefined && j.bogie.pivots !== 'axles') bad.push(`joint ${k}: pivots ${j.bogie.pivots} is not 'axles'`);
   });
   for (const b of gearOf(type).bogies) {
@@ -213,9 +217,11 @@ function place(type, P, sFront, shift, at) {
       const x1 = r[0], x2 = R[k + 1][0], j = J[k], a = j.at - x1.at, b = x2.at - j.at, s1 = s0(x1), P1 = at(s1);
       const h1 = yawOf(trackAxis(at, centreS(x1, s1), g.bogies[x1.bogie].wheelbase)), wb2 = g.bogies[x2.bogie].wheelbase;
       let s2 = s1 - (a + b), th = 0, P2;
+      const from = j.steerFrom || 0;
       for (let i = 0; i < 12; i++) {
         P2 = at(s2);
-        th = clamp(j.steer * wrap(yawOf(trackAxis(at, centreS(x2, s2), wb2)) - h1), j.yaw);
+        const d = wrap(yawOf(trackAxis(at, centreS(x2, s2), wb2)) - h1);
+        th = clamp(j.steer * Math.sign(d) * Math.max(0, Math.abs(d) - from), j.yaw);
         const e = len(sub(P1, P2)) - Math.sqrt(a * a + b * b + 2 * a * b * Math.cos(th));
         if (Math.abs(e) < 1e-6) break;
         s2 += e;
