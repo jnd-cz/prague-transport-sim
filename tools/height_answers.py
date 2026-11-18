@@ -43,6 +43,7 @@ IGNORE_ANSWERS = []  # the user's answers that drop heights: data/truth.json rad
 STRETCH_NEAR = 1.0   # m: a height this near an `ignore` answer's stretch is on it
 RADIUS_ANSWERS = []  # the user's answers on the radius review: [{'xy': city frame, 'answer': ...}] (data/truth.json)
 HOLD, FOLLOW, GROUND = 'hold the radius', 'follow the data', 'follow the ground'
+STRUCTURE_FACTS = []  # the state of the user's structures no source maps (import_track_heights.structure_states, #670)
 GROUND_ANSWERS = []  # the user's areas where the tracks take the lidar ground: radiusAnswers with `area` (load_ground_answers)
 GROUND_OTHER = 1.5   # m: a lidar this far from the track's height there is another level (a wall, a roof), no evidence
 ANSWER_REACH = 15.0  # m: an answer applies to the place where the radius would give way this near it
@@ -200,9 +201,12 @@ def staged_heights(path=None):
         if staged['snapshot'] != snap or json.dumps(have, sort_keys=True) != json.dumps(spans, sort_keys=True):
             raise SystemExit(f'{path}: snapshot {staged["snapshot"]} with {len(have)} reviewed spans, this checkout '
                              f'{snap} with {len(spans)}: run without --staged')
-        return staged
-    from import_track_heights import stage
-    return stage({'span_reviews': spans})
+    else:
+        from import_track_heights import stage
+        staged = stage({'span_reviews': spans})
+    global STRUCTURE_FACTS
+    STRUCTURE_FACTS = staged.get('structure_facts', [])
+    return staged
 
 
 def answered_source(series):

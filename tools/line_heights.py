@@ -647,7 +647,8 @@ def solve_run(c, run, r):
 POOL = 16  # chains: fewer are solved in this process (a worker takes ~2 s to start: the network has ~600)
 
 
-ANSWERS = ('RADIUS_ANSWERS', 'STEP_ANSWERS', 'IGNORE_ANSWERS', 'GROUND_ANSWERS', 'FLOOR_SINCE')  # (what ha.load sets)
+ANSWERS = ('RADIUS_ANSWERS', 'STEP_ANSWERS', 'IGNORE_ANSWERS', 'GROUND_ANSWERS', 'FLOOR_SINCE',
+           'STRUCTURE_FACTS')  # (what ha.load and ha.staged_heights set)
 
 
 def _worker(answers, chs=None):
@@ -1179,9 +1180,14 @@ def write_line(line, lookup, chs):
         join_ends(data['tracks'])
     data['heights'] = heights
     data['heightSource'] = src_ranges
+    # the user's structures no source maps that lie on the tracks this line draws, with their state (#670)
+    on = [shapely.LineString([q[:2] for q in p]) for p in [data.get('path'), data.get('pathBack')]
+          + [t['p'] for t in data['tracks']] if len(p or []) > 1]
+    structs = [{k: v for k, v in f.items() if k != 'ends'} for f in ha.STRUCTURE_FACTS
+               if any(t.distance(shapely.LineString(f['ends'])) <= 15 for t in on)]
     data['provenance'] = sources.stamp('line_heights.py', {
         'heights': sources.entry('heights', [round(metres[k]) for k in LEVELS], 'm (path and pathBack)')},
-        prev=data.get('provenance'))
+        prev=data.get('provenance'), facts={'structures': structs})
     data['attribution'] = sources.attribution(data['provenance'])
     with replacing(dst, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, separators=(',', ':'))

@@ -14,7 +14,7 @@ import unittest
 import zipfile
 from unittest.mock import patch
 
-from shapely.geometry import Point, box
+from shapely.geometry import LineString, Point, box
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dtmp_tracks import Segments, ROOT, di_data, archive_data, surface_evidence
@@ -136,6 +136,26 @@ class Guard(unittest.TestCase):
         self.assertTrue(mask.intersects(Point(float(deck[0]), float(deck[1]))))
         self.assertFalse(mask.intersects(Point(float(palmovka[0]), float(palmovka[1]))))
 
+    @unittest.skipUnless(HAS_GRID, 'fetch the snapshot: raw/proj/')
+    def test_a_users_structure_matches_once_the_sources_map_it(self):
+        # #670: the share of its line from 'from' to 'to' that OSM, Mosty 3D or the survey's decks cover
+        from geo import Frame
+        frame = Frame()
+        a, b = frame.xy(50.10347, 14.46767), frame.xy(50.10352, 14.47100)
+        a, b = (float(a[0]), float(a[1])), (float(b[0]), float(b[1]))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'data').mkdir()
+            (root / 'data/truth.json').write_text(json.dumps({'trackHeights': {'structures': [
+                {'id': 'span', 'from': [50.10347, 14.46767], 'to': [50.10352, 14.47100]}]}}), encoding='utf-8')
+            length = math.dist(a, b)
+            for share, state in ((0.95, 'matches'), (0.5, 'holds'), (0.0, 'holds')):
+                mapped = LineString([a, (a[0] + (b[0] - a[0]) * share, a[1] + (b[1] - a[1]) * share)]).buffer(1) if share else box(0, 0, 0, 0)
+                f = stage.structure_states(root, mapped)
+                self.assertEqual((f[0]['id'], f[0]['state']), ('span', state), share)
+                self.assertAlmostEqual(f[0]['cover'], share, delta=1.5 / length + 0.01)
+            self.assertEqual(stage.structure_states(Path(tmp) / 'none', box(0, 0, 1, 1)), [])
+
     def test_terrain_never_judges_numeric_di_or_a_flagged_structure(self):
         di = HeightGuard().choose({'id': 'di-1', 'z': 192.7}, match(path(1, 192.7)), 5, 0, terrain=180.4)
         self.assertEqual((di['status'], di['z']), ('selected', 192.7))
@@ -215,7 +235,7 @@ class Guard(unittest.TestCase):
                     load_context=lambda decks: __import__('track_context').TrackContext(),
                     surface_evidence=lambda rows: None,
                     Terrain=lambda: lambda xs, ys: [None]*len(xs),
-                    bridge_structures=lambda structures, ids, *rest: (structures, ids, []),
+                    bridge_structures=lambda structures, ids, *rest: (structures, ids, [], None),
                 ),
                 redirect_stdout(io.StringIO()),
             ):
@@ -259,7 +279,7 @@ class Guard(unittest.TestCase):
                     load_context=lambda decks: __import__('track_context').TrackContext(),
                     surface_evidence=lambda rows: None,
                     Terrain=lambda: lambda xs, ys: [None]*len(xs),
-                    bridge_structures=lambda structures, ids, *rest: (structures, ids, []),
+                    bridge_structures=lambda structures, ids, *rest: (structures, ids, [], None),
                 ),
                 redirect_stdout(io.StringIO()),
             ):

@@ -2,8 +2,9 @@
 """Posted speeds along a line from the OSM tram ways, and the user's posted speeds over them (tools/osm_speeds.py,
 #612): python -I tools/test_osm_speeds.py.
 
-A way's correction in data/truth.json `postedSpeeds` holds over its `maxspeed`, and the log says whether OSM still
-tags what the fact corrects, now tags the same (no longer needed) or tags something else (look again). Along a
+A way's correction in data/truth.json `postedSpeeds` holds over its `maxspeed`, and its state says whether OSM
+still tags what the fact corrects (holds), now tags the same (matches: no longer needed) or tags something else
+(changed: look again; #670). Along a
 synthetic track the samples read the way under them, the corrected one at its corrected speed, and not a parallel
 way 3 m off or one crossing it. The repository's facts each name a way, the speed OSM tagged, the posted one, a
 source and a quote, and the section names its reader.
@@ -29,18 +30,12 @@ class Corrections(unittest.TestCase):
         self.assertEqual(O.corrections({"postedSpeeds": [FIX]}), {2: FIX})
         self.assertEqual(O.corrections({}), {})
 
-    def test_the_correction_holds_and_says_what_osm_tags(self):
+    def test_the_correction_holds_and_states_what_osm_tags(self):
         fixes = O.corrections({"postedSpeeds": [FIX]})
-        for tagged, said in (("60", "65 over OSM's 60 (fact-65)"),
-                             ("65", "OSM tags 65 as fact-65 says: the correction is no longer needed"),
-                             ("70", "OSM tags 70, not the 60 fact-65 corrects: 65 holds, look at the way again"),
-                             (None, "OSM tags none, not the 60 fact-65 corrects: 65 holds")):
-            log = []
-            speeds = O.way_speeds([way(1, [], "50"), way(2, [], tagged), {"type": "node", "id": 9}], fixes, log.append)
+        for tagged, state, now in (("60", "holds", 60), ("65", "matches", 65), ("70", "changed", 70), (None, "changed", None)):
+            speeds, facts = O.way_speeds([way(1, [], "50"), way(2, [], tagged), {"type": "node", "id": 9}], fixes)
             self.assertEqual(speeds, {1: 50, 2: 65}, tagged)
-            self.assertEqual(len(log), 1, log)
-            self.assertIn(said, log[0])
-            self.assertTrue(log[0].startswith("way 2: "), log)
+            self.assertEqual(facts, [{"id": "fact-65", "state": state, "way": 2, "now": now, "recorded": 60, "fact": 65}])
 
     def test_maxspeed_values(self):
         self.assertEqual([O.speed({"maxspeed": v}) for v in ("50", "40;30", "65 km/h", "none", "walk")], [50, 40, 65, 0, 0])
@@ -54,7 +49,7 @@ class Along(unittest.TestCase):
         nodes = {1: (0.0, 0.0), 2: (100.0, 0.0), 3: (200.0, 0.0), 4: (0.0, 3.0), 5: (200.0, 3.0),
                  6: (50.0, -20.0), 7: (50.0, 20.0)}
         els = [way(1, [1, 2], "50"), way(2, [2, 3], "60"), way(3, [4, 5], "80"), way(4, [6, 7], "30")]
-        speeds = O.way_speeds(els, O.corrections({"postedSpeeds": [FIX]}), log=lambda m: None)
+        speeds, _ = O.way_speeds(els, O.corrections({"postedSpeeds": [FIX]}))
         osm, ded, by_way = O.along([[0.0, 0.0], [200.0, 0.0]], els, nodes, [], speeds)
         self.assertEqual(len(osm), 41)
         self.assertEqual(set(osm[:20]), {50})

@@ -38,6 +38,7 @@ from shapely.ops import substring
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import di_tracks  # noqa: E402
+import sources  # noqa: E402  (fact_state, #670)
 
 JOIN = di_tracks.JOIN    # m: record ends this near meet
 ATTACH = 0.5             # m: a lone chain end this near another chain's middle joins it there
@@ -69,6 +70,8 @@ TWICE = 0.5              # m: two short edges between the same nodes this near e
 SECTION_LEGS = 9.0       # m: a switch drawn as a section has legs this long or shorter (Dvorecký most 4.7 m,
                          # Palackého náměstí 6.8 m; the tongues DI draws: 8.4-9 m)
 PHOTO_SHARE = 0.8        # of an edge's length a photo track covers for the edge to take it
+PHOTO_MATCH = 0.1        # m: DI's line within this of every point of a photo track is as good as the photo (three times
+                         # the photo's own 3.1 cm around its curve, Podolská vodárna): the photo fact matches (#670)
 
 
 def _unit(v):
@@ -86,6 +89,8 @@ class Network:
         self.nodes, self.edges = {}, {}
         self.at = defaultdict(list)
         self.report = defaultdict(int)
+        # the state of each truth.json fact applied over DI (sources.fact_state, #670): {section: [entry with `at`]}
+        self.facts = {'switchTips': [], 'photoTracks': []}
         self._reach = {}
         self._zones = {}
         self._build(source)
@@ -758,10 +763,19 @@ class Network:
     def move_tips(self, tips):
         """A switch whose tip the user placed (data/truth.json trackSources.switchTips: [(near, tip)] in city metres)
         forks at the point of its through track nearest the tip: the through edge splits there and the diverging
-        leg starts at it (Podolská vodárna: 3.3 m east of DI's fork, at the manhole)."""
-        for near, tip in tips:
+        leg starts at it (Podolská vodárna: 3.3 m east of DI's fork, at the manhole). Each tip's state against DI's fork
+        (#670): matches where the fork lies within END_CLEAR of the tip (the tip has no effect), holds where the fork is
+        still at `near` (DI's fork when the user answered), changed where it is at neither or gone."""
+        same = lambda a, b: math.dist(a, b) <= END_CLEAR  # noqa: E731
+        for t in tips:
+            near, tip = t[0], t[1]
             forks = [(math.dist(v['xy'], near), n) for n, v in self.nodes.items()
                      if math.dist(v['xy'], near) <= di_tracks.FORK and self.through(n)]
+            if len(t) > 2:
+                fork = self.nodes[min(forks)[1]]['xy'] if forks else None
+                self.facts['switchTips'].append({
+                    'id': t[2], 'state': sources.fact_state(tip, near, fork, same),
+                    'off': round(math.dist(fork, tip), 2) if fork else None, 'at': [round(tip[0], 1), round(tip[1], 1)]})
             if not forks:
                 self.report['switch tips without a fork'] += 1
                 continue
@@ -801,11 +815,13 @@ class Network:
     def take_photo(self, photo):
         """Tracks measured on the orthophoto the user took over DI's (data/truth.json photoTracks): an edge the photo
         track covers along PHOTO_SHARE of its length within di_tracks.PHOTO_COVER takes the photo's line between its
-        nodes."""
+        nodes. Each photo's state against DI's lines it replaces (#670): matches where they lie within PHOTO_MATCH of
+        every point of it, holds where they are farther, changed where DI no longer covers it (the photo is not taken)."""
         if photo is None:
             return
         for ch in photo.chains:
             pl = ch['line']
+            replaced = []  # DI's lines the photo takes over, as they were
             for e in list(self.edges):
                 line = self.edges[e]['line']
                 if line.distance(pl) > di_tracks.PHOTO_COVER:
@@ -818,10 +834,17 @@ class Network:
                 piece = substring(pl, min(s0, s1), max(s0, s1))
                 coords = list(piece.coords) if s0 <= s1 else list(piece.coords)[::-1]
                 ed = self.edges[e]
+                replaced.append(ed['line'])
                 coords[0], coords[-1] = self.nodes[ed['a']]['xy'], self.nodes[ed['b']]['xy']
                 ed['line'] = LineString(coords)
                 ed['src'], ed['records'] = 'ortho', ch['records']
                 self.report['edges from the orthophoto'] += 1
+            off = max(min(d.distance(Point(p)) for d in replaced) for p in pl.coords) if replaced else None
+            for r in ch['records']:
+                if isinstance(r, dict) and r.get('place'):
+                    state = 'changed' if off is None else 'matches' if off <= PHOTO_MATCH else 'holds'
+                    self.facts['photoTracks'].append({'id': r['place'], 'state': state, 'off': None if off is None else round(off, 2),
+                                                      'at': [round(v, 1) for v in pl.interpolate(0.5, normalized=True).coords[0]]})
 
     def index(self):
         """The search tree and the passes, after the edges changed."""

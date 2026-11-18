@@ -111,12 +111,35 @@ and download it only with `--fetch` (#223).
    writes `snapshots/<id>.json` and sets `snapshots/CURRENT`. Add its row at the top of
    [snapshots/README.md](snapshots/README.md).
 4. `data-publish`, then commit `snapshots/` and `data/MANIFEST.json` together.
+5. `python -I tools/fact_status.py`: the user's facts in `data/truth.json` that override a source, by their state in
+   the new build (#670). One the new sources now match is retired on the user's answer to its review card
+   (`tools/fact_review.py`, below), in a PR that names the snapshot (git keeps the fact). One that changed (the source gives neither the
+   value recorded with the fact nor the fact's) or moved (a source the user confirmed has left it) is looked at again.
+   A DTM refresh's stop signs come before OSM's (`sources.LAYERS` signs) and are reviewed like any new data
+   (`tools/stop_signs_review.py`; the user, 2026-11-18: "the new data should be reviewed anyway").
 
 **Checking a publish:** `python -I tools/snapshot.py verify` (#107). It lists the store once and fetches
 back only what this publish added: source files no earlier snapshot in `snapshots/` has, built files not in
 `main`'s `data/MANIFEST.json` (`--base REF` for another). Files an earlier snapshot had were checked when
 it was published. Don't restore the whole snapshot into a fresh checkout to check a publish: on
 2026-10-29c that is 1,117 store objects (~2 GB) against 147 for `verify` (35 s).
+
+**Facts over a source** (#670): each tool that applies a `data/truth.json` fact over a source states it in the
+`provenance.facts` of the file it writes: holds (still needed), matches (the build without it gives the same: it can
+be retired), changed, and for a fact that confirmed a source agrees or moved (`tools/sources.py` `fact_state`;
+`sources.OVERRIDES` names the sections, where their facts are and their stable ids). `tools/fact_status.py` lists them
+across the built lines; the weekly housekeeping pass posts those to retire or look at again, and `tools/rebuild.py`
+prints the counts. A fact that corrects a source records what the source said when it was recorded (`postedSpeeds`
+`osm`, a stop sign's `pin`), so a later change of the source can show as changed.
+
+Each match is reviewed before it retires (the user, 2026-11-18: "I will need to review each case of new match to make
+sure we get proper fact replacement"): `python -P -E tools/fact_review.py` writes a card per match with a point
+(`reports/review/fact-matches-N.json`: the user's fact and the source's over the orthophoto), and `--import` applies
+the answers. A retired stop sign becomes a confirmation of the DTM's sign (the build takes the same sign, its card stays
+answered, a DTM refresh that moves it shows as moved); any other retired fact is cut out of `truth.json`. A placed
+stop sign matches the DTM's sign within 2 m in the plane, never OSM's stop position, which lies on the track's centre
+line (`tools/stop_signs_review.py` `MATCH`). A match without a point (a speed, a structure, a style answer) is retired
+by hand in a PR that quotes it.
 
 Derived files in `raw/` (the OSM answers `build_line.py` caches in `raw/lineN/`, unpacked `.gpkg`) are
 not part of a snapshot; they are recomputed from it (each OSM answer is keyed by the extract, its query

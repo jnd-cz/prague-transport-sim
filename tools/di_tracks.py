@@ -480,7 +480,8 @@ class Source:
                     break
 
 def switch_tips(truth=None):
-    """[(near, tip)] in city metres: switches whose tip the user placed (data/truth.json trackSources.switchTips)."""
+    """[(near, tip, place)] in city metres: switches whose tip the user placed (data/truth.json trackSources.switchTips);
+    `near` is DI's fork when the user answered, `place` the fact's id (#670)."""
     import json
     from geo import Frame
     path = truth or Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
@@ -488,7 +489,7 @@ def switch_tips(truth=None):
     frame, out = Frame(), []
     for f in facts:
         (nx, tx), (ny, ty) = frame.xy([f['near'][0], f['tip'][0]], [f['near'][1], f['tip'][1]])
-        out.append(((float(nx), float(ny)), (float(tx), float(ty))))
+        out.append(((float(nx), float(ny)), (float(tx), float(ty)), f['place']))
     return out
 
 

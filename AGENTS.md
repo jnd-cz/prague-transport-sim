@@ -135,7 +135,8 @@ both post on the pinned #291 and only propose.
   Not check exemptions, agent audits or lists of generated array indexes: a rebuild renumbers
   them (#177's allowlist would have failed every line on the next rebuild). Key a fact by place, a
   stable source ID or a stop. What a check can decide from geometry stays a rule in the check, counted
-  per class with its places, so `--compare` shows what a rebuild moved.
+  per class with its places, so `--compare` shows what a rebuild moved. A fact that overrides a source records what
+  the source said, and the tool applying it states whether it is still needed (DATA.md, Facts over a source; #670).
 - A provider that refuses scripted requests is waited out or read from a saved copy; requests are never
   disguised as a browser's (DATA.md, ZPS downloads).
 - Sources come only from the pinned snapshot in `raw/` (`python -I tools/snapshot.py fetch`); OSM only

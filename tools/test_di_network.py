@@ -189,6 +189,24 @@ class Network(unittest.TestCase):
         self.assertEqual(net.report['edges from the orthophoto'], 1)
         self.assertEqual(sum(ed['src'] == 'ortho' for ed in net.edges.values()), 1)
 
+    def test_a_user_tip_states_where_dis_fork_is(self):
+        # #670: DI's fork (50, 0) still where the user answered holds; at the tip matches; elsewhere or gone changed
+        for near, tip, state, off in (((50.0, 0.0), (46.7, -1.65), 'holds', 3.69), ((50.0, 0.0), (50.3, 0.1), 'matches', 0.32),
+                                      ((54.0, 0.0), (46.7, -1.65), 'changed', 3.69), ((90.0, 9.0), (89.0, 9.0), 'changed', None)):
+            net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[(near, tip, 'the switch')])
+            self.assertEqual(net.facts['switchTips'], [{'id': 'the switch', 'state': state, 'off': off,
+                                                        'at': [round(tip[0], 1), round(tip[1], 1)]}], (near, tip))
+        self.assertEqual(net_of([(0, 0), (50, 0)], tips=[((0, 0), (1, 0))]).facts['switchTips'], [])  # no id: not stated
+
+    def test_a_photo_track_states_how_far_dis_line_is(self):
+        branch = turnout(50)
+        for dy, state in ((0.3, 'holds'), (0.05, 'matches'), (2.0, 'changed')):
+            photo = dt.Source('ortho', [rec(9, [(x, y + dy) for x, y in branch]) | {'place': 'the curve'}])
+            f = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], branch, photo=photo).facts['photoTracks']
+            self.assertEqual([(e['id'], e['state']) for e in f], [('the curve', state)], dy)
+            if state != 'changed':
+                self.assertAlmostEqual(f[0]['off'], dy, delta=0.02)
+
 
 class Matching(unittest.TestCase):
     def test_each_track_of_a_double_track_keeps_its_own(self):

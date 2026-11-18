@@ -204,16 +204,17 @@ def held_verdict(v, rule, buildings):
     return rule["outsideGreen"] if v["c"] == "green" else rule["outside"]
 
 
-def facts_to_areas(areas, facts, frame):
+def facts_to_areas(areas, facts, frame, hits=None):
     """{area index: verdict} for the user's answers: the ground-level area that holds the answer's point (its holes
-    left out: a courtyard's lawn is a hole in the sidewalk around it), of the card's class, the nearest the card's size."""
+    left out: a courtyard's lawn is a hole in the sidewalk around it), of the card's class, the nearest the card's size.
+    `hits`, a dict: filled with {the fact's index: its area index} (#670)."""
     if not facts:
         return {}
     ground = [(i, a) for i, a in enumerate(areas) if a["l"] == 0 and a["c"] not in NOT_GROUND and len(a["r"]) >= 3]
     polys = [with_holes(a) for _, a in ground]
     outer = [shapely.Polygon(np.asarray(a["r"])[:, :2]).buffer(0) for _, a in ground]
     out = {}
-    for f in facts:
+    for k, f in enumerate(facts):
         x, y = frame.xy(f["lat"], f["lon"])
         p = shapely.Point(float(np.ravel(x)[0]), float(np.ravel(y)[0]))
         # (then the outlines alone: cards before 2026-11-10's last build took their point from the outline, and one,
@@ -223,6 +224,8 @@ def facts_to_areas(areas, facts, frame):
             if hit:
                 j = min(hit, key=lambda j: abs(polys[j].area - f.get("m2", 0)))
                 out[ground[j][0]] = f["verdict"]
+                if hits is not None:
+                    hits[k] = ground[j][0]
                 break
     return out
 
@@ -232,18 +235,60 @@ def with_holes(a):
     return shapely.Polygon(np.asarray(a["r"])[:, :2], [np.asarray(h)[:, :2] for h in a.get("h", []) if len(h) >= 3]).buffer(0)
 
 
-def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, rule=None, buildings=None):
+def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, rule=None, buildings=None, states=None):
     """A verdict per ground-level area (the index into areas): "fits" (within OFFSET of IPR), "small" (too small or
     narrow for the lidar), "covered", "uneven" (no steady offset), "lidar" (the survey is wrong: move it), "survey" (IPR
     is out of date there), "changing" (a construction site), "review" (held).
     ground / older: IPR and DMR 5G at S-JTSK arrays (NaN where none); cover: cover_union; rails: rail_points; frame:
     tools/geo.Frame (areas in its city frame); facts: data/truth.json surveyGround.places ({lat, lon, verdict});
     changing: the union of OSM's construction sites; rule: data/truth.json surveyGround.heldRule, with buildings (the
-    union of OSM's building footprints) for what neither the rails nor DMR 5G decide, else such an area is held."""
+    union of OSM's building footprints) for what neither the rails nor DMR 5G decide, else such an area is held.
+    states, a dict: filled with each fact's state by its index (#670): matches where a source decides as the user did
+    without the answer (the area fits IPR now, or the rails or DMR 5G give the same verdict), holds where none does,
+    the user's held rule included (a rule is no source catching up), with the verdict and what gives it: (state,
+    verdict, by: fits, rails, dmr5g, rule or None); a fact whose point lies in none of these areas is left out (its area
+    is on another line, or gone)."""
     out = {}
     rx, ry, rz = rails
     rtree = shapely.STRtree(shapely.points(rx, ry)) if len(rx) else None
-    fact_of = facts_to_areas(areas, facts, frame)
+    hits = {}
+    fact_of = facts_to_areas(areas, facts, frame, hits)
+    decided = {}  # area index: (state, what the sources decide, by which) for the areas the user answered
+
+    def by_sources(v, r, pin, inside, poly, E, N, g):
+        """The verdict the sources and the rules give an area off IPR, and by which (None: by its size or cover)."""
+        if poly.area < MIN_M2 or inside.mean() < MIN_INNER:
+            return "small", None
+        if not cover.is_empty and covered(cover, pin[:, 0], pin[:, 1]).mean() > COVERED:
+            return "covered", None
+        if v["spread"] >= STEADY:
+            return "uneven", None
+        # the rails through it, under open sky
+        if rtree is not None:
+            k = rtree.query(poly, predicate="contains")
+            if len(k) and not cover.is_empty:
+                k = k[~covered(cover, rx[k], ry[k])]
+            if len(k) >= RAIL_MIN:
+                sv = np.array([surface_at(r, rx[j], ry[j]) for j in k]) - rz[k]
+                gE, gN = frame.to_jtsk(rx[k], ry[k])
+                iv = np.asarray(ground(gE, gN), float) - rz[k]
+                s_off, i_off = float(np.nanmedian(sv)), float(np.nanmedian(iv))
+                v["rails"] = {"n": int(len(k)), "survey": round(s_off, 2), "ipr": round(i_off, 2)}
+                if abs(i_off) <= AGREE < abs(s_off):
+                    return "lidar", "rails"
+                if abs(s_off) <= AGREE < abs(i_off):
+                    return "survey", "rails"
+        if changing is not None and not changing.is_empty and covered(changing, pin[:, 0], pin[:, 1]).mean() > COVERED:
+            return "changing", None
+        o = np.asarray(older(E, N), float) - g
+        o = o[np.isfinite(o)]
+        if len(o) >= 3:
+            v["older"] = round(float(np.median(o)), 2)
+            if abs(v["older"]) <= AGREE:
+                return "lidar", "dmr5g"
+        held = held_verdict(v, rule, buildings)
+        return (held, "rule") if held else ("review", None)
+
     for i, a in enumerate(areas):
         if a["l"] != 0 or a["c"] in NOT_GROUND or len(a["r"]) < 3:
             continue
@@ -258,55 +303,30 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
         out[i] = v
         if ok.sum() < 3:
             v["verdict"] = "fits"  # (nothing to compare: outside IPR)
+            if i in fact_of:  # (the user's verdict decides nothing here)
+                decided[i] = ("matches", "fits", "fits")
             continue
         off = float(np.median(d[ok]))
         v["offset"], v["spread"] = round(off, 2), round(float(np.percentile(np.abs(d[ok] - off), 80)), 2)
         if abs(off) < OFFSET:
             v["verdict"] = "fits"
+            if i in fact_of:  # the survey fits IPR now: the user's verdict decides nothing
+                decided[i] = ("matches", "fits", "fits")
             continue
+        kept = dict(v)
+        verdict, by = by_sources(v, r, pin, inside, poly, E, N, g)
         if i in fact_of:
+            # the user's verdict holds; the sources' without it says whether it is still needed (#670)
+            decided[i] = ("matches" if verdict == fact_of[i] and by in ("rails", "dmr5g") else "holds", verdict, by)
+            v.clear()
+            v.update(kept)
             v["verdict"], v["by"] = fact_of[i], "fact"
             continue
-        if poly.area < MIN_M2 or inside.mean() < MIN_INNER:
-            v["verdict"] = "small"
-            continue
-        if not cover.is_empty and covered(cover, pin[:, 0], pin[:, 1]).mean() > COVERED:
-            v["verdict"] = "covered"
-            continue
-        if v["spread"] >= STEADY:
-            v["verdict"] = "uneven"
-            continue
-        # the rails through it, under open sky
-        if rtree is not None:
-            k = rtree.query(poly, predicate="contains")
-            if len(k) and not cover.is_empty:
-                k = k[~covered(cover, rx[k], ry[k])]
-            if len(k) >= RAIL_MIN:
-                sv = np.array([surface_at(r, rx[j], ry[j]) for j in k]) - rz[k]
-                gE, gN = frame.to_jtsk(rx[k], ry[k])
-                iv = np.asarray(ground(gE, gN), float) - rz[k]
-                s_off, i_off = float(np.nanmedian(sv)), float(np.nanmedian(iv))
-                v["rails"] = {"n": int(len(k)), "survey": round(s_off, 2), "ipr": round(i_off, 2)}
-                if abs(i_off) <= AGREE < abs(s_off):
-                    v["verdict"], v["by"] = "lidar", "rails"
-                    continue
-                if abs(s_off) <= AGREE < abs(i_off):
-                    v["verdict"], v["by"] = "survey", "rails"
-                    continue
-        if changing is not None and not changing.is_empty and covered(changing, pin[:, 0], pin[:, 1]).mean() > COVERED:
-            v["verdict"] = "changing"
-            continue
-        o = np.asarray(older(E, N), float) - g
-        o = o[np.isfinite(o)]
-        if len(o) >= 3:
-            v["older"] = round(float(np.median(o)), 2)
-            if abs(v["older"]) <= AGREE:
-                v["verdict"], v["by"] = "lidar", "dmr5g"
-                continue
-        held = held_verdict(v, rule, buildings)
-        v["verdict"], v["by"] = (held, "rule") if held else ("review", None)
-        if v["by"] is None:
-            del v["by"]
+        v["verdict"] = verdict
+        if by is not None:
+            v["by"] = by
+    if states is not None:
+        states.update({k: decided[i] for k, i in hits.items() if i in decided})
     # the places of the areas a report names, in one call (lat/lon needs the projection grid: not for every area)
     named = [v for v in out.values() if v["verdict"] != "fits"]
     if named:
