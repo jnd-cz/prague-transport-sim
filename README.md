@@ -31,10 +31,11 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
   - **U nástupiště dlouhého aspoň 15 m,** je-li v datech: celá souprava stojí podél něj, konec soupravy nejvýše
     3 m před začátkem nástupiště a čelo nejvýše 4 m za jeho koncem. Za první soupravou tak může obsloužit
     zastávku druhá, na delším nástupišti i dvě soupravy 2×T3 za sebou (asi tři čtvrtiny zastávek). U nástupiště
-    kratšího než souprava stačí čelo od 8 m před jeho koncem do 4 m za ním.
+    kratšího než souprava stačí čelo od 8 m před jeho koncem do 4 m za ním. Čelo u označníku (od 2,5 m před ním do
+    3 m za ním) zastávku obslouží vždy, i když konec delší soupravy stojí mimo nástupiště: cestující nastupují
+    dveřmi podél nástupiště.
   - **Jinde:** čelo od 20 m před označníkem do 12 m za ním.
-  - **Návěstidlo těsně za zastávkou:** čelo nejvýše 0,5 m před ním.
-- Bod zastavení je označník: do 3 m od něj získáte bonus 15 bodů za přesnost. Zastavit o kousek dál se stává
+- Bod zastavení je označník, pro každou soupravu a bez ohledu na návěstidla: do 3 m od něj získáte bonus 15 bodů za přesnost. Zastavit o kousek dál se stává
   i ve skutečnosti a cestující přesto nastoupí a vystoupí, proto do 4 m za označníkem hra nic nestrhne; přejetí
   o více než 4 m stojí 20 bodů, i když zastávku obsloužíte. Zastavení dál vzadu v povoleném místě se netrestá.
 - Cestující: počítadlo ve voze (běžná obsaditelnost 110, nejvýše 160 na vůz). Poptávka se řídí denní dobou:

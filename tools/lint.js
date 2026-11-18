@@ -146,6 +146,25 @@ function signalsInPlatforms(g) {
   return check('signal-not-in-platform', g.signals.length, bad);
 }
 
+// Each stop's stop point is its sign for every set (D 1/2 § 27.6, #694), else the GTFS point + 6 m (src/game.js
+// STOP_AHEAD); the route's end only keeps it 2 m short (counted apart: `ends`). mag: metres off.
+function stopsAtSign(g) {
+  const bad = [], ends = [];
+  for (const st of g.stops) {
+    const d = g.data.stops[st.i], want = d.sign ?? d.s + 6, off = Math.abs(st.target - want);
+    if (off < 0.05) continue;
+    (st.target >= g.route.length - 2 - 0.05 ? ends : bad).push({ stop: st.name, s: Math.round(st.target), mag: off, info: `${(want - st.target).toFixed(1)} m short of the ${d.sign !== undefined ? 'sign' : 'GTFS point + 6 m'}` });
+  }
+  return { ...check('stop-at-sign', g.stops.length, bad), ends: ends.map((e) => `${e.stop} ${e.mag.toFixed(1)} m`) };
+}
+
+// Signals hung with their stop line before their stop's sign (src/game.js signalsBeforeSign, #694): the stop point stays
+// at the sign and the tram passes the signal to serve the stop; the signals' placement is #406's.
+function signalsBeforeSign(g) {
+  const bad = (g.signalsBeforeSign || []).map((b) => ({ stop: b.stop, s: Math.round(b.s), mag: b.by, info: b.info }));
+  return check('signal-before-sign', g.signals.length, bad);
+}
+
 // Oncoming trams' platform points with a junction's stop line inside the platform (traffic.js platformCaps, #385):
 // moved to 3 m before the line, or kept where the front would no longer be 10 m into the platform. mag: metres moved.
 function backPlatformCaps(g) {
@@ -1234,6 +1253,8 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     consist: consistAtStops(g),
     stopFacts: stopFacts(g, truth),
     signalsInPlatforms: signalsInPlatforms(g),
+    stopsAtSign: stopsAtSign(g),
+    signalsBeforeSign: signalsBeforeSign(g),
     backPlatformCaps: backPlatformCaps(g),
     noOppositeStop: noOppositeStop(g),
     treeTrunks: trees.trunk,

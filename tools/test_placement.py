@@ -29,7 +29,8 @@ class Rules(unittest.TestCase):
         targets = pl.stop_points(stops, self.R.length)
         C = pl.route_conflicts(self.R, list(roads), list(crossings), None, stops, targets)
         placed, _ = pl.place_signals(signals, C, stops, targets)
-        return pl.platform_rule(placed, stops, list(targets))
+        placed, self.before = pl.platform_rule(placed, stops, targets)
+        return placed, targets
 
     def test_a_signal_goes_to_its_junction_s_stop_line(self):
         (d,), _ = self.placed([{'s': 480, 'cross': 500}], [street(500)])
@@ -56,12 +57,15 @@ class Rules(unittest.TestCase):
         self.assertAlmostEqual(d['s'], 423, places=1)    # (3 m past the stop point, the crossing's edge after it)
         self.assertEqual(targets, [420])
 
-    def test_a_crossing_inside_the_platform_moves_the_stop_point_back_before_it(self):
+    def test_a_crossing_inside_the_platform_leaves_the_stop_point_at_the_sign_and_is_listed(self):
+        # (#694: no signal moves a stop point; before it moved back to 3 m before the signal, 7.6 m short of the sign at
+        # Čechův most)
         stop = {'name': 'A', 's': 400, 'sign': 420, 'p0': 360, 'p1': 420}
         (d,), targets = self.placed([{'s': 405, 'cross': 419}], [street(419, w=4)], stops=[stop])
         self.assertEqual(d['rule'], 'platformHang')
         self.assertAlmostEqual(d['s'], 420, places=1)    # (the crossing's edge 417 + 3)
-        self.assertAlmostEqual(targets[0], 417, places=1)
+        self.assertEqual(targets, [420])
+        self.assertEqual(self.before, [(d, 0)])
 
     def test_two_at_one_stop_line_are_one(self):
         out, _ = self.placed([{'s': 480, 'cross': 500}, {'s': 484, 'cross': 505}], [street(500)])

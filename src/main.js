@@ -115,7 +115,7 @@ try {
   const r = await load.get(`data/line${lineId}.network.json`);
   if (!r.ok) throw new Error(`line ${lineId}: no network file (data/line${lineId}.network.json, tools/network.py): ${r.status}`);
   data.network = await r.json();
-  if (!(data.network.version >= 2)) throw new Error(`line ${lineId}: the network file has no heights (built before #682): python -P -E tools/network.py --lines ${lineId}`);
+  if (!(data.network.version >= 3)) throw new Error(`line ${lineId}: the network file has no heights for our stops (built before #694): python -P -E tools/network.py --lines ${lineId}`);
   built[`line${lineId}.network.json`] = data.network;
 }
 // wait for the rest before the build steps, which block the page
