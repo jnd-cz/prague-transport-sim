@@ -107,6 +107,32 @@ Sources: https://cs.wikipedia.org/wiki/Škoda_14T · https://en.wikipedia.org/wi
 
 Sources: https://cs.wikipedia.org/wiki/Škoda_15T · https://de.wikipedia.org/wiki/Škoda_15_T · https://en.wikipedia.org/wiki/Škoda_15_T · https://www.prazsketramvaje.cz/view.php?cisloclanku=2008041001 · https://www.dpp.cz/vozovy-park/tramvaje/skoda-15t · patents in §7
 
+### 3a. The 15T measured on Škoda's drawing (2026-11-18)
+
+The side view on page 2 of Škoda's product sheet *Tramvaj ForCity Alfa Praha* (2022;
+`raw/reference/skoda/forcity-alfa-praha-produktovy-list.pdf`) was rendered at 8× with pdf.js, and the axle
+centres, the bogie centres and the end bogies' pivot lines were read off it.
+- **Scale:** the body from end to end, 4,982 px = 31.40 m [S, the sheet and the DPP 15T textbook: "bez spřáhel"]. That is 6.30 mm a pixel, about ±10 mm a reading.
+- **Orientation:** the cab is at the right (the pantograph over the front section, the front view beside it).
+
+Positions are x m from the cab's end of the body [M, measured on the drawing]:
+
+| element | axles | centre | pivot |
+|---|---|---|---|
+| B1 end bogie, front | 0.90, 2.80 | 1.85 | 2.16 [D: w/6 toward the middle, as the rear one] |
+| B2 bogie between S1 and S2 | 9.95, 11.84 | 10.90 (the bellows' middle) | two: over each axle [S patent] |
+| B3 bogie between S2 and S3 | 19.57, 21.46 | 20.51 (the bellows' middle) | two: over each axle [S patent] |
+| B4 end bogie, rear | 28.62, 30.52 | 29.57 | 29.22 (a line on the drawing) [M] |
+
+- **Wheelbase:** 1.90 m on all four bogies [M].
+- **Symmetry:** the overhangs are 0.90 and 0.88 m, and the bogie centres stand 10.90 m from either end of the body.
+- **The end bogie's pivot:** 0.35 m off its centre toward the middle. The patent's w/6 is 0.32 m, so the drawing bears it out.
+- **What each section rests on:**
+  - S1 rests on 2.16 and 9.95: 7.79 m apart.
+  - S2 rests on 11.84 and 19.57: 7.73 m.
+  - S3 rests on 21.46 and 29.22: 7.76 m.
+- **The bellows:** about 1.55 m long, centred over B2 and B3.
+
 ## 4. Škoda 52T (ForCity Plus Praha)
 
 - **Sections.** 5, unidirectional, 100 % low floor. 31,990 mm over bumpers [S urban-transport-magazine; dpp.cz]. Width 2,500 mm. Wheel 640 mm new [S de.wiki; dpp.cz].
