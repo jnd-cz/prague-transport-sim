@@ -181,9 +181,20 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
                   await g.update(pts, g.reach(window.scene?.fog.far ?? 950));
                   g.drain();
                 }''')
+            # the small things drawn near the camera (src/nearbatch.js, #610) refill only once the camera has moved a
+            # tenth of their range: refilled round the captured camera before the drawn frame, so the picture does not
+            # hold where the camera was before it (#689)
+            page.evaluate('() => { for (const s of window.nearBatches?.sets ?? []) s.dirty = true; }')
             count = page.evaluate('window.drawCount')
             page.wait_for_function('n => window.drawCount > n', arg=count, timeout=remaining())
             page.screenshot(path=str(output), timeout=remaining())
+            # what of them the picture holds: per set its range, drawn and kept instances, and how far its fill is from
+            # the camera (0: filled round it)
+            info['near'] = page.evaluate('''() => {
+              const nb = window.nearBatches, cam = window.review ? window.review.camera : window.camera;
+              return nb ? Object.fromEntries(nb.sets.map((s) => [s.name, {range: Math.round(s.range), drawn: s.mesh.count,
+                total: s.total, fill_from_camera: s.at ? Math.round(Math.hypot(s.at[0] - cam.position.x, s.at[1] - cam.position.z) * 10) / 10 : null}])) : null;
+            }''')
             if errors:
                 raise RuntimeError('; '.join(errors))
             inputs = [*sorted((root / 'data').glob(f'line{line}.*')), root/'data/truth.json', root/'data/MANIFEST.json']
