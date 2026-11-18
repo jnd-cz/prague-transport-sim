@@ -201,7 +201,8 @@ export function buildStop({ stop, data, route, platforms, group, log }) {
   // (not where the survey draws a platform, an island or a sidewalk there, as the OSM ones: buildPlatforms)
   const at = route.offset(stop.target - len / 2 - 1, -2.8), cls = route.ground.dtm?.classAt(at.x, at.y);
   const surveyed = cls === 'platform' || cls === 'island' || cls === 'sidewalk';
-  if (!osm && !stop.vienna && !surveyed) {
+  stop.standIn = !osm && !stop.vienna && !surveyed; // (it and stop.shelterOuter: what the build's network layer holds, #658)
+  if (stop.standIn) {
     const pos = [], col = [];
     const left = platformStrip(route, stop.target - len - 1, stop.target - 1, -1, 1.5, 4.1, route.ground, pos, col,
       new THREE.Color(TOP), new THREE.Color(KERB));
@@ -226,6 +227,7 @@ export function buildStop({ stop, data, route, platforms, group, log }) {
     for (; lat <= osm.outer + 0.01; lat += 0.25) { const o = route.offset(stop.target - 12, -lat); if (dtm.classAt(o.x, o.y) === 'platform') last = lat; else if (last !== null) break; }
     if (last !== null) outer = Math.min(outer, last + 0.25);
   }
+  stop.shelterOuter = outer;
   // shelter (at the back of the OSM platform where there is one)
   const shelter = makeShelter();
   place(shelter, route, stop.target - 12, stop.vienna ? -(kerb + 2.4) : osm ? -(outer - 0.6) : -3.4, 0.18);

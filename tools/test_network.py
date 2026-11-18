@@ -187,6 +187,43 @@ class Walks(unittest.TestCase):
         self.assertAlmostEqual(math.hypot(d["ix"] - 20, d["iy"] - 3), 1.5)
 
 
+class Signals(unittest.TestCase):
+    def test_resample_heights(self):
+        z = nw.resample_heights([10, 12, None], 2, 5, 1)
+        self.assertEqual(z[:3].tolist(), [10, 11, 12])
+        self.assertTrue(np.isnan(z[3:]).all())
+
+    def sig(self, **kw):
+        s = object.__new__(nw.Signals)
+        s.zebras, s.osm_stops, s.jpos = [], [], {"100,0": [100, 0]}
+        s.__dict__.update(kw)
+        return s
+
+    def test_stop_line_before_a_zebra(self):
+        s = self.sig(zebras=[[[48, -3], [48, 3]]])
+        s.stop_line_at = lambda *a: (0, "edge")
+        lane = {"path": nw.Path([[0, 0], [50, 0]]), "to": "100,0"}
+        self.assertEqual(s.stop_line(lane, "cross", 60, 0, []), (4, "edge"))  # (2 m before the zebra at 48 m)
+
+    def test_osm_stop_line(self):
+        s = self.sig(osm_stops=[{"x": 45, "y": 1, "hx": 1, "hy": 0}, {"x": 44, "y": 1, "hx": -1, "hy": 0}])
+        lane = {"path": nw.Path([[0, 0], [50, 0]]), "to": "100,0"}
+        self.assertEqual(s.osm_stop(lane, 60, 0), 5)  # (the node serving the other direction left out)
+        s.jpos = {"100,0": [46, 0]}
+        self.assertIsNone(s.osm_stop(lane, 60, 0))  # (on the junction's own node: no stop line)
+
+
+class Stops(unittest.TestCase):
+    def test_set_lengths_from_the_page(self):
+        L = nw.set_lengths()
+        self.assertEqual(L[1], 15.2)
+        self.assertAlmostEqual(L[2], 30.24)  # (two cars, the couplers overlapping 0.16 m)
+
+    def test_stops_by_set(self):
+        recs = [{"stand": [True, False], "outer": [310, None]}]
+        self.assertEqual(nw.as_page("stops", recs, 2), [{"stand": False, "outer": None}])
+
+
 class Compare(unittest.TestCase):
     def test_finds_moves(self):
         a = [{"p": [0, 0, 100, 0], "w": 8, "ends": ["0,0", "1,0"], "hi": [425, 425]}]
