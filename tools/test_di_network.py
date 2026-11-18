@@ -197,7 +197,7 @@ class Network(unittest.TestCase):
                                       ((50.0, 0.0), (50.2, -1.65), 'matches', 0.2), ((54.0, 0.0), (46.7, -1.65), 'changed', 3.3)):
             net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[(near, tip, 'the switch')])
             self.assertEqual(net.facts['switchTips'], [{'id': 'the switch', 'state': state, 'off': off,
-                                                        'at': [round(tip[0], 1), round(tip[1], 1)]}], (near, tip))
+                                                        'at': [round(tip[0], 2), round(tip[1], 2)], 'src': [50.0, 0.0]}], (near, tip))
         net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[((50.0, 0.0), (46.7, -1.65))])
         self.assertEqual(net.facts['switchTips'], [])  # no id: not stated
 

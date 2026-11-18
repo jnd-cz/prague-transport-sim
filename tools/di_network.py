@@ -797,7 +797,8 @@ class Network:
             if len(t) > 2:
                 self.facts['switchTips'].append({
                     'id': t[2], 'state': sources.fact_state(at, near, (fx, fy), same),
-                    'off': round(math.dist((fx, fy), at), 2), 'at': [round(tip[0], 1), round(tip[1], 1)]})
+                    'off': round(math.dist((fx, fy), at), 2), 'at': [round(tip[0], 2), round(tip[1], 2)],
+                    'src': [round(fx, 2), round(fy, 2)]})
             if same((fx, fy), at):
                 self.report['switch tips at their fork already'] += 1
                 continue
