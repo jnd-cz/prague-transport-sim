@@ -236,11 +236,22 @@ class Beds:
         return out
 
     def style_at(self, x, y):
-        """The style of the nearest drawn point of any track (each point a row of its bed): per point."""
+        """The style of the bed's cell holding each point, as the page coloured a quad between two rows by the first (before
+        #509: src/world.js addBed, cols[i]): at the nearest drawn point of any track, its row or the one before by the
+        point's side of the row's line. (The nearest point alone split a cell's triangles between two styles where the
+        style changes: a saw-tooth across the bed, line 37 s 1229, #652.)"""
         if not hasattr(self, "_styles"):
             self._styles = self.row_styles()
+            # (each drawn point's row line and style, in the tree's order: the tracks' points one after another)
+            self._row_line = np.array([r[:4] for rows in self.rows for r in rows], float).reshape(-1, 4)
+            self._flat_styles = [s for row in self._styles for s in row]
+        x, y = np.atleast_1d(np.asarray(x, float)), np.atleast_1d(np.asarray(y, float))
         _, j = self.tree.query(np.column_stack([x, y]))
-        return [self._styles[self.owner[i]][self.index[i]] for i in np.atleast_1d(j)]
+        j = np.atleast_1d(j)
+        X, Y, nx, ny = self._row_line[j].T
+        # (behind its row's line, (ny, -nx) being the track's way: the cell of the row before, on the same track)
+        j = j - ((self.index[j] > 0) & ((x - X) * ny - (y - Y) * nx < 0))
+        return [self._flat_styles[i] for i in j.tolist()]
 
     def near_points(self, x, y, skip=-1):
         """world.js nearPoints: each track's nearest point within NEAR m: [(track, index, distance)]."""
