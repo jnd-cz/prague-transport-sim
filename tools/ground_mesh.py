@@ -74,9 +74,15 @@ WATER_LEVEL = 0.1  # a survey water area's level outside OSM's water: this quant
 WATER_LATTICE = 25.0  # m: the water's faces cut to this (the page's lookup bins triangles in 16 m cells by their box; it
 # divides TILE, so its lines meet a tile's border)
 WATER_PRIO = 2.95  # the water's weld priority: under the survey's (2.x) and the beds' (1), over the terrain's (3)
-LIDAR_TIE = 0.001  # a survey area laid on the lidar (`g`) yields to one of its rank on its own outline at a shared corner
-# (under the ranks' 0.01: the surveyed edge holds, as alpha-4 drew both from their outlines; 98% of line 9's and line
-# 37's corners whose equal-rank heights parted by over 20 cm were such a pair, p50 0.5 m, #664)
+YIELD = 0.001  # at a corner shared with a survey area of its rank on its own outline, one that is not yields: laid on the
+# lidar (`g`), or survey water at OSM's level (under the ranks' 0.01). The surveyed edge holds, as alpha-4 drew both from
+# their outlines: 98% of line 9's and line 37's corners whose equal-rank heights parted by over 20 cm were a paved area on
+# the lidar beside one on its outline, p50 0.5 m; the water keeps its level and a wall stands up to the quay (STEP's
+# "water"): line 17's Vltava edge took the middle of the two, 187.33 m between 184.68 and 189.97, #664
+TIE_STEP = 0.1  # m: equal-rank survey corners more than this off the middle of their range are a step (weld)
+LIDAR_APART = 0.5  # m: a lidar corner that yielded keeps the lidar's height, a step, where its area's own outline stands
+# more than this off the surveyed edge it yielded to (as STEP's wall). Line 37's 4,438 such corners: own outline within
+# 2 cm of the edge at 2,848 (one edge surveyed twice), over 0.5 m at 394 (two levels: (4430, 1469) 199.65 against 205.43)
 WATER_NUDGE = 3.0  # m: a water corner on a cut is seen from this far off it, on its triangle's side (off_cuts: past the
 # cut's cells on WaterLevels' raster; seen from inside a triangle 2 m along it, it lay in them and read both sides)
 BRIDGE_NEAR = 12.0  # m: around a bridge's track the survey keeps its own level (src/groundDraw.js flushDtm's 12 m)
@@ -443,14 +449,18 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
 
 
 # ---------------------------------------------------------------- the build
-def weld(cx, cy, zc, prio, kind, label=None):
+def weld(cx, cy, zc, prio, kind, label=None, zown=None):
     """The corners' heights welded at each point: (each corner's height, the steps kept by pair, the points). A point takes
-    its top-priority corners' height, the middle of their range where they differ (two survey areas of one rank that each
-    take their own outline's surface: line 22's roads #16 and #23 by a bridge's track at (-1114, -537), 193.49 and 193.32
-    m). It took the first top corner's before, the order of the partition's pieces: drawing the survey's walls reordered
-    them and moved that corner 0.17 m, #664. A corner below the top keeps its own height where it differs by more than its
-    pair's STEP (a kerb, a wall, the water); the pair is judged against the lowest top corner's kind. `label`: what gave
-    each corner its height, for the report (default `kind`)."""
+    its top-priority corners' height, whatever their order (#664: it took the first top corner's, the order of the
+    partition's pieces; drawing the survey's walls reordered them and moved line 22's corner at (-1114, -537), shared by
+    roads #16 and #23 by a bridge's track, 193.49 and 193.32 m, by 0.17 m):
+    - top corners within 2 TIE_STEP of each other: the middle of their range;
+    - the survey's top corners farther apart: a step the survey recorded, each corner takes the nearer end of the range;
+    - a corner below the top keeps its own height where it differs by more than its pair's STEP (a kerb, a wall, the
+      water); the pair is judged against the lowest top corner's kind;
+    - a lidar corner (`label` "lidar") that yielded to its rank (YIELD) keeps its own where its area's outline there
+      (`zown`) stands over LIDAR_APART off.
+    `label`: what gave each corner its height (default `kind`), for the report and the lidar's rule."""
     key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
     uk, inv = np.unique(key, return_inverse=True)
     top_p = np.full(len(uk), np.inf)
@@ -467,7 +477,16 @@ def weld(cx, cy, zc, prio, kind, label=None):
     first = np.full(len(uk), -1)
     first[inv[o[::-1]]] = o[::-1]
     top_kind = kind[first]
-    dz = zc - top_z[inv]
+    # (a point whose top corners are all the survey's and part by more than 2 TIE_STEP is a step the survey recorded:
+    # every corner there takes the nearer end of their range, the top ones their own, as alpha-4 drew each area from its
+    # outline; line 37's parking areas #3121 and #3130 share (6459.6, 827.4) at 203.19 and 202.06 m)
+    not_sv = np.zeros(len(uk), bool)
+    not_sv[inv[tops[~np.isin(kind[tops], ("survey", "raised"))]]] = True
+    split = ~not_sv & (hi - lo > 2 * TIE_STEP)
+    target = top_z[inv]
+    s = split[inv]
+    target[s] = np.where(np.abs(zc[s] - lo[inv[s]]) <= np.abs(zc[s] - hi[inv[s]]), lo[inv[s]], hi[inv[s]])
+    dz = zc - target
     pk, pt = kind == "pool", top_kind[inv] == "pool"
     pair = np.where(pk & pt, "weir", np.where(pk, "water", np.where(pt, "bank", np.where(kind == "plot", "plot",
                     np.where((kind == "raised") != (top_kind[inv] == "raised"), "kerb",
@@ -476,13 +495,22 @@ def weld(cx, cy, zc, prio, kind, label=None):
     # (a weir's two sides share the water's priority: both are top, each keeps its own level more than STEP off the
     # middle; welded to the first's, the second's triangles sloped 1.5 m up to the weir at Šítkovský)
     step = (~is_top | (pair == "weir")) & (np.abs(dz) > lim)
-    zf = np.where(step, zc, top_z[inv])
+    # (a corner on the lidar that yielded to a surveyed one of its rank keeps the lidar's height where its own outline
+    # stands more than LIDAR_APART off that one's: two levels, not one edge)
+    rank = np.round(prio, 2) == np.round(top_p[inv], 2)
+    label = kind if label is None else label
+    apart = np.zeros(len(zc), bool)
+    if zown is not None:
+        with np.errstate(invalid="ignore"):
+            apart = (label == "lidar") & ~is_top & rank & (np.abs(zown - target) > LIDAR_APART)
+    step |= apart
+    zf = np.where(step, zc, target)
     steps = {p: {"corners": int((step & (pair == p)).sum()),
                  "|dz| at shared corners, p50 / p90 / p99 / max m": [round(float(np.percentile(np.abs(dz[(pair == p) & ~is_top]), q)), 3)
                                                                      for q in (50, 90, 99, 100)] if ((pair == p) & ~is_top).any() else None}
              for p in STEP}
-    # (the points whose top corners differ: where the middle is taken, by the pair of what gave their heights)
-    label = kind if label is None else label
+    # (the points whose top corners differ, by the pair of what gave their heights: the middle up to 2 TIE_STEP, a step
+    # over it)
     names, code = np.unique(label.astype(str), return_inverse=True)
     c_lo, c_hi = np.full(len(uk), len(names)), np.full(len(uk), -1)
     np.minimum.at(c_lo, inv[tops], code[tops])
@@ -491,13 +519,16 @@ def weld(cx, cy, zc, prio, kind, label=None):
     ties = {}
     for c in (1, 5, 20):
         w = np.flatnonzero(rng > c / 100)
-        pairs = collections.Counter(names[a] if a == b else f"{names[a]}/{names[b]}" for a, b in zip(c_lo[w], c_hi[w]))
+        pairs = collections.Counter(str(names[a]) if a == b else f"{names[a]}/{names[b]}" for a, b in zip(c_lo[w], c_hi[w]))
         ties[f"over {c} cm"] = dict(sorted(pairs.items()))
     ties["max m"] = round(float(np.nanmax(rng[np.isfinite(rng)])), 3) if np.isfinite(rng).any() else 0.0
-    # (a corner laid on the lidar that yielded to a surveyed one of its rank, LIDAR_TIE: by how far it moved)
-    rank = np.round(prio, 2) == np.round(top_p[inv], 2)
-    gone = (label == "lidar") & ~is_top & rank & np.isfinite(dz)
-    ties["lidar corners yielded"] = {f"over {c} cm": int((np.abs(dz[gone]) > c / 100).sum()) for c in (1, 5, 20)}
+    ties["survey steps"] = int(split.sum())
+    ties["lidar apart"] = int(apart.sum())
+    # (the corners that yielded to one of their rank, YIELD: by how far each moved, a step kept for the water and where
+    # apart)
+    for lb in ("lidar", "pool"):
+        gone = (label == lb) & ~is_top & rank & np.isfinite(dz)
+        ties[f"{lb} corners yielded"] = {f"over {c} cm": int((np.abs(dz[gone]) > c / 100).sum()) for c in (1, 5, 20)}
     steps["ties"] = ties
     return zf, steps, len(uk)
 
@@ -768,12 +799,21 @@ def build(ln, mesh=None, threads=8, log=print):
     # (a street corner shared with a survey wall or stairs takes its height within WALL_SNAP, #653)
     zs = snap_to_walls(D, cx[m], cy[m], zs, np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span)
     zc[m] = zs
-    prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc]) + np.where(on_lidar, LIDAR_TIE, 0.0)
+    prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc]) + np.where(on_lidar | in_osm, YIELD, 0.0)
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", np.where(in_osm, "pool", "survey"))
     # (the weld's report: what gave a survey corner its height)
     sv_m = m
     sv_label = np.where(on_lidar, "lidar", np.where(np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span, "street",
                                                     kind[m]))
+    # (a lidar corner shared with a survey area off the lidar: its own outline's height there, for the weld's
+    # LIDAR_APART)
+    zown = np.full(len(cx), np.nan)
+    if on_lidar.any():
+        k = np.round(cx[m] * Q).astype(np.int64) * 10_000_000_000 + np.round(cy[m] * Q).astype(np.int64)
+        shared = on_lidar & np.isin(k, k[~on_lidar])
+        for a in np.unique(sa[shared]).tolist():
+            mm = shared & (sa == a)
+            zown[m[mm]] = surface.at(a, cx[m][mm], cy[m][mm])
     # (a raised area across a track, its axis in it, is a crossing: within the beds' outline it lies flush with the rails,
     # its kerb at the outline's edge. #512's sidewalk stood 8-21 cm over the rails at line 37's stops; the 11 raised
     # areas over line 37's rails all cross a track. One beside a track keeps its height, as on the page: world.js RAISED,
@@ -806,7 +846,7 @@ def build(ln, mesh=None, threads=8, log=print):
     label = kind.copy()
     keep = kind[sv_m] != "bed"
     label[sv_m[keep]] = sv_label[keep]
-    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label)
+    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown)
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
     vkey = np.stack([np.round(cx * Q).astype(np.int64), np.round(cy * Q).astype(np.int64), zq], 1)
@@ -843,7 +883,7 @@ def build(ln, mesh=None, threads=8, log=print):
     if len(sf):
         area[sf] = [pieces["survey"][owners[o][1]]["c"] for o in owner[tf[sf]].tolist()]
     fcls_id = np.array([CLASS_IDS[c] for c in tcls])
-    log(f"  weld: {n_points:,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items() if p != 'ties']}, ties over 1 cm {steps['ties']['over 1 cm']}, lidar corners yielded {steps['ties']['lidar corners yielded']}, "
+    log(f"  weld: {n_points:,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items() if p != 'ties']}, ties over 1 cm {steps['ties']['over 1 cm']}, survey steps {steps['ties']['survey steps']}, yielded over 5 cm: lidar {steps['ties']['lidar corners yielded']['over 5 cm']}, pool {steps['ties']['pool corners yielded']['over 5 cm']}, "
         f"{time.time() - t1:.0f} s")
 
     # the kept terrain triangles, as they are

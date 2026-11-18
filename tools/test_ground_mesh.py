@@ -183,11 +183,11 @@ class Walls(unittest.TestCase):
         # (#664: a paved yard on the lidar (`g`) and one on its own outline share (0, 0), 0.5 m apart (line 37's pairs, p50
         # 0.48 m): the surveyed edge holds, in either order, and the report counts the lidar's corner; a rank above still
         # wins over both)
-        self.assertLess(gm.LIDAR_TIE, 0.005)  # (under the ranks' 0.01 steps: a lidar corner never passes another rank)
+        self.assertLess(gm.YIELD, 0.005)  # (under the ranks' 0.01 steps: a yielding corner never passes another rank)
         cx, cy = np.array([0.0, 0.0, 1.0, 1.0]), np.zeros(4)
         zc = np.array([250.5, 250.0, 250.5, 249.0])
         p = 2.0 + (10 - 2) / 100
-        prio = np.array([p + gm.LIDAR_TIE, p, p + gm.LIDAR_TIE, p - 0.01])
+        prio = np.array([p + gm.YIELD, p, p + gm.YIELD, p - 0.01])
         kind = np.array(["survey"] * 4, dtype=object)
         label = np.array(["lidar", "survey", "lidar", "survey"], dtype=object)
         zf, steps, _ = gm.weld(cx, cy, zc, prio, kind, label)
@@ -195,6 +195,49 @@ class Walls(unittest.TestCase):
         self.assertEqual(steps["ties"]["lidar corners yielded"], {"over 1 cm": 1, "over 5 cm": 1, "over 20 cm": 1})
         o = np.array([1, 0, 3, 2])
         zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o], label[o])
+        self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
+
+    def test_a_lidar_corner_whose_outline_stands_apart_keeps_its_height(self):
+        # (#664: line 37 (3400, 9): the lidar 243.36 m, its area's own outline 248.28, the surveyed edge 248.16: one edge,
+        # welded; (4430, 1469): the lidar 199.94, its outline 199.65, the edge 205.43: two levels, a step)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0]), np.zeros(4)
+        p = 2.0 + (10 - 2) / 100
+        zc = np.array([243.36, 248.16, 199.94, 205.43])
+        prio = np.array([p + gm.YIELD, p, p + gm.YIELD, p])
+        kind = np.array(["survey"] * 4, dtype=object)
+        label = np.array(["lidar", "survey", "lidar", "survey"], dtype=object)
+        zown = np.array([248.28, np.nan, 199.65, np.nan])
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind, label, zown)
+        self.assertEqual(np.round(zf, 3).tolist(), [248.16, 248.16, 199.94, 205.43])
+        self.assertEqual(steps["ties"]["lidar apart"], 1)
+
+    def test_the_water_keeps_its_level_under_a_bank_of_its_rank(self):
+        # (#664: survey water at OSM's level, 184.68 m, and its quay of one rank, 189.97 m, share a point (line 17's Vltava
+        # by (-472, 324)): the quay keeps its top, the water its level, a step for the wall; the middle stood at 187.33)
+        cx, cy = np.zeros(3), np.zeros(3)
+        p = 2.0 + (10 - 2) / 100
+        zc = np.array([184.68, 189.97, 189.5])
+        prio = np.array([p + gm.YIELD, p, 3.0])
+        kind = np.array(["pool", "survey", "terrain"], dtype=object)
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind)
+        self.assertEqual(np.round(zf, 3).tolist(), [184.68, 189.97, 189.97])
+        self.assertEqual(steps["ties"]["pool corners yielded"]["over 20 cm"], 1)
+
+    def test_equal_rank_survey_heights_apart_are_a_step(self):
+        # (#664: line 37's parking areas #3121 and #3130 share (6459.6, 827.4) at 203.19 and 202.06 m: each keeps its own,
+        # and the corners under them take the nearer, a terrain one 0.44 m off welded, one 0.6 m off kept (STEP's wall);
+        # two 0.15 m apart take the middle; a bed's two heights are not the survey's and take theirs as before)
+        cx = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0])
+        cy = np.zeros(9)
+        p = 2.0 + (10 - 2) / 100
+        zc = np.array([203.19, 202.06, 202.5, 202.1, 203.8, 10.0, 10.15, 5.0, 5.3])
+        prio = np.array([p, p, 3.0, p + 0.01, 3.0, p, p, 1.0, 1.0])
+        kind = np.array(["survey", "survey", "terrain", "survey", "terrain", "survey", "survey", "bed", "bed"], dtype=object)
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind)
+        self.assertEqual(np.round(zf, 3).tolist(), [203.19, 202.06, 202.06, 202.06, 203.8, 10.075, 10.075, 5.15, 5.15])
+        self.assertEqual(steps["ties"]["survey steps"], 1)
+        o = np.array([1, 0, 4, 3, 2, 6, 5, 8, 7])
+        zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o])
         self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
 
 
