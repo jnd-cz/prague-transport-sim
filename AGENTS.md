@@ -174,7 +174,7 @@ both post on the pinned #291 and only propose.
   "Make sure to run any comparison or heavy job in a queue to not affect other work").
   - These take their turn themselves: `headless.py`, `rebuild.py`, `frametime.py`, `city_terrain.py` and
     `ground_mesh.py`; `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py`, `street_profile.py`
-    and `ground_partition.py` when run alone; `test_all.py` for the whole suite (#536).
+    and `ground_partition.py` when run alone; `test_all.py` for the whole suite (#536); `network.py` with `--parity`.
   - Anything else runs through `python -I tools/heavy.py "what" -- CMD ...`: a profile, a bench, a
     comparison, a script of several runs. What it starts runs in its turn without waiting again, even
     when that is a tool that queues itself or a process started with a clean environment: a job never

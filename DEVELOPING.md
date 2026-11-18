@@ -485,7 +485,12 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   the camera and of 1 km of route ahead drawn in detail. `?keepgeo` and `?bot` keep every tile's meshes too. `tools/bench/ground_tiles.py` drives the window along a line:
   what is held, each tile's time, any tile missing in view. `tools/bench/network_layer.py` times the network Start
   builds from those lookups (roads, lanes, footways, doors, signals, platforms), counts its survey reads and sizes it as
-  data ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658).
+  data ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658). `tools/network.py` builds that
+  network once, after `tools/ground_mesh.py`, into `data/lineN.network.json`: the page's rules ported, reading the
+  survey as the page does (the ground file's triangles). It holds the roads (fitted to the survey's kerbs and medians,
+  the tracks on them), their lanes, the footways with their links, and the doors so far (the note's steps 2-4);
+  `--parity` compares them with the page's own (headless), the same to the cm on lines 9, 17, 22, 23 and 37
+  (`tools/test_network_parity.py` on line 37).
 - **Buildings:** the type is read from the OSM tag under each LOD2 building, its roof shape and size;
   Mosty 3D sets the deck height on tagged bridges.
 - **Outdoor temperature:** Prague now comes from Open-Meteo, hourly.

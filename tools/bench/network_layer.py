@@ -28,7 +28,7 @@ SERIALIZE = """(T) => {
   const pts = (p) => p.p.flatMap(([x, y]) => [cm(x), cm(y)]);
   const lanes = T.laneList ?? [], walks = T.walks, roads = T.roads, li = new Map(lanes.map((l, i) => [l, i])), wi = new Map(walks.map((w, i) => [w, i]));
   return {
-    roads: roads.map((r) => ({ p: pts(r.path), w: r.w, lo: r.fitLo?.map(cm), hi: r.fitHi?.map(cm), med: r.fitMed?.map(cm), trk: r.trk?.map((v) => v && cm(v)) })),
+    roads: roads.map((r) => ({ p: pts(r.path), w: r.w, lo: r.fitLo?.map(cm), hi: r.fitHi?.map(cm), med: r.fitMed?.map((a) => a.map(cm)), trk: r.trk?.map((v) => v.map(cm)) })),
     lanes: lanes.map((l) => ({ road: roads.indexOf(l.road), dir: l.dir, from: l.from, to: l.to, p: pts(l.path) })),
     walks: walks.map((w) => ({ p: pts(w.path), link: w.link ? 1 : 0, links: w.links?.map((e) => e.map((x) => [wi.get(x.walk), cm(x.s)])) })),
     doors: (T.doors ?? []).map((d) => [wi.get(d.walk), cm(d.s), cm(d.x), cm(d.y)]),
