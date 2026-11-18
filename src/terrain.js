@@ -737,9 +737,9 @@ export function makeGround(route, terrain, profile, dtm = null) {
       return n && n.d < 22 && profile.onBridge(n.s) ? profile.heightAt(n.s, n.l) - profile.lift(n.s, n.l) - 0.012 : null;
     },
     // height function of an OSM way (its ribbon is drawn 0.12 above): ground level, or on a bridge
-    // the deck it lies on, else a straight span between the ground at its two ends. A chain's ends are read once and
-    // kept (wayEnds): settleWays reads every bridge's and tunnel's at the end of the load, while every tile's lookup is
-    // held, and Start's traffic takes them from there (it reads no lookup past the window, #658)
+    // the deck it lies on, else a straight span between the ground at its two ends. Its chain's ends: the build's from the
+    // end of the load (wayEnds, tools/network.py heights, #682), so Start's traffic reads no lookup past the window
+    // (#658); during the load each call reads its own, as the world is built
     way(line, isBridge, isTunnel = false) {
       if (isTunnel) {
         // a road tunnel (line: the whole chain of its ways, chainTunnels): graded along its length
@@ -802,20 +802,8 @@ export function makeGround(route, terrain, profile, dtm = null) {
         return m !== null ? m : Math.max(span, zg); // (never under the ground)
       };
     },
-    wayEnds: new Map(), // (a bridge's or road tunnel's chain -> the heights at its two ends, settleWays')
-    _ends(line, read) {
-      const e = this.wayEnds.get(line) ?? read();
-      if (this._settling) this.wayEnds.set(line, e);
-      return e;
-    },
-    // every bridge's and road tunnel's ends read and kept (the end of the load: every tile's lookup held, the tunnels'
-    // mouths fitted); during the load each call reads its own, as the world is built
-    settleWays(roads) {
-      this.wayEnds.clear();
-      this._settling = true;
-      for (const r of roads) if ((r.b || r.t) && r.p?.length > 1) this.way(r.way || r.p, !r.t, !!r.t);
-      this._settling = false;
-    },
+    wayEnds: new Map(), // (a bridge's or road tunnel's chain -> the heights at its two ends: the build's, src/main.js)
+    _ends(line, read) { return this.wayEnds.get(line) ?? read(); },
     // height of a track (its rails' foot) at (x, y): within 6 m of our route, ours and the opposite
     // one (4.5 m apart on the Modřany corridor), the track profile across the street (heightAt, #197: the
     // opposite track's own heights where the build gives them); elsewhere the ground or deck. The

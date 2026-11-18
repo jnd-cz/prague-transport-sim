@@ -37,6 +37,21 @@ class File(unittest.TestCase):
         self.assertEqual(got, want)
         self.assertEqual({c: len(t) for c, t in by.items()}, {"terrain": 1, "survey": 2, "bed": 0, "plot": 1, "wall": 0})
 
+    def test_a_step_brought_down_to_one_height_is_one_vertex(self):
+        """fit_mouths can bring both vertices of a step to one height: weld_coincident makes them one and drops the wall
+        between them, so the file decodes to what was built."""
+        V = mm([0, 0, 200000], [1000, 0, 200000], [1000, 0, 200000], [0, -1000, 200000], [1000, -1000, 200000])
+        F = np.array([[0, 3, 1], [3, 4, 2], [1, 3, 2]])  # (the last: the wall between the two vertices at (1000, 0))
+        built = {"V": V, "F": F, "cls": np.array([1, 1, 4]), "draw": np.array(["a", "b", "w"], dtype=object),
+                 "area": np.array(["road", "road", ""], dtype=object)}
+        self.assertEqual(gm.weld_coincident(built), 1)
+        self.assertEqual(len(built["V"]), 4)
+        self.assertEqual(built["cls"].tolist(), [1, 1])
+        self.assertEqual(built["draw"].tolist(), ["a", "b"])
+        W = built["V"][built["F"]]
+        self.assertEqual(sorted(map(tuple, W[1].tolist())), [(0, -1000, 200000), (1000, -1000, 200000), (1000, 0, 200000)])
+        self.assertEqual(gm.weld_coincident(built), 0)
+
     def test_tiles_round_trip_and_weld_on_their_border(self):
         # (x 306 m is the border between tiles e-1486 and e-1485, #30: two triangles either side share its two vertices)
         V = mm([300000, 0, 200000], [306000, 0, 200100], [306000, -1000, 199900], [300000, -1000, 200000],

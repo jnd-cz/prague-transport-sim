@@ -163,6 +163,16 @@ The questions were:
   track) settles once its tile's lookup comes (`ground.later`). Cars and walkers read the ground where they are, which
   is always in the window. Heights can move into the layer once the build makes the settled surface (the mouths in the
   ground file).
+- **Heights stored (#682).** The road tunnels' mouths are in the ground file (`tools/ground_mesh.py` fit_mouths), and
+  the build reads the file as the page does (`tools/ground_at.py`: `ground.at` with its rule beside the track,
+  `surface`, `trackAt`, the ways' ends; `tools/test_ground_at.py --browser` holds it to the page's reads). The network
+  file stores what Start places at a fixed spot: each bridge's and road tunnel's ends, the signal and pedestrian heads,
+  the platforms' outer kerbs (`zo`), the Vienna-type signs (`zs`) and the shelters (`zh`) on the opposite path, all
+  in cm. The page's settle step and its mouth fit went. What moves with the set or the signals, or stands off the
+  track, still stands on the drawn ground once its tile's lookup comes (`ground.later`, as §2 lets things placed near
+  the camera): our stops' signs and shelters, a signal's pole at a kerb past 9 m from the track. The rule beside the
+  track stays: within 4 m of the route `ground.at` is the level the OSM road ribbons are drawn 0.12 m over, by design
+  13 cm under the file's street (median 12.6 cm on lines 17 and 22, 76-78 % of the points within 2 cm of it).
 - **Paths in mm, not cm.** In cm a straight lane's points zigzag enough for the cars' curve speeds to read curves
   (docs/knowledge.md, cars' curve speeds): on line 22 the seeded trams came 26 s late against main's 7.6 (15 seeds) and
   hit a car twice. The rest stays in cm. The files are 4.0-10.5 MB raw, 0.97-2.34 MB brotli.

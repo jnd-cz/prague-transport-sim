@@ -11,7 +11,7 @@ import { buildLod2, buildOsmBuildings } from './buildings.js';
 import { buildCatenary } from './catenary.js';
 import { STYLE_BED_HEX, attachGround, buildDtm, flushDtm } from './groundDraw.js';
 import { buildRoads, buildZebras } from './streets.js';
-import { buildBridges, buildRoadPortals, buildRockTunnels, buildTrackSupport, buildWalls, fitDtmToMouths, mouthFix,
+import { buildBridges, buildRoadPortals, buildRockTunnels, buildTrackSupport, buildWalls, fitDtmToMouths,
   roadPortalMouths } from './structures.js';
 import { buildTrees } from './trees.js';
 import { ChunkedGeometry, GROUND_SNOW, SegmentIndex, W, addRibbon, addSide, densify, flatMat, polyLength } from './worldMesh.js';
@@ -288,9 +288,8 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   const cellPad = Math.hypot(ground.terrain.dx, ground.terrain.dy) / 2;
   const inMouth = (x, y) => mouths.some((m) => m.has(x, y, cellPad));
   // (the file's ground is the hill over our rock tunnels and the road tunnels' mouths too: cut there, the vault, the
-  // rock top and the portals drawn below; only the squares near them are tested)
-  const fix = mouthFix(mouths);
-  if (fix) { for (const lk of ground.lookup.parts()) fix.lookup(lk); pre.fix = fix; }
+  // rock top and the portals drawn below; only the squares near them are tested. Its streets in a mouth come down onto
+  // the tunnel road in the file, tools/ground_mesh.py fit_mouths, #682)
   const pad = TUN_W + 3 + cellPad, nearCut = [];
   for (const [a, b] of rock) for (let s = a - 1; s <= b + 1; s += 4) { const p = route.at(Math.max(0, Math.min(route.length, s))); nearCut.push([p.x - pad, p.y - pad, p.x + pad, p.y + pad]); }
   for (const m of mouths) { const r = m.D + m.w + 10; nearCut.push([m.p[0] - r, m.p[1] - r, m.p[0] + r, m.p[1] + r]); }
