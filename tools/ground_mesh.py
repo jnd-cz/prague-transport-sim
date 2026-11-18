@@ -67,6 +67,7 @@ STREETS_ROAD, STREETS_WALK = {"road", "tram"}, {"sidewalk"}  # (the classes the 
 STEP = {"kerb": 0.03, "plot": 0.01, "wall": 0.5, "weir": 0.01, "water": 0.01, "bank": math.inf}
 BORDER_NEAR = 0.002  # m: vertices this near a square's border are put onto it in both squares (tile_faces)
 CROSS_EXT = 0.3  # m: a row's line across the bed reaches this far past its edges, to the beds' outline
+EDGE_APART = 0.05  # m: a bed's edge nearer the beds' outline or another bed's edge is not a line of its own (bed_edges)
 BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge takes the edge's height (bed_surface)
 PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
 BORDER_TOL = 0.002  # m: an edge this near the border of the line's ground lies on it (edge_check; the grid's 0.71 mm)
@@ -373,21 +374,82 @@ def rail_lines(beds, outline):
     """The rails of every drawn track and its rows' lines across the bed (edge to edge, CROSS_EXT m past each edge), inside
     the beds' outline on the ground: the rails and the rows close cells as the page's bed quads do. (A rail alone would
     end inside the outline at a track's join or end, and polygonize drops what closes no face: on line 37, 6,307 rail
-    points had no vertex within 1.25 m.)"""
+    points had no vertex within 1.25 m.) And where the bed's style may change inside the outline (#676): a line across
+    the bed where a track's style changes (bed_surface.Beds.style_runs), and every bed's edges inside the outline (at a
+    fork, a switch, between paired tracks), so each face lies in one style (Beds.style_at)."""
     out = []
-    for rows in beds.rows:
+    runs = beds.style_runs()
+    for k, rows in enumerate(beds.rows):
         if len(rows) < 2:
             continue
         for j in (1, 2):
             out.append(shapely.LineString([(x + nx * off[j], y + ny * off[j]) for x, y, nx, ny, off, _ in rows]))
         for x, y, nx, ny, off, _ in rows:
-            a, b = off[0] - CROSS_EXT, off[3] + CROSS_EXT
-            out.append(shapely.LineString([(x + nx * a, y + ny * a), (x + nx * off[1], y + ny * off[1]),
-                                           (x + nx * off[2], y + ny * off[2]), (x + nx * b, y + ny * b)]))
+            out.append(across(x, y, nx, ny, off))
+        acc = beds.acc(k)
+        for a in runs[k][0][1:].tolist():
+            r = min(max(int(np.searchsorted(acc, a, "right")) - 1, 0), len(rows) - 2)
+            v = (a - acc[r]) / ((acc[r + 1] - acc[r]) or 1)
+            A, B = rows[r], rows[r + 1]
+            out.append(across(*[A[q] * (1 - v) + B[q] * v for q in range(4)], [p * (1 - v) + q * v for p, q in zip(A[4], B[4])]))
+    out += bed_edges(beds, outline)
     if not out:
         return []
     clipped = shapely.intersection(np.array(out, dtype=object), outline)
     return [g for g in shapely.get_parts(clipped) if g.geom_type == "LineString" and g.length > 1e-3]
+
+
+def across(x, y, nx, ny, off):
+    """A bed's line across at a row: edge to edge through its rails, CROSS_EXT m past each edge."""
+    a, b = off[0] - CROSS_EXT, off[3] + CROSS_EXT
+    return shapely.LineString([(x + nx * a, y + ny * a), (x + nx * off[1], y + ny * off[1]),
+                               (x + nx * off[2], y + ny * off[2]), (x + nx * b, y + ny * b)])
+
+
+def bed_edges(beds, outline):
+    """Every ground bed's two edges where they lie inside the beds' outline, more than EDGE_APART m from the outline's
+    boundary and from an earlier track's edge (one line where two lie on each other, as paired tracks' edges at the
+    middle of the strip between them: two lines mm apart would leave slivers), each piece's ends joined to the nearest
+    point of what it was cut back from (the outline, the other edge), so it closes faces."""
+    if outline.is_empty:
+        return []
+    edges, owner = [], []
+    for k, rows in enumerate(beds.rows):
+        if len(rows) < 2 or beds.tracks[k].get("b"):
+            continue
+        for j in (0, 3):
+            edges.append(shapely.LineString([(x + nx * off[j], y + ny * off[j]) for x, y, nx, ny, off, _ in rows]))
+            owner.append(k)
+    if not edges:
+        return []
+    bound = list(chunks([outline.boundary]))
+    ref = np.array(bound + edges, dtype=object)
+    ref_owner = np.array([-1] * len(bound) + owner)
+    tree = shapely.STRtree(ref)
+    out = []
+    for e, k in zip(edges, owner):
+        inside = e.intersection(outline)
+        if inside.is_empty:
+            continue
+        near = tree.query(inside, predicate="dwithin", distance=EDGE_APART)
+        near = near[ref_owner[near] < k]  # (the outline, and the edges of earlier tracks; a track's own other edge is apart)
+        if len(near):
+            others = shapely.union_all(ref[near])
+            inside = inside.difference(others.buffer(EDGE_APART, quad_segs=2))
+        else:
+            others = None
+        for g in shapely.get_parts(inside):
+            if g.geom_type != "LineString" or g.length < EDGE_APART:
+                continue
+            c = shapely.get_coordinates(g)
+            if others is not None:  # (each end that was cut back joined to what cut it)
+                ends = []
+                for p in (c[0], c[-1]):
+                    q = shapely.ops.nearest_points(shapely.Point(p), others)[1]
+                    ends.append((q.x, q.y) if q.distance(shapely.Point(p)) < 2 * EDGE_APART else None)
+                c = np.vstack(([ends[0]] if ends[0] else []) + [c] + ([ends[1]] if ends[1] else [])) if any(ends) else c
+            out.append(shapely.LineString(c))
+    return out
 
 
 def chunks(lines, most=64):

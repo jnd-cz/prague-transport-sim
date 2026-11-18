@@ -28,6 +28,12 @@ SMOOTH = 1.5  # m: the tracks' drawn points (world.js buildWorld: densify(t.p, 1
 NEAR = 4.0  # m: a track's points this near count (world.js nearPoints)
 EDGE_OVER = 0.3  # m: an edge over another bed by less than this is lowered to it (world.js edges)
 ROUTE_SAMPLE, ROUTE_CELL = 4.0, 40.0  # m: src/route.js _buildSamples
+# Where beds overlap (a switch, a fork, a diamond) a point takes the first of these styles of the beds holding it: the
+# junction's paving over its arms' panels (#676; track_styles.py lays a junction embedded over its whole area, #546)
+STYLE_OVER = ("embedded", "setts", "panels", "ballast", "grass")
+STYLE_BISECT = 0.01  # m: a style's change along a track, found to this (Beds.style_runs)
+COVER_TOL = 0.02  # m: a point this far past a bed's edge is still in it (the ground's faces end on its edge, on the mm grid)
+FAR_CUT = 3.0  # m along a track from a change of style: past it, where every drawn point within NEAR m agrees, that style
 
 
 def densify(line, maxlen=SMOOTH):
@@ -210,48 +216,108 @@ class Beds:
             out[i] = -0.72 * math.tan(roll) * same
         return out
 
-    def row_styles(self):
-        """Per track, per drawn point: the bed's style as the page colours it (src/world.js styleAt, ownStyles): the
-        route's at the nearest route point within 6 m (the other direction's track beside the route takes `stylesBack`,
-        #584), else the track's own sections (`styles`, along `p`), else panels."""
-        L = self.L
-        secs = L.get("styles") or []
-        back = L.get("stylesBack") or secs
+    def _point_style(self, k, x, y, a):
+        """Track k's style at (x, y), `a` m along its drawn points (src/world.js styleAt, ownStyles): the route's at the
+        nearest route point within 6 m (the other direction's track beside the route takes `stylesBack`, #584), else the
+        track's own sections (`styles`, along `p`), else panels."""
+        n = self.R.nearest(x, y)
+        if n and n[0] < 6:
+            secs = self.L.get("styles") or []
+            lst = (self.L.get("stylesBack") or secs) if self.R.on_back(n[1], self.R.lateral(n[1], x, y)) else secs
+            return next((q["style"] for q in lst if q["s0"] <= n[1] <= q["s1"]), "panels")
+        s = a * poly_len(self.tracks[k]["p"]) / (poly_len(self.smooth[k]) or 1)
+        return next((st for a0, b0, st in self.tracks[k].get("styles") or [] if a0 <= s <= b0), "panels")
 
-        def of(lst, s):
-            return next((x["style"] for x in lst if x["s0"] <= s <= x["s1"]), "panels")
+    def acc(self, k):
+        """Track k's drawn points' distances along it."""
+        if not hasattr(self, "_accs"):
+            self._accs = [np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(sm, axis=0).T))]) if len(sm) > 1 else np.zeros(1)
+                          for sm in self.smooth]
+        return self._accs[k]
+
+    def row_styles(self):
+        """Per track, per drawn point: the bed's style as the page colours it (_point_style)."""
+        return [[self._point_style(k, x, y, a) for (x, y), a in zip(sm, self.acc(k))] for k, sm in enumerate(self.smooth)]
+
+    def style_runs(self):
+        """Per track, its style along its drawn points: (cuts, styles), styles[i] from cuts[i] m on. A change between two
+        drawn points is found to STYLE_BISECT m (the page changed it at a row, every 1.5 m: two paired tracks' rows,
+        offset along, left a stepped edge across the beds, #676)."""
+        if hasattr(self, "_runs"):
+            return self._runs
         out = []
-        for t, sm in zip(self.tracks, self.smooth):
-            k = poly_len(t["p"]) / (poly_len(sm) or 1)
-            acc = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(sm, axis=0).T))]) if len(sm) > 1 else np.zeros(1)
-            row = []
-            for (x, y), a in zip(sm, acc):
-                n = self.R.nearest(x, y)
-                if n and n[0] < 6:
-                    row.append(of(back if self.R.on_back(n[1], self.R.lateral(n[1], x, y)) else secs, n[1]))
-                else:
-                    s = a * k
-                    row.append(next((st for a0, b0, st in t.get("styles") or [] if a0 <= s <= b0), "panels"))
-            out.append(row)
+        for k, (sm, st) in enumerate(zip(self.smooth, self.row_styles())):
+            acc = self.acc(k)
+            cuts, sty = [0.0], [st[0]]
+            for i in range(1, len(st)):
+                if st[i] == st[i - 1]:
+                    continue
+                lo, hi = acc[i - 1], acc[i]
+                p0, p1 = sm[i - 1], sm[i]
+                while hi - lo > STYLE_BISECT:
+                    mid = (lo + hi) / 2
+                    u = (mid - acc[i - 1]) / ((acc[i] - acc[i - 1]) or 1)
+                    if self._point_style(k, p0[0] + (p1[0] - p0[0]) * u, p0[1] + (p1[1] - p0[1]) * u, mid) == st[i - 1]:
+                        lo = mid
+                    else:
+                        hi = mid
+                cuts.append((lo + hi) / 2)
+                sty.append(st[i])
+            out.append((np.array(cuts), sty))
+        self._runs = out
         return out
 
+    def style_on(self, k, a):
+        """Track k's style `a` m along its drawn points."""
+        cuts, sty = self.style_runs()[k]
+        return sty[max(0, int(np.searchsorted(cuts, a, "right")) - 1)]
+
     def style_at(self, x, y):
-        """The style of the bed's cell holding each point, as the page coloured a quad between two rows by the first (before
-        #509: src/world.js addBed, cols[i]): at the nearest drawn point of any track, its row or the one before by the
-        point's side of the row's line. (The nearest point alone split a cell's triangles between two styles where the
-        style changes: a saw-tooth across the bed, line 37 s 1229, #652.)"""
-        if not hasattr(self, "_styles"):
-            self._styles = self.row_styles()
-            # (each drawn point's row line and style, in the tree's order: the tracks' points one after another)
-            self._row_line = np.array([r[:4] for rows in self.rows for r in rows], float).reshape(-1, 4)
-            self._flat_styles = [s for row in self._styles for s in row]
+        """The bed's style at each point: of the beds holding it (between their edges, at the point's own length along
+        each), the first in STYLE_OVER, the nearer bed between equals; where none holds it (the beds' outline closes
+        gaps of mm between them), the nearest drawn point's. The ground's faces are cut where a style changes and along
+        every bed's edges (tools/ground_mesh.py rail_lines), so each face lies in one style. (By the nearest drawn
+        point's row, a face spanning two paired tracks' rows or two beds at a fork took one style whole: saw-teeth along
+        the paved outline, line 37 s 1681, #676.)"""
+        runs = self.style_runs()
         x, y = np.atleast_1d(np.asarray(x, float)), np.atleast_1d(np.asarray(y, float))
-        _, j = self.tree.query(np.column_stack([x, y]))
-        j = np.atleast_1d(j)
-        X, Y, nx, ny = self._row_line[j].T
-        # (behind its row's line, (ny, -nx) being the track's way: the cell of the row before, on the same track)
-        j = j - ((self.index[j] > 0) & ((x - X) * ny - (y - Y) * nx < 0))
-        return [self._flat_styles[i] for i in j.tolist()]
+        n = len(self.owner)
+        if not n:
+            return ["panels"] * len(x)
+        if not hasattr(self, "_flat_name"):
+            accs = [self.acc(k) for k in range(len(self.smooth))]
+            # (each drawn point's style and its distance along its track to the nearest change of style)
+            self._flat_name = np.array([runs[k][1][int(r)] for k, a in enumerate(accs)
+                                        for r in np.searchsorted(runs[k][0], a, "right") - 1], dtype=object)
+            self._flat_near_cut = np.concatenate([np.abs(a[:, None] - runs[k][0][None, 1:]).min(1) if len(runs[k][0]) > 1
+                                                  else np.full(len(a), np.inf) for k, a in enumerate(accs)])
+        kq = min(8, n)
+        d, j = self.tree.query(np.column_stack([x, y]), k=kq, distance_upper_bound=NEAR)
+        d, j = d.reshape(len(x), kq), j.reshape(len(x), kq)
+        valid = np.isfinite(d)
+        jj = np.where(valid, j, 0)
+        sty = self._flat_name[jj]
+        # (the quick answer: every drawn point within NEAR m has one style, none within FAR_CUT m of a change along)
+        same = valid[:, 0] & (~valid | (sty == sty[:, :1])).all(1) & (~valid | (self._flat_near_cut[jj] > FAR_CUT)).all(1)
+        out = [None] * len(x)
+        for i in np.flatnonzero(same).tolist():
+            out[i] = sty[i, 0]
+        for i in np.flatnonzero(~same).tolist():
+            best = None
+            for row, o, k, r, v in self._near_rows(x[i], y[i]):
+                off = row[4]
+                if not (min(off[0], off[3]) - COVER_TOL <= o <= max(off[0], off[3]) + COVER_TOL):
+                    continue
+                acc = self.acc(k)
+                st = self.style_on(k, acc[r] + (acc[r + 1] - acc[r]) * v)
+                rank = (STYLE_OVER.index(st) if st in STYLE_OVER else len(STYLE_OVER), abs(o))
+                if best is None or rank < best[0]:
+                    best = (rank, st)
+            if best is not None:
+                out[i] = best[1]
+            else:  # (in no bed: the nearest drawn point's style)
+                out[i] = sty[i, 0] if valid[i, 0] else self._flat_name[int(self.tree.query((x[i], y[i]))[1])]
+        return out
 
     def near_points(self, x, y, skip=-1):
         """world.js nearPoints: each track's nearest point within NEAR m: [(track, index, distance)]."""
@@ -318,6 +384,10 @@ class Beds:
 
     def beds_near(self, x, y):
         """world.js bedsNear: [(row at the point, offset across, track)] of the beds near (x, y)."""
+        return [(row, o, k) for row, o, k, _, _ in self._near_rows(x, y)]
+
+    def _near_rows(self, x, y):
+        """beds_near's rows, each with the row before it and how far on to the next: (row, offset, track, row index, v)."""
         out = []
         for k, i, _ in self.near_points(x, y):
             if self.tracks[k].get("b"):
@@ -336,15 +406,15 @@ class Beds:
                 v = max(0.0, min(1.0, u))
                 d = math.hypot(x - (A[0] + ex * v), y - (A[1] + ey * v))
                 if best is None or d < best[0]:
-                    best = (d, A, B, v)
+                    best = (d, A, B, v, j)
             if best is None:
                 continue
-            _, A, B, v = best
+            _, A, B, v, j = best
             row = [A[q] * (1 - v) + B[q] * v for q in range(4)] + [[a * (1 - v) + b * v for a, b in zip(A[4], B[4])],
                                                                   [a * (1 - v) + b * v for a, b in zip(A[5], B[5])]]
             nl = math.hypot(row[2], row[3]) or 1
             o = ((x - row[0]) * row[2] + (y - row[1]) * row[3]) / nl / nl
-            out.append((row, o, k))
+            out.append((row, o, k, j, v))
         return out
 
     def _lower_edges(self):
