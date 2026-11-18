@@ -57,3 +57,41 @@ side views, the info overlay hides the panel features".
   side's last plate (the sanding lever's on the wall, the timetable on the wing) ends 12 px before the block; the extra
   slide grows with the turn (src/panel.js `slide`). At 1600 × 900 and 1920 × 1200 they end 10–12 px before it; at
   1280 × 1024 and 2560 × 1080 they cleared it already.
+
+After trying the merged build (same day, with a photo of 6921's cab):
+
+- **The side views:** "the right side should have end of main window with rounded corners, piece of frame and then door
+  view where doors top end is aligned with the front window top frame. The left side has similar end of main window
+  with round corners, frame divide and start of the side window frame with portion of the window on driver's side,
+  then the back wall of the cabin starts." The ceiling band stays the top of every opening: where a pillar's edge meets
+  it, the opening's corner is rounded (0.08 m at the edge's distance), and the door's leaves reach up under it. The cab's
+  rear wall stands where the general arrangement has it, 1.62 m behind the nose, across the cab window: the cab has the
+  window's front 0.57 m. The head turns left until 7° of the rear wall show (89° at 16:9; it was 105°, to the window's
+  end); the drawing's diagonal partition to the front door's jamb is left out, so the door stays in view.
+- **The lamp strip:** "the V led sign is for Výstup, some trams have this labeled and we can have it too. It should be
+  connected to request stop button (znamení řidiči)". V is labelled VÝSTUP and lights when a passenger presses the
+  request: at a request stop somebody gets off at, from a point 20 m to 60 % of the way from the last stop until the
+  doors open (src/panel.js `requested`; it was lit within 400 m of such a stop). "The arrows for left and right should
+  be green leds I think, can be a bit shorter": green, a third shorter. "The first red brzda I would label 'Brzda I'."
+  "the led symbol parts of |O| can be alongside each other": the brake lamps' bars stand beside the ring.
+- **The knobs:** "the heater rotary switches (and other rotary ones) should be aligned to the position labels, not turn
+  to another angle". The heaters' labels stand round their knobs where the pointer stops (0–3 and 0 – ½ – 1 from
+  lower left to lower right); the cams' handles have a pointer and stop at their marks; the knobs with no labels on
+  the car stand square, up off and right on.
+- **The mirror:** "mirror view should stay on top of everything, not be hidden by other surface (most visible in the side
+  views), only menu can draw over it". The cab's frame leaves the mirror's picture out, and its frame is over the HUD
+  (index.html `#mirror` z-index 6, under the panel's sheet and the menus).
+- **V and the unlabelled knobs** (2026-11-18, after a Wikimedia Commons photo of a T3P's panel at Anděl): "I found the
+  color of the V (or open door symbol, the two lines are not touching) in this photo ... It's green. Try to to position
+  the unlabeled knobs according to the reference photos." V is two strokes apart, green. On the user's photos of 6921
+  the knobs without labels stand up, but two: DVEŘE I turned right with the front door open (the doors' lamp dark), so
+  the doors' switches are up closed and right open as the game had them; OSVĚTLENÍ, the outside lights, 45° right, its
+  night position (the DPP textbook's T3R.P pages: "na „den“ - to je vlevo"). "We don't have night yet, you can leave it
+  at day. Photos were taken in the evening": it stands 45° left. The saloon's fluorescent lighting stands at the left,
+  "předvolba" (ibid.). VYPÍNAČ ŘÍZENÍ's marks read 0 up, 2 right, its handle between them at 1; PŘEPÍNAČ OSVĚTLENÍ's
+  plate is too dark on the photo to read its marks, so it has none and its handle stands diagonal as there.
+- **Záchranná brzda:** "I would also rename the 'Bezpečnostní spínač' to 'Zácharnná brzda'": the red button left of the
+  ammeter is ZÁCHRANNÁ BRZDA (EMERGENCY BRAKE).
+- **The phone's controls:** "The mobile, small screen UI button overlay would deserve overhaul. One tester suggested
+  pedal shape buttons instead of arrors up and down power/brake. ... Out of the two výhybka seems more useful than heating
+  cut out. I would rather drive with more automation when playing on the small screen." The overhaul is #661.

@@ -35,6 +35,7 @@ NEEDS = {
     "test_review.py": "data/line17.json",
     "test_touch.py": "data/line17.json",
     "test_cab_view.py": "data/line17.json",
+    "test_panel.py": "data/line17.json",
     "test_gamepad.py": "data/line17.json",
 }
 

@@ -105,7 +105,7 @@ LAYERS = {
                                                      # DTM's sign, OSM's stop position (#258)
     "timetable": ("gtfs",),
     "signals": ("osm", "rule:placement"),
-    "speeds": ("osm", "rule:curvature"),
+    "speeds": ("truth", "osm", "rule:curvature"),  # a posted speed the user saw over OSM's maxspeed (#612)
     "clearances": ("osm", "rule:assumed"),  # OSM maxheight, else the default per kind
     "crossings": ("osm",),  # where roads and paths cross the tracks (#24)
     "areas": ("osm",),  # water, green, landuse

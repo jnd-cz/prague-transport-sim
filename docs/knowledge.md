@@ -778,7 +778,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
     - **Down toward Krejcárek the sign says 65, not OSM's 60** (the user, 2026-11-15, with a photo of the sign: "there is actually
       65 km/h limit which seems to be in the same place as osm's 60. So osm is either out of date or wrong"). OSM tags this track
       (way 412908226) 60 and the other direction (way 334167230) 65. This ride's top was 60.7 km/h; the day before's 63–67 was
-      within the 65 but for 67.2.
+      within the 65 but for 67.2. The game posts 65 there from `data/truth.json` `postedSpeeds` (#612): `tools/osm_speeds.py`
+      reads a way's posted speed there over its `maxspeed`, and says when an extract tags the same (the user changed the
+      tag in OSM on 2026-11-15; the snapshot's extract is of 2026-11-04).
     - **Where the limit rises from 50:** both rides ran 53–57 km/h (medians 53–54) 50–100 m before the sign, where 50 still holds:
       the drivers pick up speed as the sign comes into view.
     - **The rest:** 21.4 km/h over Ohrada's crossings (our 15; 1.43×, under the derailment's 1.5×), 46.4 in the 43 curve, 28 where 25
@@ -937,8 +939,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
 - **The T3's driver's seat** (#246, `src/cabframe.js` `EYE`): the general arrangement's plan view has it 0.32 m left of the
   centre line (its middle at 563.5 px against the centre line's 579.5), the backrest 1.44 m and the front edge 0.96 m behind
   the nose; the desk in front of it is centred on the centre line, 0.46–0.88 m behind the nose. The cab view's eye stands
-  over the seat's middle, 1.2 m behind the nose. The cab's rear wall is 1.62 m behind the nose; a partition runs from it
-  diagonally to the front door's front jamb.
+  over the seat's middle, 1.2 m behind the nose. The cab's rear wall is 1.62 m behind the nose, across the first left
+  window (1.05–2.35 m behind the nose), so the cab has the window's front 0.57 m; a partition runs from it diagonally to
+  the front door's front jamb (the cab view leaves that one out: the user sees the door from the seat).
 - **The T3's details in Prague** (the user's photos of 6892, 6921, 7122, 8080 and 8088, 2026-11-09, #427): the red starts lower
   round the cab than along the saloon, under a cream band with a flap; the route plate hangs on the mirror's arm, which drops
   from the cab's roof; rectangular lamp units (indicator over a lamp) by the corners; a side indicator on the pillar between

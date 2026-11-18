@@ -166,7 +166,8 @@ tram, dark glass is the game.
 - **Instruments:** the speedometer 0–80 km/h with the odometer, the ammeter 0–600 A (drive and brake alike), the
   battery voltmeter 0–40 V and the glow lamp NAPĚTÍ V TROLEJI (line voltage: a T3 has no line voltmeter). With the
   assist option a red mark on the speedometer shows the speed limit.
-- **Lamps** as on the car: the indicators, V (stop request), DOORS (green when **all are closed**), BRAKES I / II /
+- **Lamps** as on the car: the indicators (green), V (EXIT, green: a passenger pressed the stop request to get off
+  at the next request stop; lit until the doors open), DOORS (green when **all are closed**), BRAKE I, BRAKES II and
   TRAIN (red while the shoe brakes are on, TRAIN the second car's), ACCELERATOR (orange while its resistors are in),
   MIRROR HEATING.
 - **Controls** can be pressed with the mouse or a finger and send the game's key (with the assist option the key is
@@ -182,12 +183,12 @@ tram, dark glass is the game.
 
 - You sit where the T3 has the driver's seat: 0.32 m left of the car's centre line, 1.2 m behind its front. So the
   windscreen's left post stands in the view ahead.
-- Hold Q / E (or ← / →) to look out of the left window to its end, or right through the front door. The cab's
-  frame (the posts, the window's end, the door) and the panel turn with the head: on the left the side wall with
-  the reverser, the cab heater, the heating, the heating cut-out and the sanding lever; on the right the panel's
-  wing with the lighting and the run's timetable.
-- The right rear-view mirror (Z toggles) shows the side of the set and the doors. It grows with the window and
-  keeps its field of view.
+- Hold Q / E (or ← / →) to look out of the left window to the cab's rear wall, which crosses it, or right through
+  the front door. The cab's frame (the posts with the windows' rounded corners, the rear wall, the door) and the
+  panel turn with the head: on the left the side wall with the reverser, the cab heater, the heating, the heating
+  cut-out and the sanding lever; on the right the panel's wing with the lighting and the run's timetable.
+- The right rear-view mirror (Z toggles) shows the side of the set and the doors, and nothing but the menus covers
+  it. It grows with the window and keeps its field of view.
 - **Outside view** (V): the camera orbits the tram. Drag to turn and tilt it; the wheel or two fingers
   zoom; a double click brings it back behind the tram.
 
