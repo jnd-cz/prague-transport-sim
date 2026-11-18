@@ -55,7 +55,8 @@ both post on the pinned #291 and only propose.
 - One branch per issue (`<number>-<short-name>`), PR into `main`, the PR says which checks were run and
   their numbers. Small doc or data-fact changes may go straight to `main`.
 - PR description: `Closes #N.` (or `Part of #N.`, below), what changes and why, a check table (line × check, before → after),
-  and for rebuilt data what changed per line. Merged as a squash, subject `<PR title> (#PR)` (the title
+  and for rebuilt data what changed per line. Pictures go in from the branch by commit SHA (DEVELOPING.md, Pictures
+  in a PR): `gh` cannot upload them. Merged as a squash, subject `<PR title> (#PR)` (the title
   ends with `(#issue)`), branch deleted.
 - **`Closes #N` only when this PR meets every point of the issue's "Done when".** Anything still
   open (the user's answers in a review queue, an import of those answers, a rebuild, a data-publish,

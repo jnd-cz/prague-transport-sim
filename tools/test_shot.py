@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Screenshot controls and isolation: python -P -E tools/test_shot.py."""
+from contextlib import nullcontext
 from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from PIL import Image
 from playwright.sync_api import sync_playwright, TimeoutError
@@ -135,6 +136,20 @@ class Shots(unittest.TestCase):
             shot.main(['--line','17','--s','5064','--out',str(output)], self.root)
         self.assertEqual(prior.read_bytes(), b'previous successful image')
         self.assertEqual(list(output.iterdir()), [prior])
+
+    def test_weather_reaches_both_captures_and_names_the_files(self):
+        output, seen = self.root/'shots-w', []
+        def fake_capture(browser, root, line, s, view, dst, timeout, **kwargs):
+            seen.append(kwargs.get('weather'))
+            Image.new('RGB',(10,10),'red').save(dst)
+            return {'camera':{},'target_xy':{}}
+        with patch.object(shot,'git',return_value='reference'), patch.object(shot,'capture',fake_capture), \
+             patch.object(shot,'checkout',return_value=nullcontext(self.root)), \
+             patch.object(shot,'sync_playwright',return_value=nullcontext()), \
+             patch.object(shot.gpu,'launch',return_value=(MagicMock(),'fake')):
+            shot.main(['--line','17','--s','5064','--weather','snow','--out',str(output)], self.root)
+        self.assertEqual(seen, ['snow', 'snow'])
+        self.assertTrue((output/'line17-s5064-cab-snow-pair.png').exists())
 
 
 if __name__ == '__main__':

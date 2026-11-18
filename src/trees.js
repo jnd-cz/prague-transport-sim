@@ -8,57 +8,129 @@ import { CELL, GROUND_SNOW, SegmentIndex, pointInRing, signedArea } from './worl
 
 // Vegetation from the city register (data.geo.trees: [x, y, kind], tools/geoportal.py): 0 deciduous
 // tree, 1 conifer, 2 bush or hedge, 3 plants in a container, 4 a sample along a registered tree row
-// (a position on the row's line, not a surveyed tree). Trees inside a building are dropped and
-// crowns shrink until they clear the facades; row samples on a carriageway are dropped too.
-// Without the register, parks and woods are filled at random.
+// (a position on the row's line, not a surveyed tree). Without the register, parks and woods are filled
+// at random. What the rules below decide is kept per class with its places (group.userData.treeLog, the
+// lint's tree checks), #649:
+// - a tree inside a building is dropped (courtyard trees are not under a roof);
+// - a tree under TRACK_MIN from a track centre is dropped (the tram's body and its swing); further out a
+//   crown that reaches over the tram's band starts above the wire on a bare trunk and grows taller and wider
+//   than the others, an oval that arches over the track as the limes and chestnuts on Mariánské hradby do (the
+//   user, 2026-11-17: "make them taller over track"; their photos of 2026-11-18: trunks bare to the wire,
+//   crowns half as tall again as wide, meeting over the track);
+// - a crown next to a facade is narrowed, not shrunk, and the tree dropped only when a crown CROWN_MIN wide
+//   does not clear it (the user: "narrower next to buildings");
+// - a row sample near a register tree is that tree again; a sample on a carriageway or a parking lot moves
+//   off it to the nearest other ground within ROW_SNAP (the row lines lie up to 5 m off their trees: the
+//   castle's row south of Mariánské hradby runs 2.5 m into the carriageway, its trunks 2.5 m behind the
+//   kerb), else it is dropped.
 const CROWN = 2.6; // icosahedron radius of a tree crown at scale 1 (x 1.1 wide, x 1.4 tall)
+const TRACK_MIN = 2.2; // m from a track centre: the T3's half-width 1.25 m plus about 1 m
+const TRAM_BAND = 1.6; // m from a track centre that a crown under the wire stays out of (body 1.25 m, its swing)
+const WIRE_CLEAR = 6.5; // m over the rail: a crown reaching into the tram's band keeps its underside above this
+const LIFT_TALL = 1.6; // a lifted crown's height over an unlifted one's (k = 1: 7.3 m -> 11.6 m, its top ~18 m over the rail)
+const LIFT_WIDE = 1.2; // and its width (k = 1: 6.3 m -> 7.6 m across, over the track above the wire)
+const CROWN_MIN = 0.8; // m: the narrowest crown radius next to a facade
+const ROW_DUP = 4; // m: a row sample this near a register tree is that tree (the register's spacing ~8 m)
+const ROW_SNAP = 5; // m: how far a row sample on a carriageway may move off it
 export function buildTrees(group, data, ground, trackDist) {
   const r = rng(99);
   const trees = [], bushes = [], pots = [];
+  const log = { building: [], track: [], facade: [], rowDuplicate: [], rowOnRoad: [], rowMoved: [], lifted: [], narrowed: [] };
+  group.userData.treeLog = log;
   const roof = roofIndex(group); // buildings are already in the group
   const under = (x, y, z) => { const h = roof(x, y); return h !== null && h > z; };
-  // carriageway: the surveyed streets where they exist, else near an OSM road's centre line
+  // carriageway: the surveyed streets where they exist, else near an OSM road's centre line (a tram strip
+  // is not one: trees there answer to the track rule)
   const roads = new SegmentIndex(10);
   for (const rd of data.roads) if (!rd.f && rd.c) roads.addLine(rd.p);
   const onRoad = (x, y) => {
     const t = ground.dtm?.surfaceAt(x, y);
-    if (t) return t.c === 'road' || t.c === 'tram' || t.c === 'parking';
+    if (t) return t.c === 'road' || t.c === 'parking';
     return roads.dist(x, y) < 2.5;
   };
-  // crown scale that clears the facades: shrinks until neither its rim nor its half-rim is under
-  // a roof; 0 when even a small crown does not fit
-  const fit = (x, y, z, k) => {
-    for (; k >= 0.45; k *= 0.85) {
-      const bottom = z + 5.4 * k - CROWN * 1.4 * k;
+  // the crown's width that clears the facades: narrowed until neither its rim nor its half-rim is under a
+  // roof higher than its bottom; 0 when even a crown CROWN_MIN wide does not fit
+  const fit = (x, y, bottom, R) => {
+    for (let w = 1; R * w >= CROWN_MIN; w *= 0.85) {
       let clear = true;
       for (const f of [1, 0.5]) for (let a = 0; a < 8 && clear; a++) {
-        const rad = CROWN * 1.1 * k * f;
+        const rad = R * w * f;
         clear = !under(x + Math.cos(a * Math.PI / 4) * rad, y + Math.sin(a * Math.PI / 4) * rad, bottom);
       }
-      if (clear) return k;
+      if (clear) return w;
     }
     return 0;
   };
+  // a tree of size k: [x, y, k, z, its crown's bottom and top over z, its radius] (m: the shape any tree model
+  // can take), or null
+  const plant = (x, y, z, k) => {
+    let R = CROWN * 1.1 * k, half = CROWN * 1.4 * k, b = 5.4 * k - half;
+    let w = fit(x, y, z + b, R);
+    if (w && trackDist(x, y) - R * w < TRAM_BAND) {
+      const rail = ground.trackOwn?.heightAt(x, y, 10) ?? z;
+      if (rail + WIRE_CLEAR - z > b) {
+        b = rail + WIRE_CLEAR - z; half *= LIFT_TALL; R *= LIFT_WIDE;
+        w = fit(x, y, z + b, R);
+        if (w) log.lifted.push([x, y]);
+      }
+    }
+    if (!w) { log.facade.push([x, y]); return null; }
+    if (w < 1) log.narrowed.push([x, y]);
+    return [x, y, k, z, b, b + 2 * half, R * w];
+  };
   const real = data.geo?.trees;
   if (real) {
-    const seen = new Set(); // the register and the sampled tree rows overlap: one plant per ~1.5 m cell
+    // the register's trees, for the row samples that repeat them
+    const reg = new Map(), cellOf = (i, j) => i * 65536 + j;
     for (const [x, y, kind = 0] of real) {
+      if (kind > 1) continue;
+      const k = cellOf(Math.floor(x / ROW_DUP), Math.floor(y / ROW_DUP));
+      if (reg.has(k)) reg.get(k).push(x, y); else reg.set(k, [x, y]);
+    }
+    const nearReg = (x, y) => {
+      const i0 = Math.floor(x / ROW_DUP), j0 = Math.floor(y / ROW_DUP);
+      for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) {
+        const a = reg.get(cellOf(i, j));
+        if (a) for (let n = 0; n < a.length; n += 2) if (Math.hypot(a[n] - x, a[n + 1] - y) < ROW_DUP) return true;
+      }
+      return false;
+    };
+    // the nearest ground off the carriageway within ROW_SNAP, 1 m past its edge where that is off it too
+    const offRoad = (x, y) => {
+      for (let rad = 0.5; rad <= ROW_SNAP; rad += 0.5) for (let a = 0; a < 16; a++) {
+        const cx = Math.cos(a * Math.PI / 8), cy = Math.sin(a * Math.PI / 8);
+        if (onRoad(x + cx * rad, y + cy * rad)) continue;
+        const f = onRoad(x + cx * (rad + 1), y + cy * (rad + 1)) ? rad : rad + 1;
+        return [x + cx * f, y + cy * f];
+      }
+      return null;
+    };
+    const seen = new Set(); // one plant per ~1.5 m cell
+    for (let [x, y, kind = 0] of real) {
+      if (kind === 4) {
+        if (nearReg(x, y)) { log.rowDuplicate.push([x, y]); continue; }
+        if (onRoad(x, y)) {
+          const o = offRoad(x, y);
+          if (!o) { log.rowOnRoad.push([x, y]); continue; }
+          log.rowMoved.push([x, y, o[0], o[1]]);
+          [x, y] = o;
+          if (nearReg(x, y)) { log.rowDuplicate.push([x, y]); continue; }
+        }
+      }
       const cell = `${Math.round(x / 1.5)},${Math.round(y / 1.5)}`;
       if (seen.has(cell)) continue;
       seen.add(cell);
       const z = ground.at(x, y);
-      if (under(x, y, z + 1)) continue; // inside a building (courtyard trees are not under a roof)
+      if (under(x, y, z + 1)) { log.building.push([x, y]); continue; }
       if (kind === 2 || kind === 3) {
         if (trackDist(x, y) < 2.2) continue;
         (kind === 2 ? bushes : pots).push([x, y, 0.8 + r() * 0.6, z]);
         continue;
       }
-      if (kind === 4 && onRoad(x, y)) continue;
-      // street trees next to the tracks are pruned clear of the tram and the wires
-      const d = trackDist(x, y);
-      if (d < 3.2) continue;
-      const k = fit(x, y, z, Math.min(0.75 + r() * 0.6, (d - 1.9) / 2.86));
-      if (k) trees.push([x, y, k, z]);
+      if (trackDist(x, y) < TRACK_MIN) { log.track.push([x, y]); continue; }
+      // (each tree's size from its place: a rule that keeps or drops another tree does not resize this one)
+      const t = plant(x, y, z, 0.75 + rng(Math.round(x * 10) * 73856093 ^ Math.round(y * 10) * 19349663)() * 0.6);
+      if (t) trees.push(t);
     }
   }
   for (const g of data.green) {
@@ -74,8 +146,8 @@ export function buildTrees(group, data, ground, trackDist) {
       if (trackDist(x, y) < 6) continue;
       const z = ground.terrain.height(x, y);
       if (under(x, y, z + 1)) continue;
-      const k = fit(x, y, z, 0.7 + r() * 0.7);
-      if (k) trees.push([x, y, k, z]);
+      const k = 0.7 + r() * 0.7, half = CROWN * 1.4 * k, w = fit(x, y, z + 5.4 * k - half, CROWN * 1.1 * k);
+      if (w) trees.push([x, y, k, z, 5.4 * k - half, 5.4 * k + half, CROWN * 1.1 * k * w]);
     }
   }
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
@@ -91,15 +163,18 @@ export function buildTrees(group, data, ground, trackDist) {
     const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.25, 3, 5), new THREE.MeshLambertMaterial({ color: 0x5b4632 }), trees.length);
     crown.userData.trees = true; // read by the lints
     const place = (i, f) => {
-      const [x, y, k, z] = trees[i];
-      s.set(k * 1.1 * f, k * 1.4 * f, k * 1.1 * f);
-      p.set(x, z + 5.4 * k + CROWN * 1.4 * k * (f - 1) * 0.5, -y); // (a thinner crown keeps its top lower, not its bottom)
+      const [x, y, , z, b, t, R] = trees[i], half = (t - b) / 2;
+      s.set(R * f / CROWN, half * f / CROWN, R * f / CROWN);
+      p.set(x, z + b + half + half * (f - 1) * 0.5, -y); // (a thinner crown keeps its top lower, not its bottom)
       m.compose(p, q, s);
       crown.setMatrixAt(i, m);
     };
-    trees.forEach(([x, y, k, z], i) => {
-      s.set(1, k, 1);
-      p.set(x, z + 1.5 * k, -y);
+    // the trunk reaches 0.17 of the crown's height into it (3 k long under a crown at 5.4 k); a lifted crown's
+    // tree is taller and its trunk thicker, by its height over 15 m (an unlifted one is 12.2 m at most)
+    trees.forEach(([x, y, , z, b, t], i) => {
+      const h = b + (t - b) * 0.17, th = Math.max(1, t / 15);
+      s.set(th, h / 3, th);
+      p.set(x, z + h / 2, -y);
       m.compose(p, q, s);
       trunk.setMatrixAt(i, m);
     });
