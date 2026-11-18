@@ -617,3 +617,47 @@ A practical route to the missing lengths: measure a perpendicular side photo of 
   - the wikiwand page title "Loading AI tools";
   - an "AI a MCP server" navigation link on hlidacstatu.cz;
   - spkv.upce.cz's bot-protection wall.
+
+## 13. The 14T and the 52T measured on pictures, and the best guesses (2026-11-18)
+
+The user (2026-11-18), on the open questions: "I do not have the information for your user question. Make your best guess for each question based on all material we have found so far." The pictures and documents are kept in `raw/reference/` (`photos/52t/`, `photos/14t/`, `skoda/`), listed in its `SOURCES.md`.
+
+**The 52T, measured on the side view the user sent** (DPP's render of the livery, both sides, 1778 × 1000; `photos/52t/user-52t-sides.jpg`):
+- The upper view: the cab at the right, its end at x 1615, the rear end at 169. 1,446 px = 31.99 m over the bumpers, 22.1 mm a pixel.
+- Positions from the cab end, m [M, ±0.1; a bogie's middle is its fairing's]:
+
+  | element | from the cab end | from the rear end (mirrored) | used |
+  |---|---|---|---|
+  | front end bogie | 2.23 | 2.28 | 2.25 |
+  | joint 1 (bellows' middle) | 9.36 | 9.40 | 9.38 |
+  | inner bogie under section 2 | 11.52 | 11.60 | 11.56 |
+  | joint 2 | 13.69 | 13.74 | 13.72 |
+
+  The rest are mirrored about the middle.
+- Section lengths: the end sections 9.38 m each, the bogie sections 4.34 m each (their bogie in the middle), the carried section 4.55 m (with the middle double door).
+- The wheelbase does not show (the bogies are covered): 1.8 m [E].
+- Škoda's City catalogue (2023, `skoda/skoda-catalogue-city-en.pdf`, the Prague page) words the layout: two swivel bogies under the outermost sections and two partially swivelling ones under the inner sections. Its joints are "short, wide and spacious", without steps.
+- The 29T/30T brochures (2015) call the Bratislava cars' inner bogies "omezeně otočné" / "limitedly pivotable"; neither they nor the catalogue give an angle.
+
+**The 14T, measured on DPP's photo of car 9160** (`photos/14t/dpp-2840-mhd-tram-885a_01.webp`, 894 × 596, nearly side-on in perspective):
+- Method: along the car's side, a point's position is an affine function of (x − 447) / h. Here x is its column, 447 the image's middle, and h the height between the upper and the lower red stripe there. h was fitted along the side as 136.0 − 0.0869 x (212 columns, worst residual 9 px).
+- Scale: section 1's bogie, its wheels 1.88 m apart (the sister 19T's wheelbase, pl.wikipedia), measured from the nose.
+- Measured [M, ±0.3 m near the front, ±0.5 m further]:
+  - section 1: its wheels at 3.18 and 5.06 m;
+  - joints at 6.35, 12.55, 16.86 and 23.22 m;
+  - section 3's wheels at 13.59 and 15.38 m.
+- Check: section 3's wheelbase comes out 1.78 m against 1.88, so the far side reads about 5 % short.
+- Made symmetric about the middle of the 30.25 m body [E]:
+  - section 1: 0 – 6.35 m, its fixed bogie at 4.12 m;
+  - sections 2 and 4: 6.62 m each, carried;
+  - section 3: 12.97 – 17.28 m, its fixed bogie at 15.13 m;
+  - section 5: mirrored.
+
+**Best guesses** (the user, above):
+
+| question | guess | why |
+|---|---|---|
+| the 52T's inner bogies' largest turn | 5° (0.087 rad) | They are "partially" or "limitedly" pivotable. That is more than the ~3° the 2005 patent gives for designs called non-pivoting, and well under the ~12° an end section's bogie needs on 18 m (ČVUT utility model CZ16360U1). A bogie in the middle of a 4.3 m section needs little: the section is nearly the chord between its joints. |
+| the KT4's rod ratio | 0.5 | The two halves are equal and the bow-tie plates symmetric. 0.5 keeps the joint over the track centreline, which the rods are there for ("limits overhang in curves"). |
+| the KT4's springs' threshold (`steerFrom`) | 0.05 rad (~3°) of the bogies' relative turn | "Only at a larger turn of the bogies" (a KT4 driver, k-report.net, 2023-10-11). The joint stays straight on curves wider than ~180 m (8.9 m / 0.05) and steers in street curves (20–50 m: 0.18–0.45 rad). |
+| the 52T's and 14T's wheelbases | 1.8 m and 1.88 m | The 52T's bogie frames come from the ForCity Smart (DPP); Škoda's figure seen for a ForCity bogie is 1.8 m. The 14T has the 19T's (its sister, same length). |

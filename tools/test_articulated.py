@@ -4,7 +4,7 @@
 - the T3 (one section, two free bogies): on the straight as before; on a 20 m curve both pivots on it 6.4 m apart in a
   straight line, each bogie turned by asin(3.2 / R) against the body; on a 200 m crest both pivots on the profile;
 - the Prague types the user named (2026-11-18: KT8D5, 14T, 15T, 52T, K2, KT4), their running gear from
-  docs/research/articulated-trams.md (the 14T's and the 52T's positions estimated until a source gives them): on a
+  docs/research/articulated-trams.md (the 14T's and the 52T's measured on photos, see there): on a
   25 m curve every support of every section on the curve, neighbouring sections' pins in one place, a carried
   section its length between its pins, a section on one fixed or limited bogie on the track's heading there, the
   15T's sections each on two axles of their bogies a wheelbase apart, the KT4's joint on the track (its rods split
@@ -36,8 +36,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHARED = """
 const A = await import('/src/articulated.js'), { T3 } = await import('/src/tram.js');
 const YAW = 0.6, wb = 1.9;
-const free = (at, centre) => ({ at, centre, turn: 'free', wheelbase: wb }), fixed = (at) => ({ at, turn: 'fixed', wheelbase: wb });
-const limited = (at) => ({ at, turn: 'limited', maxAngle: 0.1, wheelbase: wb }); // [E] the 52T's angle is not known
+const free = (at, centre, w = wb) => ({ at, centre, turn: 'free', wheelbase: w }), fixed = (at, w = wb) => ({ at, turn: 'fixed', wheelbase: w });
+// [E] the 52T's inner bogies turn 5° (0.087 rad) at most: more than the ~3° of designs called non-pivoting (Škoda's
+// patent CZ297213B6 on the prior art), well under the ~12° an end bogie needs on 18 m (ČVUT, CZ16360U1)
+const limited = (at, w) => ({ at, turn: 'limited', maxAngle: 0.087, wheelbase: w });
 const pin = (at, bogie) => ({ at, yaw: YAW, pitch: null, ...(bogie ? { bogie: { turn: 'free', wheelbase: wb } } : {}) });
 const sec = (from, to, ...bogies) => ({ from, to, bogies });
 const TYPES = {
@@ -47,18 +49,22 @@ const TYPES = {
   // K2 [E]: the T3's 3.80 m end overhang, the middle bogie under the joint; couplers 0.55 m
   K2: { sections: [sec(0.55, 10.75, free(4.35)), sec(10.75, 20.95, free(17.15))], joints: [pin(10.75, true)] },
   // KT4: pivots 8.90 m apart, the joint midway on no bogie, steered by rods from the bogies [E: evenly], stiff in pitch
-  KT4: { sections: [sec(0.47, 9.53, free(5.08)), sec(9.53, 18.58, free(13.98))], joints: [{ at: 9.53, yaw: YAW, pitch: 0, steer: 0.5 }] },
+  // the rods' springs hold the joint straight below a turn of the bogies of 0.05 rad [E: "only at a larger turn of the
+  // bogies", a KT4 driver, k-report.net 2023-10-11]: straight on curves over ~180 m
+  KT4: { sections: [sec(0.47, 9.53, free(5.08)), sec(9.53, 18.58, free(13.98))], joints: [{ at: 9.53, yaw: YAW, pitch: 0, steer: 0.5, steerFrom: 0.05 }] },
   // 15T, measured on Škoda's drawing: the end bogies' pivots w/6 off their middles toward the car's middle; between
   // the sections a bogie with a pivot over each axle and no pin; no coupler (an emergency one fitted by hand)
   '15T': { sections: [sec(0, 10.90, free(2.16, 1.85)), sec(10.90, 20.51), sec(20.51, 31.40, free(29.22, 29.57))],
     joints: [10.90, 20.51].map((at) => ({ at, yaw: YAW, pitch: null, bogie: { turn: 'free', wheelbase: wb, pivots: 'axles' } })) },
-  // 14T [E positions]: fixed bogies under sections 1, 3 and 5, sections 2 and 4 hung between them; 30.25 m
-  '14T': { sections: [sec(0, 8.4, fixed(4.0)), sec(8.2, 12.6), sec(12.4, 17.85, fixed(15.12)), sec(17.65, 22.05), sec(21.85, 30.25, fixed(26.25))],
-    joints: [8.3, 12.5, 17.75, 21.95].map((at) => pin(at)) },
-  // 52T [E positions]: free bogies under the end sections at their outer ends, the end sections resting on the next
-  // one's pin; limited bogies under sections 2 and 4; section 3 hung between them; 31.99 m over the bumpers
-  '52T': { sections: [sec(0, 8.6, free(2.6)), sec(8.4, 14.2, limited(11.3)), sec(14.0, 18.0), sec(17.8, 23.6, limited(20.7)), sec(23.4, 31.99, free(29.4))],
-    joints: [8.5, 14.1, 17.9, 23.5].map((at) => pin(at)) },
+  // 14T: fixed bogies under sections 1, 3 and 5, sections 2 and 4 hung between them; 30.25 m, 1.88 m wheelbase (the
+  // sister 19T's). Measured on DPP's side photo of 9160, its perspective taken out, made symmetric [E]
+  '14T': { sections: [sec(0, 6.35, fixed(4.12, 1.88)), sec(6.35, 12.97), sec(12.97, 17.28, fixed(15.13, 1.88)), sec(17.28, 23.90), sec(23.90, 30.25, fixed(26.13, 1.88))],
+    joints: [6.35, 12.97, 17.28, 23.90].map((at) => pin(at)) },
+  // 52T: free bogies under the end sections near their outer ends, the end sections resting on the next one's pin;
+  // limited bogies in the middle of the short sections 2 and 4; section 3 hung between them; 31.99 m over the bumpers.
+  // Measured on the side view the user sent (DPP's render, 2026-11-18), made symmetric; wheelbase 1.8 m [E]
+  '52T': { sections: [sec(0, 9.38, free(2.25, undefined, 1.8)), sec(9.38, 13.72, limited(11.56, 1.8)), sec(13.72, 18.27), sec(18.27, 22.61, limited(20.43, 1.8)), sec(22.61, 31.99, free(29.74, undefined, 1.8))],
+    joints: [9.38, 13.72, 18.27, 22.61].map((at) => pin(at)) },
 };
 // a point of section k of a pose at position a along the vehicle
 const pt = (type, P, k, a) => { const S = type.sections[k], q = P.sections[k], m = (S.from + S.to) / 2, d = a - m, cp = Math.cos(q.pitch);
@@ -103,8 +109,9 @@ SYNTH = """async () => {
       // the 15T: each bogie under a joint has its two axles' points a wheelbase apart, both on the curve
       q.axles = Math.max(0, ...(type.joints || []).map((j, k) => (j.bogie?.pivots === 'axles'
         ? Math.abs(dist(pt(type, P, k, j.at - wb / 2), pt(type, P, k + 1, j.at + wb / 2)) - wb) : 0)));
-      // the KT4: the steered joint's point on the curve
-      q.steered = Math.max(0, ...(type.joints || []).map((j, k) => (j.steer != null ? onCircle(R, pt(type, P, k, j.at)) : 0)));
+      // the KT4: the steered joint's point on the curve (without its springs' threshold: with it, a little outside)
+      const even = { ...type, joints: (type.joints || []).map((j) => ({ ...j, steerFrom: undefined })) }, E = A.placeUnit(even, sF, at);
+      q.steered = Math.max(0, ...(type.joints || []).map((j, k) => (j.steer != null ? onCircle(R, pt(even, E, k, j.at)) : 0)));
       out.types[name] = q;
     }
     // a joint limit below the curve's angle: the KT8D5 with 0.05 rad
@@ -113,9 +120,9 @@ SYNTH = """async () => {
   }
   // the KT4's rods held straight by their springs until the bogies' turn passes steerFrom: straight on a 300 m curve
   // (the bogies 0.03 rad apart), steering on a 25 m one
-  { const kt4 = { ...TYPES.KT4, joints: [{ ...TYPES.KT4.joints[0], steerFrom: 0.05 }] };
-    out.steerFrom = { wide: A.placeUnit(kt4, 60, curve(300)).joints[0].yaw, tight: A.placeUnit(kt4, 60, curve(25)).joints[0].yaw,
-      even: A.placeUnit(TYPES.KT4, 60, curve(25)).joints[0].yaw }; }
+  { const kt4 = TYPES.KT4, even = { ...kt4, joints: [{ ...kt4.joints[0], steerFrom: undefined }] };
+    out.steerFrom = { from: kt4.joints[0].steerFrom, wide: A.placeUnit(kt4, 60, curve(300)).joints[0].yaw, tight: A.placeUnit(kt4, 60, curve(25)).joints[0].yaw,
+      even: A.placeUnit(even, 60, curve(25)).joints[0].yaw }; }
   // gear that cannot be placed
   const f = (at) => ({ at, turn: 'free', wheelbase: 1.8 });
   const bad = {
@@ -214,7 +221,7 @@ def main():
         fails.append(f"a joint past its limit is not held there with its bogie off the track: {h}")
     sf = r["steerFrom"]
     if abs(sf["wide"]) > 1e-9 or not 0 < abs(sf["tight"]) < abs(sf["even"]):
-        fails.append(f"the KT4's steered joint with steerFrom 0.05: not straight on a 300 m curve, or not steering less on a 25 m one: {sf}")
+        fails.append(f"the KT4's steered joint with steerFrom {sf['from']}: not straight on a 300 m curve, or not steering less on a 25 m one: {sf}")
     for name, problems in r["refused"].items():
         if not problems:
             fails.append(f"gear {name} not refused")
