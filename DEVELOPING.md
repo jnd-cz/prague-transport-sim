@@ -342,8 +342,8 @@ carries them:
 2. Link them from the PR's body by that commit's full SHA, not the branch, which is deleted at the merge:
    `![desktop](https://raw.githubusercontent.com/jnd-cz/prague-transport-sim/<sha>/docs/reviews/issueN-desktop.jpg)`.
    A phone's portrait shot goes in as `<img src="…" width="320" alt="…">`.
-3. Remove them in the next commit (`git rm docs/reviews/issueN-*`) and push. The squash merge then adds nothing
-   to main. The links keep working after the merge: `refs/pull/N/head` keeps the commit (#662's still load
+3. Remove them in the next commit (`git rm docs/reviews/issueN-*`, only the issue's own: the directory keeps older
+   pictures of #162, #176 and #178 on main) and push. The squash merge then adds nothing to main. The links keep working after the merge: `refs/pull/N/head` keeps the commit (#662's still load
    with its branch deleted).
 
 **The limits against real rides** (#451): `python -P -E tools/rides_limits.py --lines 22,23` maps the GPS rides in
