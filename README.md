@@ -161,10 +161,10 @@ tmavé sklo je hra.
 - **Přístroje:** rychloměr 0–80 km/h s počítadlem, ampérmetr 0–600 A (jízda i brzda), voltmetr baterie 0–40 V
   a doutnavka NAPĚTÍ V TROLEJI (T3 nemá voltmetr trakčního napětí). S asistencí ukazuje červená značka na
   rychloměru nejvyšší dovolenou rychlost.
-- **Kontrolky** jako na voze: směrovky (zelené), V (VÝSTUP: cestující zmáčkl znamení řidiči, aby vystoupil v příští
-  zastávce na znamení; svítí do otevření dveří), DVEŘE (zelená, když jsou **všechny zavřené**), BRZDA I, BRZDY II
-  a VLAK (červené při zabrzděných čelisťových brzdách, VLAK u druhého vozu), ZRYCHLOVAČ (oranžová, dokud jsou
-  zařazeny odpory), TOPENÍ ZRCÁTKA.
+- **Kontrolky** jako na voze: směrovky (zelené), V (VÝSTUP, zelená: cestující zmáčkl znamení řidiči, aby
+  vystoupil v příští zastávce na znamení; svítí do otevření dveří), DVEŘE (zelená, když jsou **všechny zavřené**),
+  BRZDA I, BRZDY II a VLAK (červené při zabrzděných čelisťových brzdách, VLAK u druhého vozu), ZRYCHLOVAČ
+  (oranžová, dokud jsou zařazeny odpory), TOPENÍ ZRCÁTKA.
 - **Ovladače** jdou stisknout myší nebo prstem a pošlou klávesu hry (s asistencí je na nich napsaná). Ty, které
   hra zatím neumí (mycí stroj, stěrače, osvětlení, havarijní pojezd a další), jsou nakreslené a nic nedělají.
   Najetí myší na ovladač řekne, co dělá.

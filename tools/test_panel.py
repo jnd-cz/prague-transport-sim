@@ -3,7 +3,8 @@
 port, 1600 x 900). Checks:
 - the lamp strip's V (výstup): dark before a passenger's stop request, lit from it until the doors open, dark at a
   request stop nobody gets off at (src/panel.js requested);
-- the heaters' knobs point at their position labels in every position (src/panel.js POS);
+- the heaters' knobs point at their position labels in every position (src/panel.js POS), the control switch's
+  handle at its mark 1 (CAM);
 - the cab frame leaves the mirror's picture out while it is shown, and covers it when the mirror is off (src/cabframe.js);
 - with the head turned all the way left, the cab's rear wall stands at the screen's left edge (src/cabframe.js REAR)."""
 import argparse
@@ -40,7 +41,8 @@ REQUEST = """async () => {
   [g.nextStop, g.tram.s] = was; g.paused = false;
   return out;
 }"""
-# each heater position: the knob's angle against the direction from its middle to the position's label
+# each heater position: the knob's angle against the direction from its middle to the position's label; the control
+# switch: its handle against its mark 1
 KNOBS = """async () => {
   const g = window.game, wait = () => new Promise((r) => setTimeout(r, 400)), out = [];
   const mid = (el) => { const b = el.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
@@ -55,6 +57,9 @@ KNOBS = """async () => {
     }
     g.climate[key] = was;
   }
+  const cam = document.querySelector('#dash .full [data-c="vypinac"] .cam'), h = cam.querySelector('.handle');
+  const m = new DOMMatrix(getComputedStyle(h).transform), [cx, cy] = mid(cam), [lx, ly] = mid(cam.querySelectorAll('.marks b')[1]);
+  out.push({ id: 'vypinac', k: 1, label: '1', knob: Math.round(Math.atan2(m.b, m.a) * 180 / Math.PI), toLabel: Math.round(Math.atan2(ly - cy, lx - cx) * 180 / Math.PI) });
   return out;
 }"""
 # the cab frame's canvas at the middle of the mirror's picture and at the screen's left edge
@@ -115,7 +120,7 @@ def main():
     if "skip" not in q:
         if "on" in q["before"]:
             fails.append(f"V lit before the stop request: {q}")
-        if q["after"] != "on a":
+        if q["after"] != "on g":
             fails.append(f"V dark after the stop request: {q}")
         if "on" in q["served"] or "on" in q["nobody"]:
             fails.append(f"V lit once the doors opened or with nobody getting off: {q}")

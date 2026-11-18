@@ -166,9 +166,9 @@ tram, dark glass is the game.
 - **Instruments:** the speedometer 0–80 km/h with the odometer, the ammeter 0–600 A (drive and brake alike), the
   battery voltmeter 0–40 V and the glow lamp NAPĚTÍ V TROLEJI (line voltage: a T3 has no line voltmeter). With the
   assist option a red mark on the speedometer shows the speed limit.
-- **Lamps** as on the car: the indicators (green), V (EXIT: a passenger pressed the stop request to get off at the
-  next request stop; lit until the doors open), DOORS (green when **all are closed**), BRAKE I, BRAKES II and TRAIN
-  (red while the shoe brakes are on, TRAIN the second car's), ACCELERATOR (orange while its resistors are in),
+- **Lamps** as on the car: the indicators (green), V (EXIT, green: a passenger pressed the stop request to get off
+  at the next request stop; lit until the doors open), DOORS (green when **all are closed**), BRAKE I, BRAKES II and
+  TRAIN (red while the shoe brakes are on, TRAIN the second car's), ACCELERATOR (orange while its resistors are in),
   MIRROR HEATING.
 - **Controls** can be pressed with the mouse or a finger and send the game's key (with the assist option the key is
   written on them). Those the game doesn't simulate yet (the washing plant, wipers, lighting, emergency drive and

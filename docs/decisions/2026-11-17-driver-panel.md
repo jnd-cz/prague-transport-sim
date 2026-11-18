@@ -81,6 +81,17 @@ After trying the merged build (same day, with a photo of 6921's cab):
 - **The mirror:** "mirror view should stay on top of everything, not be hidden by other surface (most visible in the side
   views), only menu can draw over it". The cab's frame leaves the mirror's picture out, and its frame is over the HUD
   (index.html `#mirror` z-index 6, under the panel's sheet and the menus).
+- **V and the unlabelled knobs** (2026-11-18, after a Wikimedia Commons photo of a T3P's panel at Anděl): "I found the
+  color of the V (or open door symbol, the two lines are not touching) in this photo ... It's green. Try to to position
+  the unlabeled knobs according to the reference photos." V is two strokes apart, green. On the user's photos of 6921
+  the knobs without labels stand up, but two: DVEŘE I turned right with the front door open (the doors' lamp dark), so
+  the doors' switches are up closed and right open as the game had them; OSVĚTLENÍ, the outside lights, 45° right, its
+  night position (the DPP textbook's T3R.P pages: "na „den“ - to je vlevo"). "We don't have night yet, you can leave it
+  at day. Photos were taken in the evening": it stands 45° left. The saloon's fluorescent lighting stands at the left,
+  "předvolba" (ibid.). VYPÍNAČ ŘÍZENÍ's marks read 0 up, 2 right, its handle between them at 1; PŘEPÍNAČ OSVĚTLENÍ's
+  plate is too dark on the photo to read its marks, so it has none and its handle stands diagonal as there.
+- **Záchranná brzda:** "I would also rename the 'Bezpečnostní spínač' to 'Zácharnná brzda'": the red button left of the
+  ammeter is ZÁCHRANNÁ BRZDA (EMERGENCY BRAKE).
 - **The phone's controls:** "The mobile, small screen UI button overlay would deserve overhaul. One tester suggested
   pedal shape buttons instead of arrors up and down power/brake. ... Out of the two výhybka seems more useful than heating
   cut out. I would rather drive with more automation when playing on the small screen." The overhaul is #661.
