@@ -37,6 +37,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 VERSION = 1
+PARTS = ("roads", "lanes")  # (what the layer holds so far, in the note's steps)
 
 
 # ---------------------------------------------------------------- the page's arithmetic
@@ -563,6 +564,9 @@ class Roads:
         self.fit()
         for road in self.roads:
             self.track_lats(road)
+        self.lanes = []
+        for k, road in enumerate(self.roads):
+            self.build_lanes(k, road)
 
     # (the samples every 4 m of each road and the 65 points across ±16 m, read in one go)
     def fit(self):
@@ -741,8 +745,89 @@ class Roads:
             anyt = anyt or bool(lats)
         road["trk"] = out if anyt else None
 
+    # ------------------------------------------------------------ lanes
+    @staticmethod
+    def kerbs(r, s):
+        """kerbs(): the two kerb lines at s (m from the centre line, + right): fitted, else the OSM width."""
+        if r["fitLo"] is None:
+            return -r["w"] / 2, r["w"] / 2
+        lo, hi = r["fitLo"], r["fitHi"]
+        f = max(0, min(len(lo) - 1, s / 4))
+        i = math.floor(f)
+        j, u = min(len(lo) - 1, i + 1), f - i
+        return lo[i] * (1 - u) + lo[j] * u, hi[i] * (1 - u) + hi[j] * u
+
+    @staticmethod
+    def tracks_at(r, s):
+        if r["trk"] is None:
+            return []
+        return r["trk"][max(0, min(len(r["trk"]) - 1, js_round(s / 4)))] or []
+
+    @staticmethod
+    def lanes_of(r, d):
+        """lanesOf(): lanes in a direction as OSM tags them, else one (half of `lanes` from 4 on a two-way road)."""
+        if r["o"]:
+            return r["ln"] or 1
+        own = r["lf"] if d > 0 else r["lb"]
+        if own:
+            return own
+        return math.floor(r["ln"] / 2) if (r["ln"] or 0) >= 4 else 1
+
+    def lane_offset(self, r, s, d, k=0):
+        """laneOffset(): a car's lateral position (+ right of its direction) on lane k of its direction at s."""
+        lo, hi = self.kerbs(r, s)
+        tk = [t for t in self.tracks_at(r, s) if lo - 0.5 < t < hi + 0.5]
+        if d < 0:
+            lo, hi = -hi, -lo
+            tk = [-t for t in tk]
+        n = self.lanes_of(r, d)
+        if r["o"]:
+            div = lo
+        elif r["fitMed"] is not None:
+            mL, mR = r["fitMed"]
+            f = max(0, min(len(mL) - 1, s / 4))
+            i = math.floor(f)
+            j, u = min(len(mL) - 1, i + 1), f - i
+            div = max(lo, min(hi, -(mL[i] * (1 - u) + mL[j] * u) if d < 0 else mR[i] * (1 - u) + mR[j] * u))
+        elif len(tk) >= 2:
+            div = (min(tk) + max(tk)) / 2
+        else:
+            div = (lo + hi) / 2
+        band = max(0.1, hi - div)
+        step = max(2.6, min(3.25, (band - 1.7) / (n - 0.5))) if n > 1 else 0
+        own = [t for t in tk if t > div]
+        if band < 3.2 and own:
+            return min(own)
+        right = hi - min(1.7, band / 2)
+        return max(right - k * step, div + min(1.1, band / 2))
+
+    def build_lanes(self, k, r):
+        """_buildLanes(): a lane per direction (and per OSM lane) at laneOffset every ~2 m, trimmed 5 m back from both
+        junctions, smoothed."""
+        L = r["path"].length
+        trim = min(5, L * 0.2)
+        for d in ([r["o"]] if r["o"] else [1, -1]):
+            for sel in range(self.lanes_of(r, d)):
+                n = max(2, math.ceil((L - 2 * trim) / 2))
+                u = trim + ((L - 2 * trim) * np.arange(n + 1)) / n
+                sr = u if d > 0 else L - u
+                X, Y, HX, HY = r["path"].at(sr)
+                pts = []
+                for x, y, hx, hy, s_ in zip(X.tolist(), Y.tolist(), HX.tolist(), HY.tolist(), sr.tolist()):
+                    hx, hy = hx * d, hy * d
+                    off = self.lane_offset(r, s_, d, sel)
+                    pts.append([x + hy * off, y - hx * off])
+                path = Path(smooth_polyline(pts, 1, 6) if len(pts) > 3 else pts)
+                self.lanes.append({"road": k, "dir": d, "sel": sel, "trim": trim, "path": path,
+                                   "from": r["ends"][0 if d > 0 else 1], "to": r["ends"][1 if d > 0 else 0]})
+
 
 # ---------------------------------------------------------------- the file
+def lane_record(ln):
+    """A lane as the file keeps it: its road (the index), direction, lane and points (cm)."""
+    return {"road": ln["road"], "dir": ln["dir"], "sel": ln["sel"], "p": [cm(v) for v in ln["path"].p.ravel().tolist()]}
+
+
 def road_record(r):
     """A road as the file keeps it (positions in cm)."""
     out = {"p": [cm(v) for v in r["path"].p.ravel().tolist()], "w": r["w"], "ends": r["ends"]}
@@ -772,16 +857,19 @@ def build(ln, log=print):
     recs = [road_record(r) for r in roads.roads]
     fitted = sum(1 for r in roads.roads if r["fitLo"] is not None)
     log(f"line {ln}: {len(recs)} roads ({fitted} fitted to the survey, {sum(1 for r in roads.roads if r['fitMed'])} with a "
-        f"median, {sum(1 for r in roads.roads if r['trk'])} with tracks), {time.time() - t0:.1f} s")
-    return {"line": str(ln), "version": VERSION, "roads": recs, "fitted": fitted}
+        f"median, {sum(1 for r in roads.roads if r['trk'])} with tracks), {len(roads.lanes)} lanes, {time.time() - t0:.1f} s")
+    return {"line": str(ln), "version": VERSION, "roads": recs, "lanes": [lane_record(x) for x in roads.lanes],
+            "fitted": fitted}
 
 
 def write(ln, net):
     import sources
     from atomic import replacing
     n, fitted = len(net["roads"]), net.pop("fitted")
-    net["provenance"] = sources.stamp("network.py", {"roads": sources.entry(
-        "streets", [fitted, 0, n - fitted], "roads: OSM's ways split at their junctions; kerbs fitted to the survey where it has them")})
+    net["provenance"] = sources.stamp("network.py", {
+        "roads": sources.entry("streets", [fitted, 0, n - fitted],
+                               "roads: OSM's ways split at their junctions; kerbs fitted to the survey where it has them"),
+        "lanes": sources.single("streets", "osm", len(net["lanes"]), "lanes: each road's, beside its kerbs and tracks")})
     net["attribution"] = sources.attribution(net["provenance"])
     p = os.path.join(ROOT, "data", f"line{ln}.network.json")
     with replacing(p, "w", encoding="utf-8") as f:
@@ -790,12 +878,13 @@ def write(ln, net):
 
 
 # ---------------------------------------------------------------- the parity with the page
-# (the page's roads as the file keeps them: src/traffic.js Traffic of the shift started as a player starts it)
+# (the page's roads and lanes as the file keeps them: src/traffic.js Traffic of the shift started as a player starts it)
 PAGE_ROADS = """async () => {
   const { startShift } = await import('/tools/bench/shift.js');
   await startShift({ timeout: 300 });
-  const cm = (v) => Math.round(v * 100);
-  return window.traffic.roads.map((r) => {
+  const cm = (v) => Math.round(v * 100), T = window.traffic;
+  const lanes = T.laneList.map((l) => ({ road: l.k, dir: l.dir, sel: l.sel, p: l.path.p.flatMap(([x, y]) => [cm(x), cm(y)]) }));
+  const roads = T.roads.map((r) => {
     const o = { p: r.path.p.flatMap(([x, y]) => [cm(x), cm(y)]), w: r.w, ends: r.ends };
     for (const k of ['o', 'b', 't']) if (r[k]) o[k] = r[k];
     for (const k of ['tram', 'ln', 'lf', 'lb']) if (r[k] != null) o[k] = r[k];
@@ -804,11 +893,12 @@ PAGE_ROADS = """async () => {
     if (r.trk) o.trk = r.trk.map((a) => a.map(cm));
     return o;
   });
+  return { roads, lanes };
 }"""
 
 
 def page_roads(lines, browser=None):
-    """{line: the page's roads} from headless Chromium (tools/headless.py's page; `browser`, else one launched on the
+    """{line: {part: the page's records}} from headless Chromium (tools/headless.py's page; `browser`, else one launched on the
     GPU, tools/gpu.py)."""
     import faulthandler
 
@@ -839,15 +929,22 @@ def page_roads(lines, browser=None):
     return out
 
 
+POSITIONS = ("p", "lo", "hi", "med", "trk")  # (the fields in cm: a gap of 1 cm is the rounding's)
+
+
+def ident(r):
+    """A record's identity where the lists' lengths differ: a road's junctions, a lane's road, direction and lane."""
+    return tuple(r["ends"]) if "ends" in r else (r.get("road"), r.get("dir"), r.get("sel"))
+
+
 def compare(page, built):
-    """The build's roads against the page's, in order: the roads the same to the cm (`exact`) and within 1 cm
-    (`equal`), and per field the roads over 1 cm apart (with the largest gap, cm, and the first such road)."""
+    """The build's records (roads, lanes) against the page's, in order: those the same to the cm (`exact`) and within
+    1 cm (`equal`), and per field those over 1 cm apart (with the largest gap, cm, and the first one)."""
     rep = {"page": len(page), "build": len(built), "exact": 0, "equal": 0, "fields": {}}
     if len(page) != len(built):
-        pe = {tuple(r["ends"]) for r in page}
-        be = {tuple(r["ends"]) for r in built}
-        rep["only page"] = sorted(pe - be)[:10]
-        rep["only build"] = sorted(be - pe)[:10]
+        pe, be = {ident(r) for r in page}, {ident(r) for r in built}
+        rep["only page"] = sorted(pe - be, key=str)[:10]
+        rep["only build"] = sorted(be - pe, key=str)[:10]
         return rep
 
     def flat(v):
@@ -864,7 +961,7 @@ def compare(page, built):
             va, vb = a.get(k), b.get(k)
             if va == vb:
                 continue
-            if k in ("p", "lo", "hi", "med", "trk"):
+            if k in POSITIONS:
                 fa, fb = flat(va), flat(vb)
                 if fa is not None and fb is not None and len(fa) == len(fb):
                     gap = max(abs(x - y) for x, y in zip(fa, fb))
@@ -880,7 +977,7 @@ def compare(page, built):
             if gap is not None:
                 f["max cm"] = max(f["max cm"], gap)
             if f["first"] is None:
-                f["first"] = {"road": i, "ends": a["ends"], "page": str(va)[:120], "build": str(vb)[:120]}
+                f["first"] = {"i": i, "id": ident(a), "page": str(va)[:120], "build": str(vb)[:120]}
         rep["equal"] += same
     return rep
 
@@ -895,7 +992,7 @@ def main(argv=None):
     built = {}
     for ln in lines:
         net = build(ln)
-        built[ln] = net["roads"]
+        built[ln] = {k: net[k] for k in PARTS}
         if not a.no_write:
             print(write(ln, net))
     if a.parity:
@@ -904,9 +1001,10 @@ def main(argv=None):
             page = page_roads(lines)
         bad = 0
         for ln in lines:
-            rep = compare(page[ln], built[ln])
-            print(f"line {ln}: {json.dumps(rep, ensure_ascii=False)}")
-            bad += rep["equal"] != rep["page"] or rep["page"] != rep["build"]
+            for part in PARTS:
+                rep = compare(page[ln][part], built[ln][part])
+                print(f"line {ln} {part}: {json.dumps(rep, ensure_ascii=False)}")
+                bad += rep["equal"] != rep["page"] or rep["page"] != rep["build"]
         return 1 if bad else 0
     return 0
 

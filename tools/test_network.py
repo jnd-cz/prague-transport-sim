@@ -115,6 +115,39 @@ class Fit(unittest.TestCase):
         self.assertIsNone(r["fitLo"])
 
 
+class Lanes(unittest.TestCase):
+    """laneOffset on a road along x fitted to kerbs at ±4.25 m (+ right of the car's direction)."""
+
+    def setUp(self):
+        self.sv = FakeSurvey([(-4, 4, "road"), (-9, 9, "sidewalk")])
+
+    def build(self, w=8, **kw):
+        data = {"roads": [{"p": [[0, 0], [100, 0]], "w": w, "f": 0, "c": 1, **kw}]}
+        return nw.Roads(data, self.sv, None, None)
+
+    def test_two_way(self):
+        R = self.build()
+        r = R.roads[0]
+        self.assertEqual([round(R.lane_offset(r, 50, d), 6) for d in (1, -1)], [2.55, 2.55])  # (1.7 m in from the kerb)
+        self.assertEqual([(x["dir"], x["from"], x["to"]) for x in R.lanes], [(1, "0,0", "100,0"), (-1, "100,0", "0,0")])
+        a, b = R.lanes
+        self.assertAlmostEqual(a["path"].p[len(a["path"].p) // 2][1], -2.55)  # (right of eastbound: south)
+        self.assertAlmostEqual(b["path"].p[len(b["path"].p) // 2][1], 2.55)
+        self.assertAlmostEqual(a["path"].p[0][0], 5)  # (trimmed 5 m back from the junction)
+
+    def test_one_way_two_lanes(self):
+        R = self.build(o=1, ln=2)
+        r = R.roads[0]
+        self.assertEqual(len(R.lanes), 2)
+        self.assertEqual([round(R.lane_offset(r, 50, 1, k), 6) for k in (0, 1)], [2.55, -0.7])  # (3.25 m apart)
+
+    def test_narrow_street_on_its_own_track(self):
+        R = self.build()
+        r = {**R.roads[0], "fitLo": [-2.0] * 26, "fitHi": [2.0] * 26, "trk": [[-0.8, 0.8]] * 26}
+        self.assertEqual(R.lane_offset(r, 50, 1), 0.8)  # (the band right of the tracks' middle is under 3.2 m)
+        self.assertEqual(R.lane_offset(r, 50, -1), 0.8)
+
+
 class Compare(unittest.TestCase):
     def test_finds_moves(self):
         a = [{"p": [0, 0, 100, 0], "w": 8, "ends": ["0,0", "1,0"], "hi": [425, 425]}]
