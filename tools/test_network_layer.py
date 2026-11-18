@@ -3,7 +3,8 @@
 is done), a shift started. Start reads no lookup of a tile the window does not hold (the survey's classes, the ground's
 heights: every one goes through the lookup), and fewer lookups are held than the file has tiles. The traffic's network
 is the file's (data/lineN.network.json, tools/network.py): its roads, lanes, walks, doors, bound lanes, heads and
-crossings, each lane where the file starts it. Line 17 has every part: OSM's stop lines and signalled crossings, medians.
+crossings, each lane where the file starts it, the heads on the file's heights and the bridges' and road tunnels' ways
+between the file's ends (#682). Line 17 has every part: OSM's stop lines and signalled crossings, medians.
 
     python -P -E tools/test_network_layer.py
 A browser test (about 30 s). Skipped without line 17's network (python -I tools/snapshot.py data-fetch).
@@ -34,7 +35,10 @@ START = """async () => {
   return { reads, missed, held: window.groundTiles.lookups.size, tiles: window.groundTiles.tiles.size,
     n: { roads: T.roads.length, lanes: T.laneList.length, walks: T.walks.length, doors: T.doors.length, lights: T.lightLanes.length,
          pedCross: T.pedCross.length, heads: T.lights.count, pedHeads: T.pedLights.count },
-    lanes: T.laneList.map((l) => [l.k, l.dir, l.sel, mm(l.path.p[0][0]), mm(l.path.p[0][1]), l.path.p.length]) };
+    lanes: T.laneList.map((l) => [l.k, l.dir, l.sel, mm(l.path.p[0][0]), mm(l.path.p[0][1]), l.path.p.length]),
+    poles: [T.lights, T.pedLights].map((L) => { const pole = L.group.children[0], M = new pole.matrix.constructor(), out = [];
+      for (let i = 0; i < L.count; i++) { pole.getMatrixAt(i, M); out.push(M.elements[13]); } return out; }),
+    ways: window.game.route.ground.wayEnds.size };
 }"""
 
 
@@ -75,6 +79,15 @@ class StartReadsNoSurvey(unittest.TestCase):
                                        "heads": len(N["heads"]), "pedHeads": len(N["pedHeads"])})
         self.assertEqual(self.r["lanes"], [[L["road"], L["dir"], L["sel"], L["p"][0], L["p"][1], len(L["p"]) // 2] for L in N["lanes"]])
         self.assertGreater(len(N["pedCross"]), 0)
+
+    def test_heights_are_the_files(self):
+        """The heads stand on the heights the build stored (#682), and the bridges' and road tunnels' ways run between
+        the build's ends."""
+        for poles, key in zip(self.r["poles"], ("heads", "pedHeads")):
+            self.assertEqual(len(poles), len(self.net[key]))
+            worst = max((abs(y - h["z"] / 100) for y, h in zip(poles, self.net[key])), default=0)
+            self.assertLess(worst, 0.001, key)
+        self.assertEqual(self.r["ways"], len(self.net["ways"]))
 
     def test_no_page_errors(self):
         self.assertEqual(self.errors, [])

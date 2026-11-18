@@ -228,6 +228,51 @@ class Heights(unittest.TestCase):
                             "x0": 0, "y0": 0, "dx": 10, "dy": -10, "nx": 2, "ny": 2})
         self.assertEqual(np.round(g.height([0, 10, 0, 5, 9], [0, 0, -10, -2.5, -9]), 3).tolist(), [100, 101, 102, 101, 103.5])
 
+    def test_sections_every_2_m(self):
+        self.assertEqual(nw.sections(10, 20), [10, 12, 14, 16, 18, 20])
+        self.assertEqual(nw.sections(0, 1), [0, 0.5, 1])  # (at least two)
+
+    def test_what_start_stands_on(self):
+        """heights(): the ways' ends once a chain, each head's surface at its cm point, and a platform's zo (a strip the
+        survey does not draw), zs (a Vienna-type one's sign on the opposite path) and zh (an opposite one's shelter)."""
+        class G:
+            way_of = {3: 0, 5: 0, 7: 1}
+
+            def way_ends(self):
+                return {3: (1.0, 2.0), 5: (1.0, 2.0), 7: (3.0, 4.0)}
+
+            def surface_many(self, xs, ys):
+                return [x + y / 100 for x, y in zip(xs, ys)]
+
+            def surface(self, x, y):
+                return x + y / 100
+
+            def track_at(self, x, y):
+                return 1000 + x
+        route = nw.Route([[0, 0], [100, 0]])
+        back = nw.Route([[100, 10], [0, 10]])
+
+        class SG:
+            heads = [(1.234, 0.0, 0.0)]
+            ped_heads = []
+
+        class ST:
+            platforms = [
+                {"i": 0, "rt": route, "back": False, "s0": 10, "s1": 14, "side": -1, "outer": 4.0, "kerb": None, "surveyed": False},
+                {"i": 1, "rt": route, "back": False, "s0": 10, "s1": 14, "side": -1, "outer": 4.0, "kerb": None, "surveyed": True},
+                {"i": 2, "rt": back, "back": True, "s0": 20, "s1": 40, "side": -1, "outer": 5.0, "kerb": 3.0, "surveyed": True},
+                {"i": 3, "rt": back, "back": True, "s0": 20, "s1": 40, "side": -1, "outer": 5.0, "kerb": 3.0, "surveyed": True,
+                 "shared": True}]
+        data = {"platforms": [{}, {}, {"stop": [70, 10], "shelter": 1}, {}]}
+        z = nw.heights(G(), data, SG, ST)
+        self.assertEqual(z["ways"], [[3, 1.0, 2.0], [7, 3.0, 4.0]])
+        self.assertAlmostEqual(z["heads"][0], 1.23)
+        self.assertEqual(sorted(z["platforms"]), [0, 2])
+        self.assertEqual([round(v, 4) for v in z["platforms"][0]["zo"]], [9.96, 11.96, 13.96])  # (4 m right of the route: south)
+        # (the back path runs west: 3.8 m right of it is north, at the stop's s 30)
+        self.assertAlmostEqual(z["platforms"][2]["zs"], 70 + 13.8 / 100)
+        self.assertAlmostEqual(z["platforms"][2]["zh"], 1000 + 70)
+
 
 if __name__ == "__main__":
     unittest.main()

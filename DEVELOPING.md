@@ -500,9 +500,11 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
 - **The network** (the traffic's roads, lanes, footways and doors, the signals bound to the lanes, what the platforms and
   stops read of the survey) is built once, after `tools/ground_mesh.py`, by `tools/network.py` into
   `data/lineN.network.json` ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658). Start
-  builds none of it and reads no lookup past the window: what it places stands on the drawn ground, its heights read at
-  the end of the load while every lookup is held (`src/main.js` settleNetwork), or once its tile's lookup comes
-  (`ground.later`). A change to a traffic rule is a change to `tools/network.py` and a rebuild of the file. The page's
+  builds none of it and reads no lookup past the window: what it places stands on the heights the build read from the
+  ground file as the page reads it (`tools/ground_at.py`, held to the page's reads by `tools/test_ground_at.py --browser`,
+  #682): the bridges' and road tunnels' ends, the signal heads, the platforms. Our stops' signs and shelters settle once
+  their tile's lookup comes (`ground.later`). The road tunnels' mouths are in the ground file (`tools/ground_mesh.py`
+  fit_mouths). A change to a traffic rule is a change to `tools/network.py` and a rebuild of the file. The page's
   rules were ported whole: before they went, its network and the build's were the same to the cm on lines 9, 17, 22, 23
   and 37 (#667, #668). `tools/test_network_layer.py` holds Start to it; `tools/bench/network_layer.py` times Start and
   counts its reads.
