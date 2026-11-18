@@ -207,6 +207,8 @@ OVERRIDES = {
     "postedSpeeds": (("postedSpeeds",), lambda f: f["id"], "tools/osm_speeds.py"),
     "stopSigns": (("stopSigns", "signs"), lambda f: f"{f['stop']} → {f['towards']}" if f.get("towards")
                   else f"{f['stop']}, from {f.get('from')}", "tools/build_line.py"),
+    "switchTips": (("trackSources", "switchTips"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
+    "photoTracks": (("trackSources", "photoTracks"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
 }
 
 

@@ -1242,6 +1242,10 @@ def main():
         # the line number changes at this stop (index into stops): passengers of the first line
         # all leave there, the tram waits and departs as the second line
         out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
+    # the facts applied over DI on the whole network (data/truth.json switchTips, photoTracks: di_network.py) that lie
+    # on this line's tracks, with their state (#670)
+    on_tracks = [path] + ([Polyline(back_pts)] if len(back_pts) > 1 else [])
+    di_facts = {k: [e for e in v if any(pl.project(e["at"])[1] <= 15 for pl in on_tracks)] for k, v in net.facts.items()}
     one = sources.single
     by = lambda ranges: [round(sum(b - a for a, b, s in ranges if s == k)) for k in ("ortho", "di", "dtmp", "osm")]
     out["provenance"] = sources.stamp("build_line.py", {
@@ -1259,7 +1263,7 @@ def main():
         "signals": one("signals", "osm", len(signals)), "crossings": one("crossings", "osm", len(crossings)),
         "buildings": one("buildings", "osm", len(buildings)), "roads": one("streets", "osm", len(roads)),
         "green": one("areas", "osm", len(green)), "water": one("areas", "osm", len(water))},
-        facts={"stopSigns": sign_facts})
+        facts={"stopSigns": sign_facts, **di_facts})
     out["attribution"] = sources.attribution(out["provenance"])
     dst = os.path.join(OUT, f"line{LINE}.json")
     with replacing(dst, "w", encoding="utf-8") as f:
