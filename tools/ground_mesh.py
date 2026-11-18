@@ -205,6 +205,92 @@ def city_at(G, px, py):
     return out
 
 
+WALL_LATTICE = 1.0  # m: a survey wall's faces cut to this, their corners between its sides (across_outline, #653)
+WALL_SNAP = 0.3  # m: a street corner on a wall's or stairs' outline this near its height there takes it (#653)
+WALL_ON = 0.01  # m: a corner this near the outline lies on it (the faces are noded on it)
+WALL_CLASSES = ("wall", "stairs")
+
+
+def across_outline(ring_segs, x, y):
+    """Heights of points inside a survey area between its sides: the outline's height at the nearest point on it, and at
+    the nearest point on its other side (the direction from the point turned past 90 degrees), weighted by the other's
+    distance. On the outline, its height. A battered wall's strip, 0.9 m across and 35 m long with 3 and 4 outline points
+    along its foot and its top (line 37 (3915, 316), area 1444), triangulated on its outline alone folded into a W 2 m
+    tall (#653); between its sides it runs straight across. ring_segs: (n, 2, 3) the outline's edges."""
+    a, b = ring_segs[:, 0], ring_segs[:, 1]
+    e = b[:, :2] - a[:, :2]
+    l2 = np.maximum((e ** 2).sum(1), 1e-12)
+    out = np.full(len(x), np.nan)
+    for k in range(0, len(x), 2000):
+        px, py = x[k:k + 2000, None], y[k:k + 2000, None]
+        t = np.clip(((px - a[:, 0]) * e[:, 0] + (py - a[:, 1]) * e[:, 1]) / l2, 0, 1)
+        qx, qy = a[:, 0] + e[:, 0] * t, a[:, 1] + e[:, 1] * t
+        qz = a[:, 2] + (b[:, 2] - a[:, 2]) * t
+        d = np.hypot(qx - px, qy - py)
+        r = np.arange(len(px))
+        j = d.argmin(1)
+        d1, z1 = d[r, j], qz[r, j]
+        ux, uy = qx[r, j] - px[:, 0], qy[r, j] - py[:, 0]
+        back = (qx - px) * ux[:, None] + (qy - py) * uy[:, None] < 0
+        d2m = np.where(back, d, np.inf)
+        j2 = d2m.argmin(1)
+        d2, z2 = d2m[r, j2], qz[r, j2]
+        with np.errstate(invalid="ignore"):  # (no other side: inf, its own height taken)
+            z = np.where(np.isfinite(d2) & (d1 > 1e-6), (z1 * d2 + z2 * d1) / np.maximum(d1 + d2, 1e-12), z1)
+        out[k:k + 2000] = z
+    return out
+
+
+def ring_segments(a):
+    """A survey area's outline edges with heights at both ends: (n, 2, 3)."""
+    segs = []
+    for r in [a["r"]] + a.get("h", []):
+        for i in range(len(r)):
+            p, q = r[i], r[(i + 1) % len(r)]
+            if p[2] is not None and q[2] is not None and (p[0], p[1]) != (q[0], q[1]):
+                segs.append([p[:3], q[:3]])
+    return np.asarray(segs, float).reshape(-1, 2, 3)
+
+
+def snap_to_walls(D, x, y, z, street):
+    """Heights `z` of points (x, y) with each `street` one on a level-0 survey wall's or stairs' outline set to the
+    outline's height there (along the edge it lies on, between its ends), the nearest within WALL_SNAP of its own. The
+    street surface reads IPR, whose 1 m raster spreads a wall's face over 1-2 m; outranking the wall in the weld, it set
+    the wall's top along Krejcárek's ramp (line 37 (3929, 331)) to its own heights, a fringe of 3 cm steps (#653). A wall
+    holds its top and its foot at one place: of the two, the one within WALL_SNAP; past it is a level the street surface
+    does not meet, and its step stays."""
+    z = np.array(z, float)
+    a, b = [], []
+    for ar in D["areas"]:
+        if ar["c"] not in WALL_CLASSES or ar.get("l", 0) != 0:
+            continue
+        for r in [ar["r"]] + ar.get("h", []):
+            for i in range(len(r)):
+                p, q = r[i], r[(i + 1) % len(r)]
+                if p[2] is not None and q[2] is not None:
+                    a.append(p[:3])
+                    b.append(q[:3])
+    s = np.flatnonzero(street & np.isfinite(z))
+    if not a or not len(s):
+        return z
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    tree = shapely.STRtree(shapely.linestrings(np.stack([a[:, :2], b[:, :2]], 1)))
+    pi, si = tree.query(shapely.points(x[s], y[s]), predicate="dwithin", distance=WALL_ON)
+    if not len(pi):
+        return z
+    e = b[si, :2] - a[si, :2]
+    t = np.clip(((x[s][pi] - a[si, 0]) * e[:, 0] + (y[s][pi] - a[si, 1]) * e[:, 1]) / np.maximum((e ** 2).sum(1), 1e-12), 0, 1)
+    zw = a[si, 2] + (b[si, 2] - a[si, 2]) * t
+    d = np.abs(zw - z[s][pi])
+    o = np.lexsort((d, pi))  # (per point, its nearest height first)
+    pi, zw, d = pi[o], zw[o], d[o]
+    first = np.r_[True, pi[1:] != pi[:-1]]
+    pi, zw, d = pi[first], zw[first], d[first]
+    near = d <= WALL_SNAP
+    z[s[pi[near]]] = zw[near]
+    return z
+
+
 def plane(tri, x, y):
     """Heights on the planes of triangles (n, 3, 3) at (x, y), barycentric."""
     a, b, c = tri[:, 0], tri[:, 1], tri[:, 2]
@@ -396,6 +482,10 @@ def build(ln, mesh=None, threads=8, log=print):
             g = lattice(q["g"], WATER_LATTICE)
             if g is not None and not g.is_empty:
                 lines.append(g)
+        elif q["c"] == "wall":  # (a wall's face, its corners between its two sides: across_outline, #653)
+            g = lattice(q["g"], WALL_LATTICE)
+            if g is not None and not g.is_empty:
+                lines.append(g)
     for k, q in enumerate(pieces["bed"]):
         lines.append(q["g"].boundary)
         owners.append(("bed", k, q["g"]))
@@ -576,7 +666,11 @@ def build(ln, mesh=None, threads=8, log=print):
     need = np.isnan(zs)
     for a in np.unique(sa[need]).tolist():
         mm = need & (sa == a)
-        zs[mm] = surface.at(a, cx[m][mm], cy[m][mm])
+        segs = ring_segments(D["areas"][a]) if D["areas"][a]["c"] == "wall" else None
+        if segs is not None and len(segs):  # (a wall's face between its sides, #653)
+            zs[mm] = across_outline(segs, cx[m][mm], cy[m][mm])
+        else:
+            zs[mm] = surface.at(a, cx[m][mm], cy[m][mm])
     # (a river or a pond is level: in OSM's water, at the level its banks give (WaterLevels, as OSM's water above: two of
     # line 17's survey water areas span a weir, Helmovský and Troja's, their own level 3.4-3.9 m under the water above it,
     # #632); elsewhere, as the page laid it (src/terrain.js DtmSurface), at its outline's WATER_LEVEL quantile: its
@@ -608,6 +702,8 @@ def build(ln, mesh=None, threads=8, log=print):
         on = (ko[j] == ku) if len(ko) else np.zeros(len(up), bool)
         up, j = up[on], j[on]
         zs[up] = lowered_heights(cx[m][up], cy[m][up], zs[up], rz[j], low, low_w, low_ramp)
+    # (a street corner shared with a survey wall or stairs takes its height within WALL_SNAP, #653)
+    zs = snap_to_walls(D, cx[m], cy[m], zs, np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span)
     zc[m] = zs
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc])
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", np.where(in_osm, "pool", "survey"))

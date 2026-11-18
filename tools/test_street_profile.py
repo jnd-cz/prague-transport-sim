@@ -166,6 +166,61 @@ class Sidewalks(unittest.TestCase):
         self.assertEqual(rough["walker's steps"], 0)
         self.assertGreater(rough["walker's metres on a wall, left out"], 10)
 
+    def test_wall_edges_are_the_sidewalks_own_edges_on_a_wall(self):
+        # (a sidewalk whose far edge is a wall's top: that edge, at the sidewalk's own heights; not its kerb or its ends)
+        sw = {"c": "sidewalk", "l": 0, "r": [[0, 0, 200.1], [20, 0, 200.1], [20, 6, 200.3], [0, 6, 200.2]]}
+        wall = {"c": "wall", "l": 0, "r": [[0, 6, 200.2], [20, 6, 200.3], [20, 6.3, 198.0], [0, 6.3, 198.0]]}
+        e = sp.wall_edges({"areas": [sw, wall]})
+        self.assertEqual(e.tolist(), [[[20, 6, 200.3], [0, 6, 200.2]]])
+
+    def test_a_wall_holds_the_walkway_at_its_top(self):
+        # a 6 m sidewalk whose far edge is a wall's top at 200.2 m, the street 2 m below it; IPR's raster spreads the
+        # wall's face from 4 to 7 m: the fill holds the sidewalk's own edge and takes no pull within 1.5 m of it (#653: the
+        # walkway sank 0.5 m into the top of Krejcárek's ramp wall)
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        u = np.arange(0.125, 20, 0.25)
+        ipr = SimpleNamespace(sample=lambda x, y: 200.2 - 2.0 * np.clip((np.asarray(y, float) - 4.0) / 3.0, 0, 1))
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 6),
+               "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))],
+               "wall_edges": np.array([[[20, 6, 200.2], [0, 6, 200.2]]])}  # (the sidewalk on its left)
+        f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 200.1), [(0, 0), (20, 6)])
+        z = sp.bilinear(f, np.array([10.0, 10.0]), np.array([5.0, 5.9]))
+        self.assertAlmostEqual(z[1], 200.2, delta=0.03)  # (between the held row and a free one, 0.5 m in)
+        self.assertGreater(z[0], 200.1)
+        ctx.pop("wall_edges")
+        z0 = sp.bilinear(sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 200.1), [(0, 0), (20, 6)]),
+                         np.array([10.0]), np.array([5.9]))
+        self.assertLess(z0[0], 199.8)  # (without it: IPR's smear)
+
+    def test_wall_heights_take_the_nearest_edge(self):
+        # (the sidewalk on the edge's left; a cell on its right, the wall's other level, does not take it)
+        X, Y = np.meshgrid(np.arange(0, 4.1, 0.5), np.array([0.0, 1.0, 3.0, -0.5]))
+        z, d, q, n = sp.wall_heights(np.array([[[0, 0, 10.0], [4, 0, 12.0]]]), X, Y, np.ones(X.shape, bool), 1.5)
+        self.assertAlmostEqual(z[0, 4], 11.0)
+        self.assertAlmostEqual(d[1, 4], 1.0)
+        self.assertEqual(q[1, 4].tolist(), [2.0, 0.0])
+        self.assertEqual(n[1, 4].tolist(), [0.0, 1.0])  # (into the sidewalk)
+        self.assertTrue(np.isnan(z[2]).all() and np.isinf(d[2]).all())
+        self.assertTrue(np.isnan(z[3]).all())
+
+    def test_the_walls_level_nearest_the_reference(self):
+        # (a wall 2 m tall: its top and its foot within a metre; the sidewalk's own outline said the foot, IPR beside the
+        # wall the top: the top. Without a reference, its own)
+        wall = {"c": "wall", "l": 0, "r": [[0, 0, 230.6], [10, 0, 230.6], [10, 0.3, 228.56], [0, 0.3, 228.56]]}
+        lv = sp.WallLevels({"areas": [wall]})
+        got = lv.pick(np.array([5.0, 0.2, 5.0]), np.array([0.0, 0.0, 0.0]), np.array([228.56, 228.56, 228.56]),
+                      np.array([230.4, 228.7, np.nan]))
+        self.assertEqual(got.tolist(), [228.56, 228.56, 228.56])  # (no wall vertex within 1 m of (5, 0): its own)
+        got = lv.pick(np.array([0.2, 0.2]), np.array([0.1, 0.1]), np.array([228.56, 228.56]), np.array([230.4, 228.7]))
+        self.assertEqual(got.tolist(), [230.6, 228.56])
+
+    def test_a_wall_edge_runs_with_its_sidewalk_on_its_left(self):
+        # (the same edge drawn the other way round its ring: turned)
+        sw = {"c": "sidewalk", "l": 0, "r": [[0, 6, 200.2], [20, 6, 200.3], [20, 0, 200.1], [0, 0, 200.1]]}
+        wall = {"c": "wall", "l": 0, "r": [[0, 6, 200.2], [20, 6, 200.3], [20, 6.3, 198.0], [0, 6.3, 198.0]]}
+        self.assertEqual(sp.wall_edges({"areas": [sw, wall]}).tolist(), [[[20, 6, 200.3], [0, 6, 200.2]]])
+
 
 class Measures(unittest.TestCase):
     def street(self, n=40):

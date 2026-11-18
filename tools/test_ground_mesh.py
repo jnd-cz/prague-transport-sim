@@ -138,6 +138,31 @@ class LoweredKerbs(unittest.TestCase):
         self.assertEqual(len(gm.lowered_kerbs({})[0]), 0)
 
 
+class Walls(unittest.TestCase):
+    def test_a_street_corner_on_a_wall_takes_its_height_there(self):
+        # (#653: a wall's top rising 229.6 -> 230.0 m along x = 0..4, its foot at 228.5, top and foot at one place at
+        # x = 4. A sidewalk corner on its top 0.12 m under it takes it, between its ends; one where the wall holds its top
+        # and its foot, the nearer; one 2 m off any, or off the outline, keeps its own; a lawn corner is not moved, nor one
+        # on another level's wall)
+        wall = {"c": "wall", "l": 0, "r": [[0, 0, 229.6], [4, 0, 230.0], [4, 0, 228.5], [4, 0.3, 228.5], [0, 0.3, 228.5]]}
+        upper = {"c": "wall", "l": 1, "r": [[0, 1, 300.0], [4, 1, 300.0], [4, 1.3, 300.0]]}
+        D = {"areas": [wall, upper]}
+        x = np.array([2.0, 0.0, 4.0, 2.0, 2.0, 2.0, 2.0])
+        y = np.array([0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 1.0])
+        z = np.array([229.68, 229.50, 228.70, 227.60, 229.70, 229.75, 299.90])
+        street = np.array([True, True, True, True, True, False, True])
+        got = gm.snap_to_walls(D, x, y, z, street)
+        self.assertEqual(np.round(got, 3).tolist(), [229.8, 229.6, 228.5, 227.6, 229.7, 229.75, 299.9])
+
+
+    def test_a_walls_face_runs_straight_across_between_its_sides(self):
+        # (#653: a battered wall 1 m across, its foot rising 228 -> 229 m along 10 m, its top at 230: across it between
+        # the two, on its outline the outline's)
+        a = {"c": "wall", "l": 0, "r": [[0, 0, 228.0], [10, 0, 229.0], [10, 1, 230.0], [0, 1, 230.0]]}
+        got = gm.across_outline(gm.ring_segments(a), np.array([5.0, 5.0, 5.0, 2.0, 0.0]), np.array([0.0, 0.5, 1.0, 0.25, 0.5]))
+        self.assertEqual(np.round(got, 3).tolist(), [228.5, 229.25, 230.0, 228.65, 229.0])
+
+
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
         # (a lawn on the lidar ground takes the city mesh's height: its triangles under the classes above, "under")
