@@ -4,6 +4,7 @@
   "contactorSound": "reference: user listening observations for src/audio.js and src/tr37.js, #590",
   "stops": "tools/lint.js stopFacts: the stop detector (src/game.js _vienna) scored against the facts of the loaded line",
   "stopTypes": "reference: what the types in stops mean",
+  "postedSpeeds": "tools/osm_speeds.py: a way's posted speed over its OSM maxspeed, keyed by the OSM way id (`osm` is what the way tagged when the fact was recorded, #612)",
   "rules": "reference: signal-not-in-platform is checked by tools/lint.js signalsInPlatforms, consist-coupled by consistAtStops; the facts themselves are not read",
   "places": "reference: places the user described, for the scenery and structure work",
   "notes": "reference",
@@ -269,12 +270,6 @@
    "quote": "For now the game uses 60 km/h spped sign at most, higher speeds to be picked up from osm (openrailwaymap) track info."
   },
   {
-   "id": "user-ohrada-krejcarek-65",
-   "text": "Down from Ohrada toward Krejcárek (line 37's direction) the posted speed is 65 km/h, where OSM's 60 is: OSM way 412908226 tags 60 (its other direction, way 334167230, 65). Reference until #612 has tools/osm_speeds.py read it.",
-   "source": "user 2026-11-15 (#500, PR #501), with a photo of the sign",
-   "quote": "I watched the section between ohrada and Krejcárek and found there is actually 65 km/h limit which seems to be in the same place as osm's 60. So osm is either out of date or wrong."
-  },
-  {
    "id": "user-t3-controls",
    "text": "The T3 controls are placeholders without pedals; the pedals and the accelerator (zrychlovač) are to be researched and simulated.",
    "source": "user 2026-11-03 (#215)",
@@ -315,6 +310,17 @@
    "text": "Mosty 3D's solid models are much simplified: a bridge's track and walkway run at one level, which the model's top stands for.",
    "source": "user 2026-11-10 with a photo from Železniční most's walkway, #445 session (PR #452)",
    "quote": "In reality the bridge has rail track continuing in the same level as outside of river area and sidewalk is next to it at about the same level too. The solid 3D model is very siplified."
+  }
+ ],
+ "postedSpeeds": [
+  {
+   "id": "user-ohrada-krejcarek-65",
+   "way": 412908226,
+   "osm": 60,
+   "maxspeed": 65,
+   "text": "Down from Ohrada toward Krejcárek (line 37's direction) the posted speed is 65 km/h, where OSM way 412908226 tags 60 in the extract of 2026-11-04 (its other direction, way 334167230, 65). The user changed the way's tag in OSM the same day: an extract with 65 makes the correction redundant, and tools/osm_speeds.py says so.",
+   "source": "user 2026-11-15 (#500, PR #501), with a photo of the sign; the OSM edit: #612",
+   "quote": "I watched the section between ohrada and Krejcárek and found there is actually 65 km/h limit which seems to be in the same place as osm's 60. So osm is either out of date or wrong."
   }
  ],
  "places": [

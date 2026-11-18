@@ -778,7 +778,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
     - **Down toward Krejcárek the sign says 65, not OSM's 60** (the user, 2026-11-15, with a photo of the sign: "there is actually
       65 km/h limit which seems to be in the same place as osm's 60. So osm is either out of date or wrong"). OSM tags this track
       (way 412908226) 60 and the other direction (way 334167230) 65. This ride's top was 60.7 km/h; the day before's 63–67 was
-      within the 65 but for 67.2.
+      within the 65 but for 67.2. The game posts 65 there from `data/truth.json` `postedSpeeds` (#612): `tools/osm_speeds.py`
+      reads a way's posted speed there over its `maxspeed`, and says when an extract tags the same (the user changed the
+      tag in OSM on 2026-11-15; the snapshot's extract is of 2026-11-04).
     - **Where the limit rises from 50:** both rides ran 53–57 km/h (medians 53–54) 50–100 m before the sign, where 50 still holds:
       the drivers pick up speed as the sign comes into view.
     - **The rest:** 21.4 km/h over Ohrada's crossings (our 15; 1.43×, under the derailment's 1.5×), 46.4 in the 43 curve, 28 where 25

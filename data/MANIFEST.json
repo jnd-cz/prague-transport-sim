@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "7aa101e",
- "published": "2026-11-18 10:05",
- "note": "#664: the weld's ties (one height whatever the order, the survey's steps, lidar corners yield, water and far lidar keep their own): ground of lines 9, 17, 22, 23 and 37",
+ "built_at_commit": "86b3c40",
+ "published": "2026-11-18 10:38",
+ "note": "#612: line 37's posted speed from Ohrada down to Krejcárek 65 over OSM's 60 (data/truth.json postedSpeeds)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -181,8 +181,8 @@
    "sha256": "fdf96d606d154cc488870d32e7d5625f79c3149f764e4f58761cde05f861643a"
   },
   "line37.json": {
-   "size": 2538818,
-   "sha256": "542da8c8eb920d20469273c701a6486db42b44577025482eb31a01ba44f919ea"
+   "size": 2538829,
+   "sha256": "32f3b61f08e5ced8b84320e7afa2555e6787e94ce0c816b565b4cc3301b697f7"
   },
   "line37.streets.bin": {
    "size": 2581731,
