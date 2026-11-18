@@ -99,7 +99,7 @@ def probes(g):
     s = 0.0
     while s <= g.rt.length:
         x, y, hx, hy = g.rt.at(s)
-        for o in range(-30, 31, 3):
+        for o in np.arange(-29.63, 30, 3):  # (off the rules' round distances: a point 6 m out reads 5.999999 on the page)
             pts.append((x - hy * o, y + hx * o))
         s += 25
     for line, _, _, _ in g.chains():
