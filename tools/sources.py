@@ -210,6 +210,7 @@ OVERRIDES = {
     "switchTips": (("trackSources", "switchTips"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
     "photoTracks": (("trackSources", "photoTracks"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
     "structures": (("trackHeights", "structures"), lambda f: f["id"], "tools/import_track_heights.py, through tools/line_heights.py"),
+    "surveyGround": (("surveyGround", "places"), lambda f: f"{f['lat']},{f['lon']}", "tools/dtm.py (zps_ground.judge)"),
 }
 
 

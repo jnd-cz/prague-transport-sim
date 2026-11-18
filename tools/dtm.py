@@ -393,10 +393,17 @@ try:  # (DI's and DTMP's surveyed tracks from raw/: without them the rails decid
 except (ImportError, OSError) as e:
     print(f"survey ground: no surveyed rails ({e}): only DMR 5G decides")
     _rails = zps_ground.rail_points([])
+_ground_states = {}  # each answer's state against what the sources decide without it, by its index (#670)
+_ground_facts = _facts.get("surveyGround", {}).get("places", [])
 ground_verdicts = zps_ground.judge(areas, lambda E, N: _ipr.sample(E, N), _older, zps_ground.cover_union(areas, _osm_cover),
-                                   _rails, F, _facts.get("surveyGround", {}).get("places", []),
+                                   _rails, F, _ground_facts,
                                    zps_ground.cover_union([], _changing), _facts.get("surveyGround", {}).get("heldRule"),
-                                   zps_ground.cover_union([], _buildings))
+                                   zps_ground.cover_union([], _buildings), _ground_states)
+# stated: the answers on this line's areas; an answer of this line whose point lies in none of them, changed
+ground_facts = [{"id": sources.fact_id("surveyGround", f), "state": _ground_states[k][0], "verdict": f["verdict"],
+                 "sources": _ground_states[k][1]} if k in _ground_states else
+                {"id": sources.fact_id("surveyGround", f), "state": "changed", "verdict": f["verdict"], "sources": None}
+                for k, f in enumerate(_ground_facts) if k in _ground_states or str(f.get("line")) == str(LINE)]
 ground_moved = zps_ground.apply(areas, ground_verdicts)
 ground_report = zps_ground.summary(ground_verdicts, ground_moved)
 print("survey ground:", ground_report["areas"], ground_report["m2"], f"{ground_moved} vertices moved")
@@ -523,7 +530,8 @@ out["provenance"] = sources.stamp("dtm.py", {
                                    "outlines": outline_report,
                                    "shelters": {k: v for k, v in shelter_report.items() if k != "shelters"}}),
     "areas[c=deck]": sources.single("structures", "zps", nc(lambda c: c == "deck")),
-    "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))})
+    "areas[c=wall]": sources.single("walls", "zps", nc(lambda c: c == "wall"))},
+    facts={"surveyGround": ground_facts})
 out["attribution"] = sources.attribution(out["provenance"])
 dst = os.path.join(ROOT, "data", f"line{LINE}.dtm.json")
 with replacing(dst, "w", encoding="utf-8") as fh:
