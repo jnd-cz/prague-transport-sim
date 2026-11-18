@@ -36,6 +36,11 @@ FULL = "!!(document.fullscreenElement || document.webkitFullscreenElement)"
 # (Safari on an iPhone: a page has no Fullscreen API)
 SAFARI = """for (const k of ['fullscreenEnabled', 'webkitFullscreenEnabled']) Object.defineProperty(Document.prototype, k, { get: () => false });
 delete Element.prototype.requestFullscreen; delete Element.prototype.webkitRequestFullscreen;"""
+# (a desktop browser that reports a coarse pointer without a touch screen, as the Firefox of #675's note)
+COARSE = """const mm = window.matchMedia.bind(window);
+window.matchMedia = (q) => /pointer: coarse/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : mm(q);"""
+# (switched on with 🎮 once, on a desktop)
+STORED = "localStorage.setItem('tram-touch', '1');"
 # (started from the home screen)
 HOME = """const mm = window.matchMedia.bind(window);
 window.matchMedia = (q) => /display-mode: (fullscreen|standalone)/.test(q) ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : mm(q);"""
@@ -73,8 +78,10 @@ def layout(page):
     }""")
 
 
-def shift(browser, port, line, vp, mobile, before=None):
+def shift(browser, port, line, vp, mobile, before=None, script=None):
     ctx = browser.new_context(viewport={"width": vp[0], "height": vp[1]}, is_mobile=mobile, has_touch=mobile)
+    if script:
+        ctx.add_init_script(script)
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -196,6 +203,22 @@ def main():
                 r.setdefault("deskButtons", []).append(page.is_visible("#touch button[data-k='w']"))
                 r.setdefault("deskAsked", []).append(page.evaluate("!!document.getElementById('fsAsk')?.classList.contains('show')"))
                 ctx.close()
+            # a desktop reporting a coarse pointer without touch (#675): hidden at load, ⛶ in the menu changes nothing;
+            # one switched on with 🎮 once: shown, and the menu's 🎮 says so
+            seen = {}
+            def full(page):
+                seen["menu"] = [page.evaluate("document.body.classList.contains('touch')"), page.evaluate("document.querySelector('.tbToggle:not(.fs)').classList.contains('on')")]
+                page.click(".tbToggle.fs")
+                page.wait_for_timeout(300)
+                seen["afterFull"] = page.evaluate("document.body.classList.contains('touch')")
+            ctx, page, errors = shift(browser, port, args.line, (1699, 1016), False, full, COARSE)
+            r["deskCoarse"] = {**seen, "shift": page.is_visible("#touch button[data-k='w']"), "errors": errors[:3]}
+            ctx.close()
+            def menu_on(page):
+                seen["stored"] = page.evaluate("document.querySelector('.tbToggle:not(.fs)').classList.contains('on')")
+            ctx, page, errors = shift(browser, port, args.line, (1280, 720), False, menu_on, STORED)
+            r["deskStored"] = {"marked": seen["stored"], "shift": page.is_visible("#touch button[data-k='w']"), "errors": errors[:3]}
+            ctx.close()
             browser.close()
     finally:
         server.shutdown()
@@ -212,6 +235,10 @@ def main():
         fails.append(f"page errors: {r['phoneErrors']}")
     if any(r["deskButtons"]):
         fails.append("on-screen controls shown on a desktop")
+    if r["deskCoarse"] != {"menu": [False, False], "afterFull": False, "shift": False, "errors": []}:
+        fails.append(f"a desktop reporting a coarse pointer without touch: controls shown, or changed by ⛶ (#675): {r['deskCoarse']}")
+    if r["deskStored"] != {"marked": True, "shift": True, "errors": []}:
+        fails.append(f"a desktop with the controls switched on: not shown, or the menu's 🎮 does not say so: {r['deskStored']}")
     if not r["asked"] or r["noFull"] != [False, "0"]:
         fails.append(f"full screen: a phone not asked, or 'Not now' still went full screen ({r['noFull']})")
     if not r["askedL"] or not r["fullAgain"]:

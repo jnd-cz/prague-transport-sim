@@ -17,6 +17,9 @@ const STARTS = ['btnStart', 'btnPerfTest', 'btnPerfRef'];
 const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { /* (no storage) */ } return null; };
 const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
 const fsAble = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+// (shown by default only where the device takes touch: a coarse pointer alone is no touch screen. A desktop Firefox
+// showed them at load with navigator.maxTouchPoints 0, the player's note fb-20261118-083538, #675)
+const touchDevice = () => navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
 // (started from the home screen: full screen already, the browser's bars gone)
 const standalone = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
 // [key, label, hold] — a held button sends keyup on release (sand, look, zoom, the emergency brake)
@@ -29,7 +32,7 @@ export class TouchControls {
     this.sheet = sheet; // () => the panel's sheet opened or closed
     let on;
     try { on = localStorage.getItem(KEY); } catch { /* (no storage) */ }
-    this.set(on === null || on === undefined ? matchMedia('(pointer: coarse)').matches : on === '1', false);
+    this.set(on === null || on === undefined ? touchDevice() : on === '1', false);
     const css = document.createElement('style');
     css.textContent = `
 #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 6; user-select: none; -webkit-user-select: none }
@@ -47,6 +50,8 @@ body.touch.shift #touch { display: block }
 #touch.deadman .main .dm { display: block }
 body.touch #rpBtn { display: none !important }
 .tbToggle { position: fixed; top: 8px; left: 8px; z-index: 11; font-size: 18px; padding: 6px 9px }
+/* (switched on: the menu says so, so a desktop that once switched them on can tell why they show, #675) */
+.tbToggle.on { background: rgba(44,107,55,.9); border: 1px solid rgba(170,230,180,.8); border-radius: 6px }
 body.shift .tbToggle { display: none }
 /* (a touch screen with the controls switched off has no pause and no way back to them: 🎮 stays in the shift, the user's
    phone in landscape, 2026-11-11, #485) */
@@ -116,6 +121,7 @@ body.shift .tbToggle { display: none }
     tg.textContent = '🎮';
     tg.onclick = () => this.set(!this.on);
     document.body.appendChild(tg);
+    this.set(this.on, false);
     this.fullscreen();
     this.sync();
   }
@@ -191,7 +197,7 @@ body.shift .tbToggle { display: none }
     this.on = on;
     document.body.classList.toggle('touch', on);
     if (keep) try { localStorage.setItem(KEY, on ? '1' : '0'); } catch { /* (no storage) */ }
-    if (this.toggle) this.toggle.title = t(on ? 'tb.off' : 'tb.on');
+    if (this.toggle) { this.toggle.title = t(on ? 'tb.off' : 'tb.on'); this.toggle.classList.toggle('on', on); }
   }
 
   labels() {
