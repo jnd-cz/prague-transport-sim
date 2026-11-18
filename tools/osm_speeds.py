@@ -7,7 +7,8 @@ whether the track is dedicated (no vehicle road along it: its own corridor, wher
 canted). Reads the Overpass cache written by build_line.py, writes `speed` into data/lineN.json:
   {"step": 5, "osm": [km/h or 0, ...], "dedicated": [0/1, ...], "source": "..."}
 A posted speed in data/truth.json `postedSpeeds` (seen by the user, keyed by the OSM way id) holds over that way's
-`maxspeed` (#612); each one applied is printed.
+`maxspeed` (#612); its state against OSM (holds, matches, changed: tools/sources.py fact_state) goes into the
+provenance's `facts` (#670, tools/fact_status.py).
 
 Usage:  python tools/osm_speeds.py --line 22
 """
@@ -21,6 +22,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STEP = 5.0
 CELL = 20.0  # m: the grids' cell
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -I / -P leave it out)
+import sources  # noqa: E402
 
 
 def speed(tags):
@@ -36,27 +38,22 @@ def corrections(truth):
     return {f["way"]: f for f in truth.get("postedSpeeds", [])}
 
 
-def way_speeds(els, fixes, log=print):
-    """Each tram way's posted speed: its `maxspeed`, or the correction for it. A correction holds whatever OSM tags;
-    the log says where OSM now tags the same (no longer needed) and where it tags neither the speed the fact corrects
-    nor the corrected one (the way was edited since: look at it again)."""
-    out = {}
+def way_speeds(els, fixes):
+    """Each tram way's posted speed: its `maxspeed`, or the correction for it, which applies whatever OSM tags; and
+    each correction's state against what OSM tags now (sources.fact_state: `osm` is what the way tagged when the fact
+    was recorded)."""
+    out, facts = {}, []
     for w in els:
         if w["type"] != "way":
             continue
         v = speed(w.get("tags"))
         f = fixes.get(w["id"])
         if f:
-            if v == f["maxspeed"]:
-                log(f"way {w['id']}: OSM tags {v} as {f['id']} says: the correction is no longer needed")
-            elif v != f["osm"]:
-                log(f"way {w['id']}: OSM tags {v or 'none'}, not the {f['osm']} {f['id']} corrects: "
-                    f"{f['maxspeed']} holds, look at the way again")
-            else:
-                log(f"way {w['id']}: {f['maxspeed']} over OSM's {v} ({f['id']})")
+            facts.append({"id": sources.fact_id("postedSpeeds", f), "state": sources.fact_state(f["maxspeed"], f["osm"], v or None),
+                          "way": w["id"], "now": v or None, "recorded": f["osm"], "fact": f["maxspeed"]})
             v = f["maxspeed"]
         out[w["id"]] = v
-    return out
+    return out, facts
 
 
 def seg_dist(p, a, b):
@@ -142,7 +139,6 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     from geo import Frame
     from atomic import replacing
-    import sources
     line_id = sys.argv[sys.argv.index("--line") + 1] if "--line" in sys.argv else "22"
     dst = os.path.join(ROOT, "data", f"line{line_id}.json")
     line = json.load(open(dst, encoding="utf-8"))
@@ -159,17 +155,20 @@ def main():
     nodes = {e["id"]: tuple(float(v) for v in F.xy(e["lat"], e["lon"])) for e in els if e["type"] == "node"}
     fixes = corrections(json.load(open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8")))
     roads = [r for r in line["roads"] if not r.get("f") and r.get("c")]
-    osm, ded, by_way = along(line["path"], els, nodes, roads, way_speeds(els, fixes))
+    speeds, facts = way_speeds(els, fixes)
+    osm, ded, by_way = along(line["path"], els, nodes, roads, speeds)
     held = sum(by_way.get(w, 0) for w in fixes)
-    for w in sorted(w for w in fixes if by_way.get(w)):
-        print(f"{fixes[w]['id']}: {by_way[w]} samples at {fixes[w]['maxspeed']} km/h")
+    facts = [f for f in facts if by_way.get(f["way"])]  # the ways under this line's track
+    for f in facts:
+        print(f"{f['id']}: {f['state']}, OSM {f['now'] or 'none'}; {by_way[f['way']]} samples at {f['fact']} km/h")
 
     line["speed"] = {"step": STEP, "osm": osm, "dedicated": ded,
                      "source": "OpenStreetMap railway=tram maxspeed (as shown by OpenRailwayMap)"}
     # (a sample without a posted speed is 0: the game's curvature and switch limits hold there)
     tagged = sum(1 for v in osm if v)
     line["provenance"] = sources.stamp("osm_speeds.py", {"speed": sources.entry(
-        "speeds", [held, tagged - held, len(osm) - tagged], f"{STEP:g} m samples")}, line.get("provenance"))
+        "speeds", [held, tagged - held, len(osm) - tagged], f"{STEP:g} m samples")}, line.get("provenance"),
+        facts={"postedSpeeds": facts})
     line["attribution"] = sources.attribution(line["provenance"])
     # (written whole and renamed: tools/rebuild.py runs other steps that read this file at the same time)
     with replacing(dst, "w", encoding="utf-8") as fh:

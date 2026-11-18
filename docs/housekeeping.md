@@ -21,7 +21,9 @@ starts from the new baseline anyway.
    - leftover worktrees and branches;
    - known failures whose issue is closed;
    - dated issues;
-   - CI times.
+   - CI times;
+   - the data/truth.json facts over a source that a source now matches, that changed or moved, or that are retired
+     but still stated (`tools/fact_status.py`, #670).
 2. Turn what it shows into proposals, one line each, which someone can act on:
    - a draft idle over 48 h: close it, or label it `parked` with what is left (AGENTS.md, Merge windows);
    - ready PRs: the list for the merge window;
@@ -34,7 +36,10 @@ starts from the new baseline anyway.
    - a known-failure row whose issue is closed: remove it, or name its new issue;
    - a dated issue whose day has come: who takes it;
    - a file that grew over 15 % in a week, or passed 2000 lines: noted for the next architecture review;
-   - CI's median over 2 minutes, or runs that failed.
+   - CI's median over 2 minutes, or runs that failed;
+   - a fact a source now matches: retire it, deleted from `data/truth.json` in a PR that quotes it and names the
+     snapshot that matches (the user, 2026-11-18: "git history is good enough"); one that changed or moved: look at
+     the place again.
 3. Post: `python -I tools/repo_health.py --post 291`, then one comment with the proposals, numbered, so
    the user answers by number. The pass changes nothing itself.
 

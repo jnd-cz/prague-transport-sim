@@ -277,6 +277,8 @@ def main():
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import validation
         validation.write_report(built)
+        import fact_status  # the facts over a source the lines state (#670): what a source now matches
+        print("facts that override a source:", fact_status.summary(fact_status.collect(ROOT)) or "none stated")
     sys.exit(1 if any("FAILED" in r for r in results) else 0)
 
 

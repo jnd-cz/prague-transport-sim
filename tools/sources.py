@@ -163,10 +163,11 @@ def single(layer, source, n, unit="features"):
     return entry(layer, [n if s == source else 0 for s in LAYERS[layer]], unit)
 
 
-def stamp(tool, lists, prev=None, root=ROOT):
+def stamp(tool, lists, prev=None, root=ROOT, facts=None):
     """A built file's provenance: per list (the file's JSON key) its layer, levels and counts, and the
     sources used with their dates. Several tools writing one file (lineN.json) each add their lists
-    to the block already there (`prev`)."""
+    to the block already there (`prev`). `facts`: per data/truth.json section, the state of each of its facts the tool
+    applied over a source (fact_state, #670); kept from `prev` like the lists, and absent while no tool states one."""
     out = {"lists": dict((prev or {}).get("lists", {}))}
     for key, e in lists.items():
         out["lists"][key] = {"tool": tool} | e
@@ -176,7 +177,60 @@ def stamp(tool, lists, prev=None, root=ROOT):
     out["sources"] = {s: {k: v for k, v in (("title", SOURCES[s].title), ("date", dated(s, root)),
                                             ("attribution", SOURCES[s].attribution), ("datum", SOURCES[s].datum)) if v}
                       for s in used}
+    stated = dict((prev or {}).get("facts", {}))
+    for section, es in (facts or {}).items():
+        for e in es:
+            if e.get("state") not in FACT_STATES:
+                raise ValueError(f"{section} {e.get('id')}: state {e.get('state')!r} is not one of {FACT_STATES}")
+        if es:
+            stated[section] = {"tool": tool, "facts": sorted(es, key=lambda e: str(e["id"]))}
+        else:  # none of the section's facts applies to this file
+            stated.pop(section, None)
+    if stated:
+        out["facts"] = stated
     return out
+
+
+# The state of a data/truth.json fact the build applies over a source, on every build (#670; the user, 2026-11-18: "report
+# the custom facts which are overriding source data once they match [...] so we can eventually retire the manual
+# corrections"). A correction holds while the source still differs from it, matches once the source gives the fact's
+# value (it can be retired: deleted from truth.json on the user's word, "git history is good enough"), and changed when
+# the source gives neither the value recorded with the fact nor the fact's (look again). A confirmation (the user said
+# the source was right) agrees while the source still gives it, and moved once the source left it: the fact then holds
+# against the source.
+FACT_STATES = ("holds", "matches", "changed", "agrees", "moved")
+
+# The data/truth.json sections whose facts override a source (#670): where their facts are in the file, each fact's
+# stable id (its own id, else its place: never an array index), and the tool that states them. tools/fact_status.py
+# lists a fact of these that no built file states as not stated.
+OVERRIDES = {
+    "postedSpeeds": (("postedSpeeds",), lambda f: f["id"], "tools/osm_speeds.py"),
+}
+
+
+def overriding(truth, section):
+    """The facts of an OVERRIDES section in data/truth.json (as loaded), in file order."""
+    v = truth
+    for k in OVERRIDES[section][0]:
+        v = (v or {}).get(k) if isinstance(v, dict) else None
+    return v or []
+
+
+def fact_id(section, fact):
+    return OVERRIDES[section][1](fact)
+
+
+def fact_state(fact, recorded, now, same=None, confirms=False):
+    """The state of a fact whose value is `fact`, recorded when the source said `recorded` (None: not recorded), where
+    the source now says `now` (None: nothing there). `same(a, b)`: within the kind's tolerance (default: equal)."""
+    same = same or (lambda a, b: a == b)
+    if confirms:
+        return "agrees" if now is not None and same(now, fact) else "moved"
+    if now is not None and same(now, fact):
+        return "matches"
+    if recorded is None or (now is not None and same(now, recorded)):
+        return "holds"
+    return "changed"
 
 
 def attribution(*provs):
