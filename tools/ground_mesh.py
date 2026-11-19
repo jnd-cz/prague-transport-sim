@@ -17,7 +17,8 @@ From the partition (tools/ground_partition.py partition(): survey, bed, plot and
    - inside the beds' outline (but a raised area: a platform, a sidewalk, an island): the bed surface, the lowest bed
      there (bed_surface.Beds.surface: the rails at top of rail - lift -+ the cant's tilt, as the page lays the bed);
    - survey: the generated street surface (data/lineN.streets.*, #512) on roads, tram areas and sidewalks; elsewhere
-     the survey area's own surface (its outline's heights, triangulated);
+     the survey area's own surface (its outline's heights, triangulated; stairs of one flight, its plane, and stairs
+     whose outline read as planes the lidar holds, those: flight(), stairs_planes(), #447);
    - plot: the city mesh's (#632);
    - water (OSM's, and the survey's in it; the file's terrain class drawn as water): the level its banks give past its
      weirs (ground_partition.WaterLevels, #632), its faces cut to WATER_LATTICE;
@@ -115,6 +116,163 @@ def flight(a):
     if rank < 3 or np.abs(A @ coef - P[:, 2]).max() > STAIRS_FLAT:
         return None
     return x0, y0, coef
+
+
+STAIRS_PLANES = 3  # the most planes looked for on a stairs area's outline: flights and landings (outline_planes)
+STAIRS_ACROSS = 0.5  # m: outline points all this near one line in plan give no slope across it: level across, as a step is
+STAIRS_STEEP = 1.0  # rise over run: no flight is steeper (a step of 17 / 29 cm is 0.59); a plane that is, is a wall's face
+STAIRS_EDGES = 2  # a plane holds this many of the outline's edges that no plane before it does: one edge from a point
+# off the planes to a point on one (a post's foot, a cheek wall's end) is no flight
+STAIRS_ROUNDS = 6  # a plane is fitted again to the points it holds at most this many times
+STAIRS_GRID = 0.25  # m: a stairs area's planes and its outline's triangles are held against the lidar every this far
+STAIRS_SAMPLES = 8  # with fewer points inside it an area is too small for the lidar's 1 m raster to say
+STAIRS_LIDAR = 0.5  # m: planes are taken where they lie this near the lidar, on average (ground_place.OFF_LIDAR)
+STAIRS_NEARER = 0.1  # m: and this much nearer it than the outline's triangles do
+
+
+def plane_through(P):
+    """The plane through points (n, 3) by least squares, as flight() gives it: (x0, y0, (gx, gy, z0)). Points within
+    STAIRS_ACROSS of one line in plan (two points; a flight's side) say nothing of the slope across the line: the plane
+    is level across it."""
+    x0, y0 = P[:, 0].mean(), P[:, 1].mean()
+    d = P[:, :2] - (x0, y0)
+    vt = np.linalg.svd(d, full_matrices=False)[2]
+    if len(P) < 3 or np.abs(d @ vt[1]).max() < STAIRS_ACROSS:
+        t = d @ vt[0]
+        g = float(t @ (P[:, 2] - P[:, 2].mean())) / max(float(t @ t), 1e-12)
+        return x0, y0, np.array([g * vt[0, 0], g * vt[0, 1], P[:, 2].mean()])
+    return x0, y0, np.linalg.lstsq(np.column_stack([d, np.ones(len(P))]), P[:, 2], rcond=None)[0]
+
+
+def plane_at(p, x, y):
+    """Heights on a plane (x0, y0, (gx, gy, z0)) at (x, y)."""
+    x0, y0, (gx, gy, z0) = p
+    return z0 + gx * (np.asarray(x, float) - x0) + gy * (np.asarray(y, float) - y0)
+
+
+def plane_grown(P, seed):
+    """The plane grown from the outline points `seed` (indexes into P (n, 3)) and which points it holds: (plane, (n,)
+    bool). Fitted to the seed, then to the points within STAIRS_FLAT of it, until they stay the same (STAIRS_ROUNDS at
+    most). None where it ends steeper than STAIRS_STEEP."""
+    hold = np.zeros(len(P), bool)
+    hold[seed] = True
+    for _ in range(STAIRS_ROUNDS):
+        p = plane_through(P[hold])
+        new = np.abs(plane_at(p, P[:, 0], P[:, 1]) - P[:, 2]) <= STAIRS_FLAT
+        if new.sum() < 2 or (new == hold).all():
+            break
+        hold = new
+    if math.hypot(p[2][0], p[2][1]) > STAIRS_STEEP:
+        return None
+    return p, np.abs(plane_at(p, P[:, 0], P[:, 1]) - P[:, 2]) <= STAIRS_FLAT
+
+
+def outline_planes(S):
+    """Up to STAIRS_PLANES planes on a stairs area's outline, and the plane each of its edges lies on: (planes, (n,) index,
+    -1 on none). S: (n, 2, 3) the outline's edges. Each plane is grown from one edge not yet on a plane (plane_grown);
+    the one holding the most of the outline's length not yet on a plane is taken, of STAIRS_EDGES such edges or more, one
+    after another: an edge lies on the first plane that holds both its ends."""
+    P, inv = np.unique(S.reshape(-1, 3), axis=0, return_inverse=True)
+    e = inv.reshape(-1, 2)
+    L = np.hypot(S[:, 1, 0] - S[:, 0, 0], S[:, 1, 1] - S[:, 0, 1])
+    on = np.full(len(S), -1)
+    planes = []
+    for _ in range(STAIRS_PLANES):
+        best, seen = None, set()
+        for k in np.flatnonzero(on < 0).tolist():
+            g = plane_grown(P, e[k])
+            if g is None or g[1].tobytes() in seen:
+                continue
+            seen.add(g[1].tobytes())
+            new = (on < 0) & g[1][e[:, 0]] & g[1][e[:, 1]]
+            if new.sum() >= STAIRS_EDGES and (best is None or L[new].sum() > best[0]):
+                best = (float(L[new].sum()), g[0], new)
+        if best is None:
+            break
+        on[best[2]] = len(planes)
+        planes.append(best[1])
+        if (on >= 0).all():
+            break
+    return planes, on
+
+
+def flights(a):
+    """The readings of a stairs area's outline as planes, the plainest first: [(planes, (m, 2, 3) the outline's edges on
+    them, (m,) each edge's plane)]: the outline's first plane (outline_planes), its first two, its first three, then each
+    later one alone. The points off the planes are left out: a cheek wall's top, a post, the ground at a side wall's
+    foot. Which reading holds, if any, the lidar says (stairs_planes)."""
+    S = ring_segments(a)
+    if len(S) < 3:
+        return []
+    planes, on = outline_planes(S)
+    sets = [np.arange(k + 1) for k in range(len(planes))] + [np.array([k]) for k in range(1, len(planes))]
+    return [([planes[j] for j in ks], S[np.isin(on, ks)], np.searchsorted(ks, on[np.isin(on, ks)])) for ks in sets]
+
+
+def on_flights(fit, x, y):
+    """Heights of points of a stairs area on its planes (flights()): each on the plane of the outline's nearest edge that
+    lies on one."""
+    planes, S, on = fit
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    a, e = S[:, 0, :2], S[:, 1, :2] - S[:, 0, :2]
+    l2 = np.maximum((e ** 2).sum(1), 1e-12)
+    out = np.full(len(x), np.nan)
+    for k in range(0, len(x), 2000):
+        px, py = x[k:k + 2000, None], y[k:k + 2000, None]
+        t = np.clip(((px - a[:, 0]) * e[:, 0] + (py - a[:, 1]) * e[:, 1]) / l2, 0, 1)
+        j = on[np.hypot(a[:, 0] + e[:, 0] * t - px, a[:, 1] + e[:, 1] * t - py).argmin(1)]
+        for i, p in enumerate(planes):
+            out[k:k + 2000][j == i] = plane_at(p, px[j == i, 0], py[j == i, 0])
+    return out
+
+
+def by_lidar(fits, x, y, z, zl):
+    """Which of a stairs area's readings as planes (flights()) the lidar holds, None where none: the one lying nearest
+    the lidar zl at the points (x, y), by the mean distance, where that is within STAIRS_LIDAR and STAIRS_NEARER or more
+    under the same of z, the outline's triangles there. Of two as near to a cm, the plainer."""
+    ok = np.isfinite(z) & np.isfinite(zl)
+    if ok.sum() < STAIRS_SAMPLES:
+        return None
+    most = min(STAIRS_LIDAR, float(np.abs(z[ok] - zl[ok]).mean()) - STAIRS_NEARER)
+    best = None
+    for f in fits:
+        d = round(float(np.abs(on_flights(f, x[ok], y[ok]) - zl[ok]).mean()), 2)
+        if d <= most and (best is None or d < best[0]):
+            best = (d, f)
+    return None if best is None else best[1]
+
+
+def stairs_planes(D, ids, lidar):
+    """{area: its planes} of the stairs areas among `ids` that are no one flight (flight()) and whose outline read as
+    planes (flights()) the lidar holds (by_lidar): each takes them for its surface (SurveySurface). lidar(x, y): IPR's
+    raster in the line's frame.
+
+    A stairs outline carries more than the stairs: the top of the wall beside them, the ground at their side's foot, the
+    next flight's noses. Line 37's area 2169 at (4001, 1412) has a flight's 14 noses along one side (182.67-186.42 m)
+    and the level it leads to (186.4-186.9 m) along the other: its triangles lay 1.76 m off the lidar, 10 of its 19 m2
+    steeper than 1:1, and the level's plane 0.19 m off it. The outline alone cannot tell: planes taken wherever they
+    held 80 % of its length and met without a cliff changed lines 9, 17, 22, 23 and 37 by +2, +6, -13, -12 and -2 m2
+    steeper than 1:1 of 400, 293, 290, 172 and 68, since a strip of steps between two levels (line 37, area 2192 at
+    (3908, 1322): 188.33 m one side, 188.92 m the other) reads as two planes too, and there the triangles are right
+    (#447). The raster is the bare earth: it leaves out a short flight up to a door or down below the ground
+    (docs/knowledge.md, Bare earth leaves out small things). Where it holds a level, the ground is drawn level and
+    that flight is no ground: 2169's noses lead 4 m below the sidewalk the area lies in."""
+    ids = [i for i in sorted(set(ids)) if D["areas"][i]["c"] == "stairs" and flight(D["areas"][i]) is None]
+    tri = SurveySurface(D, ids)
+    out = {}
+    for i in ids:
+        a = D["areas"][i]
+        fits = flights(a)
+        g = shapely.Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
+        if not fits or not g.is_valid or g.is_empty:
+            continue
+        x0, y0, x1, y1 = g.bounds
+        X, Y = np.meshgrid(np.arange(x0, x1 + STAIRS_GRID, STAIRS_GRID), np.arange(y0, y1 + STAIRS_GRID, STAIRS_GRID))
+        m = shapely.contains_xy(g, X, Y)
+        f = by_lidar(fits, X[m], Y[m], tri.at(i, X[m], Y[m]), np.asarray(lidar(X[m], Y[m]), float))
+        if f is not None:
+            out[i] = f
+    return out
 
 
 RISER = 1.0  # m: an outline rising this much between two points RISER_RUN apart or nearer climbs a wall
@@ -216,10 +374,11 @@ def beside(D, ids, raised, lidar):
 
 class SurveySurface:
     """Each survey area's own surface: its outline's heights, triangulated (the page's DtmSurface); a stairs area that is
-    one flight, its plane (flight())."""
+    one flight, its plane (flight()); one in `planes` (stairs_planes()), its planes there."""
 
-    def __init__(self, D, areas):
+    def __init__(self, D, areas, planes=None):
         self.tris, self.area, self.flights = [], [], {}
+        self.planes = {i: f for i, f in (planes or {}).items() if i in set(areas)}
         for i in sorted(set(areas)):
             a = D["areas"][i]
             if a["c"] == "stairs":
@@ -247,6 +406,8 @@ class SurveySurface:
         if area in self.flights:
             x0, y0, (gx, gy, z0) = self.flights[area]
             return z0 + gx * (np.asarray(x, float) - x0) + gy * (np.asarray(y, float) - y0)
+        if area in self.planes:
+            return on_flights(self.planes[area], x, y)
         if self.tree is None or not len(x):
             return out
         pi, ti = self.tree.query(shapely.points(x, y), predicate="intersects")
@@ -1141,6 +1302,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
                      wall_lines.source_lines(ln, box=box.bounds), box.bounds, log)
     walls = wall_stretches = wall_lines.stretches(ln, box=box.bounds, lidar=lidar_w, extra=abut)
     log(f"  {len(abut)} abutment lines, {len(walls)} wall stretches")
+    # (the stairs that are no one flight and whose outline's planes the lidar holds, #447)
+    stairs = stairs_planes(D, [q["area"] for q in pieces["survey"] if q["c"] == "stairs"], lidar_w)
+    log(f"  {len(stairs)} stairs on their outline's planes: {sum(len(f[0]) > 1 for f in stairs.values())} of them on two or three")
     for w in walls:
         g = shapely.LineString(w["p"]).intersection(box)
         if not g.is_empty:
@@ -1168,7 +1332,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
             g = lattice(q["g"], WATER_LATTICE)
             if g is not None and not g.is_empty:
                 lines.append(g)
-        elif q["c"] == "wall":  # (a wall's face, its corners between its two sides: across_outline, #653)
+        # (a wall's face, its corners between its two sides: across_outline, #653; stairs of two or three planes, their
+        # corners on them either side of a crease, #447)
+        elif q["c"] == "wall" or len(stairs.get(q["area"], ((),))[0]) > 1:
             g = lattice(q["g"], WALL_LATTICE)
             if g is not None and not g.is_empty:
                 lines.append(g)
@@ -1286,7 +1452,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     prio = np.full(len(cx), 9.0)
     kind = np.full(len(cx), "", dtype=object)
     from track_styles import RANK
-    surface = SurveySurface(D, [pieces["survey"][owners[o][1]]["area"] for o in owner if owners[o][0] == "survey"])
+    surface = SurveySurface(D, [pieces["survey"][owners[o][1]]["area"] for o in owner if owners[o][0] == "survey"], stairs)
     # terrain: the parent triangle's plane
     m = corner_cls == "terrain"
     par = np.array([owners[o][1] for o in owner])[corner_face[m]]

@@ -651,6 +651,17 @@ Sections:
     to 2.5 m; 7-24 % of their area, triangulated on the outline, is steeper than 1:1 (1-2 % of the other paved
     areas'). They take a wall's heights (`ground_mesh.wall_like`): a terraced garden's edgings, line 23 (-1117, 806),
     stood as fins up to 2 m across its lawns. The wider ones (6-23 a line, 0.25-0.53 ha) keep their outline.
+  - *Stairs* (level 0: 283-1,016 areas a line). 56-76 % have their outline within 0.2 m of one plane and take it
+    (`ground_mesh.flight`). The others' outlines carry more than the stairs: the top of a wall beside them, the ground
+    at a side wall's foot, the next flight's noses, the level a flight leads to. Their triangles fold: 68-400 m² a line
+    steeper than 1:1 (3.6-6.3 % of their plan). The outline alone does not say which of its points are the stairs:
+    read as up to three planes holding 80 % of its length and meeting without a cliff, it changed lines 9, 17, 22, 23
+    and 37 by +2, +6, -13, -12 and -2 m², since a strip of steps between two levels reads as two planes as well. IPR's
+    raster says it for 19-67 areas a line (`ground_mesh.stairs_planes`: the planes within 0.5 m of it on average and
+    0.1 m nearer than the triangles): one plane in all but 0-4 of them, 22-154 m² less a line steeper than 1:1, none
+    more. The raster is the bare earth: where a short flight leads up to a door or down below the ground it shows the
+    level round it, and that level is what the ground then draws (line 37, area 2169 at (4001, 1412)). 88-269 areas a
+    line stay on their triangles, 23-86 of them with 0.5 m² or more steeper than 1:1 (#447).
   The survey also has 65 km of `Terénní_hrana` (the tops and feet of slopes) on line 17 and 8.4 km of
   `Hranice_schodiště`; neither is read by the ground yet (#447 for the stairs).
 

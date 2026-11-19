@@ -191,6 +191,75 @@ class Stairs(unittest.TestCase):
         self.assertEqual(s.flights, {})
         self.assertAlmostEqual(float(s.at(0, np.array([1.0]), np.array([0.0]))[0]), 200.0)
 
+    # (a flight of 2 m rise over 4 m and its landing, 3 m long)
+    LANDING = {"c": "stairs", "l": 0, "r": [[0, 0, 0.0], [2, 0, 0.0], [2, 4, 2.0], [2, 7, 2.0], [0, 7, 2.0], [0, 4, 2.0]]}
+    # (as line 37's area 2169: a flight's noses along one side, the level it leads to along the others)
+    NOSES = {"c": "stairs", "l": 0, "r": [[0, 0, 2.0], [2, 0, 4.0], [2, 10, 4.0], [0, 10, 4.0], [0, 4, 4.0], [0, 3, 3.5], [0, 2, 3.0],
+                                          [0, 1, 2.5]]}
+
+    def test_points_on_one_line_give_a_plane_level_across_it(self):
+        side = np.array([[0, 0, 2.0], [0, 1, 2.5], [0, 4, 4.0]])
+        p = gm.plane_through(side)
+        np.testing.assert_allclose(gm.plane_at(p, np.array([0.0, 3.0, -2.0]), np.array([2.0, 2.0, 0.0])), [3.0, 3.0, 2.0], atol=1e-9)
+        p = gm.plane_through(np.array([[0, 0, 0.0], [2, 0, 1.0], [2, 4, 3.0], [0, 4, 2.0]]))
+        self.assertAlmostEqual(float(gm.plane_at(p, 1.0, 2.0)), 1.5)
+        self.assertAlmostEqual(float(gm.plane_at(p, 2.0, 0.0)), 1.0)
+
+    def test_a_flight_and_its_landing_are_two_planes(self):
+        """#447: each point on the plane of the outline's nearest edge that lies on one."""
+        self.assertIsNone(gm.flight(self.LANDING))
+        planes, on = gm.outline_planes(gm.ring_segments(self.LANDING))
+        self.assertEqual(len(planes), 2)
+        self.assertEqual(on.tolist(), [0, 0, 1, 1, 1, 0])  # (the flight's foot and sides first: 10 m of the outline)
+        fits = gm.flights(self.LANDING)
+        self.assertEqual([len(f[0]) for f in fits], [1, 2, 1])  # (the flight; the flight and the landing; the landing)
+        y = np.array([0.0, 2.0, 3.5, 4.5, 6.0])
+        np.testing.assert_allclose(gm.on_flights(fits[1], np.full(5, 1.0), y), [0.0, 1.0, 1.75, 2.0, 2.0], atol=1e-9)
+        np.testing.assert_allclose(gm.on_flights(fits[0], np.full(5, 1.0), y), 0.5 * y, atol=1e-9)
+        np.testing.assert_allclose(gm.on_flights(fits[2], np.full(5, 1.0), y), 2.0, atol=1e-9)
+
+    def test_one_edge_to_a_point_off_the_planes_is_no_plane(self):
+        post = {"c": "stairs", "l": 0, "r": [[0, 0, 0.0], [2, 0, 0.0], [2, 2, 1.9], [2, 4, 2.0], [0, 4, 2.0]]}
+        self.assertIsNone(gm.flight(post))
+        planes, on = gm.outline_planes(gm.ring_segments(post))
+        self.assertEqual(len(planes), 1)
+        self.assertEqual(on.tolist(), [0, -1, -1, 0, 0])
+        self.assertAlmostEqual(float(gm.on_flights(gm.flights(post)[0], np.array([1.9]), np.array([2.0]))[0]), 1.0)
+
+    def test_a_plane_steeper_than_any_flight_is_none(self):
+        P = np.array([[0, 0, 0.0], [0, 1, 1.5], [2, 0, 0.0], [2, 1, 1.5]])
+        self.assertIsNone(gm.plane_grown(P, [0, 1]))
+        self.assertEqual(gm.plane_grown(P, [0, 2])[1].tolist(), [True, False, True, False])
+
+    def test_the_lidar_holds_the_level_beside_a_flights_noses(self):
+        """#447: line 37's area 2169, its triangles 1.76 m off the lidar and the level's plane 0.19 m."""
+        D = {"areas": [self.NOSES, self.KREJCAREK]}
+        planes = gm.stairs_planes(D, [0, 1], lambda x, y: np.full(len(x), 4.05))
+        self.assertEqual(list(planes), [0])  # (Krejcárek's is one flight: flight())
+        self.assertEqual(len(planes[0][0]), 1)
+        s = gm.SurveySurface(D, [0, 1], planes)
+        np.testing.assert_allclose(s.at(0, np.array([0.0, 0.5, 1.9]), np.array([1.0, 2.0, 9.0])), 4.0, atol=1e-9)
+        self.assertIn(1, s.flights)
+        self.assertLess(float(gm.SurveySurface(D, [0, 1]).at(0, np.array([0.1]), np.array([1.0]))[0]), 3.0)  # (without)
+
+    def test_the_outlines_triangles_stay_where_the_lidar_lies_on_them_or_on_nothing(self):
+        D = {"areas": [self.NOSES]}
+        tri = gm.SurveySurface(D, [0])
+        self.assertEqual(gm.stairs_planes(D, [0], lambda x, y: tri.at(0, x, y)), {})
+        self.assertEqual(gm.stairs_planes(D, [0], lambda x, y: np.full(len(x), 4.0 + gm.STAIRS_LIDAR + 0.01)), {})
+        self.assertEqual(gm.stairs_planes(D, [0], lambda x, y: np.full(len(x), np.nan)), {})
+
+    def test_of_the_readings_the_nearest_the_lidar_and_of_two_as_near_the_plainer(self):
+        fits = gm.flights(self.LANDING)
+        X, Y = np.meshgrid(np.arange(0.125, 2, 0.25), np.arange(0.125, 7, 0.25))
+        x, y = X.ravel(), Y.ravel()
+        creased = np.minimum(0.5 * y, 2.0)
+        self.assertIs(gm.by_lidar(fits, x, y, creased + 0.3, creased), fits[1])
+        self.assertIs(gm.by_lidar(fits, x, y, creased + 0.3, 0.5 * y), fits[0])
+        self.assertIs(gm.by_lidar(fits, x, y, np.zeros(len(x)), np.full(len(x), 2.0)), fits[2])
+        self.assertIsNone(gm.by_lidar(fits, x, y, creased + gm.STAIRS_NEARER - 0.02, creased))  # (the triangles as near)
+        self.assertIs(gm.by_lidar(fits[:1] * 2, x, y, creased + 0.3, 0.5 * y), fits[0])
+
 
 class Walls(unittest.TestCase):
     def test_a_street_corner_on_a_wall_takes_its_height_there(self):
