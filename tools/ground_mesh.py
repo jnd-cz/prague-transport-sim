@@ -249,36 +249,44 @@ def own_heights(D, G, streets, sc, sa, x, y, zs, need, ipr=None):
     cand = np.flatnonzero(need & np.isin(sc, OWN_PLANE))
     if not len(cand):
         return zs, src
+    from scipy.spatial import cKDTree
     ipr = ipr or IprDtm()
     zs = zs.copy()
+    # (per area only which corners; the street and the city mesh are read once for all of them: city_at builds its
+    # tree on each call, and per area it took the heights from 5 to 25 min a line)
+    offs = []
     for a in np.unique(sa[cand]).tolist():
         k = cand[sa[cand] == a]
         segs = ring_segments(D["areas"][a])
         if not len(segs):
             continue
-        c = D["areas"][a]["c"]
-        if c in RAISED:  # (a median's outline is its kerb's top: only off it, where lidar or a sidewalk meets it)
+        if D["areas"][a]["c"] in RAISED:  # (a median's outline is its kerb's top: only off it, where lidar or a sidewalk meets it)
             ring = shapely.MultiLineString([s_[:, :2] for s_ in segs])
-            off = k[shapely.distance(ring, shapely.points(x[k], y[k])) > OWN_ON]
+            offs.append(k[shapely.distance(ring, shapely.points(x[k], y[k])) > OWN_ON])
         else:  # (elsewhere every corner but its surveyed points: its outline's long edges ran between far points too)
-            from scipy.spatial import cKDTree
             d, _ = cKDTree(segs[:, 0, :2]).query(np.column_stack([x[k], y[k]]))
-            off = k[d > OWN_ON]
-        if not len(off):
-            continue
-        z = np.full(len(off), np.nan)
-        for kd in (("road", "sidewalk") if c == "parking" else ("sidewalk",)):
-            miss = np.isnan(z)
-            if miss.any():
-                z[miss] = streets.at(kd, x[off][miss], y[off][miss])
-        src[off[np.isfinite(z)]] = "street"
-        miss = np.isnan(z)
-        if miss.any() and own_ground(D, a, ipr):
-            zl = city_at(G, x[off][miss], y[off][miss])
-            z[np.flatnonzero(miss)] = zl
-            src[off[np.flatnonzero(miss)[np.isfinite(zl)]]] = "lidar"
-        src[off[np.isnan(z)]] = "plane"
-        zs[off] = np.where(np.isfinite(z), z, zs[off])
+            offs.append(k[d > OWN_ON])
+    off = np.concatenate(offs) if offs else np.zeros(0, int)
+    if not len(off):
+        return zs, src
+    z = np.full(len(off), np.nan)
+    park = sc[off] == "parking"
+    if park.any():
+        z[park] = streets.at("road", x[off][park], y[off][park])
+    miss = np.isnan(z)
+    if miss.any():
+        z[miss] = streets.at("sidewalk", x[off][miss], y[off][miss])
+    src[off[np.isfinite(z)]] = "street"
+    miss = np.flatnonzero(np.isnan(z))
+    if len(miss):
+        ground = {a: own_ground(D, a, ipr) for a in np.unique(sa[off[miss]]).tolist()}
+        miss = miss[np.array([ground[a] for a in sa[off[miss]].tolist()], bool)]
+    if len(miss):
+        zl = city_at(G, x[off][miss], y[off][miss])
+        z[miss] = zl
+        src[off[miss[np.isfinite(zl)]]] = "lidar"
+    src[off[np.isnan(z)]] = "plane"
+    zs[off] = np.where(np.isfinite(z), z, zs[off])
     return zs, src
 
 
