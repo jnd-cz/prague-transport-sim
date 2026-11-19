@@ -82,9 +82,12 @@ sys.stdout.reconfigure(encoding="utf-8")
 CALLS = {
     "u3": "const { run } = await import('/tools/bench/u3.js'); return await run(SEED);",
     "redruns": "const { run } = await import('/tools/bench/redruns.js'); return await run(SEED);",
-    # u3 and redruns drive the same trip with the same seed: one drive, both watchers (#205), reported as both
+    # u3, redruns and stops drive the same trip with the same seed: one drive, their watchers (#205, #708), reported
+    # as each one asked (DRIVE). A watcher only reads, so the counts are those of the checks run alone.
     "drive": "const { run } = await import('/tools/bench/u3.js'); const { redrunsWatch } = await import('/tools/bench/redruns.js');"
-             "const r = await run(SEED, { also: [redrunsWatch] }); const red = r.also[0]; delete r.also; return { u3: r, redruns: red };",
+             "const { stopsWatch } = await import('/tools/bench/stops.js');"
+             "const r = await run(SEED, { also: [redrunsWatch, stopsWatch] }); const [red, stops] = r.also; delete r.also;"
+             "return { u3: r, redruns: red, stops };",
     "stops": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED);",
     "autumn": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED, { weather: 'leaves', full: true });",
     # (the other weathers the game has: rain lowers the grip everywhere, snow packs ice into the rails at the crossings, #242)
@@ -113,6 +116,20 @@ CALLS = {
               "const { run } = await import('/tools/bench/speedLimits.js'); return run();",
 }
 SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights", "limits"}
+DRIVE = ("u3", "redruns", "stops")  # the checks one drive serves: two or more of a line and seed run as one "drive"
+
+
+def merge_drives(jobs):
+    """The runs for the jobs (line, check, seed): where two or more of DRIVE are asked for one line and seed, one
+    "drive" in the place of the first and the others left out (#205, #708)."""
+    asked = {}
+    for line, check, seed in jobs:
+        if check in DRIVE:
+            asked.setdefault((line, seed), []).append(check)
+    first = {(line, cs[0], seed) for (line, seed), cs in asked.items() if len(cs) > 1}
+    merged = {k for k, cs in asked.items() if len(cs) > 1}
+    return [(line, "drive", seed) if (line, check, seed) in first else (line, check, seed) for line, check, seed in jobs
+            if (line, check, seed) in first or check not in DRIVE or (line, seed) not in merged]
 
 
 def judge(check, r):
@@ -781,7 +798,7 @@ def main():
     ap.add_argument("--jobs", type=int, default=None,
                     help="pages at once (worker processes); default by cores and free memory, up to ~4 GB a page (line 17)")
     ap.add_argument("--separate", action="store_true",
-                    help="u3 and redruns as two drives (default: one drive watched by both, the same counts)")
+                    help="u3, redruns and stops each as a drive of its own (default: one drive watched by those asked, the same counts)")
     ap.add_argument("--batch", type=int, default=None,
                     help="at most N runs of one line per page load (1: a fresh page per run; default: planned from this "
                          "machine's run times, #413); the counts are the same (#205)")
@@ -852,8 +869,10 @@ def main():
         print(f"[{i}/{len(jobs)}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}")
               + f" … {'pass' if ok else 'FAIL'} ({secs} s) {text}", flush=True)
 
+    asked = set(jobs)
+
     def split(res):
-        """A drive's result as the u3 and redruns results it holds (an error goes to both); its time noted."""
+        """A drive's result as the results of the checks asked of it (an error goes to each); its time noted."""
         (line, check, seed), r, secs, *rest = res
         load = rest[0] if rest else 0
         if not r.get("error") and secs - load > 0:  # (a timeout or a failed load says nothing of the run's length)
@@ -864,7 +883,7 @@ def main():
             return [((line, check, seed), r, secs, load)]
         extra = {"pageErrors": r["pageErrors"]} if r.get("pageErrors") else {}
         return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs, load)
-                for c in ("u3", "redruns")]
+                for c in DRIVE if (line, c, seed) in asked]
 
     heavy = HeavyJob("headless")  # (waits its turn among the heavy jobs, and the nightly baseline for it: #280)
     try:
@@ -875,12 +894,8 @@ def main():
             # runs took 1633 s drawing at 4 pages, 721 s at 8 and 706 s at 12 without, #411)
             a.jobs = workers(4.0, most=PAGES)
         os.makedirs(a.out, exist_ok=True)
-        # (u3 and redruns of a line and seed: one drive; then batches of one line's runs, each in one page)
-        runs = list(jobs)
-        if not a.separate:
-            both = {(l, s) for l, c, s in jobs if c == "u3"} & {(l, s) for l, c, s in jobs if c == "redruns"}
-            runs = [(l, "drive", s) if c == "u3" and (l, s) in both else (l, c, s) for l, c, s in jobs
-                    if not (c == "redruns" and (l, s) in both)]
+        # (u3, redruns and stops of a line and seed: one drive; then batches of one line's runs, each in one page)
+        runs = list(jobs) if a.separate else merge_drives(jobs)
         t = load_timings() if TIMINGS else {"runs": {}, "loads": {}}
         batches = plan(runs, a.jobs, t, a.batch and max(1, a.batch))
         dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
