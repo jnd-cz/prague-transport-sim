@@ -26,6 +26,9 @@ line's build, of that box only. Then, per place, into reports/places/NAME/:
   sloping metres; a ramp or a flight of stairs little off its chord. A profile picture per section.
 - **pictures**: built.png and written.png, the ground from above at the reach (ground_mesh.picture).
 - --written: nothing built, the written file measured alone (seconds).
+- --overlay: the line's ground file with the place's middle tiles replaced by the build's, into
+  reports/places/NAME/overlay/data/, for tools/shot.py --overlay: the game drawn with the place's ground, nothing
+  published. (The network file is the written one; a tile's border may crack where the rule moved it.)
 
 Several places take a shared heavy-job turn (3 GB, the threads); one runs as it is.
 """
@@ -292,12 +295,57 @@ def sections(pl, meshes, out):
     return res
 
 
+def overlay(ln, built, mid, out, root=ROOT):
+    """The written ground file of line ln with the tiles `mid` taken from `built`, into out/data/: (the tiles replaced,
+    those the written file lacks)."""
+    import ground_mesh as gm
+    with open(os.path.join(root, "data", f"line{ln}.ground.json"), encoding="utf-8") as f:
+        layout = json.load(f)
+    with open(os.path.join(root, "data", f"line{ln}.ground.bin"), "rb") as f:
+        blob = f.read()
+    V, F = built["V"], built["F"]
+    cen = V[F].mean(1) / Q
+    m = in_tiles(cen[:, 0], cen[:, 1], mid)
+    used, fl = np.unique(F[m], return_inverse=True)
+    nb, nl = gm.encode_tiles(V[used], fl.reshape(-1, 3), built["cls"][m], built["draw"][m], built["area"][m])
+    mine = {t["name"]: nb[t["offset"]:t["offset"] + t["bytes"]] for t in nl["tiles"]}
+    lay = {t["name"]: t["layout"] for t in nl["tiles"]}
+    parts, tiles, off, done = [], [], 0, []
+    for t in layout["tiles"]:
+        b = blob[t["offset"]:t["offset"] + t["bytes"]]
+        tl = t["layout"]
+        if t["name"] in mine:
+            b, tl = mine[t["name"]], lay[t["name"]]
+            done.append(t["name"])
+        tiles.append(dict(t, offset=off, bytes=len(b), layout=tl))
+        parts.append(b)
+        off += len(b)
+    layout["tiles"] = tiles
+    layout["vertices"] = int(sum(t["layout"]["vertices"] for t in tiles))
+    layout["classes"] = {c: int(sum(t["layout"]["classes"].get(c, 0) for t in tiles)) for c in gm.CLASS_IDS}
+    layout["triangles"] = int(sum(layout["classes"].values()))
+    for name in gm.LAYERS:
+        names = {}
+        for t in tiles:
+            for c, v in (t["layout"].get(name) or {}).items():
+                names.setdefault(c, set()).update(v)
+        if names:
+            layout[name] = {c: sorted(v) for c, v in names.items()}
+    d = os.path.join(out, "data")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, f"line{ln}.ground.bin"), "wb") as f:
+        f.write(b"".join(parts))
+    with open(os.path.join(d, f"line{ln}.ground.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(layout, f, separators=(",", ":"), ensure_ascii=False)
+    return done, [tile_name(e, n) for e, n in mid if tile_name(e, n) not in done]
+
+
 def by_class(V, F, cls):
     import ground_mesh as gm
     return V / Q, {c: F[cls == i] for c, i in gm.CLASS_IDS.items()}
 
 
-def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False, build=True):
+def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False, build=True, over=False):
     """One place built, compared and measured: its report (also written to reports/places/NAME/place.json). build=False:
     the written file alone."""
     import ground_mesh as gm
@@ -328,6 +376,8 @@ def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False
     out = out or os.path.join(ROOT, "reports", "places", name)
     os.makedirs(out, exist_ok=True)
     px = max(2, min(8, int(900 / (2 * reach))))
+    if over and built is not None:
+        rep["overlay"] = dict(zip(("tiles replaced", "tiles the written file lacks"), overlay(ln, built, mid, os.path.join(out, "overlay"))))
     meshes = {k: v for k, v in (("built", mine), ("written", theirs)) if v is not None}
     rep["sections"] = sections(pl, meshes, out)
     if mine is not None:
@@ -376,6 +426,7 @@ def main(argv=None):
     ap.add_argument("--ring", type=int, default=1)
     ap.add_argument("--rings", action="store_true", help="also build with one ring more and compare the two")
     ap.add_argument("--written", action="store_true", help="build nothing: measure the written file alone")
+    ap.add_argument("--overlay", action="store_true", help="also write the line's ground file with the place's tiles replaced")
     ap.add_argument("--mesh")
     ap.add_argument("--threads", type=int, default=4)
     a = ap.parse_args(argv)
@@ -396,12 +447,12 @@ def main(argv=None):
         ap.error("a place's name, --all, --list, or --line with --at")
     if a.written or (len(todo) == 1 and not a.rings):
         for k, v in todo.items():
-            run(k, v, a.ring, a.mesh, a.threads, build=not a.written)
+            run(k, v, a.ring, a.mesh, a.threads, build=not a.written, over=a.overlay)
         return 0
     from baseline_store import HeavyJob
     with HeavyJob("ground places", share={"gb": 5 if a.rings else 3, "cores": a.threads}):
         for k, v in todo.items():
-            run(k, v, a.ring, a.mesh, a.threads, rings=a.rings)
+            run(k, v, a.ring, a.mesh, a.threads, rings=a.rings, over=a.overlay)
     return 0
 
 
