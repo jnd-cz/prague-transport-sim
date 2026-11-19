@@ -1133,6 +1133,8 @@ export function groundUnderDecks(g, world) {
   for (const [a, b] of pr.bridges) {
     const span = { s0: Math.round(a), s1: Math.round(b), samples: 0, ground: { over: 0, tris: 0, max: 0 }, deck: { over: 0, tris: 0, max: 0 }, kinds: {} };
     const seen = new Set();
+    const ends = [a, b, ...(pr.ramps || []).flat().filter((v) => v > a && v < b)];
+    const inDeck = (s) => ends.every((e) => Math.abs(s - e) > 8);
     const count = (what, hit, mag, s, l, p, kind) => {
       const c = span[what], id = `${hit.object.uuid}:${hit.faceIndex}`;
       c.over++;
@@ -1154,8 +1156,9 @@ export function groundUnderDecks(g, world) {
         const ours = (h) => h.object.userData.surface === 'dtm' && !surveyOf(h);
         const deck = hits.find((h) => !ours(h) && levelOf(h) > 0), ground = hits.find((h) => !ours(h) && levelOf(h) === 0);
         if (deck && deck.point.y - zt > OVER_RAILS) count('deck', deck, deck.point.y - zt, s, l, p, kind(deck));
-        // (the ground meets the deck at the abutments: counted more than 8 m inside the span, as Profile.overBridge)
-        if (ground && ground.point.y > zu && s > a + 8 && s < b - 8) count('ground', ground, ground.point.y - zu, s, l, p, kind(ground));
+        // (the ground meets the deck at the abutments: counted more than 8 m inside the deck, as Profile.overBridge; a ramp's
+        // end on the span is an abutment too, the deck beginning there, #594: line 17 s 4136, 7372, 14730, line 37 s 3036)
+        if (ground && ground.point.y > zu && inDeck(s)) count('ground', ground, ground.point.y - zu, s, l, p, kind(ground));
       }
     }
     // (the parapets flushDtm drew from the survey on a flat deck, metres per side: what of the deck's edge they cover)

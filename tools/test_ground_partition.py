@@ -105,6 +105,25 @@ class Beds(unittest.TestCase):
         self.assertAlmostEqual(B.area, 4 * 12, places=3)  # (three 2 m stretches on each side kept, four left out)
         self.assertEqual(log["samples on structures, left out"], 3)
 
+    def test_the_bed_ends_at_the_decks_end(self):
+        # (#594: a span s 60-100 with a ramp s 60-64, the deck from s 64 (x 14); the lidar falls 6 m from x 11, so its
+        # test left out the ramp's sample at x 12 and the bed ended at x 10. The route's deck decides: the bed to x 14)
+        L = {"path": [[-50, 0], [50, 0]], "tracks": [track([[0, 0], [20, 0]], 11)], "spans": [[60, 100]],
+             "ramps": [[60, 64]], "heights": {"step": 2, "path": [0.0] * 51}, "lift": {"step": 2, "unit": 0.001, "v": [0] * 51}}
+        log = {}
+        B, _ = gp.bed_pieces(L, shapely.box(-100, -100, 100, 100), Ipr(lambda x, y: np.where(x > 11, -6.0, 0.0)), Frame(), log)
+        self.assertAlmostEqual(B.bounds[2], 14, places=3)
+        self.assertAlmostEqual(B.area, 14 * 4, places=2)
+        self.assertEqual(log["samples near a span's end the route's decks decided against the lidar"], 1)
+        # (a track crossing under the deck, 6 m below the route, keeps the lidar's test)
+        L["tracks"].append(track([[30, -10], [30, 10]], 11, -6.0))
+        B, outs = gp.bed_pieces(L, shapely.box(-100, -100, 100, 100), Ipr(lambda x, y: np.where(x > 11, -6.0, 0.0)), Frame())
+        self.assertAlmostEqual(dict(outs)[1].area, 20 * 4, places=2)
+
+    def test_route_decks_are_the_spans_less_their_ramps(self):
+        self.assertEqual(gp.route_decks({"spans": [[0, 100], [200, 210]], "ramps": [[0, 10], [90, 100], [205, 210]]}),
+                         [(10, 90), (200, 205)])
+
     def test_outline_keep_mask(self):
         import track_beds
         tr = track([[0, 0], [10, 0]], 6)
