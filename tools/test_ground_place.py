@@ -4,6 +4,7 @@ key (tools/city_terrain.py code_hash): what it hashes of the code.
 
     python -P -E tools/test_ground_place.py
 """
+import json
 import os
 import sys
 import tempfile
@@ -104,6 +105,33 @@ class Measures(unittest.TestCase):
 
     def test_only_what_lies_in_the_box(self):
         self.assertEqual(gpl.measures(*self.wall(), (0, 0, 4, 5))["m2 by class"], {"survey": 25.0})
+
+
+class Overlay(unittest.TestCase):
+    def test_the_places_tile_is_the_builds_and_its_neighbour_the_written_files(self):
+        """x 306 m is the border between tiles e-1486 and e-1485 (tools/test_ground_mesh.py): a triangle either side."""
+        def mesh(z):
+            V = mm([300000, 0, z], [305000, 0, z], [305000, -1000, z], [307000, 0, z], [312000, 0, z], [312000, -1000, z])
+            return {"V": V, "F": np.array([[0, 1, 2], [3, 4, 5]]), "cls": np.array([S, S]),
+                    "draw": np.array(["road", "road"], dtype=object), "area": np.array(["road", "road"], dtype=object)}
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "data"))
+            w = mesh(200000)
+            blob, layout = gm.encode_tiles(w["V"], w["F"], w["cls"], w["draw"], w["area"])
+            with open(os.path.join(root, "data", "line99.ground.bin"), "wb") as f:
+                f.write(blob)
+            with open(os.path.join(root, "data", "line99.ground.json"), "w", encoding="utf-8") as f:
+                json.dump(layout, f)
+            left = tuple(int(v) for v in tile_index(302.0, -0.5))
+            done, lacking = gpl.overlay("99", mesh(205000), [left, (left[0], left[1] + 50)], os.path.join(root, "over"), root)
+            self.assertEqual((len(done), len(lacking)), (1, 1))
+            with open(os.path.join(root, "over", "data", "line99.ground.json"), encoding="utf-8") as f:
+                lay = json.load(f)
+            with open(os.path.join(root, "over", "data", "line99.ground.bin"), "rb") as f:
+                V, by = gm.decode(f.read(), lay)
+            z = {round(float(x)): float(h) for x, _, h in V.tolist()}
+            self.assertEqual((z[300], z[305], z[307], z[312]), (205.0, 205.0, 200.0, 200.0))
+            self.assertEqual((lay["triangles"], len(by["survey"])), (2, 2))
 
 
 class Places(unittest.TestCase):

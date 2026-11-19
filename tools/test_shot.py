@@ -117,6 +117,21 @@ class Shots(unittest.TestCase):
             self.assertEqual(image.getpixel((0,shot.BAR)), (255,0,0))
             self.assertEqual(image.getpixel((20,shot.BAR)), (0,0,255))
 
+    def test_an_overlays_files_stand_in_for_the_checkouts_at_the_same_paths(self):
+        """#757: a place's ground file served over the checkout's; every other file, and a path out of the overlay, as ever."""
+        import urllib.request
+        (self.root / 'data').mkdir(exist_ok=True)
+        (self.root / 'data' / 'a.bin').write_bytes(b'checkout')
+        (self.root / 'data' / 'b.bin').write_bytes(b'only here')
+        with tempfile.TemporaryDirectory() as over:
+            (Path(over) / 'data').mkdir()
+            (Path(over) / 'data' / 'a.bin').write_bytes(b'overlay')
+            with site(self.root, over) as url, site(self.root) as plain:
+                read = lambda u: urllib.request.urlopen(u, timeout=10).read()  # noqa: E731
+                self.assertEqual(read(f'{url}/data/a.bin'), b'overlay')
+                self.assertEqual(read(f'{url}/data/b.bin'), b'only here')
+                self.assertEqual(read(f'{plain}/data/a.bin'), b'checkout')
+
     def test_a_missing_game_hook_is_named(self):
         (self.root / 'index.html').write_text(HTML.replace('dispose() {}, ', ''), encoding='utf-8')
         with self.assertRaisesRegex(RuntimeError, 'window.traffic.dispose'):
