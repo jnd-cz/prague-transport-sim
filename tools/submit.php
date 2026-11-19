@@ -51,7 +51,8 @@ if (!isset($meta['packages']) || !is_array($meta['packages']) || !count($meta['p
 // (each names itself as the game's check passes it: the id and version become a file's name at the review)
 foreach ($meta['packages'] as $p) {
   if (!is_array($p) || !isset($p['id'], $p['version']) || !is_string($p['id']) || !is_string($p['version'])
-      || !preg_match('~' . $rules['id'] . '~D', $p['id']) || !preg_match('/^\d+\.\d+\.\d+$/D', $p['version'])) fail(400, 'packages');
+      || !preg_match('~' . $rules['id'] . '~D', $p['id']) || in_array($p['id'], isset($rules['reserved']) ? $rules['reserved'] : array(), true)
+      || !preg_match('/^\d+\.\d+\.\d+$/D', $p['version'])) fail(400, 'packages');
 }
 
 // the archive: a zip within the package cap, each entry of a type the game takes (its central directory read)

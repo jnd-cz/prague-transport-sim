@@ -96,6 +96,7 @@ def package_ok(p, r=None):
     (accept), so they are held here too."""
     r = r or rules()
     return (isinstance(p, dict) and isinstance(p.get("id"), str) and re.fullmatch(r["id"], p["id"]) is not None
+            and p["id"] not in r.get("reserved", ())
             and isinstance(p.get("version"), str) and VERSION.fullmatch(p["version"]) is not None)
 
 

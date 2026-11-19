@@ -11,6 +11,9 @@ Makes the sample packages here (a box the size of a T3 car as a tier-1 glTF vehi
   (the box lying across the track), a claimed tier without its nodes (a rig naming bogies the model lacks), over the
   triangle budget, longer than a vehicle may be (34 m: the cap is 33 m), a file's name that is not a plain one, a
   model that links to an address outside the package.
+- seven over the limits (#713), refused before they are unpacked or at their content: an archive whose directory
+  understates a file, one of more files than the cap, a file declared over its type's cap, an image over 2048 px a
+  side, a sound over 60 s, a pack's gain over 2, an id the store keeps for itself.
 - a .gltf with its .bin beside it among the files installs; the loading screen writes any file's name as text.
 - a 25 m box installs with a warning: longer than its type, it runs on the type's pivots (articulated types: #579).
 - removing the vehicle takes it out of the menu, and its sound pack and fleet out of the registry.
@@ -31,6 +34,7 @@ import sys
 import threading
 import wave
 import zipfile
+import zlib
 
 from playwright.sync_api import sync_playwright
 
@@ -104,6 +108,38 @@ def bell():
     return b.getvalue()
 
 
+def tone(seconds, rate=8000):
+    """A quiet 8-bit mono WAV of that length (61 s: 488 kB)."""
+    b = io.BytesIO()
+    with wave.open(b, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(1)
+        w.setframerate(rate)
+        w.writeframes(bytes([128]) * int(seconds * rate))
+    return b.getvalue()
+
+
+def png(w, h):
+    """A grey PNG of w x h px."""
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    rows = (b"\x00" + b"\x80" * w) * h
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 0, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b"")
+
+
+def understated(data, name, declared):
+    """The .zip with `name`'s unpacked size in its directory (and its local header) set to `declared`."""
+    out, at = bytearray(data), 0
+    for sig, size_at, name_at, len_at in ((b"PK\x01\x02", 24, 46, 28), (b"PK\x03\x04", 22, 30, 26)):
+        at = 0
+        while (at := out.find(sig, at)) >= 0:
+            n = struct.unpack_from("<H", out, at + len_at)[0]
+            if bytes(out[at + name_at:at + name_at + n]) == name.encode():
+                struct.pack_into("<I", out, at + size_at, declared)
+            at += 4
+    return bytes(out)
+
+
 def manifest(kind, pid, files, **more):
     """A package.json: the fields every kind has, its files listed with their sizes and hashes."""
     return {"schema": 1, "kind": kind, "id": pid, "version": "1.0.0", "game": ">=1.0 <2",
@@ -164,6 +200,26 @@ def samples():
     broken["markup in a file's name"] = (zipped([("", m, f)]), "not a path inside the package")
     m, f = vehicle("sample.linked", model=glb(image="https://example.invalid/t.png"))
     broken["a model linking elsewhere"] = (zipped([("", m, f)]), "links to https://example.invalid/t.png")
+    # over the limits (#713). Before anything is unpacked: a directory that understates a file (1 MB of zeros declared
+    # as 1 kB), more files than an archive may hold, a file declared over its type's cap
+    m, f = vehicle("sample.bomb", extra={"notes.txt": bytes(100_000)})
+    broken["an archive that understates a file"] = (understated(zipped([("", m, f)]), "notes.txt", 1000), "unpacks to more than the 1000 bytes its archive declares")
+    m, f = vehicle("sample.many")
+    broken["too many files"] = (zipped([("", m, {**f, **{f"x/{i}.txt": b"" for i in range(RULES["caps"]["entries"])}})]), f"files, over the cap of {RULES['caps']['entries']}")
+    m, f = vehicle("sample.big-text", extra={"notes.txt": bytes(RULES["caps"]["text"] + 1)})
+    broken["a file over its type's cap"] = (zipped([("", m, f)]), "unpacked, over the cap of")
+    # at an install, what the files hold: an image's sides, a sound's length, a pack's gain
+    side = RULES["image"]["maxSide"] * 2
+    m, f = vehicle("sample.wide-image", extra={"wide.png": png(side, 16)})
+    broken["an image over the side"] = (zipped([("", m, f)]), f"is {side} x 16 px, over {RULES['image']['maxSide']} px a side")
+    lf = {"long.wav": tone(RULES["sound"]["maxSeconds"] + 1)}
+    lm = manifest("sounds", "sample.long-sound", lf, requires={VID: ">=1.0"}, events={"bell": "long.wav"})
+    broken["a sound over the length"] = (zipped([("", lm, lf)]), f"over the {RULES['sound']['maxSeconds']} s a sound may")
+    gf = {"bell.wav": bell()}
+    gm = manifest("sounds", "sample.loud", gf, requires={VID: ">=1.0"}, events={"bell": "bell.wav"}, gain=5)
+    broken["a gain over the range"] = (zipped([("", gm, gf)]), f"gain 5 is not between 0 and {RULES['sound']['maxGain']}")
+    m, f = vehicle("index.json")
+    broken["an id the store keeps"] = (zipped([("", m, f)]), "a name the browser's store keeps for itself")
     gltf, binary = glb(split="box.bin")
     sf = {"box.gltf": gltf, "box.bin": binary}
     sm = manifest("vehicle", "sample.split", sf, type="T3", loader="gltf", model="box.gltf", tier=1,
