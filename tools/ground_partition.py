@@ -618,14 +618,17 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
 
 
 # ---------------------------------------------------------------- the run
-def partition(ln, mesh=None, threads=8, windows=(), geometry=False):
-    """The partition of line ln: (the pieces per class, the report, the terrain triangles in each window)."""
+def partition(ln, mesh=None, threads=8, windows=(), geometry=False, within=None):
+    """The partition of line ln: (the pieces per class, the report, the terrain triangles in each window). within: a box
+    (x0, y0, x1, y1) the line's ground is cut to, for one place's ground (tools/ground_place.py, #757)."""
     from geo import Frame
     from ipr_dtm import IprDtm
     t0 = time.time()
     L, D = load(ln)
     F, ipr = Frame(), IprDtm()
     box = line_area(L)  # (the box within CORRIDOR of the route and tracks: `box` below is that polygon)
+    if within is not None:
+        box = polygonal(box.intersection(shapely.box(*within)))
     rep = {"line": ln, "box": [round(v, 2) for v in box.bounds], "box_km2": round(box.area / 1e6, 4),
            "corridor m": CORRIDOR, "of the box, %": round(100 * box.area / line_box(L).area, 1)}
     tm, last = {}, [time.time()]

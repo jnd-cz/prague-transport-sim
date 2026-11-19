@@ -103,6 +103,10 @@ things are done, and why a rule exists, is in the files it points to:
   merge). Take the label with `gh issue edit N --add-label rebuild` while nobody holds it; it goes when that
   PR merges. Other branches change tools, test them on a local rebuild and wait. `main`'s manifest always names
   data that is in the store; a publish is checked with `snapshot.py verify`.
+- **Ground changes are proven on places, rebuilt in batches** (the user, 2026-11-19, #757: "faster iteration over
+  specific problematic places instead of trying one fix in one issue and waiting four hour+ long rebuilds"): a
+  ground rule's PR carries the tool, its test and its places' numbers and merges without a rebuild; the holder of
+  `rebuild` rebuilds every line once for the merged batch, and that PR carries the lines' check table.
 - **Sources** come only from the pinned snapshot in `raw/` (`snapshot.py fetch`), OSM only from its local
   extract: the public Overpass API is not used. A new source file goes into a snapshot with its URL, licence
   and date, and into `tools/sources.py`. A provider that refuses scripted requests is waited out, never fooled.
@@ -136,6 +140,7 @@ things are done, and why a rule exists, is in the files it points to:
   |---|---|---|
   | docs, research, harness | nothing; the PR says so | all |
   | the review page, review cards | `tools/test_review.py` (phone and desktop sizes) | headless |
+  | a ground rule (`ground_mesh.py`, `ground_partition.py`, `bed_surface.py`) | the tool's test; `tools/ground_place.py` on the rule's places and `--all`, before → after (a new case becomes a place in `data/truth.json` `groundPlaces`); no line rebuilt | the lines' rebuild and checks: once for the batch, below |
   | a build tool, its data rebuilt (world) | the tool's test; `--checks lint,surfaces,canted,crossing,spacing,heights` on the rebuilt lines; `tools/datadiff.py` or `tools/track_moves.py` per line; a smoke drive per line (`--checks u3 --seeds 1`) | redruns, traffic, seeds 2–5 |
   | drawn geometry in the game (surfaces, track beds, crossings, kerbs) | `lint,surfaces,crossing,canted`; every seedless move needs a reason | seeded checks |
   | drawing or load that keeps the world (models, materials, load cuts) | screenshots main vs branch, `tools/frametime.py`; for a load cut, the world after load compared with main's | seeded checks |
