@@ -16,10 +16,10 @@ import session  # noqa: E402
 class Fake:
     """A runner that records the commands and answers the reads."""
 
-    def __init__(self, issue=None, branches="", prs=None, dirty=""):
+    def __init__(self, issue=None, branches="", prs=None, dirty="", stacked=None):
         self.issue = issue or {"title": "Checks: the stops check rides with the drive", "state": "OPEN",
                                "labels": [{"name": "lane:tooling"}, {"name": "agent:claude"}]}
-        self.branches, self.prs, self.dirty, self.seen = branches, prs or [], dirty, []
+        self.branches, self.prs, self.dirty, self.seen, self.stacked = branches, prs or [], dirty, [], stacked or []
 
     def __call__(self, *cmd, cwd=session.ROOT, check=True):
         self.seen.append(cmd)
@@ -27,8 +27,11 @@ class Fake:
             return json.dumps(self.issue), 0
         if cmd[:3] == ("git", "branch", "--list"):
             return self.branches, 0
+        if cmd[:3] == ("gh", "pr", "merge"):
+            for p in self.prs:
+                p["state"] = "MERGED"
         if cmd[:3] == ("gh", "pr", "list"):
-            return json.dumps(self.prs), 0
+            return json.dumps(self.stacked if "--base" in cmd else self.prs), 0
         if cmd[:3] == ("git", "status", "--short"):
             return self.dirty, 0
         return "", 0
@@ -135,6 +138,61 @@ class Finish(unittest.TestCase):
         with self.assertRaises(SystemExit):
             session.finish(708, run=r)
         self.assertFalse(r.ran("git", "worktree", "remove"))
+
+
+class Merge(unittest.TestCase):
+    """merge N: everything checked before anything changes, then the squash, the finish, the remote branch."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        p = mock.patch.object(session, "folder", return_value=self.tmp.name)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def pr(self, **more):
+        return {"number": 744, "title": "Checks: stops with the drive (#708)", "state": "OPEN", "isDraft": True,
+                "mergeable": "MERGEABLE", "statusCheckRollup": [{"name": "tools", "conclusion": "SUCCESS"},
+                                                                {"context": "legacy", "state": "SUCCESS"}], **more}
+
+    def test_a_draft_with_passed_checks_is_merged_under_its_title_and_finished(self):
+        r, said = Fake(branches="708-stops-with-drive", prs=[self.pr()]), []
+        session.merge(708, run=r, out=said.append)
+        self.assertEqual(r.ran("gh", "pr", "ready")[0][-1], "744")
+        m = r.ran("gh", "pr", "merge")[0]
+        self.assertEqual(m[m.index("--subject") + 1], "Checks: stops with the drive (#708) (#744)")
+        self.assertIn("--squash", m)
+        self.assertNotIn("--delete-branch", m)  # (gh would remove the worktree with its untracked files)
+        heads = [c[:3] for c in r.seen]
+        self.assertLess(heads.index(("gh", "pr", "merge")), heads.index(("git", "worktree", "remove")))
+        self.assertEqual(r.ran("git", "branch", "-D")[0][-1], "708-stops-with-drive")
+        self.assertEqual(r.ran("git", "push")[0][-2:], ("--delete", "708-stops-with-drive"))
+        self.assertEqual(r.ran("gh", "issue", "edit")[0][-2:], ("--remove-label", "agent:claude"))
+        self.assertIn("merged as", said[0])
+
+    def test_nothing_changes_while_something_is_in_the_way(self):
+        cases = {"a PR standing on it": dict(prs=[self.pr()], stacked=[{"number": 745}]),
+                 "a conflict": dict(prs=[self.pr(mergeable="CONFLICTING")]),
+                 "a check running": dict(prs=[self.pr(statusCheckRollup=[{"name": "tools", "conclusion": ""}])]),
+                 "a check failed": dict(prs=[self.pr(statusCheckRollup=[{"name": "tools", "conclusion": "FAILURE"}])]),
+                 "untracked files": dict(prs=[self.pr()], dirty="?? reports/708/"),
+                 "no open PR": dict(prs=[]),
+                 "two open PRs": dict(prs=[self.pr(), self.pr(number=746)])}
+        for what, kw in cases.items():
+            r = Fake(branches="708-stops-with-drive", **kw)
+            with self.assertRaises(SystemExit, msg=what):
+                session.merge(708, run=r)
+            self.assertFalse(r.ran("gh", "pr", "ready") or r.ran("gh", "pr", "merge") or r.ran("git", "worktree", "remove"), what)
+        with self.assertRaises(SystemExit):
+            session.merge(708, run=Fake(branches=""))
+
+    def test_the_files_listed_are_named_and_discard_goes_on(self):
+        r = Fake(branches="708-stops-with-drive", prs=[self.pr(isDraft=False)], dirty="?? reports/708/")
+        with self.assertRaises(SystemExit) as e:
+            session.merge(708, run=r)
+        self.assertIn("reports/708/", str(e.exception))
+        session.merge(708, discard=True, run=r, out=lambda s: None)
+        self.assertFalse(r.ran("gh", "pr", "ready"))  # (it was no draft)
+        self.assertTrue(r.ran("gh", "pr", "merge") and r.ran("git", "worktree", "remove"))
 
 
 if __name__ == "__main__":
