@@ -98,13 +98,37 @@ LATTICE = 4  # m: the error's samples, every LATTICE-th cell of IPR's 1 m raster
 
 
 # ---------------------------------------------------------------- heights
+STAIRS_FLAT = 0.2  # m: a stairs area whose outline's points all lie this near one plane is one flight
+
+
+def flight(a):
+    """The plane of a stairs area that is one flight: (x0, y0, (gx, gy, z0)), z = z0 + gx (x - x0) + gy (y - y0); None
+    where its outline's points do not lie within STAIRS_FLAT of a plane (a turn, a landing, a side wall's top in the
+    outline: 49-67 % of a line's stairs rising over 0.5 m). The outline's heights triangulated gave a warped sheet:
+    Krejcárek's eight steps (survey area 1339, line 37 (3927, 329)) strayed 0.39 m from their straight line, #447."""
+    P = np.array([q for q in a["r"] if q[2] is not None], float)
+    if len(P) < 3:
+        return None
+    x0, y0 = P[:, 0].mean(), P[:, 1].mean()
+    A = np.column_stack([P[:, 0] - x0, P[:, 1] - y0, np.ones(len(P))])
+    coef, _, rank, _ = np.linalg.lstsq(A, P[:, 2], rcond=None)
+    if rank < 3 or np.abs(A @ coef - P[:, 2]).max() > STAIRS_FLAT:
+        return None
+    return x0, y0, coef
+
+
 class SurveySurface:
-    """Each survey area's own surface: its outline's heights, triangulated (the page's DtmSurface)."""
+    """Each survey area's own surface: its outline's heights, triangulated (the page's DtmSurface); a stairs area that is
+    one flight, its plane (flight())."""
 
     def __init__(self, D, areas):
-        self.tris, self.area = [], []
+        self.tris, self.area, self.flights = [], [], {}
         for i in sorted(set(areas)):
             a = D["areas"][i]
+            if a["c"] == "stairs":
+                f = flight(a)
+                if f is not None:
+                    self.flights[i] = f
             if any(q[2] is None for q in a["r"]):
                 continue
             g = shapely.Polygon([tuple(q) for q in a["r"]],
@@ -123,6 +147,9 @@ class SurveySurface:
     def at(self, area, x, y):
         """Heights of points of one area (NaN where none of its triangles holds them)."""
         out = np.full(len(x), np.nan)
+        if area in self.flights:
+            x0, y0, (gx, gy, z0) = self.flights[area]
+            return z0 + gx * (np.asarray(x, float) - x0) + gy * (np.asarray(y, float) - y0)
         if self.tree is None or not len(x):
             return out
         pi, ti = self.tree.query(shapely.points(x, y), predicate="intersects")

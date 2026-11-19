@@ -170,6 +170,28 @@ class LoweredKerbs(unittest.TestCase):
         self.assertEqual(len(gm.lowered_kerbs({})[0]), 0)
 
 
+class Stairs(unittest.TestCase):
+    # (Krejcárek's stairs, line 37 survey area 1339: the foot at 228.56-228.82, the top at 229.75-229.82)
+    KREJCAREK = {"c": "stairs", "l": 0, "r": [[3925.7, 328.8, 228.82], [3926.8, 327.2, 228.56], [3928.7, 328.4, 229.82],
+                                               [3928.8, 328.5, 229.76], [3927.8, 330.1, 229.75]]}
+
+    def test_one_flight_is_its_plane_foot_to_top(self):
+        """#447: the outline's heights triangulated strayed 0.39 m from the straight line between foot and top."""
+        s = gm.SurveySurface({"areas": [self.KREJCAREK]}, [0])
+        self.assertIn(0, s.flights)
+        t = np.linspace(0, 1, 9)
+        z = s.at(0, 3926.25 + 2.0 * t, 328.0 + 1.25 * t)
+        self.assertLess(float(np.abs(z - (z[0] + (z[-1] - z[0]) * t)).max()), 1e-9)
+        self.assertAlmostEqual(float(z[-1] - z[0]), 1.09, delta=0.1)
+
+    def test_stairs_with_a_turn_keep_their_outline(self):
+        turn = {"c": "stairs", "l": 0, "r": [[0, 0, 200.0], [2, 0, 200.0], [2, 3, 201.5], [5, 3, 203.0], [5, 5, 203.0], [0, 5, 201.5]]}
+        self.assertIsNone(gm.flight(turn))
+        s = gm.SurveySurface({"areas": [turn, {"c": "paved", "l": 0, "r": [[0, 0, 1.0], [1, 0, 1.0], [0, 1, 2.0]]}]}, [0, 1])
+        self.assertEqual(s.flights, {})
+        self.assertAlmostEqual(float(s.at(0, np.array([1.0]), np.array([0.0]))[0]), 200.0)
+
+
 class Walls(unittest.TestCase):
     def test_a_street_corner_on_a_wall_takes_its_height_there(self):
         # (#653: a wall's top rising 229.6 -> 230.0 m along x = 0..4, its foot at 228.5, top and foot at one place at
