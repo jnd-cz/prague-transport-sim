@@ -153,6 +153,17 @@ and its ring only, so with unchanged tools every difference is a rule that reads
 what gave the vertex its height. A ground rule is tried on its places first; the lines are rebuilt once for a
 batch of changes.
 
+A place says how it should look and how that is measured. `seen` is what street-level imagery shows there, in
+words, with the points and headings it was looked at from (the pictures themselves are not kept: they are the
+provider's). `sections` are lines across the place, each with the most of a measure it may have: the ground is
+sampled every 0.25 m along the line and compared with IPR's 1 m raster. A wall between level grounds may slope
+for a few metres at most (rise over run between 0.2 and 3) and stay within 0.5 m of the raster but for the wall's
+own 2 m; a ramp or a flight of stairs keeps to the straight line between its ends. `--written` measures the
+written file alone, in seconds: the quay's section slopes for 10 m of its 30 (2.5 allowed) and Krejcárek's stairs
+stray 0.39 m from their chord (0.15 allowed) on the data of 2026-11-19. To see a place as the game draws it from
+where a panorama stands, `tools/shot.py --view review --at X,Y --yaw H --pitch P --dist D` with the target `D` m
+ahead of the camera along `H`; a compass heading is 7.8° more in the local frame.
+
 ## Deploy
 
 The game is static files: `index.html`, `src/`, `assets/`, `data/`. Three.js comes from jsDelivr and

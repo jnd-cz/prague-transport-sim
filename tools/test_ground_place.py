@@ -115,6 +115,46 @@ class Places(unittest.TestCase):
             self.assertEqual(len(p["at"]), 2, name)
             self.assertTrue(p.get("issue") and p.get("what") and p.get("source"), name)
             self.assertLessEqual(float(p.get("reach") or gpl.REACH), 250, name)
+            for s in p.get("sections") or []:
+                self.assertTrue(s.get("name") and len(s["from"]) == 2 and len(s["to"]) == 2 and s.get("expect"), name)
+                self.assertLessEqual(max(abs(s[k][i] - p["at"][i]) for k in ("from", "to") for i in (0, 1)),
+                                     float(p.get("reach") or gpl.REACH), f"{name}: a section inside the place's reach")
+            if p.get("seen"):
+                self.assertTrue(p["seen"].get("what") and p["seen"].get("from") and p["seen"].get("source"), name)
+
+
+class Sections(unittest.TestCase):
+    def profile(self, heights):
+        d = np.arange(len(heights)) * gpl.SECTION_STEP
+        return d, np.asarray(heights, float)
+
+    def test_level_ground_a_wall_and_level_ground_does_not_slope(self):
+        d, z = self.profile([8.0] * 20 + [0.0] * 20)
+        m = gpl.section_measures(d, z, z)
+        self.assertEqual((m["sloping m"], m["largest step m"], m["off the lidar m"]), (0.0, 8.0, 0.0))
+        self.assertFalse(gpl.held(m, {"sloping m": 2.5, "off the lidar m": 2.5}))
+
+    def test_the_same_drop_as_a_slope_slopes_and_leaves_the_lidar(self):
+        d, wall = self.profile([8.0] * 20 + [0.0] * 20)
+        _, z = self.profile([8.0] * 4 + list(np.linspace(8.0, 0.0, 33)) + [0.0] * 3)
+        m = gpl.section_measures(d, z, wall)
+        self.assertEqual(m["sloping m"], 8.0)
+        self.assertGreater(m["off the lidar m"], 5.0)
+        self.assertEqual(set(gpl.held(m, {"sloping m": 2.5, "off the lidar m": 2.5})), {"sloping m", "off the lidar m"})
+
+    def test_an_even_flight_keeps_to_its_chord_a_warped_one_does_not(self):
+        d, even = self.profile(np.linspace(0.0, 1.1, 10))
+        self.assertEqual(gpl.section_measures(d, even)["off the chord m"], 0.0)
+        _, warped = self.profile([0.0, 0.0, 0.0, 0.1, 0.9, 1.0, 1.1, 1.1, 1.1, 1.1])
+        m = gpl.section_measures(d, warped)
+        self.assertGreater(m["off the chord m"], 0.3)
+        self.assertEqual(m["rise m"], 1.1)
+        self.assertIn("off the chord m", gpl.held(m, {"off the chord m": 0.15}))
+
+    def test_samples_off_the_mesh_are_counted_not_measured(self):
+        d, z = self.profile([1.0, 1.0, np.nan, np.nan, 1.0, 1.0])
+        m = gpl.section_measures(d, z)
+        self.assertEqual((m["off the mesh m"], m["sloping m"], m["largest step m"]), (0.75, 0.0, 0.0))
 
 
 class MeshKey(unittest.TestCase):
