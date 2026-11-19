@@ -112,9 +112,29 @@ class Finish(unittest.TestCase):
         session.finish(708, discard=True, run=r, out=lambda s: None)
         self.assertTrue(r.ran("git", "worktree", "remove"))
 
-    def test_no_branch_no_work(self):
+    def test_no_branch_and_no_merged_pr_no_work(self):
         with self.assertRaises(SystemExit):
             session.finish(708, run=Fake(branches=""))
+        r = Fake(branches="", prs=[{"number": 9, "state": "MERGED", "headRefName": "7080-other"}])  # (another issue's)
+        with self.assertRaises(SystemExit):
+            session.finish(708, run=r)
+        self.assertFalse(r.ran("gh", "issue", "edit"))
+
+    def test_a_merge_that_took_the_branch_leaves_the_label_to_finish(self):
+        """#748, #749: the worktree and the branch were gone when finish ran; it stopped and the label stayed."""
+        prs = [{"number": 744, "state": "MERGED", "headRefName": "708-stops-with-drive"},
+               {"number": 9, "state": "OPEN", "headRefName": "709-other"}]
+        with mock.patch.object(session, "folder", return_value=os.path.join(self.tmp.name, "gone")):
+            r, said = Fake(branches="", prs=prs), []
+            session.finish(708, run=r, out=said.append)
+        self.assertFalse(r.ran("git", "worktree", "remove") or r.ran("git", "branch", "-D"))
+        self.assertEqual(r.ran("gh", "issue", "edit")[0][-2:], ("--remove-label", "agent:claude"))
+        self.assertIn("gone already", said[0])
+        # (the branch gone, the folder still there: its files are looked at as ever)
+        r = Fake(branches="", prs=prs, dirty="?? reports/708/")
+        with self.assertRaises(SystemExit):
+            session.finish(708, run=r)
+        self.assertFalse(r.ran("git", "worktree", "remove"))
 
 
 if __name__ == "__main__":

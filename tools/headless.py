@@ -22,7 +22,7 @@ any job; an occupied port fails. --url explicitly uses an existing server. The p
 nothing (#411): they keep what a draw did for the checks, the world matrices and the walkers' poses. The counts
 are the same, run by run, on every check of every line, at a sixth of the CPU (--draw: once a second in
 software as before; --gpu: on the machine's GPU, tools/gpu.py). A batch runs checks of one line one after another in one
-loaded page, starting a new shift for each: the load (~60 s) once per batch instead of once per run, the
+loaded page, starting a new shift for each: the load (6-27 s a line on the dev PC, 2026-11-19) once per batch instead of once per run, the
 counts the same as in fresh pages (#205: all 21 of line 17's runs, run by run). The batches are planned from
 this machine's run times (TIMINGS, kept by every run): each line split so that the pages, taking the longest
 batch first, finish soonest (#413); --batch N: at most N runs a batch instead (1: a fresh page per run). --jobs N runs N pages

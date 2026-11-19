@@ -75,23 +75,35 @@ def start(n, name=None, agent="claude", raw=False, run=run, out=print):
     return wt, branch
 
 
+def prs_of(n, branch, run=run):
+    """The pull requests of issue n's branch: by its name, or, with the local branch gone (the merge deleted it: #748
+    and #749 left their sessions so), those whose branch is N-..."""
+    if branch:
+        return json.loads(run("gh", "pr", "list", "--head", branch, "--state", "all", "--json", "number,state")[0] or "[]")
+    every = json.loads(run("gh", "pr", "list", "--state", "all", "--limit", "200", "--json", "number,state,headRefName")[0] or "[]")
+    return [p for p in every if (p.get("headRefName") or "").startswith(f"{n}-")]
+
+
 def finish(n, discard=False, run=run, out=print):
     wt, branch = folder(n), branch_of(n, run)
-    if not branch:
-        raise SystemExit(f"session: no local branch of #{n}")
-    prs = json.loads(run("gh", "pr", "list", "--head", branch, "--state", "all", "--json", "number,state")[0] or "[]")
+    prs = prs_of(n, branch, run)
     if not any(p["state"] == "MERGED" for p in prs) or any(p["state"] == "OPEN" for p in prs):
-        raise SystemExit(f"session: {branch} has no merged PR or an open one ({prs or 'none'}): nothing is removed")
+        raise SystemExit(f"session: {branch or f'#{n} (no local branch)'} has no merged PR or an open one "
+                         f"({prs or 'none'}): nothing is removed")
+    gone = []
     if os.path.isdir(wt):
         dirty, _ = run("git", "status", "--short", cwd=wt)
         if dirty and not discard:
             raise SystemExit(f"session: {wt} holds changed or untracked files; look at them, then --discard:\n{dirty}")
         run("git", "worktree", "remove", "--force", wt)
-    run("git", "branch", "-D", branch)
+        gone.append(wt)
+    if branch:
+        run("git", "branch", "-D", branch)
+        gone.append(branch)
     issue = json.loads(run("gh", "issue", "view", str(n), "--json", "labels")[0])
     for lab in [x["name"] for x in issue["labels"] if x["name"].startswith("agent:")]:
         run("gh", "issue", "edit", str(n), "--remove-label", lab)
-    out(f"#{n}: {wt} and {branch} removed, the agent's label taken off")
+    out(f"#{n}: {' and '.join(gone) + ' removed' if gone else 'its worktree and branch were gone already'}, the agent's label taken off")
 
 
 def main(argv=None):
