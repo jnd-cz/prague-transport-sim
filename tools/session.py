@@ -176,4 +176,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    # (an issue's title in Czech: a cp1252 console stopped start 697 at its last line, "Rašínovo", the work done)
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())
