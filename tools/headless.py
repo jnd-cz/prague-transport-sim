@@ -917,12 +917,13 @@ def main():
             # by what they leave)
             room = heavy.room()
             a.jobs = max(1, min(workers(PAGE_GB, most=PAGES), int(room["gb"] // PAGE_GB), room["cores"] // PAGE_CORES))
-            heavy.claim(gb=PAGE_GB * a.jobs, cores=PAGE_CORES * a.jobs)
         os.makedirs(a.out, exist_ok=True)
         # (u3, redruns and stops of a line and seed: one drive; then batches of one line's runs, each in one page)
         runs = list(jobs) if a.separate else merge_drives(jobs)
         t = load_timings() if TIMINGS else {"runs": {}, "loads": {}}
         batches = plan(runs, a.jobs, t, a.batch and max(1, a.batch))
+        pages = min(a.jobs, len(batches))  # (what the queue keeps for this run: the pages it opens, #728)
+        heavy.claim(gb=PAGE_GB * pages, cores=PAGE_CORES * pages)
         dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
         print(f"{len(runs)} runs in {len(batches)} batches on {min(a.jobs, len(batches))} pages, longest first; "
               f"expected {finish(dur, a.jobs):.0f} s from {len(t['runs'])} timed runs", flush=True)
