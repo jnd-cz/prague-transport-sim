@@ -117,6 +117,29 @@ def flight(a):
     return x0, y0, coef
 
 
+RISER = 1.0  # m: an outline rising this much between two points RISER_RUN apart or nearer climbs a wall
+RISER_RUN = 1.0  # m
+
+
+def climbs(a):
+    """Whether a survey area's outline climbs a wall: two points next to each other on it RISER_RUN apart or nearer and
+    RISER or more apart in height. Such an area lies on two levels and its outline's heights, triangulated, are no
+    surface: the sidewalk at the Modřany viaduct's abutment (line 17, area 7214) is the street's sidewalk under the bridge
+    at 198.2 m, the strip on the ramp at 203-204 m and the abutment's shelf at 201.7 m in one outline, which steps
+    198.48 -> 200.80 m in 0.49 m; under the bridge it rose 3.4 m in 12 m to the abutment, where IPR's raster and the
+    street surface are level to 0.1 m (#761)."""
+    for r in [a["r"]] + a.get("h", []):
+        P = np.array([[q[0], q[1], np.nan if q[2] is None else q[2]] for q in r], float)
+        if len(P) < 2:
+            continue
+        Q2 = np.roll(P, -1, 0)
+        run = np.hypot(Q2[:, 0] - P[:, 0], Q2[:, 1] - P[:, 1])
+        with np.errstate(invalid="ignore"):
+            if ((run <= RISER_RUN) & (np.abs(Q2[:, 2] - P[:, 2]) >= RISER)).any():
+                return True
+    return False
+
+
 class SurveySurface:
     """Each survey area's own surface: its outline's heights, triangulated (the page's DtmSurface); a stairs area that is
     one flight, its plane (flight())."""
@@ -640,13 +663,15 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
 
 
 # ---------------------------------------------------------------- the build
-def weld(cx, cy, zc, prio, kind, label=None, zown=None):
+def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None):
     """The corners' heights welded at each point: (each corner's height, the steps kept by pair, the points). A point takes
     its top-priority corners' height, whatever their order (#664: it took the first top corner's, the order of the
     partition's pieces; drawing the survey's walls reordered them and moved line 22's corner at (-1114, -537), shared by
     roads #16 and #23 by a bridge's track, 193.49 and 193.32 m, by 0.17 m):
     - top corners within 2 TIE_STEP of each other: the middle of their range;
     - the survey's top corners farther apart: a step the survey recorded, each corner takes the nearer end of the range;
+      and so the top corners a surveyed wall line holds at its two sides' levels (`held`, hold_at_walls), whatever their
+      class: the terrain's two sides of a wall took the middle, and the wall stood as two ramps (#697);
     - a corner below the top keeps its own height where it differs by more than its pair's STEP (a kerb, a wall, the
       water); the pair is judged against the lowest top corner's kind;
     - a lidar corner (`label` "lidar") that yielded to its rank (YIELD) keeps its own where its area's outline there
@@ -672,7 +697,10 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None):
     # every corner there takes the nearer end of their range, the top ones their own, as alpha-4 drew each area from its
     # outline; line 37's parking areas #3121 and #3130 share (6459.6, 827.4) at 203.19 and 202.06 m)
     not_sv = np.zeros(len(uk), bool)
-    not_sv[inv[tops[~np.isin(kind[tops], ("survey", "raised"))]]] = True
+    other = ~np.isin(kind[tops], ("survey", "raised"))
+    if held is not None:
+        other &= ~held[tops]
+    not_sv[inv[tops[other]]] = True
     split = ~not_sv & (hi - lo > 2 * TIE_STEP)
     target = top_z[inv]
     s = split[inv]
@@ -960,6 +988,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         deck = shapely.union_all(shapely.buffer(np.asarray(spans, dtype=object), BRIDGE_NEAR, cap_style="flat"))
         shapely.prepare(deck)
         on_span = shapely.contains_xy(deck, cx[m], cy[m])
+    # (but an area whose outline climbs a wall: on two levels, its own outline is no surface, climbs(), #761)
+    two_levels = {a: climbs(D["areas"][a]) for a in np.unique(sa[on_span]).tolist()}
+    on_span &= ~np.array([two_levels.get(a, False) for a in sa.tolist()], bool)
     for kd, cls in (("road", STREETS_ROAD), ("sidewalk", STREETS_WALK)):
         mm = np.isin(sc, list(cls)) & ~on_span
         if mm.any():
@@ -1081,7 +1112,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     label = kind.copy()
     keep = kind[sv_m] != "bed"
     label[sv_m[keep]] = sv_label[keep]
-    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown)
+    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"))
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
     vkey = np.stack([np.round(cx * Q).astype(np.int64), np.round(cy * Q).astype(np.int64), zq], 1)

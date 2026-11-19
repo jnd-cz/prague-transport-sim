@@ -66,6 +66,32 @@ class Stretches(unittest.TestCase):
         self.assertTrue(np.allclose(s["gr"], 0.0))
         self.assertTrue(np.all(np.abs(s["zr"] - 198.2) <= 0.15))
 
+    def test_terraces_narrower_than_the_smear_take_the_lines_own_heights(self):
+        """Under Chotkova, line 23 (-896, 720): a wall's foot and top lines 0.15 m apart (208.6, 211.6), its inner face
+        0.5 m behind, the next wall 2.75 m on (214.0); IPR's raster is one slope through them. Readings 2.5-4 m off a
+        line lay on the next terraces, and the walls stood 1.5-2.5 m with a wavy top."""
+        def slope(x, y):  # (level 208.6 west of the walls, one slope through them, level 214 past them)
+            return np.interp(np.asarray(x, float), [-1.0, 4.4], [208.6, 214.0])
+
+        def line(x, z):  # (running north: its left is west, downhill)
+            return np.array([[x, 0.0, z], [x, 30.0, z]])
+        st = wl.of_lines([line(0.0, 208.6), line(0.15, 211.6), line(0.65, 211.4), line(3.4, 214.0)], slope)
+        self.assertEqual([round(float(s["p"][0][0]), 2) for s in st], [0.15, 3.4])  # (the foot's line and the inner face: no step)
+        self.assertTrue(np.allclose(st[0]["zl"], 208.6) and np.allclose(st[0]["zr"], 211.4))
+        self.assertTrue(np.allclose(st[1]["zl"], 211.4) and np.allclose(st[1]["zr"], 214.0))
+
+    def test_a_sides_readings_stop_at_a_wall_areas_outline(self):
+        """A survey wall area's outline bounds a terrace as a wall line does: the readings past it are another level's."""
+        def two(x, y):  # (a step of 3 m at x = 0 and another at x = 2, each smeared over a metre)
+            x = np.asarray(x, float)
+            return 200.0 + 3.0 * np.clip(x + 0.5, 0, 1) + 3.0 * np.clip(x - 1.5, 0, 1)
+        wall = np.array([[0.0, 0.0, 203.0], [0.0, 30.0, 203.0]])
+        area = np.array([[2.0, -5.0, 203.0], [2.0, 35.0, 203.0], [2.6, 35.0, 206.0], [2.6, -5.0, 206.0], [2.0, -5.0, 203.0]])
+        alone = wl.of_lines([wall], two)[0]
+        self.assertTrue(np.all(alone["zr"] > 205.5))  # (read 2.5-4 m off: the level past the second wall)
+        st = wl.of_lines([wall], two, [area])[0]
+        self.assertTrue(np.allclose(st["zl"], 200.0) and np.allclose(st["zr"], 203.0))
+
     def test_runs_close_small_gaps_and_drop_short_ones(self):
         d = np.arange(12.0)
         on = np.array([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0], bool)

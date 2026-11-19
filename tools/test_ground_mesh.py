@@ -294,6 +294,25 @@ class Walls(unittest.TestCase):
         zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o])
         self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
 
+    def test_an_outline_that_climbs_a_wall_is_on_two_levels(self):
+        # (#761: the Modřany abutment's sidewalk, area 7214 of line 17: 198.48 -> 200.80 m in 0.49 m of its outline)
+        street = {"r": [[0, 0, 198.0], [10, 0, 198.15], [10, 3, 198.3], [0, 3, 198.1]]}  # (a kerb's 15 cm is no wall)
+        self.assertFalse(gm.climbs(street))
+        two = {"r": [[0, 0, 198.15], [1.1, 0, 198.48], [1.15, 0.49, 200.8], [10, 0.5, 200.4], [10, 3, 204.0], [0, 3, 201.7]]}
+        self.assertTrue(gm.climbs(two))
+        self.assertTrue(gm.climbs({"r": street["r"], "h": [[[4, 1, 198.1], [4.3, 1, 199.4], [4.3, 2, 199.4]]]}))  # (a hole's outline too)
+        self.assertFalse(gm.climbs({"r": [[0, 0, None], [0.5, 0, 203.0], [5, 4, 203.0]]}))  # (a point without a height)
+        self.assertFalse(gm.climbs({"r": [[0, 0, 198.0], [6, 0, 201.0], [6, 5, 201.0]]}))  # (a ramp: 3 m in 6 m)
+
+    def test_the_terrains_two_sides_of_a_held_wall_keep_their_levels(self):
+        # (#697: two terrain corners at one point on a surveyed wall line, held at its sides' levels, took the middle;
+        # unheld ones still do)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0]), np.zeros(4)
+        zc = np.array([208.6, 211.6, 208.6, 211.6])
+        prio, kind = np.full(4, 3.0), np.array(["terrain"] * 4, dtype=object)
+        zf, _, _ = gm.weld(cx, cy, zc, prio, kind, held=np.array([True, True, False, False]))
+        self.assertEqual(np.round(zf, 3).tolist(), [208.6, 211.6, 210.1, 210.1])
+
 
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):

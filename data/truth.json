@@ -4605,23 +4605,44 @@
    ],
    "reach": 30,
    "issue": 738,
-   "what": "a 5 m lattice cell on lidar green with corners far from a plane (207.07, 209.15, 212.81, 213.63 m): its diagonal the same whatever lines are added elsewhere in the tile",
-   "source": "found on #676: an unrelated change moved the ground here 210.3 -> 210.9 m, #738",
+   "what": "the terraced retaining walls between Chotkova (205 m) and the road above it (213 m): three walls of about 3 m with a footpath on the first terrace; and a 5 m lattice cell on them with corners far from a plane (207.07, 209.15, 212.81, 213.63 m): its diagonal the same whatever lines are added elsewhere in the tile",
+   "source": "found on #676: an unrelated change moved the ground here 210.3 -> 210.9 m, #738; the walls: #697",
    "seen": {
-    "what": "From the track in Chotkova looking south: a lawn rising evenly from the road's edge to the trees; no wall seen at the road.",
+    "what": "South of Chotkova's roadway: a stone retaining wall about 3 m tall at the road's edge, slightly battered, a narrow gravel verge at its foot; on its top a footpath (gravel, a steel grating) behind the wall's coping and a fence; behind the footpath the hill, ivy over the next wall. The lawn rising to the trees is the north side of the road.",
     "from": [
      {
       "at": [
-       50.092709,
-       14.407675
+       50.0927863,
+       14.4075084
       ],
       "headings": [
-       184
+       90,
+       180,
+       270
       ]
      }
     ],
-    "source": "a contributor's photosphere on Google Maps, seen 2026-11-19 (its position is the contributor's)"
-   }
+    "source": "the user's photo from the footpath on the wall looking west to the hairpin, 2026-11-19 (this session: \"Chotkova has road, wall, footpath, hill, so maybe that's why it's tricky\"; kept in raw/reference/photos/chotkova/, not published); a contributor's car-mounted photosphere on Google Maps at the same place, seen 2026-11-19",
+    "corrects": "the entry of 2026-11-19 read the photosphere's view across the road, north, as the view south: \"a lawn rising evenly from the road's edge to the trees; no wall seen at the road\"",
+    "game": "main draws one lawn slope from the road wall's top to the upper road. With the survey's wall lines read by their own heights (#697): the road wall, the footpath's terrace at 208.5 m, a wall to 211.5 m, a terrace, a wall to 214.0 m."
+   },
+   "sections": [
+    {
+     "name": "from the footpath on the road wall's top south over the two walls behind it, x = -896",
+     "from": [
+      -896.0,
+      725.6
+     ],
+     "to": [
+      -896.0,
+      719.6
+     ],
+     "expect": {
+      "sloping m": 2.0
+     },
+     "why": "the survey's own heights there: the road 205.3, the first wall's top and the footpath 208.5 (wall area 842, a wall line at 208.54), the next wall's foot and top lines 0.15 m apart at 208.6 and 211.6, the third's at 214.0, the upper road 213.2: level terraces between upright walls. IPR's 1 m raster is one slope through them, and so was the written file of 2026-11-19 (the whole 6 m sloping). The footpath's 1.75 m may count as sloping: its surveyed heights rise from 208.47 at the road wall's top to 208.7 at the next wall's foot; the walls must not"
+    }
+   ]
   },
   "modrany-viaduct-ramps": {
    "line": "17",
