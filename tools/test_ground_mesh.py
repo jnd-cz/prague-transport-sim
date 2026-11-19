@@ -269,75 +269,39 @@ class Lidar(unittest.TestCase):
         self.assertTrue(np.isnan(got[0]))  # (a triangle no class lies over is not asked)
 
 
-class OwnPlane(unittest.TestCase):
-    class Streets:
-        """A sidewalk surface at 100.25 m for x < 2 (where it reaches), none elsewhere; no carriageway."""
-        def at(self, kind, x, y):
-            return np.where((x < 2) & (kind == "sidewalk"), 100.25, np.nan)
+class MeetRaised(unittest.TestCase):
+    """A yard x 0-10 at 100 m; a sidewalk at x < 0 sharing its corners at x 0; a road at x > 10 sharing those at x 10."""
+    def corners(self, side):
+        # (sc, x, y, zs; sa: the areas, for the test of two yards)
+        ys = np.arange(0, 11, 1.0)
+        x = np.concatenate([np.zeros(11), np.full(11, 10.0), np.full(11, 1.0), np.full(11, 2.0), np.full(11, 5.0),
+                            np.zeros(11), np.full(11, 10.0)])
+        y = np.tile(ys, 7)
+        sc = np.array(["paved"] * 55 + ["sidewalk"] * 11 + ["road"] * 11)
+        sa = np.array([0] * 55 + [1] * 11 + [2] * 11)
+        zs = np.concatenate([np.full(55, 100.0), np.full(11, 100.0 + side), np.full(11, 99.9)])
+        return sc, sa, x, y, zs
 
-    class Ipr:
-        """IPR's ground `dz` m off the yard's outline (100 m at x 0 rising to 100.5 m at x 10)."""
-        def __init__(self, dz):
-            from geo import Frame
-            self.dz, self.E0 = dz, Frame().E0
+    def test_the_yard_meets_the_sidewalk_and_fades_inward(self):
+        sc, sa, x, y, zs = self.corners(0.2)
+        z, s = gm.meet_raised(sc, x, y, zs)
+        np.testing.assert_allclose(z[:11], 100.2)  # (on the edge: the sidewalk's)
+        self.assertTrue(np.all(z[22:33] < 100.2) and np.all(z[22:33] > 100.0))  # (1 m in: part of it)
+        np.testing.assert_allclose(z[44:55], 100.0)  # (5 m in: none)
+        np.testing.assert_allclose(z[11:22], 100.0)  # (at the road: pinned)
+        np.testing.assert_allclose(z[55:], zs[55:])  # (the others left)
 
-        def sample(self, E, N):
-            return 100 + 0.05 * (np.asarray(E, float) - self.E0) + self.dz
+    def test_a_larger_step_stands(self):
+        sc, sa, x, y, zs = self.corners(0.5)
+        z, s = gm.meet_raised(sc, x, y, zs)
+        np.testing.assert_allclose(z, zs)
 
-    def setUp(self):
-        # (a yard 0-10 x 0-10 whose outline stands at 100 m at x 0 and 100.5 m at x 10; the city mesh at 100.2 m)
-        self.D = {"areas": [{"c": "paved", "l": 0, "r": [[0, 0, 100], [10, 0, 100.5], [10, 10, 100.5], [0, 10, 100]]}]}
-        x, y = np.array([-20., 30, 30, -20]), np.array([-20., -20, 30, 30])
-        self.G = {"x": x, "y": y, "z": np.full(4, 100.2), "T": np.array([[0, 1, 2], [0, 2, 3]]), "under": np.array([0, 1])}
-        # (corners: at a surveyed point (0, 0); on a cut through it near a sidewalk at (1, 5) and far from one at (6, 5);
-        # on its long edge at (0, 5), near the sidewalk)
-        self.x, self.y = np.array([0., 1, 6, 0]), np.array([0., 5, 5, 5])
-        self.sc, self.sa = np.array(["paved"] * 4), np.array([0, 0, 0, 0])
-        self.z0 = np.array([100., 100.05, 100.3, 100.])  # (the outline's plane)
-
-    def own(self, ipr, sc=None):
-        return gm.own_heights(self.D, self.G, self.Streets(), self.sc if sc is None else sc, self.sa, self.x, self.y,
-                              self.z0.copy(), np.ones(4, bool), ipr=self.Ipr(ipr))
-
-    def test_off_its_surveyed_points_the_street_surface_then_the_lidar(self):
-        z, src = self.own(0.1)
-        self.assertEqual(src.tolist(), ["", "street", "lidar", "street"])
-        self.assertEqual(np.round(z, 3).tolist(), [100.0, 100.25, 100.2, 100.25])
-
-    def test_a_street_surface_far_from_the_lidar_is_not_taken(self):
-        # (the sidewalk's surface 0.25 m over the city mesh: it reached past its street)
-        self.G["z"] = np.full(4, 100.0)
-        z, src = self.own(0.1)
-        self.assertEqual(src.tolist(), ["", "lidar", "lidar", "lidar"])
-        self.assertEqual(np.round(z, 3).tolist(), [100.0, 100.0, 100.0, 100.0])
-
-    def test_neither_far_from_the_outlines_plane(self):
-        # (the city mesh 0.8 m under the plane at (6, 5): a slope steeper than the corners, folded at them)
-        self.G["z"] = np.array([100.2, 99.0, 99.0, 100.2])  # (falling to x 30: at x 1 100.04, at x 6 99.82, 0.48 m under 100.3)
-        z, src = self.own(0.1)
-        self.assertEqual(src[2], "plane")
-        self.assertEqual(z[2], 100.3)
-
-    def test_an_area_off_the_ground_keeps_its_plane_whole(self):
-        # (IPR 3 m under its outline: a yard over a cellar, a terrace; no street surface on part of it either)
-        z, src = self.own(-3.0)
-        self.assertEqual(src.tolist(), ["plane"] * 4)
-        self.assertEqual(z.tolist(), self.z0.tolist())
-
-    def test_a_median_and_a_parking_area_keep_their_outline(self):
-        # (a median's outline is its kerb's top, a parking area's its kerb's foot: only the corners off it change; a
-        # parking area takes the carriageway's surface, here none, not the sidewalks')
-        self.D["areas"][0]["c"] = "median"
-        z, src = self.own(0.1, np.array(["median"] * 4))
-        self.assertEqual(src.tolist(), ["", "street", "lidar", ""])
-        self.D["areas"][0]["c"] = "parking"
-        z, src = self.own(0.1, np.array(["parking"] * 4))
-        self.assertEqual(src.tolist(), ["", "lidar", "lidar", ""])
-        self.assertEqual(z[3], 100.0)
-
-    def test_other_classes_are_left(self):
-        z, src = self.own(0.0, np.array(["sidewalk"] * 4))
-        self.assertEqual(z.tolist(), self.z0.tolist())
+    def test_two_yards_on_a_shared_edge_shift_alike(self):
+        # (the corners 1 m in shared by a second yard: each of the two corners at a place shifts alike)
+        sc, sa, x, y, zs = self.corners(0.2)
+        z, _ = gm.meet_raised(np.concatenate([sc, sc[22:33]]), np.concatenate([x, x[22:33]]), np.concatenate([y, y[22:33]]),
+                              np.concatenate([zs, zs[22:33]]))
+        np.testing.assert_allclose(z[-11:], z[22:33])
 
 
 class Steps(unittest.TestCase):
