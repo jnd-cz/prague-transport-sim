@@ -178,28 +178,30 @@ def keep(k, counts, places):
     os.replace(tmp, os.path.join(d, f"{k}.json"))
 
 
-def measure_at(rev, lines, checks, want, run=subprocess.run, out=None):
-    """Main's seedless runs at a commit: a pinned worktree with that commit's code and data, its own
-    headless.py (which takes its turn in the heavy-job queue), removed afterwards. Returns (counts, places)
-    of the runs measured on exactly `want`, the commit's trees."""
+def measure_at(rev, lines, checks, want, run=subprocess.run, out=None, seeds=None):
+    """Main's runs at a commit: a pinned worktree with that commit's code and data, its own headless.py (which takes
+    its turn in the heavy-job queue), removed afterwards. Seedless checks without `seeds`; seeded checks with the
+    seeds to run (#709). Returns (counts, places) of the runs measured on exactly `want`, the commit's trees."""
     out = out or sys.stderr
     wt = tempfile.mkdtemp(prefix=f"{os.path.basename(ROOT)}-base-{rev[:7]}-", dir=os.path.dirname(ROOT))
     os.rmdir(wt)  # (git worktree add wants to create it)
     py = sys.executable
     try:
-        print(f"measuring {','.join(checks)} of lines {','.join(lines)} at {rev[:7]} in {wt}", file=out, flush=True)
+        seeded = ["--seeds", ",".join(str(s) for s in seeds)] if seeds else []
+        print(f"measuring {','.join(checks)} of lines {','.join(lines)}" + (f", seeds {seeded[1]}," if seeds else "")
+              + f" at {rev[:7]} in {wt}", file=out, flush=True)
         run(["git", "worktree", "add", "-q", "--detach", wt, rev], cwd=ROOT, check=True)
         run([py, "-I", "tools/snapshot.py", "data-fetch"], cwd=wt, check=True)
         # (exit 1 only says a check is over its threshold: the counts are stored all the same)
         run([py, "-P", "-E", "tools/headless.py", "--lines", ",".join(lines), "--checks", ",".join(checks),
-             "--baseline", "--port", "0"], cwd=wt)
+             *seeded, "--baseline", "--port", "0"], cwd=wt)
         counts, places = {}, {}
         for name, to in (("headless.json", counts), ("headless-places.json", places)):
             p = os.path.join(wt, "reports", "baseline", name)
             if os.path.exists(p):
                 with open(p, encoding="utf-8") as f:
                     to.update(json.load(f))
-        wanted = {f"line{line}-{c}" for line in lines for c in checks}
+        wanted = {f"line{line}-{c}" + (f"-seed{s}" if seeds else "") for line in lines for c in checks for s in (seeds or [0])}
         counts = {j: v for j, v in counts.items() if j in wanted and v.get("measured_on") == want}
         return counts, {j: v for j, v in places.items() if j in counts}
     finally:

@@ -121,6 +121,27 @@ class Checkpoints(unittest.TestCase):
         self.assertIn(["git", "worktree", "remove", "--force", self.wt], seen)
         self.assertFalse(os.path.exists(self.wt))
 
+    def test_measure_at_runs_seeded_checks_with_their_seeds(self):
+        """#709: the seeds go to the pinned worktree's run, and the runs are read by their seeded names."""
+        want = {"src": "s"}
+        seen = []
+
+        def run(cmd, cwd=None, **kw):
+            seen.append(cmd)
+            if cmd[:3] == ["git", "worktree", "add"]:
+                os.makedirs(os.path.join(cmd[5], "reports", "baseline"))
+            if "tools/headless.py" in cmd:
+                with open(os.path.join(cwd, "reports", "baseline", "headless.json"), "w", encoding="utf-8") as f:
+                    json.dump({"line9-u3-seed1": {"counts": {"n": 1}, "measured_on": want},
+                               "line9-u3-seed2": {"counts": {"n": 2}, "measured_on": want},
+                               "line9-u3-seed3": {"counts": {"n": 3}, "measured_on": want},
+                               "line9-lint": {"counts": {"n": 4}, "measured_on": want}}, f)
+            return mock.Mock(returncode=0)
+        counts, _ = baseline_store.measure_at("abcdef0123", ["9"], ["u3"], want, run=run, out=io.StringIO(), seeds=[1, 2])
+        self.assertEqual(sorted(counts), ["line9-u3-seed1", "line9-u3-seed2"])  # (the seeds asked, no seedless run)
+        cmd = next(c for c in seen if "tools/headless.py" in c)
+        self.assertEqual(cmd[cmd.index("--seeds") + 1], "1,2")
+
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 JOB = ("import os, sys, time; sys.path.insert(0, sys.argv[1]); import baseline_store as b\n"

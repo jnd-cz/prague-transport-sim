@@ -134,15 +134,16 @@ things are done, and why a rule exists, is in the files it points to:
   | a build tool, its data rebuilt (world) | the tool's test; `--checks lint,surfaces,canted,crossing,spacing,heights` on the rebuilt lines; `tools/datadiff.py` or `tools/track_moves.py` per line; a smoke drive per line (`--checks u3 --seeds 1`) | redruns, traffic, seeds 2–5 |
   | drawn geometry in the game (surfaces, track beds, crossings, kerbs) | `lint,surfaces,crossing,canted`; every seedless move needs a reason | seeded checks |
   | drawing or load that keeps the world (models, materials, load cuts) | screenshots main vs branch, `tools/frametime.py`; for a load cut, the world after load compared with main's | seeded checks |
-  | the simulation (`traffic.js`, `autopilot.js`, `tram.js`, `tr37.js`, `electric.js`, the game's rules) | `u3,redruns,traffic,lint` on all lines, seeds 1–5, `--compare`; the tram or the autopilot: also `stops`, `tools/test_traction.py`, `tools/test_electric.py`, `tools/test_drives.py` | the geometry checks |
+  | the simulation (`traffic.js`, `autopilot.js`, `tram.js`, `tr37.js`, `electric.js`, the game's rules) | `u3,redruns,stops,traffic,lint` on all lines, seeds 1–5, `--compare` (`stops` rides on the `u3` drive); the tram or the autopilot: also `tools/test_traction.py`, `tools/test_electric.py`, `tools/test_drives.py` | the geometry checks |
   | track heights (`tools/line_heights.py`, the profile) | also `heights` | |
   | a world checkpoint (W1, W2 …, ROADMAP.md) | every check on every line once; its moves explained in its PR | |
 
 - **Reading a compare** (DEVELOPING.md, Baselines): seeded counts are judged by the branch's mean against the
   min–max of main's seeds; moves inside it are noise. Every mean outside it, every stuck, unfinished or penalty
-  run and every seedless move needs a reason tied to the change. When `--compare` says the seeded runs compare
-  with a checkpoint, run the same seeds on main at the merge base back to back before reading any move (until
-  #709 does it). A PR does not refresh the baseline: the deploy PC measures main's at night.
+  run and every seedless move needs a reason tied to the change. Where main has no baseline at the merge base,
+  `--compare` measures the runs there first and keeps them (the first compare on a base takes about twice as
+  long). A note that seeded runs compare with a checkpoint means no move is read from them. A PR does not refresh
+  the baseline: the deploy PC measures main's at night.
 - A measurement worth repeating becomes a check (`tools/bench/`, a `headless.py --checks` entry), not a scratch
   script. Scratch output goes to `reports/` (ignored but for `reports/review/`) or outside the checkout.
 
