@@ -223,16 +223,21 @@ def straight(S, d, a, b):
     return [(i, j, j != b) for i, j in zip(cuts, cuts[1:]) if d[j] - d[i] >= PIECE]
 
 
-def of_lines(lines, lidar, others=()):
+def of_lines(lines, lidar, others=(), meeting=()):
     """The stretches of polylines ([(n, 3) arrays]): [{"p": (m, 2), "zl", "gl", "zr", "gr": (m,)}]. others: more lines
-    a side's readings stop at (the survey's wall areas' outlines)."""
+    a side's readings stop at (the survey's wall areas' outlines). meeting: the lines (their indexes) whose two ends
+    stand on other walls (an abutment's line between its wing walls' corners, ground_mesh.abutments): an end's
+    readings run along that wall, through the raster's smear of it, and the point next to the end stands for it."""
     out = []
     walls = segments(list(lines) + list(others))
-    for p in lines:
+    for n_line, p in enumerate(lines):
         S = sample(np.asarray(p, float))
         if len(S) < 2:
             continue
         zl, gl, zr, gr = levels(S, lidar, walls)
+        if n_line in meeting and len(S) > 3:
+            for q in (zl, gl, zr, gr):
+                q[0], q[-1] = q[1], q[-2]
         d = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(S[:, 0]), np.diff(S[:, 1])))])
         for a, b, turns in (q for r in runs(np.abs(zl - zr) >= STEP, d) for q in straight(S, d, *r)):
             v = [np.array(q[a:b + 1], float) for q in (zl, gl, zr, gr)]
@@ -300,7 +305,8 @@ def stretches(ln, root=ROOT, box=None, lidar=None, extra=()):
     if box is not None:
         box = (box[0] - FIT[-1], box[1] - FIT[-1], box[2] + FIT[-1], box[3] + FIT[-1])
     # (extra: more lines taken as wall lines, ground_mesh.abutments, #763)
-    return of_lines(source_lines(ln, root, box) + list(extra), lidar or ipr_lidar(), wall_outlines(ln, root, box))
+    src = source_lines(ln, root, box)
+    return of_lines(src + list(extra), lidar or ipr_lidar(), wall_outlines(ln, root, box), set(range(len(src), len(src) + len(extra))))
 
 
 def main(argv=None):
