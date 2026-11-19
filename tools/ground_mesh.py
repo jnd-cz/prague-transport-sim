@@ -249,6 +249,49 @@ def bends(g, at, step=None, fine=LATTICE_FINE, tol=LATTICE_BEND):
     return shapely.intersection(shapely.MultiLineString(segs), g)
 
 
+WALL_HOLD = 1.5  # m: a corner this near a wall's line stands at the level of its side (IPR's raster smears a step this
+# far, street_profile.SW_KERB_SMEAR; the street surface and the city mesh carry the smear)
+
+
+def hold_at_walls(cx, cy, tx, ty, z, eligible, walls):
+    """Heights z of corners (cx, cy) with each eligible one within WALL_HOLD of a wall stretch (wall_lines.stretches)
+    set to the level of the side of the wall its triangle's centre (tx, ty) lies on, at the nearest point of the line. A
+    corner on the line itself so takes the top in a face above the wall and the foot in one below it: two heights at
+    one point, the weld's step, an upright face (#697). Returns (z, the corners held)."""
+    held = np.zeros(len(cx), bool)
+    if not walls or not eligible.any():
+        return z, held
+    A, B, ZL, ZR = [], [], [], []
+    for w in walls:
+        p = w["p"]
+        A.append(p[:-1])
+        B.append(p[1:])
+        ZL.append(np.column_stack([w["zl"][:-1], w["zl"][1:]]))
+        ZR.append(np.column_stack([w["zr"][:-1], w["zr"][1:]]))
+    A, B, ZL, ZR = (np.concatenate(v) for v in (A, B, ZL, ZR))
+    tree = shapely.STRtree(shapely.linestrings(np.stack([A, B], 1)))
+    idx = np.flatnonzero(eligible)
+    pi, si = tree.query(shapely.points(cx[idx], cy[idx]), predicate="dwithin", distance=WALL_HOLD)
+    if not len(pi):
+        return z, held
+    P = np.column_stack([cx[idx[pi]], cy[idx[pi]]])
+    v = B[si] - A[si]
+    t = np.clip(((P - A[si]) * v).sum(1) / np.maximum((v * v).sum(1), 1e-12), 0, 1)
+    d = np.hypot(*(P - A[si] - t[:, None] * v).T)
+    order = np.lexsort((d, pi))  # (per corner its nearest segment first)
+    first = np.concatenate([[True], pi[order][1:] != pi[order][:-1]])
+    k = order[first]
+    c, s, t = idx[pi[k]], si[k], t[k]
+    v = B[s] - A[s]
+    left = v[:, 0] * (ty[c] - A[s, 1]) - v[:, 1] * (tx[c] - A[s, 0]) > 0
+    level = np.where(left, ZL[s, 0] + (ZL[s, 1] - ZL[s, 0]) * t, ZR[s, 0] + (ZR[s, 1] - ZR[s, 0]) * t)
+    ok = np.isfinite(level)
+    z = z.copy()
+    z[c[ok]] = level[ok]
+    held[c[ok]] = True
+    return z, held
+
+
 def city_at(G, px, py):
     """The city mesh's height at points under the classes above the terrain (ground_partition's "under" triangles):
     its triangle's plane, NaN where none holds a point."""
@@ -675,6 +718,14 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     streets = Streets(ln)
     under_at = city_sampler(G)
     n_bent = 0
+    # (the walls the survey has as lines, where the ground steps across them: their lines among the faces' lines, so
+    # corners lie on them, #697)
+    import wall_lines
+    walls = wall_lines.stretches(ln, box=box.bounds)
+    for w in walls:
+        g = shapely.LineString(w["p"]).intersection(box)
+        if not g.is_empty:
+            lines.append(g)
     for k, q in enumerate(pieces["survey"]):
         lines.append(q["g"].boundary)
         owners.append(("survey", k, q["g"]))
@@ -929,6 +980,12 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (a street corner shared with a survey wall or stairs takes its height within WALL_SNAP, #653)
     zs = snap_to_walls(D, cx[m], cy[m], zs, np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span)
     zc[m] = zs
+    # (a wall the survey has as a line: the street, the lidar ground and the terrain beside it stand at its side's level
+    # up to it, #697)
+    elig = corner_cls == "terrain"
+    elig[m] = (np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span) | on_lidar
+    cen = fc.mean(1)
+    zc, at_wall = hold_at_walls(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, elig, walls)
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc]) + np.where(on_lidar | in_osm, YIELD, 0.0)
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", np.where(in_osm, "pool", "survey"))
     # (the weld's report: what gave a survey corner its height)
@@ -964,7 +1021,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     zc[m[ok]], prio[m[ok]], kind[m[ok]] = zb[ok], 1.0, "bed"
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
-    log(f"  heights: {int(nan.sum())} corners without one {no_height}, {time.time() - t1:.0f} s")
+    log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
+        f"{int(at_wall.sum()):,} corners, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         from geo import Frame
         from ipr_dtm import IprDtm
