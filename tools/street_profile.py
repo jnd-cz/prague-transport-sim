@@ -1621,8 +1621,9 @@ def _wide_init(ln):
 def wide_square(ln, cell, ij, raised_xy, ctx=None):
     """One square of line_wide: the line's streets built in it and measured, as sums and samples to merge in square
     order (survey and generated: the road 1 m inside its edge against IPR, the drive lines, the sidewalks), the
-    generated jumps' places, and per confirmed raised corridor (raised_xy) its tracks' samples within 50 m and how many
-    read raised. None where the square holds no street."""
+    generated jumps' places, and per confirmed raised corridor (raised_xy: a point, or a place with `from` and `to`) its
+    tracks' samples within 50 m of the point or on the stretch in this square (confirmed_corridor), and how many read
+    raised. None where the square holds no street."""
     import shapely
     ctx = ctx or (_WIDE["ctx"] if _WIDE.get("ln") == ln else context(ln))
     i, j = ij
@@ -1636,7 +1637,10 @@ def wide_square(ln, cell, ij, raised_xy, ctx=None):
         n = r = 0
         for c in cs:
             if "raised" in c:
-                near = np.hypot(*(c["p"] - xy).T) <= 50.0
+                if isinstance(xy, dict):
+                    near = confirmed_corridor(ln, c["p"], [xy]) & (np.abs(c["p"] - at) <= radius).all(1)
+                else:
+                    near = np.hypot(*(c["p"] - xy).T) <= 50.0
                 n += int(near.sum())
                 r += int(c["raised"][near].any(1).sum())
         out["raised"].append((n, r))
@@ -1748,7 +1752,9 @@ def line_wide(lines, cell, out_path, jobs=None):
                 x, y = F.xy([r["lat"]], [r["lon"]])
                 raised_at.append({"place": r["place"], "xy": np.array([float(np.ravel(x)[0]), float(np.ravel(y)[0])]),
                                   "n": 0, "raised": 0})
-        xy = [r["xy"] for r in raised_at]
+        # (a stretch the user confirmed between two ends: its tracks' samples on it, #606)
+        xy = [r["xy"] if not (q.get("from") and q.get("to")) else q
+              for r, q in zip(raised_at, [q for q in RAISED_PLACES if q["line"] == ln])]
         if jobs > 1:
             ex = sysinfo.pool(min(jobs, len(sq)), _wide_init, ln)
             results = ex.map(wide_square, *zip(*[(ln, cell, ij, xy) for ij in sq]))
@@ -1811,7 +1817,7 @@ def line_wide(lines, cell, out_path, jobs=None):
             for c, v in sorted(scat.items()) if v["survey"]}
         res["triangles over the streets (road, tram, sidewalks)"] = tri
         res["squares"] = len(sq)
-        res["confirmed raised corridors, share of the tracks within 50 m read raised"] = {
+        res["confirmed raised corridors, share of the tracks within 50 m (a stretch: on it) read raised"] = {
             r["place"]: round(r["raised"] / r["n"], 2) if r["n"] else None for r in raised_at}
         res["generated jumps, places"] = places
         out[ln] = res
