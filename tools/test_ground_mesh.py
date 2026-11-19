@@ -359,6 +359,38 @@ class Walls(unittest.TestCase):
         self.assertEqual(np.round(zf, 3).tolist(), [208.6, 211.6, 210.1, 210.1])
 
 
+class Terraces(unittest.TestCase):
+    """#663: a raised courtyard, line 37 (7590, 743): beds 2.1-3.7 m over the lidar inside walls as high."""
+
+    @staticmethod
+    def box(x0, y0, x1, y1, z):
+        return [[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]]
+
+    def setUp(self):
+        b = self.box
+        self.D = {"areas": [
+            {"c": "green", "g": 1, "r": b(0, 0, 10, 10, 210.0)},        # 0 a bed, 4 m over the lidar, by wall 1
+            {"c": "wall", "r": b(0, -0.3, 10, 0, 210.0)},               # 1 its wall, as high
+            {"c": "green", "g": 1, "r": b(30, 0, 40, 10, 210.0)},       # 2 as high, no wall: a deck, a roof
+            {"c": "green", "g": 1, "r": b(60, 0, 70, 10, 206.2)},       # 3 a lawn on the ground by wall 4
+            {"c": "wall", "r": b(60, -0.3, 70, 0, 207.5)},              # 4 a garden wall on the ground
+            {"c": "green", "r": b(0, 20, 10, 30, 210.0)},               # 5 off the lidar: its own outline already
+            {"c": "green", "g": 1, "l": 1, "r": b(0, 40, 10, 50, 210.0)},  # 6 on a structure's level
+            # 7 a footpath from the street up onto the bed's terrace: 3 of its 6 points at the bed's height
+            {"c": "sidewalk", "r": [[10, 0, 210.0], [12, 0, 210.0], [12, 10, 210.0], [12, 20, 206.1], [10, 20, 206.0], [10, 10, 208.0]]},
+            # 8 the street's sidewalk along the terrace's foot: it touches the bed, none of its points over the lidar
+            {"c": "sidewalk", "r": b(-3, 0, 0, 10, 206.05)},
+        ]}
+        self.lidar = lambda x, y: np.full(np.shape(x), 206.0)
+
+    def test_a_lidar_area_over_the_lidar_by_a_wall_as_high_is_a_terrace(self):
+        self.assertEqual(gm.terraces(self.D, list(range(9)), self.lidar), {0})
+
+    def test_a_footpath_onto_a_terrace_stands_on_it_and_a_streets_sidewalk_at_its_foot_does_not(self):
+        self.assertEqual(gm.beside(self.D, [7, 8], {0}, self.lidar), {7})
+        self.assertEqual(gm.beside(self.D, [7, 8], set(), self.lidar), set())
+
+
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
         # (a lawn on the lidar ground takes the city mesh's height: its triangles under the classes above, "under")

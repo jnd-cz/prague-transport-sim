@@ -553,6 +553,19 @@ Sections:
   ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`). What reaches a rail without crossing
   the track lies at the bed's height within 5 cm of it (`ground_mesh.rail_band`): line 17 s 17128's stop island, classed
   sidewalk, lies along the outer rail (9.5 cm over it before), line 9's depot hall (a plot) over its tracks' ends.
+- **Terraces: where the lidar's ground is not the ground** (#663, measured 2026-11-19). A lawn or a yard on the lidar
+  (`g`) lies on the city mesh inside (#444). 38-108 of them a line (of 1,375-3,663) have an outline over 1 m above
+  IPR's raster (its points' median); 4-70 lie over 1 m under it. Those over it are of three kinds: terraces inside
+  walls as high (a raised courtyard, line 37 (7590, 743): six beds 2.1-3.7 m over the raster, their walls 2.2-4.2 m),
+  areas on a deck or a roof, where the raster is the ground under the structure, and outlines that are off. A
+  terrace keeps its own outline's surface (`ground_mesh.terraces`: over 1 m, and touching a wall whose outline stands
+  as far over the raster): 2-10 areas a line, 18-3,628 m²; the others, 28-105 a line and 0.7-4.0 ha, stay on the
+  lidar. The median keeps the raster's smear out: a lawn along a retaining wall's top has only that edge over it. A
+  footpath that touches a terrace and has a quarter of its outline's points over 1 m above the raster runs onto it
+  and keeps its own outline too (`beside`: 0-5 a line); a street's sidewalk along a terrace's foot touches it with
+  none of its points over (2-3 a line, up to 2.3 ha) and stays on the street surface. Not solved: one area on both
+  levels (line 37 green 4451, 8,164 m², 37 % of its points over): its strip between a wall and the footpath is a
+  pit.
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of
