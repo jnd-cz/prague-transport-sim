@@ -508,9 +508,11 @@ the pinned #291 and only proposes.
   2026-11-19: "yes").
 
 **Stacked work:** an issue that needs another branch's unmerged work branches from it and opens its PR with
-`--base` on that branch. Once the base squash-merges, merge main into the stacked branch (no force-push); a
-conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and merge (#578
-on #575).
+`--base` on that branch. Before the base's PR merges, move the stacked PR onto main (`gh pr edit N --base main`):
+deleting the base's branch closes a PR still based on it, and a closed PR cannot change its base (#745, reopened
+by putting the branch back for a moment). Once the base squash-merges, merge main into the stacked branch (no
+force-push); a conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and
+merge (#578 on #575).
 
 **Unattended runs:** an investigation script is committed only when it runs like the other tools: its own server
 on a free port (as `headless.py`), no fixed agent port, a usage line at the top. Without issues allowed, findings
