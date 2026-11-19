@@ -4798,7 +4798,19 @@
    "said": "As I thought and you suggest we can remove the old invented walls and move retaining walls into the build where we don't have them yet.",
    "source": "the user, 2026-11-19 (session), #765",
    "seen": {
-    "what": "not looked at in street imagery yet",
+    "what": "From the road beside it: a wall of irregular stone masonry stands at the road's edge, between 2 and 3 m tall here, under a flat coping that steps down along the road; behind its top a bank of grass and bushes rises to the trees.",
+    "from": [
+     {
+      "at": [
+       50.0947797,
+       14.4225173
+      ],
+      "headings": [
+       350
+      ]
+     }
+    ],
+    "source": "Google Street View (a car's panorama), seen 2026-11-19 (looked at, not copied)",
     "game": "main 2a8ddf2: the page's slab, 3.9 m tall and level along the whole line; behind it the written ground has the strip's outline as teeth 10 m wide (tools/shot.py --line 17 --s 15298 --view review --at=150,806 --yaw 20 --pitch 10 --dist 35)"
    },
    "sections": [
