@@ -4472,12 +4472,15 @@
    ],
    "reach": 40,
    "issue": 653,
-   "what": "the sidewalk ramp from platform A (228.4 m) up to the road's sidewalk (230.6 m), round a retaining wall and a flight of stairs: one clean wall face, no jagged steps along the lattice",
+   "what": "the stop's access from the road Pod Krejcárkem: the road on a retaining wall over a ramp that falls along it to the platform, a cheek wall between ramp and landing tapering to nothing, a straight flight of stairs at the ramp's top",
    "said": "on Krejcárek I saw malformed sidewalk/ramp to the tram stop",
    "source": "the user, 2026-11-17, #653",
    "seen": {
-    "what": "From the road Pod Krejcárkem: the road's sidewalk with a railing along its edge stands about 2 m over the tram stop; a long even concrete ramp between railings runs down along the retaining wall to the platform, and a straight flight of stairs with railings goes down beside it. All on solid ground.",
+    "what": "Three levels side by side. The road stands on a retaining wall (a concrete beam on ribbed pilasters, a railing on it), about 1 m over the ramp at the stairs and 2 m at the ramp's foot. The ramp, asphalt, about 3 m wide, falls evenly along that wall from the stairs' top to the platform's level over some 30 m. Between the ramp and the platform's landing runs a low concrete cheek wall with a railing, as high as the stairs at their top and tapering to nothing at the ramp's foot. The stairs are one straight flight of 8 granite steps, about 2 m wide, between that cheek wall's end and the white retaining wall, from the landing up to the ramp's top. The platform has a granite edge; the track through the stop is ballasted with sleepers, and setts begin past the platform's end.",
     "from": [
+     {
+      "photos": "raw/reference/photos/krejcarek/user-2026-11-19-1..5 (SOURCES.md)"
+     },
      {
       "at": [
        50.0950058,
@@ -4487,10 +4490,12 @@
        285,
        345,
        45
-      ]
+      ],
+      "source": "Google Street View, seen 2026-11-19 (looked at, not copied)"
      }
     ],
-    "source": "Google Street View, seen 2026-11-19 (looked at, not copied)"
+    "source": "the user's five photos of 2026-11-19 (session: \"Got some fresh photo from Krejcárek for reference: stop, ramps, stairs, wall\")",
+    "game": "with the stairs' rule (#447, PR #762) drawn from the photos' viewpoints 1 and 3 (tools/shot.py --line 37 --s 2975 --view review --at=3927.25,328.6 --yaw 58 --pitch 10 --dist 8; --at=3917.6,322.7 --yaw 238 --pitch 9 --dist 14): the road's wall, the ramp, the tapering cheek wall and the landing as in the photos, the stairs one even slope (no steps: the ground has none); thin shards at the stairs' track-side foot"
    },
    "sections": [
     {
@@ -4506,7 +4511,39 @@
      "expect": {
       "off the chord m": 0.15
      },
-     "why": "the survey's outline has the foot at 228.56-228.82 and the top at 229.75-229.82: one even flight (#447)"
+     "why": "the survey's outline has the foot at 228.56-228.82 and the top at 229.75-229.82: one even flight of 8 steps (#447)"
+    },
+    {
+     "name": "up the ramp along the road's wall, its foot to the stairs' top",
+     "from": [
+      3902.92,
+      310.53
+     ],
+     "to": [
+      3931.9,
+      328.3
+     ],
+     "expect": {
+      "off the chord m": 0.25,
+      "off the lidar m": 1.0,
+      "largest step m": 0.15
+     },
+     "why": "an even ramp of 4 %: 228.49 to 229.90 m over 33 m, within 5 cm of IPR's raster in the written file of 2026-11-19: right today, a case that must stay"
+    },
+    {
+     "name": "from the ramp across the cheek wall to the landing, 6 m before the stairs",
+     "from": [
+      3923.36,
+      323.08
+     ],
+     "to": [
+      3920.22,
+      328.19
+     ],
+     "expect": {
+      "sloping m": 1.0
+     },
+     "why": "the ramp at 229.41 m, the landing at 228.7 m, the cheek wall (survey wall area 1442) between them within 0.6 m"
     }
    ]
   },
