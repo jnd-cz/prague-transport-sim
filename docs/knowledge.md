@@ -553,6 +553,27 @@ Sections:
   ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`). What reaches a rail without crossing
   the track lies at the bed's height within 5 cm of it (`ground_mesh.rail_band`): line 17 s 17128's stop island, classed
   sidewalk, lies along the outer rail (9.5 cm over it before), line 9's depot hall (a plot) over its tracks' ends.
+- **Where walls stand** (#697, measured 2026-11-19 on the five lines; the user: "can we use the open data sources to
+  infer where walls should really stand as opposed to blending between the different height points?"). Four sources,
+  best first:
+  - *The survey's wall areas* (`lineN.dtm.json` class `wall`): used since #653. They lie under only 2-5 % of the
+    survey's wall lines.
+  - *The survey's wall lines* (`lineN.zps.json` kind `Zeď`, level 0: a wall too thin to be an area, with heights at its
+    points): 7.2-13.6 km a line, to the survey's centimetres. IPR's raster steps by 0.7 m or more across 3.5-7.1 km of
+    them (`tools/wall_lines.py` prints the table: 326-537 stretches a line; over 4 m on 0.4-1.8 km). The line's own height is the foot
+    on about a third of the stepped length, the top on a third and neither on the rest, so the two sides' levels are
+    read from the raster 2.5-4 m off the line (past its smear of the step, 2 m at an 8 m wall) as a level and a slope,
+    and the line's height replaces a side's where it is within 0.5 m of it. Rašínovo nábřeží's quay wall is such a
+    line, 7 cm from the two sidewalk areas' shared edge; no wall area crosses there.
+  - *OSM `barrier=retaining_wall`*: 12.7-41.5 km a line inside the 1,200 m corridor, 73-78 % of it across a raster
+    step of 0.7 m or more (the same reading as for the survey's lines), so its positions are good enough to find the
+    step. Most of that (7-27 km a line) lies outside the survey's areas, on the terrain; inside them, 1.5-3.8 km a
+    line has neither a survey wall stretch nor a wall area within 2 m. Not used yet: its position is to a metre or
+    two and it has no heights.
+  - *Geoportál's retaining walls* (`lineN.geo.json` `walls`, with a height): 0.6-1.6 km a line. Not used by the
+    ground.
+  The survey also has 65 km of `Terénní_hrana` (the tops and feet of slopes) on line 17 and 8.4 km of
+  `Hranice_schodiště`; neither is read by the ground yet (#447 for the stairs).
 
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 

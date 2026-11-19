@@ -86,6 +86,24 @@ class Hold(unittest.TestCase):
         got, _ = gm.hold_at_walls(np.array([-0.5]), np.array([2.5]), np.array([-0.6]), np.array([2.5]), np.array([0.0]), np.ones(1, bool), wall)
         self.assertAlmostEqual(float(got[0]), 200.5)
 
+    def test_a_bank_behind_a_low_wall_keeps_its_slope_to_the_wall(self):
+        """Chotkova, line 23 (-887, 721): a 1 m wall under a lawn rising 0.8 m a metre was drawn 4-7 m."""
+        def bank(x, y):  # (the wall at x = 0: the road level at 199 to its east, the lawn from 200 rising westwards)
+            x = np.asarray(x, float)
+            return np.where(x > 0, 199.0, 200.0 + 0.8 * np.abs(x))
+        s = wl.of_lines([np.array([[0.0, 0.0, np.nan], [0.0, 30.0, np.nan]])], bank)[0]
+        self.assertTrue(np.allclose(s["zl"], 200.0) and np.allclose(s["gl"], 0.8))
+        self.assertTrue(np.allclose(s["zr"], 199.0) and np.allclose(s["gr"], 0.0))
+        got, _ = gm.hold_at_walls(np.array([0.0, -1.0, 1.0]), np.full(3, 10.0), np.array([-0.3, -1.2, 1.2]), np.full(3, 10.0),
+                                  np.zeros(3), np.ones(3, bool), [s])
+        self.assertTrue(np.allclose(got, [200.0, 200.8, 199.0]))
+
+    def test_a_corner_past_a_stretchs_end_is_left(self):
+        cx, cy = np.array([0.0, -0.5, -0.5]), np.array([31.0, -1.0, 15.0])
+        got, held = gm.hold_at_walls(cx, cy, cx - 0.2, cy, np.full(3, 192.0), np.ones(3, bool), self.WALL)
+        self.assertEqual(held.tolist(), [False, False, True])
+        self.assertEqual(got.tolist(), [192.0, 192.0, 196.9])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

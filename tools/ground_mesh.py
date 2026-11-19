@@ -255,20 +255,27 @@ WALL_HOLD = 1.5  # m: a corner this near a wall's line stands at the level of it
 
 def hold_at_walls(cx, cy, tx, ty, z, eligible, walls):
     """Heights z of corners (cx, cy) with each eligible one within WALL_HOLD of a wall stretch (wall_lines.stretches)
-    set to the level of the side of the wall its triangle's centre (tx, ty) lies on, at the nearest point of the line. A
-    corner on the line itself so takes the top in a face above the wall and the foot in one below it: two heights at
-    one point, the weld's step, an upright face (#697). Returns (z, the corners held)."""
+    set to the ground of the side of the wall its triangle's centre (tx, ty) lies on: that side's level at the nearest
+    point of the line plus its slope over the corner's distance from it. A corner on the line itself so takes the top
+    in a face above the wall and the foot in one below it: two heights at one point, the weld's step, an upright face
+    (#697). A corner past a stretch's end is left. Returns (z, the corners held)."""
     held = np.zeros(len(cx), bool)
     if not walls or not eligible.any():
         return z, held
-    A, B, ZL, ZR = [], [], [], []
+    A, B, ZL, ZR, GL, GR, END = [], [], [], [], [], [], []
     for w in walls:
         p = w["p"]
+        n = len(p) - 1
         A.append(p[:-1])
         B.append(p[1:])
-        ZL.append(np.column_stack([w["zl"][:-1], w["zl"][1:]]))
-        ZR.append(np.column_stack([w["zr"][:-1], w["zr"][1:]]))
-    A, B, ZL, ZR = (np.concatenate(v) for v in (A, B, ZL, ZR))
+        for out, k in ((ZL, "zl"), (ZR, "zr"), (GL, "gl"), (GR, "gr")):
+            v = w.get(k)
+            v = np.zeros(n + 1) if v is None else np.asarray(v, float)
+            out.append(np.column_stack([v[:-1], v[1:]]))
+        e = np.zeros((n, 2), bool)  # (a segment's end that is its stretch's end)
+        e[0, 0] = e[-1, 1] = True
+        END.append(e)
+    A, B, ZL, ZR, GL, GR, END = (np.concatenate(v) for v in (A, B, ZL, ZR, GL, GR, END))
     tree = shapely.STRtree(shapely.linestrings(np.stack([A, B], 1)))
     idx = np.flatnonzero(eligible)
     pi, si = tree.query(shapely.points(cx[idx], cy[idx]), predicate="dwithin", distance=WALL_HOLD)
@@ -276,16 +283,21 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls):
         return z, held
     P = np.column_stack([cx[idx[pi]], cy[idx[pi]]])
     v = B[si] - A[si]
-    t = np.clip(((P - A[si]) * v).sum(1) / np.maximum((v * v).sum(1), 1e-12), 0, 1)
+    raw = ((P - A[si]) * v).sum(1) / np.maximum((v * v).sum(1), 1e-12)
+    t = np.clip(raw, 0, 1)
     d = np.hypot(*(P - A[si] - t[:, None] * v).T)
     order = np.lexsort((d, pi))  # (per corner its nearest segment first)
     first = np.concatenate([[True], pi[order][1:] != pi[order][:-1]])
     k = order[first]
-    c, s, t = idx[pi[k]], si[k], t[k]
+    c, s, t, d, raw = idx[pi[k]], si[k], t[k], d[k], raw[k]
     v = B[s] - A[s]
     left = v[:, 0] * (ty[c] - A[s, 1]) - v[:, 1] * (tx[c] - A[s, 0]) > 0
-    level = np.where(left, ZL[s, 0] + (ZL[s, 1] - ZL[s, 0]) * t, ZR[s, 0] + (ZR[s, 1] - ZR[s, 0]) * t)
-    ok = np.isfinite(level)
+
+    def along(Q):
+        return Q[s, 0] + (Q[s, 1] - Q[s, 0]) * t
+    level = np.where(left, along(ZL) + along(GL) * d, along(ZR) + along(GR) * d)
+    past = ((raw < -1e-9) & END[s, 0]) | ((raw > 1 + 1e-9) & END[s, 1])
+    ok = np.isfinite(level) & ~past
     z = z.copy()
     z[c[ok]] = level[ok]
     held[c[ok]] = True

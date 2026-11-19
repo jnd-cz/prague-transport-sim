@@ -11,11 +11,14 @@ nábřeží, line 17 (-743, -1421), 8 m.
 
 stretches(ln): the runs of those lines across which the ground steps, each a polyline with the level to its left and
 to its right at every point:
-- the level on a side is IPR's raster SIDE m off the line (past the raster's smear of the step), or the line's own
-  surveyed height where that is within OWN of it (the survey's point is the better reading of the side it was taken
-  on: about a third of the stepped length has it at the foot, a third at the top);
-- a point is on a stretch where the two sides differ by STEP or more; a stretch runs at least MIN_LEN, gaps up to GAP
-  closed; the levels smoothed along it over SMOOTH points.
+- a side's ground is IPR's raster read FIT m off the line, past the raster's smear of the step, as a straight line
+  across: its level at the wall and its slope away from it (`zl`, `gl`; `zr`, `gr`). A level sidewalk gives its
+  level; a bank rising behind a low wall gives the bank's foot at the wall, not the bank's height 2 m up it (the
+  highest reading made a 1 m wall under Chotkova's lawn 4-7 m, line 23 (-887, 721));
+- the line's own surveyed height is a side's level where it is within OWN of it (the survey's point is the better
+  reading of the side it was taken on: about a third of the stepped length has it at the foot, a third at the top);
+- a point is on a stretch where the two sides' levels at the wall differ by STEP or more; a stretch runs at least
+  MIN_LEN, gaps up to GAP closed; levels and slopes smoothed along it over SMOOTH points.
 """
 import json
 import math
@@ -29,8 +32,8 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 KIND = "Zeď"
 SPACING = 1.0  # m between a line's samples
-SIDE = 1.5  # m off the line: where IPR's raster is read for a side's level (its smear of a step: street_profile SW_KERB_SMEAR)
-REACH = 2.5  # m off the line: the farthest reading of a side
+FIT = (2.5, 3.0, 3.5, 4.0)  # m off the line: where IPR's raster is read for a side (its smear of the quay's 8 m reaches 2 m)
+SLOPE = 1.5  # rise over run: a side's slope is held to this (a reading on another wall or a tree's foot tilts the fit)
 OWN = 0.5  # m: the line's own height this near a side's raster level is that side's level
 STEP = 0.7  # m: the ground steps across the line by this or more (a kerb and a garden's edge are under it)
 MIN_LEN = 2.0  # m: a shorter run is no stretch
@@ -65,24 +68,32 @@ def sample(p, spacing=SPACING):
     return np.vstack(out + [last])
 
 
-def levels(S, lidar):
-    """The level to the left and to the right of sampled points S (sample()), lidar(x, y) IPR's raster. Read at SIDE and
-    up to REACH off the line: the raster's smear pulls the high side down and the low side up, so the high side takes
-    the highest of its readings and the low side the lowest (at SIDE alone the quay's top read 194.2-197.1 m along 130 m
-    of a level sidewalk)."""
-    off = np.arange(SIDE, REACH + 1e-9, 0.5)
-    L = np.stack([lidar(S[:, 0] + S[:, 3] * o, S[:, 1] + S[:, 4] * o) for o in off])
-    R = np.stack([lidar(S[:, 0] - S[:, 3] * o, S[:, 1] - S[:, 4] * o) for o in off])
+def _side(S, lidar, sign):
+    """(the level at the line, the slope away from it) of the ground on one side of sampled points: the least-squares
+    line through IPR's readings FIT m off."""
+    d = np.asarray(FIT, float)
+    Z = np.stack([lidar(S[:, 0] + sign * S[:, 3] * o, S[:, 1] + sign * S[:, 4] * o) for o in d])
+    ok = np.isfinite(Z)
+    n = ok.sum(0)
     with np.errstate(all="ignore"):
-        left_high = np.nanmedian(L, 0) >= np.nanmedian(R, 0)
-        zl = np.where(left_high, np.nanmax(L, 0), np.nanmin(L, 0))
-        zr = np.where(left_high, np.nanmin(R, 0), np.nanmax(R, 0))
+        dm = np.where(ok, d[:, None], 0).sum(0) / n
+        zm = np.where(ok, Z, 0).sum(0) / n
+        dd = np.where(ok, d[:, None] - dm, 0)
+        g = (dd * np.where(ok, Z - zm, 0)).sum(0) / (dd ** 2).sum(0)
+    g = np.clip(np.where(n >= 3, g, 0.0), -SLOPE, SLOPE)
+    return np.where(n >= 1, zm - g * dm, np.nan), g
+
+
+def levels(S, lidar):
+    """The ground to the left and to the right of sampled points S (sample()), lidar(x, y) IPR's raster: (zl, gl, zr,
+    gr), each side's level at the line and its slope away from it (see the module's text)."""
+    (zl, gl), (zr, gr) = _side(S, lidar, 1.0), _side(S, lidar, -1.0)
     z = S[:, 2]
     # (the line's own height is the side's it lies nearer, within OWN)
     dl, dr = np.abs(z - zl), np.abs(z - zr)
     own_l = np.isfinite(z) & (dl <= OWN) & (dl <= dr)
     own_r = np.isfinite(z) & (dr <= OWN) & (dr < dl)
-    return np.where(own_l, z, zl), np.where(own_r, z, zr)
+    return np.where(own_l, z, zl), gl, np.where(own_r, z, zr), gr
 
 
 def runs(on, d):
@@ -102,16 +113,17 @@ def runs(on, d):
 
 
 def of_lines(lines, lidar):
-    """The stretches of polylines ([(n, 3) arrays]): [{"p": (m, 2), "zl": (m,), "zr": (m,)}]."""
+    """The stretches of polylines ([(n, 3) arrays]): [{"p": (m, 2), "zl", "gl", "zr", "gr": (m,)}]."""
     out = []
     for p in lines:
         S = sample(np.asarray(p, float))
         if len(S) < 2:
             continue
-        zl, zr = levels(S, lidar)
+        zl, gl, zr, gr = levels(S, lidar)
         d = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(S[:, 0]), np.diff(S[:, 1])))])
         for a, b in runs(np.abs(zl - zr) >= STEP, d):
-            out.append({"p": S[a:b + 1, :2].copy(), "zl": _median(zl[a:b + 1]), "zr": _median(zr[a:b + 1])})
+            out.append({"p": S[a:b + 1, :2].copy(), "zl": _median(zl[a:b + 1]), "gl": _median(gl[a:b + 1]),
+                        "zr": _median(zr[a:b + 1]), "gr": _median(gr[a:b + 1])})
     return out
 
 
@@ -149,7 +161,7 @@ def stretches(ln, root=ROOT, box=None, lidar=None):
     """The stepped stretches of line ln's wall lines (of_lines), those reaching a box where one is given (with SIDE's
     margin: a stretch is found from its own line alone, so a box's build finds what the line's build does)."""
     if box is not None:
-        box = (box[0] - SIDE, box[1] - SIDE, box[2] + SIDE, box[3] + SIDE)
+        box = (box[0] - FIT[-1], box[1] - FIT[-1], box[2] + FIT[-1], box[3] + FIT[-1])
     return of_lines(source_lines(ln, root, box), lidar or ipr_lidar())
 
 
