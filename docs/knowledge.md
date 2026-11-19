@@ -525,6 +525,11 @@ Sections:
     earth lies 0.0-0.4 m under the rails there and 2.3-14 m under the spans' bridges (`line_structures.py`
     `ramps`). The ramps stay spans: off a span, the street flush pulls the street beside a walled ramp up to the
     track (Modřanská, 40 kerbs).
+  - The bed on the ground ends at the deck's end (`ground_partition.py` `bed_pieces`, #594): near a span the route's
+    decks (spans less ramps) decide, not the lidar's 2.5 m test; the two parted by one 2 m bed sample at every deck end,
+    and the bed stopped up to 2 m short, a terrain or survey triangle falling under the rails (line 17 s 4062, 5076:
+    1.07 and 1.67 m under the bed top). A deck's walkways where the survey has no deck under our track (Krejcárek's
+    north end) are laid all the same (`flushDtm`).
 - **Open track from the lidar** (#591): the rail top stands 0.14-0.18 m over IPR's bare earth on open track
   (ballast or grass) and -0.02 to +0.02 m on paved track (DI heights only; where our heights come from the lidar the
   measure is circular). It does not tell ballast from grass.

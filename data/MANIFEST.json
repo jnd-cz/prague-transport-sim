@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-15",
- "built_at_commit": "17fca73",
- "published": "2026-11-18 23:45",
- "note": "#682: the road tunnels' mouths in the ground file (fit_mouths), the heights Start uses in the network files (version 2); all five lines on main 00b2e9a's data",
+ "built_at_commit": "b0e3f9c",
+ "published": "2026-11-19 05:19",
+ "note": "#594: bed ends at the route's deck ends (ground_partition bed_pieces); ground files of lines 9, 17, 37 rebuilt on main a3e9638 + b0e3f9c (22, 23 unchanged)",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -25,12 +25,12 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.ground.bin": {
-   "size": 29846105,
-   "sha256": "37e6d7a1e3033e2b7fae5b3c1b7e2b3f8c2c08348ca5826e960b121f7d49b10d"
+   "size": 29845816,
+   "sha256": "ece1775a1d887994489051b80d2bee5f20ba442de0676d25f72c8c7729e4a8ae"
   },
   "line17.ground.json": {
-   "size": 129065,
-   "sha256": "3f590cb39c4a90f0be28b647ce95295dc7fd97980988ca31bdf5d1d12db033b8"
+   "size": 129074,
+   "sha256": "9bd81bf2a33b065d858aebc466a65b160a364183c97f66a5b8c5059eccb1176a"
   },
   "line17.json": {
    "size": 7046694,
@@ -38,7 +38,7 @@
   },
   "line17.network.json": {
    "size": 9289335,
-   "sha256": "10be4a503cba8735e04778a2a2f033d43f2479f37d25034beb5075bf39bebc6b"
+   "sha256": "13c7153314a04c6de3d7da2cc543c0fdc6380c2427622ae8e9772724fd4922de"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -185,12 +185,12 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.ground.bin": {
-   "size": 12034133,
-   "sha256": "b74206f79601e1ae61ec2c865404c45f5fe180b6ac5ad6492f3b478abaaa79b8"
+   "size": 12034823,
+   "sha256": "faabe870d45703f72afa9d530dec2e11b372b9a6168cdfed0b11ee0cd7823076"
   },
   "line37.ground.json": {
-   "size": 51322,
-   "sha256": "9d16f4230ecd745f211f96f7b7646657638ea1d7ad8bd0b31e021c88e114d260"
+   "size": 51323,
+   "sha256": "3d713bec41030ad6fa2d55160b2a67061c20079a816104bb28c5eea7f858d359"
   },
   "line37.json": {
    "size": 2540615,
@@ -198,7 +198,7 @@
   },
   "line37.network.json": {
    "size": 4084944,
-   "sha256": "0e74422b031e97640de842fd735c3c505d309d0f74624e3c8fcea2269ee1cab6"
+   "sha256": "29bee936bf54a2f68c268e91fd16b33517c7c92af70cf784693717e20e84a240"
   },
   "line37.streets.bin": {
    "size": 2581731,
@@ -237,12 +237,12 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.ground.bin": {
-   "size": 26059252,
-   "sha256": "36edae8e4a2054fb916ff255cf73133a71cac45af631296b681ebe4e5befa51a"
+   "size": 26057821,
+   "sha256": "5975b44f4c971299dbd413297a7b49e969d856f073ab91b0bc1922964969fd36"
   },
   "line9.ground.json": {
-   "size": 87885,
-   "sha256": "0007ff61b29f9dd4d3bf4b9cc63d3319c54b41a39634f1f4df36959e1c7ae182"
+   "size": 87869,
+   "sha256": "199feed12de67f1321d381f384649c44c54d92b14f6880333fd1226f002c4e7f"
   },
   "line9.json": {
    "size": 6276517,
@@ -250,7 +250,7 @@
   },
   "line9.network.json": {
    "size": 10465869,
-   "sha256": "6917f867b600328ee199baaaa00219fa0a5bb6249f0ed35767eba14179740221"
+   "sha256": "b2082cf72f4f67c0114a37c5e7e2d999e76ee9b23b77d11e80889dec98b51261"
   },
   "line9.streets.bin": {
    "size": 6076977,

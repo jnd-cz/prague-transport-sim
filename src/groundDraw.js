@@ -52,7 +52,11 @@ export function flushDtm(ground) {
       const n = route.nearest(p[0], p[1]);
       if (!n || n.d >= 15 || !profile.onBridge(n.s)) continue;
       const q = route.at(n.s), zt = profile.height(n.s) - profile.lift(n.s) - STREET_BELOW - (a.c === 'deck' ? 0.02 : 0);
-      const zr = ownAt(a, ai, n.s, q.x, q.y, zt) ?? dtm.deckAt(q.x, q.y, zt, 2.5);
+      // (a walkway with no deck under the route's axis, own or another's, within 2.5 m of the deck takes no offset but is
+      // still laid below (WALK): on Krejcárek's north end, s 3458-3496, the survey has no deck under our track, and its
+      // tram strip 1.5-4.3 m left of it, from the deck up to the parapet's top, stood 0.37 m over the rails, #594)
+      const walk = a.c === 'tram' || a.c === 'paved' || a.c === 'sidewalk';
+      const zr = ownAt(a, ai, n.s, q.x, q.y, zt) ?? dtm.deckAt(q.x, q.y, zt, 2.5) ?? (walk && Math.abs(p[2] - zt) <= 2.5 ? zt : null);
       if (zr === null) continue;
       const k = Math.max(0, Math.min(1, (n.d - 8) / 7));
       deckMoves.push([p, (zt - zr) * (1 - k * k * (3 - 2 * k)), n, a.c]);
