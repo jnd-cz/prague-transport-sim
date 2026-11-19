@@ -6,6 +6,12 @@
 // buzzer and the clicks of the controller, the contactors and the relays.
 import { T3, CAR_PITCH } from './tram.js';
 
+// A pack's `gain` and a loop's, held to 0..PACK_GAIN_MAX whatever the pack says (src/packageRules.json sound.maxGain:
+// the check refuses others at install, #713; here for a pack installed before it): the master's 0.6 times a recording
+// at full scale times more than this is past clipping.
+const PACK_GAIN_MAX = 2;
+const packGain = (g) => (g == null ? g : Math.min(PACK_GAIN_MAX, Math.max(0, Number.isFinite(g) ? g : 1)));
+
 // The events the game raises (one entry a line: tools/sound_lists.py writes them into docs/vehicles.md).
 export const EVENTS = {
   'door.open': 'the doors start opening (their clip starts)',
@@ -364,10 +370,10 @@ export class TramAudio {
       out.gain.value = 0;
       src.connect(out).connect(this.master);
       src.start();
-      loops[name] = { ...l, src, out };
+      loops[name] = { ...l, gain: packGain(l.gain), src, out };
       this._synth(name, false);
     }
-    this.pack = { id: pack.id, gain: pack.gain, lineContactorRelease: pack.lineContactorRelease, events, loops };
+    this.pack = { id: pack.id, gain: packGain(pack.gain), lineContactorRelease: pack.lineContactorRelease, events, loops };
   }
 
   // a built-in loop's voices on or off (a pack's recording plays in its place)

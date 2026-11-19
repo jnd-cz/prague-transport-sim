@@ -6,7 +6,7 @@
 // to the host's submit.php (tools/submit.php; tools/serve.py locally) with the check's report; tools/submissions.py
 // reviews them.
 import { t, getLang, onLangChange } from './i18n.js';
-import { state, install, installUrl, readZip, setEnabled, remove, newerAt, canInstall, catalogue, dryCheck, fetchEntries } from './packages.js';
+import { state, install, installUrl, readZip, setEnabled, remove, newerAt, canInstall, catalogue, dryCheck, fetchEntries, packageRules, withinCaps } from './packages.js';
 import { localUrl } from './localFiles.js';
 
 const el = (tag, { dataset, ...props } = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); Object.assign(e.dataset, dataset); e.append(...kids.filter((k) => k != null)); return e; };
@@ -51,6 +51,8 @@ export function initPackages({ onChange }) {
     folder.onchange = () => folder.files.length && run(async () => {
       // (the paths below the folder picked: its own name is the first part)
       const entries = new Map();
+      // (its files' number and sizes before any is read, #713)
+      withinCaps(folder.files.length, [...folder.files].reduce((a, f) => a + f.size, 0), await packageRules(), 'the folder');
       for (const f of folder.files) entries.set(f.webkitRelativePath.split('/').slice(1).join('/'), new Uint8Array(await f.arrayBuffer()));
       return install(entries, 'folder');
     });

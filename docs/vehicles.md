@@ -256,6 +256,13 @@ above; its `loader` `gltf` or `gltf-rigged`), a `livery` `livery.json`'s (*Liver
 - the manifest's fields above, `game` and `requires` met, the vehicle installed and switched on;
 - every file listed: a type the game reads (`types`), present, of its `bytes` and `sha256`, within the caps (`caps`:
   the package, a model, an image, a sound);
+- before a .zip is unpacked, by its directory: the archive's own size and what it unpacks to (`caps.archive`), the
+  number of its files (`caps.entries`), each file's declared size against its type's cap; a file is then unpacked to
+  its declared size and no further. A folder is held to the same before it is read, an address before more than the
+  caps is fetched;
+- at an install, what the files hold: an image's sides (`image.maxSide`; a livery's textures power-of-two ones), a
+  sound's length (`sound.maxSeconds`), a sound pack's and its loops' `gain` (0 to `sound.maxGain`); an `id` is none of
+  the store's own names (`reserved`);
 - a vehicle's model, loaded by the game's own loader: its rig's names for the `moves` it claims
   (`src/rigged.js` `rigProblems`), and one car as the game draws it (`src/models.js` `vehicleFit`): at most `fit`'s
   `maxLength` (33 m) long, at most its type's width (`VEHICLE_TYPES` in `src/tram.js`) plus `widthOver` wide, its
