@@ -340,9 +340,9 @@ export async function fetchEntries(url) {
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
   if (/\.zip($|\?)/i.test(url)) return readZip(await res.arrayBuffer());
   const text = await res.text(), p = JSON.parse(text), entries = new Map([['package.json', new TextEncoder().encode(text)]]);
-  const r = await packageRules();
+  const rules = await packageRules();
   for (const f of p.files || []) {
-    if (!safe(f.path, r)) continue;
+    if (!safe(f.path, rules)) continue;
     const r = await fetch(new URL(f.path, new URL(url, location.href)));
     if (r.ok) entries.set(f.path, new Uint8Array(await r.arrayBuffer()));
   }
