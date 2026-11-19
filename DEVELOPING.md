@@ -272,13 +272,15 @@ python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic
   spread and every move of a seedless check (lint, surfaces).
 - **Which baseline each tier compares with** (#282):
   - a checkpoint's run stores itself under its name (`--baseline --publish --checkpoint W1`: every check, seeds 1-5);
-  - seedless checks compare with main at the merge base: its baseline, else measured there once in a pinned worktree
-    through the queue and kept on this machine by its key;
-  - seeded checks compare with main's at the merge base when the night has measured it, else with the latest
-    checkpoint; `--against W1` names one.
-- **A seeded compare against a checkpoint is not a compare with main.** When `--compare` says the seeded runs
-  compare with a checkpoint, run the same seeds on main at the merge base back to back before reading any move:
-  #582's stops moved by up to 50 late seconds against W2 and were identical to main's. #709 makes `--compare` do it.
+  - every check compares with main at the merge base: its baseline (the night's, or this machine's), else measured
+    there once in a pinned worktree through the queue and kept on this machine by its key. A seeded check is
+    measured with the seeds asked (#709), so the first compare on a base takes about twice as long;
+  - `--against W1` compares with a checkpoint instead; `--no-measure-base` leaves the measuring out, and a seeded
+    run then takes the latest checkpoint's.
+- **A seeded compare against a checkpoint is not a compare with main** (the note says "not with main"): read no
+  move from it. #582's stops moved by up to 50 late seconds against W2 and were identical to main's.
+- **One drive a seed:** `u3`, `redruns` and `stops` asked together come from one drive of each line and seed, its
+  watchers reporting each (#205, #708; `--separate`: a drive each).
 
 For a combined GTFS run, independently check every logged pair and the built timetable against the
 pinned GTFS, including eligible pairs omitted from both the log and timetable:
@@ -506,9 +508,11 @@ the pinned #291 and only proposes.
   2026-11-19: "yes").
 
 **Stacked work:** an issue that needs another branch's unmerged work branches from it and opens its PR with
-`--base` on that branch. Once the base squash-merges, merge main into the stacked branch (no force-push); a
-conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and merge (#578
-on #575).
+`--base` on that branch. Before the base's PR merges, move the stacked PR onto main (`gh pr edit N --base main`):
+deleting the base's branch closes a PR still based on it, and a closed PR cannot change its base (#745, reopened
+by putting the branch back for a moment). Once the base squash-merges, merge main into the stacked branch (no
+force-push); a conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and
+merge (#578 on #575).
 
 **Unattended runs:** an investigation script is committed only when it runs like the other tools: its own server
 on a free port (as `headless.py`), no fixed agent port, a usage line at the top. Without issues allowed, findings

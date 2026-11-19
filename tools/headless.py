@@ -39,10 +39,11 @@ measured at night (tools/autodeploy.py), not by PRs:
 
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint,surfaces --compare
 
-What --compare reads (#282): --against NAME that checkpoint's run. Otherwise, per run, main's baseline of the merge
-base, committed or published; where there is none, a seeded run takes the latest world checkpoint's, and a seedless
-run is measured on demand at the merge base in a pinned worktree (--no-measure-base leaves it out) and kept on this
-machine by its key for the next branch on the same base. A checkpoint is stored by
+What --compare reads (#282, #709): --against NAME that checkpoint's run. Otherwise, per run, main's baseline of the
+merge base, committed or published; where there is none, the run is measured on demand at the merge base in a pinned
+worktree (a seeded check with the seeds asked) and kept on this machine by its key for the next branch on the same
+base. --no-measure-base leaves that out: a seeded run then takes the latest world checkpoint's, which is not a
+compare with main (the note says so, #582). A checkpoint is stored by
 `--baseline --publish --checkpoint W1`; a name other than W<n> is a test's: stored under that name only, since a
 partial run under the key would stop the nightly measurement of main.
 
@@ -743,9 +744,10 @@ def run_one(page, errors, check, seed, timeout, load=0):
 
 
 def choose_baseline(base, stored_places, results, main_rev, want, measure=True, store=baseline_store):
-    """What each run compares with, when no checkpoint is named (#282): main's own at the merge base, this machine's or
-    published; for a seedless run without one, what this machine measured there, or a measurement now; for a seeded
-    run without one, the latest world checkpoint's. Returns (base, places, the runs left on an older baseline)."""
+    """What each run compares with, when no checkpoint is named (#282, #709): main's own at the merge base, this
+    machine's or published; for a run without one, what this machine measured there, or a measurement now (a seeded
+    check with the seeds asked); only where that is left out or gives nothing, a seeded run takes the latest world
+    checkpoint's. Returns (base, places, the runs left on an older baseline)."""
     jobs = {key_of(*job): job for job in results}
     missing = lambda b: {j for j in jobs if (b.get(j) or {}).get("measured_on") != want}  # noqa: E731
     if missing(base):
@@ -774,16 +776,32 @@ def choose_baseline(base, stored_places, results, main_rev, want, measure=True, 
         counts, places = store.measure_at(main_rev, lines, checks, want)
         store.keep(store.key(want), counts, places)
         take(counts, places, seedless())
-    seeded = {j for j in missing(base) if jobs[j][1] not in SEEDLESS}
-    named = store.latest_checkpoint(store.checkpoints()) if seeded else None
+    def seeded():
+        return {j for j in missing(base) if jobs[j][1] not in SEEDLESS}
+
+    # (a seeded run without main's baseline: measured at the merge base too, with the seeds asked, #709. A checkpoint
+    # in its place read #582's stops as 50 s late against W2 when they were main's to the second)
+    if seeded():
+        take(*store.kept(store.key(want)), seeded())
+    if seeded() and measure:
+        need = [jobs[j] for j in seeded()]
+        lines, checks, seeds = (sorted({j[k] for j in need}, key=str) for k in range(3))
+        print(f"note: main has no baseline of {len(need)} seeded runs at {main_rev[:7]}: measuring them there, kept on this machine")
+        counts, places = store.measure_at(main_rev, lines, checks, want, seeds=seeds)
+        store.keep(store.key(want), counts, places)
+        take(counts, places, seeded())
+    # (what is still without one, measuring left out or failed: the latest checkpoint's, said loudly)
+    left = seeded()
+    named = store.latest_checkpoint(store.checkpoints()) if left else None
     if named:
         counts, places = store.fetch_checkpoint(named)
-        seeded &= set(counts or {})
-        take(counts or {}, places or {}, seeded)
-        print(f"note: {len(seeded)} seeded runs compare with checkpoint {named}: main has no baseline at {main_rev[:7]}")
+        left &= set(counts or {})
+        take(counts or {}, places or {}, left)
+        print(f"note: {len(left)} seeded runs compare with checkpoint {named}, not with main: main has no baseline at "
+              f"{main_rev[:7]}. Read no move from them before the same seeds are run on main at the merge base")
     else:
-        seeded = set()
-    return base, stored_places, sorted(j for j in missing(base) - seeded if j in base)
+        left = set()
+    return base, stored_places, sorted(j for j in missing(base) - left if j in base)
 
 
 def main():
