@@ -368,6 +368,8 @@ function requested(game, st, s) {
 export class Panel {
   constructor() {
     this.dash = $('dash');
+    this.resized = true; // (the dashboard's size changed since place(): update() then places its parts again)
+    new ResizeObserver(() => { this.resized = true; }).observe(this.dash);
     this.look = 0;
     this.fold = store(FOLD_KEY) === '1';
     this.held = {}; // keys held (the momentary controls drawn pressed)
@@ -540,7 +542,7 @@ export class Panel {
 
   place() {
     const dw = this.dash.offsetWidth, dh = this.dash.offsetHeight;
-    this.placed = `${dw}x${dh}`;
+    this.resized = false;
     if (!dw || !dh) return;
     if (!document.body.classList.contains('pcompact')) {
       const s = dh / H, pz = this.el.pz;
@@ -590,11 +592,11 @@ export class Panel {
   update(game, opts) {
     const b = document.body;
     if (this.layoutKey !== this.modeKey()) this.layout();
-    else if (this.placed !== `${this.dash.offsetWidth}x${this.dash.offsetHeight}`) this.place();
+    else if (this.resized) this.place(); // (the dashboard's size changed: a ResizeObserver says so, no layout read here, #706)
     if (!this.fitted) this.fit();
     const tram = game.tram, eq = tram.eq, lamps = game.lamps || {}, e = this.el, now = performance.now();
     const set = (k, v, f) => { if (this.state[k] !== v) { this.state[k] = v; f(v); } };
-    b.dataset.doors = game.doorState;
+    set('doors', game.doorState, (v) => { b.dataset.doors = v; });
     b.classList.toggle('passist', !!opts.assist);
     b.classList.toggle('pdeadman', !!opts.deadman);
     // the dial, the meters
