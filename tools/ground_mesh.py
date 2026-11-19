@@ -140,6 +140,80 @@ def climbs(a):
     return False
 
 
+TERRACE = 1.0  # m: a lidar-ground area's outline this far over the lidar (its points' median) beside a wall as high
+
+
+def over_lidar(a, lidar):
+    """How far a survey area's outline stands over the lidar: the median over its points with a height (NaN without)."""
+    r = np.array([q[:3] for q in a["r"] if q[2] is not None], float)
+    if not len(r):
+        return np.nan
+    d = r[:, 2] - np.asarray(lidar(r[:, 0], r[:, 1]), float)
+    d = d[np.isfinite(d)]
+    return float(np.median(d)) if len(d) else np.nan
+
+
+def terraces(D, ids, lidar):
+    """Which of the lidar-ground areas `ids` are terraces: {id}. A lawn or a yard on the lidar (`g`) has surveyed heights
+    on its outline only and lies on the lidar inside (#444). On a raised courtyard the lidar's ground is the ground
+    round it: line 37 (7590, 743), six beds whose outlines stand 2.1-3.7 m over IPR's raster inside walls as high; laid
+    on the lidar they were pits and their walls blades (#663). A terrace is a level-0 `g` area whose outline stands
+    TERRACE or more over the lidar and that touches a wall (wall_like) whose outline does too: it keeps its own
+    outline's surface. lidar(x, y): IPR's raster in the line's frame."""
+    ids = [i for i in ids if D["areas"][i].get("g") and D["areas"][i].get("l", 0) == 0 and len(D["areas"][i]["r"]) >= 3]
+    if not ids:
+        return set()
+    high = [i for i in ids if (over_lidar(D["areas"][i], lidar) or 0) >= TERRACE]  # (NaN: not over)
+    if not high:
+        return set()
+    walls = []
+    for a in D["areas"]:
+        if a.get("l", 0) != 0 or len(a["r"]) < 3 or not wall_like(a):
+            continue
+        walls.append(a)
+    if not walls:
+        return set()
+    polys = shapely.polygons([shapely.LinearRing([q[:2] for q in a["r"]]) for a in walls])
+    tree = shapely.STRtree(polys)
+    over = {}
+    out = set()
+    for i in high:
+        g = shapely.Polygon([q[:2] for q in D["areas"][i]["r"]])
+        for k in tree.query(g, predicate="dwithin", distance=0.05).tolist():
+            if k not in over:
+                over[k] = over_lidar(walls[k], lidar)
+            if over[k] >= TERRACE:
+                out.add(i)
+                break
+    return out
+
+
+TERRACE_SHARE = 0.25  # of a footpath's outline points TERRACE over the lidar: it runs onto the terrace it touches
+
+
+def beside(D, ids, raised, lidar):
+    """Which of the areas `ids` touch one of the areas `raised` and stand on it: {id}, those with TERRACE_SHARE of their
+    outline's points TERRACE or more over the lidar. A footpath between a raised courtyard's beds (line 37, sidewalk
+    2962: 30 % of its points) has their heights in its outline; on the street surface, which reads the lidar, it ran
+    in a trench 2-3 m under them (#663). A street's sidewalk along a terrace's foot touches it too and stays on the
+    street surface: 2-3 a line, up to 2.3 ha, none of their points over."""
+    if not raised or not ids:
+        return set()
+    R = sorted(raised)
+    tree = shapely.STRtree(shapely.polygons([shapely.LinearRing([q[:2] for q in D["areas"][i]["r"]]) for i in R]))
+    out = set()
+    for i in ids:
+        r = D["areas"][i]["r"]
+        if len(r) < 3 or not len(tree.query(shapely.Polygon([q[:2] for q in r]), predicate="dwithin", distance=0.05)):
+            continue
+        P = np.array([q[:3] for q in r if q[2] is not None], float)
+        if len(P):
+            d = P[:, 2] - np.asarray(lidar(P[:, 0], P[:, 1]), float)
+            if np.isfinite(d).any() and (d[np.isfinite(d)] >= TERRACE).mean() >= TERRACE_SHARE:
+                out.add(i)
+    return out
+
+
 class SurveySurface:
     """Each survey area's own surface: its outline's heights, triangulated (the page's DtmSurface); a stairs area that is
     one flight, its plane (flight())."""
@@ -1146,8 +1220,15 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (but an area whose outline climbs a wall: on two levels, its own outline is no surface, climbs(), #761)
     two_levels = {a: climbs(D["areas"][a]) for a in np.unique(sa[on_span]).tolist()}
     on_span &= ~np.array([two_levels.get(a, False) for a in sa.tolist()], bool)
+    # (a terrace keeps its own outline's surface, and so does a footpath that touches one, #663)
+    from geo import Frame as Frame_
+    from ipr_dtm import IprDtm as IprDtm_
+    f_, ipr_ = Frame_(), IprDtm_()
+    lidar_ = lambda px, py: ipr_.sample(np.asarray(px) + f_.E0, np.asarray(py) + f_.N0)  # noqa: E731
+    raised = terraces(D, np.unique(sa).tolist(), lidar_)
+    on_terrace = np.isin(sa, sorted(raised | beside(D, np.unique(sa[np.isin(sc, list(STREETS_WALK))]).tolist(), raised, lidar_)))
     for kd, cls in (("road", STREETS_ROAD), ("sidewalk", STREETS_WALK)):
-        mm = np.isin(sc, list(cls)) & ~on_span
+        mm = np.isin(sc, list(cls)) & ~on_span & ~on_terrace
         if mm.any():
             zs[mm] = streets.at(kd, cx[m][mm], cy[m][mm])
     # (a lawn, a yard, a railway yard on the lidar ground (`g`, tools/zps_inside.py) has surveyed heights on its outline
@@ -1156,6 +1237,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # hillside of them terraced: line 37 s 3472, area 2705)
     need = np.isnan(zs)
     on_lidar = need & np.array([bool(D["areas"][a].get("g")) for a in sa.tolist()], bool)
+    on_lidar &= ~on_terrace
     if on_lidar.any():
         zs[on_lidar] = city_at(G, cx[m][on_lidar], cy[m][on_lidar])
     need = np.isnan(zs)
