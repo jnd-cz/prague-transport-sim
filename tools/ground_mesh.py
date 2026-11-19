@@ -428,8 +428,10 @@ def abutments(tracks, outline, bed_at, lidar, wall_lines_, box=None, log=None):
       past it.
     - The face: the bed reaches a deck's end (#594) and overhangs the abutment (Modřany: by 1.3 m). Back from the end
       the lidar rises from the ground the deck leaves to the ramp's top within ABUT_BACK; the face is where it crosses
-      the middle of the two. Where it does not rise by wall_lines.STEP (an embankment's cone under the deck's end:
-      Krejcárek, line 37 (3954, 380)), the face is the bed's end.
+      the middle of the two. Where it does not rise as a wall's smear does, by wall_lines.SLOPE over a metre (an
+      embankment's cone under the deck's end: Krejcárek, line 37 (3954, 380), 0.6 m a metre before and behind the
+      bed's end; read as a face it made a wall of 0.8-2 m across the cone, 13 m² of steep faces), the face is the
+      bed's end.
     - Ends within ABUT_JOIN are one abutment: its line through the faces' middle, square to the track.
     - Either way the line ends at a surveyed wall line's point within ABUT_SNAP of it along the track and ABUT_WING to
       the side that stands wall_lines.STEP or more over the ground the deck leaves (the wing wall's corner: at
@@ -457,8 +459,10 @@ def abutments(tracks, outline, bed_at, lidar, wall_lines_, box=None, log=None):
         if not np.isfinite(Zb[k]).any():
             continue
         top = np.nanmax(Zb[k])
-        if top - zg[k] < wall_lines.STEP:
-            continue
+        n1 = int(round(1.0 / ABUT_STEP))  # (a face: the raster rises as a smeared wall does, not as a bank)
+        with np.errstate(invalid="ignore"):
+            if top - zg[k] < wall_lines.STEP or not (Zb[k, n1:] - Zb[k, :-n1] >= wall_lines.SLOPE).any():
+                continue
         over = np.flatnonzero(Zb[k] >= (top + zg[k]) / 2)
         i = int(over[0])
         if i == 0:

@@ -448,7 +448,7 @@ class Abutments(unittest.TestCase):
 
     def test_over_a_slope_with_no_step_the_face_is_the_beds_end(self):
         # (an embankment's cone under the deck's end: Krejcárek, line 37 (3954, 380))
-        got = gm.abutments(self.tracks, self.outline, self.bed_at, lambda x, y: 103.0 + 0.05 * np.asarray(x, float), [])
+        got = gm.abutments(self.tracks, self.outline, self.bed_at, lambda x, y: 103.0 + 0.6 * np.clip(np.asarray(x, float), -9, 5), [])
         self.assertEqual(self.ends(got), [[0.0, -3.0], [0.0, 3.0]])
 
     def test_a_bed_that_ends_on_the_ground_is_no_abutment(self):
