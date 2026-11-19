@@ -10,7 +10,8 @@ the moving assemblies. **Download GLB** exports the current pose. The supplied `
 has closed doors and a raised collector. It imports into Blender and other glTF 2.0 applications as
 rigid objects with local pivots; it does not need a skin or armature.
 The hosted studio is <https://tatra-t3-model-studio.jnd-cz.chatgpt.site>. Entry, running-gear,
-interior and collector camera buttons show the details at inspection distance.
+interior and collector camera buttons show the details at inspection distance. **6892 front** and
+**6312 photo angle** approximate the eye-level sightlines of 17823.jpg and 15609.jpg.
 
 ## References and limits
 
@@ -47,7 +48,7 @@ No source image or user photograph is embedded in the GLB or redistributed in th
 
 The 2026-11-16 review uses the user's requested **24-place early cushioned interior**, inspired by
 6312/6102, under the 6892 exterior. There are 13 single seats on the left, nine on the door side,
-and two at the rear. The arrangement is a simplified modelling choice, not a survey of 6892.
+and two at the rear, with one facing pair in the rear door-side bay. The arrangement is a simplified modelling choice, not a survey of 6892.
 The interior follow-up supplies the seats' loop frames and pedestal bases, red upholstery,
 pink-beige lower wall panels with silver kick plates, red/silver sill trim and dark rubber ribs.
 Three seats near doorways have rounded electrical-box bases; the others have round pedestals.
@@ -135,7 +136,7 @@ The studio works without world data. Its first load needs the same CDN as the ga
 
 | Files | Author / origin | Licence |
 |---|---|---|
-| `tatra-t3-6892.glb`, generated lettering | Original model made for this project by Codex, 2026-11-09, revised 2026-11-16 | AGPL-3.0-or-later |
+| `tatra-t3-6892.glb`, generated lettering | Original model made for this project by Codex, 2026-11-09, revised 2026-11-19 | AGPL-3.0-or-later |
 | `rig.json`, `preview.png`, `doors-open.png` | Rig manifest and renders of the original model | AGPL-3.0-or-later |
 | `../../src/t3photo.js` | Reproducible geometry and pose source | AGPL-3.0-or-later |
 

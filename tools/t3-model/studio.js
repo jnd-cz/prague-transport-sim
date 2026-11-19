@@ -48,6 +48,8 @@ function view(name) {
   viewName = name;
   const views = { hero: [-15, 7.0, 19], front: [0, 3.2, 18], side: [-23, 3.4, 0], rear: [9, 5.5, -19], left: [20, 5, 13] };
   const closeups = {
+    front: { eye: [0, 1.65, 16.4], target: [0, 2.46, 6.2] },
+    quarter: { eye: [7.6, 1.65, 15.3], target: [0, 2.10, 3.4] },
     entry: { eye: [-4.4, 1.65, 6.7], target: [-.8, 1.10, 5.3] },
     bogie: { eye: [-3.7, 1.15, 4.75], target: [-.1, .38, 3.2] },
     interior: { eye: [0, 2.25, -5.85], target: [0, 1.65, 4.25] },

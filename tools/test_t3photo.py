@@ -143,7 +143,7 @@ CHECK = """async () => {
   bindPhotoT3(gltf.scene);
   s.pose(gltf.scene, { doors: [1, .5, 0], pantograph: .3, wipers: 1 });
   checks.importedRigMoves = near(Math.abs(gltf.scene.rig.doors[0].pairs[0].outer.rotation.y), T3_PHOTO.doorMaxAngle)
-    && near(gltf.scene.rig.wipers[0].rotation.z, .52);
+    && near(gltf.scene.rig.wipers[0].rotation.z, -.52) && near(gltf.scene.rig.wipers[1].rotation.z, .52);
   s.pose(gltf.scene); s.roundTrip = gltf.scene;
   const originalBounds = new THREE.Box3().setFromObject(m), importedBounds = new THREE.Box3().setFromObject(gltf.scene);
   checks.glbBounds = originalBounds.min.distanceTo(importedBounds.min) < .001 && originalBounds.max.distanceTo(importedBounds.max) < .001;
@@ -212,7 +212,7 @@ def main():
             else:
                 result.pop('nodes')
             if args.screenshots:
-                for view in ['hero', 'front', 'side', 'rear', 'left', 'entry', 'bogie', 'interior', 'collector']:
+                for view in ['hero', 'front', 'side', 'rear', 'quarter', 'coupler', 'entry', 'bogie', 'interior', 'collector']:
                     page.evaluate('(v) => t3studio.view(v)', view)
                     page.wait_for_timeout(350)
                     page.screenshot(path=str(out / f'{view}.png'))
