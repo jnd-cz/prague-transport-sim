@@ -222,8 +222,8 @@ the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 ## Dev
 
 **Headless checks from the command line** (Playwright, see DATA.md setup): the benches and lints below,
-each in a fresh headless page, with pass / fail per run (exit code 1 on a failure) and the results in
-`reports/headless/`:
+a line's runs batched in headless pages (#205, #413; `--batch 1`: a fresh page per run), with pass / fail per
+run (exit code 1 on a failure; the thresholds are `judge` in the tool) and the results in `reports/headless/`:
 
 ```bash
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
@@ -248,17 +248,37 @@ The harness verifies its own server before launching a job. An occupied `--port`
 or stopping the existing listener; use `--port 0` to allocate a free port atomically. `--url` explicitly
 uses an already-running server.
 
-Regression checks compare with main's baseline in the data store: the key counts of each run, with the code and data they were measured on. `--baseline` also keeps a local copy in `reports/baseline/`, ignored by git.
+### Baselines
+
+Regression checks compare a run with main's stored baseline (#89, #156, #282; `/regress` picks the lines and checks):
 
 ```bash
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --compare
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --baseline
+python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --compare
 ```
 
-`--compare` prints baseline → now per run (also in `reports/headless/compare.md`, for the PR) and marks
-problem counts that rose (traffic counts beyond a 15 % + 5 noise band). It warns when the baseline was not
-measured on main's code and data. `--baseline` stores the run as the new baseline; it needs the game,
-the in-page checks and `data/MANIFEST.json` committed and `data/` matching the manifest.
+- **What is stored:** the key counts of each run and their places, under a key of what the counts depend on
+  (`tools/baseline_store.py` `MEASURED`: `src/`, `index.html`, the in-page checks, `data/MANIFEST.json`,
+  `data/truth.json`), in the data store.
+- **Who measures main:** the deploy PC, at night, after a merge that changes one of those (`tools/autodeploy.py`,
+  2 pages at once, not while a heavy job runs). A PR does not refresh the baseline. `--baseline` stores a run as
+  one (it needs the game, the checks and `data/MANIFEST.json` committed and `data/` matching the manifest) and
+  keeps a local copy in `reports/baseline/`.
+- **`--compare`** takes the baseline of the branch's merge base and prints baseline → now per run (also in
+  `reports/headless/compare.md`, for the PR), with the places new and gone (#157). It warns when main has moved
+  since.
+- **Seeded counts** (seeds 1-5 by default) are judged by the branch's mean against the min–max of main's seeds: a
+  change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside the spread are listed as
+  noise. Stuck, unfinished and penalty runs are listed per seed and need a reason, as does every mean outside the
+  spread and every move of a seedless check (lint, surfaces).
+- **Which baseline each tier compares with** (#282):
+  - a checkpoint's run stores itself under its name (`--baseline --publish --checkpoint W1`: every check, seeds 1-5);
+  - seedless checks compare with main at the merge base: its baseline, else measured there once in a pinned worktree
+    through the queue and kept on this machine by its key;
+  - seeded checks compare with main's at the merge base when the night has measured it, else with the latest
+    checkpoint; `--against W1` names one.
+- **A seeded compare against a checkpoint is not a compare with main.** When `--compare` says the seeded runs
+  compare with a checkpoint, run the same seeds on main at the merge base back to back before reading any move:
+  #582's stops moved by up to 50 late seconds against W2 and were identical to main's. #709 makes `--compare` do it.
 
 For a combined GTFS run, independently check every logged pair and the built timetable against the
 pinned GTFS, including eligible pairs omitted from both the log and timetable:
@@ -466,6 +486,79 @@ the places that look wrong, worst first: kerb steps, wheels on a sidewalk, heigh
 floating or sunken cars and walkers, gaps in the surveyed streets, bumpy footways. Click a row (or
 `n` / `b`) to fly there; arrows orbit, `+` / `−` zoom; coloured posts mark every place.
 `window.streetBot` holds the result (`stats`, `findings`, `raw` samples). One run takes about a minute.
+
+## Working rules in detail
+
+What [AGENTS.md](AGENTS.md) states in a line: how it is done, and where the rule came from.
+
+**Skills** (Claude Code, `.claude/skills/`): `/issue N` starts an issue's session, `/regress` runs the regression
+check before a PR, `/housekeeping` is the weekly pass (also every Monday at 06:30) and with `checkpoint` the
+architecture review at a world checkpoint ([docs/housekeeping.md](docs/housekeeping.md)). Housekeeping posts on
+the pinned #291 and only proposes.
+
+**Heavy jobs** (`baseline_store.HeavyJob`, first come first served; #280, #536):
+- What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
+  started with a clean environment: a job never waits for a process that started it (#585). A job that waits
+  with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
+- Each job prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
+  (`tools/sysinfo.py`). `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
+- #728 splits the queue: timings alone, count runs and builds beside each other while memory allows (the user,
+  2026-11-19: "yes").
+
+**Stacked work:** an issue that needs another branch's unmerged work branches from it and opens its PR with
+`--base` on that branch. Once the base squash-merges, merge main into the stacked branch (no force-push); a
+conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and merge (#578
+on #575).
+
+**Unattended runs:** an investigation script is committed only when it runs like the other tools: its own server
+on a free port (as `headless.py`), no fixed agent port, a usage line at the top. Without issues allowed, findings
+go into a "Findings" section of the PR.
+
+**Facts in `data/truth.json`:**
+- A new section names its reader in the file's `readers`, or says it is reference only (#224).
+- No check exemptions, agent audits or lists of generated array indexes: #177's allowlist would have failed every
+  line on the next rebuild. What a check can decide from geometry stays a rule in the check, counted per class
+  with its places, so `--compare` shows what a rebuild moved.
+- A fact that overrides a source records what the source said, and the tool applying it states whether it is
+  still needed (DATA.md, Facts over a source; #670).
+- Built files carry their `provenance` from `tools/sources.py` (a layer's fallback order, date, credits).
+
+**Review findings files** (`reports/review/`, above):
+- Offer only answers an importer turns into evidence, and say on the card why another answer stays held (#162,
+  #176).
+- The file names its `issue` and `line` (or `lines`): the review directory (`reviews.html`, #288) lists it under
+  them, and lists the sets of closed issues apart.
+- A set whose issue is closed while findings wait is deleted (the user, 2026-11-05: "If the issue is closed and
+  reviews are unasnwered then it's out of date and can be deleted"), unless a build reads it
+  (`tools/review_sets.py` `READ_BY`: deleting one broke the build, #416).
+
+**Page checks and tests:**
+- In a page: `tools/lint.js` on a page loaded with `?keepgeo` (`lint()`; `lint({ traffic: true })` averages seeds
+  22, 7, 1234); benches in `tools/bench/` (u3, redruns, walkers; `batch.html`).
+- Run long browser jobs unawaited and poll: script calls time out at 45 s. A background window throttles frames,
+  so no fps readings from one.
+- A test that drives a page limits the whole test (`faulthandler.dump_traceback_later`, as `tools/test_review.py`):
+  Playwright's `page.evaluate` has no limit, and a promise that never resolves hangs the run without output.
+- A test that needs `data/` or `raw/` skips without them, saying what to fetch.
+
+**Dev switches:** `?line=N`, `?inspect`, `?review` (findings on the map), `?bot`, `?keepgeo`, `?notunnels`,
+`?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile
+from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N,
+replayed up to route s and handed over paused: a stuck scene as it was, #157).
+
+**Where some rules came from:**
+
+| rule | from |
+|---|---|
+| `Closes #N` only with every point met | #146 was nearly closed with six places still awaiting the user's answers |
+| calibrate a check before it holds data | #119's survey check held 4.6 km of line 17's open track: it was calibrated on street track only |
+| don't reformat what you don't change | #119's reflow buried its changes |
+| no seeded checks on a world change | they measure traffic reshuffled by the new data (#156). The user, 2026-11-05: "build up the static world … without regression checks at every step where they don't make sense yet (like traffic behavior because of shifting terrain)" |
+| the world first, a lane may pause | the user, 2026-11-05: "pause simulation work after finishing the current PRs"; the simulation lane waited for checkpoint W2 and resumed there (#414) |
+| heavy jobs take turns | the user, 2026-11-12, #516: "Make sure to run any comparison or heavy job in a queue to not affect other work" |
+| one rebuild at a time | two branches publishing rebuilt data overwrite each other's lines (#280) |
+| findings off the path go on a lane's list | issues opened faster than closed: 410 against 251 in 26 days. The user, 2026-11-19: "yes" (#731) |
+| a security hole is not written up in public | the repository is public and the alpha is live. The user, 2026-11-19: "fix and file privately" |
 
 ## How the game's parts work
 
