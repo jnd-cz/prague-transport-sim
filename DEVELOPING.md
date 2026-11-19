@@ -136,9 +136,22 @@ packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](N
 **The city terrain** (#428, the first step of #276's ground): `python -P -E tools/city_terrain.py` meshes IPR's
 1 m raster of the whole city once, 10 cm within 120 m of DI's tracks and growing beyond (at most 3 m), with no
 cell over its tolerance. It is no line step: the mesh goes into the machine cache
-(`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and code), not `data/`, and nothing in the game reads
-it yet. A heavy job: 13 min and 15 GB on the dev PC; `--box x0,y0,x1,y1` meshes a part at once. Its report and a
-picture of the city limits go to `reports/city-terrain/`.
+(`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and the code that makes the mesh: the three files of
+`CODE`, `city_terrain.py` up to its section on the key and the cache, so a change to the command line or the
+heavy-job turn keeps the mesh, #757), not `data/`. The ground file is built from it (`tools/ground_mesh.py`). A
+heavy job: 13 min and 15 GB on the dev PC; `--box x0,y0,x1,y1` meshes a part at once. Its report and a picture of
+the city limits go to `reports/city-terrain/`.
+
+**A place's ground** (#757): `python -P -E tools/ground_place.py NAME` builds the ground of one place of
+`data/truth.json` `groundPlaces` (or `--line N --at X,Y`) with the line build's own code
+(`ground_mesh.build(within=...)`): the tiles its reach touches and one ring of tiles round them, in about a minute
+and 2 GB, with no turn among the heavy jobs (`--all` takes a shared one). Into `reports/places/NAME/` go its
+measures inside the reach (the steps' walls by height, the steep faces that are no wall, the area per class), the
+same of the written file, both from above as pictures, and the **locality**: the place's middle tiles against
+`data/lineN.ground.*`, vertex for vertex and triangle for triangle. A tile's ground is meant to depend on the tile
+and its ring only, so with unchanged tools every difference is a rule that reads something farther away, named by
+what gave the vertex its height. A ground rule is tried on its places first; the lines are rebuilt once for a
+batch of changes.
 
 ## Deploy
 

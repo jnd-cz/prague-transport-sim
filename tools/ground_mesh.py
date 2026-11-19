@@ -584,7 +584,9 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None):
     return zf, steps, len(uk)
 
 
-def build(ln, mesh=None, threads=8, log=print):
+def build(ln, mesh=None, threads=8, log=print, within=None):
+    """The ground of line ln; within: of a box (x0, y0, x1, y1) of it only (a place's, tools/ground_place.py, #757), and
+    then also each corner's point, height and what gave it ("corners")."""
     import bed_surface
     import ground_partition as gp
     from city_terrain import peak_gb
@@ -593,7 +595,7 @@ def build(ln, mesh=None, threads=8, log=print):
     def log(msg):  # (each step with the peak memory so far: lines 22 and 17 hold 9 M terrain triangles, 21 GB)
         log0(f"{msg} (peak {peak_gb():.1f} GB)")
     t0 = time.time()
-    pieces, prep, _ = gp.partition(ln, mesh, threads, geometry=True)
+    pieces, prep, _ = gp.partition(ln, mesh, threads, geometry=True, within=within)
     G = pieces["_"]
     L, D, box = G["L"], G["D"], G["box"]
     x, y, z, T = G["x"], G["y"], G["z"], G["T"]
@@ -696,6 +698,7 @@ def build(ln, mesh=None, threads=8, log=print):
     (e0, e1), (n0, n1) = tile_index([bx0, bx1], [by0, by1])
     rects = [(max(bx0, b[0]), max(by0, b[1]), min(bx1, b[2]), min(by1, b[3]))
              for b in (tile_box(e, n) for e in range(int(e0), int(e1) + 1) for n in range(int(n0), int(n1) + 1))]
+    rects = [r for r in rects if r[2] > r[0] and r[3] > r[1]]  # (a box ending on the grid: no square past its edge, #757)
     t1 = time.time()
     with ThreadPoolExecutor(threads) as ex:
         faces = list(ex.map(lambda r: tile_faces(r, lines_tree, lines, kept_tree, kept_polys), rects))
@@ -999,7 +1002,10 @@ def build(ln, mesh=None, threads=8, log=print):
     rep["draw classes"] = {c: {k or "-": int(v) for k, v in d.items()} for c, d in rep["draw classes"].items()}
     rep["survey classes"] = {c: {k or "-": int(v) for k, v in zip(*np.unique(area[fcls_id == i].astype(str), return_counts=True))}
                              for c, i in CLASS_IDS.items() if (area[fcls_id == i] != "").any()}
-    return {"V": V, "F": F, "cls": fcls_id, "draw": draw, "area": area, "box": box, "L": L, "rep": rep}
+    out = {"V": V, "F": F, "cls": fcls_id, "draw": draw, "area": area, "box": box, "L": L, "rep": rep}
+    if within is not None:
+        out["corners"] = {"x": cx, "y": cy, "z": zf, "label": label}
+    return out
 
 
 def xy_ids(V):
@@ -1708,13 +1714,17 @@ def raster_error(built, ln):
 COLORS = {"terrain": (130, 175, 110), "survey": (150, 150, 158), "bed": (150, 90, 60), "plot": (210, 120, 120)}
 
 
-def picture(ln, window, path, px=5):
+def picture(ln, window, path, px=5, mesh=None):
     """The written ground seen from above at a window (x0, y0, x1, y1): each triangle its class's colour, shaded by its
-    slope (light from the north-west), the steps' walls as red lines."""
+    slope (light from the north-west), the steps' walls as red lines. mesh: (V in m, {class: triangles}) drawn in place
+    of the line's written file (a place's build, tools/ground_place.py)."""
     from PIL import Image, ImageDraw
-    layout = json.load(open(os.path.join(ROOT, "data", f"line{ln}.ground.json"), encoding="utf-8"))
-    with open(os.path.join(ROOT, "data", f"line{ln}.ground.bin"), "rb") as f:
-        V, by = decode(f.read(), layout)
+    if mesh is not None:
+        V, by = mesh
+    else:
+        layout = json.load(open(os.path.join(ROOT, "data", f"line{ln}.ground.json"), encoding="utf-8"))
+        with open(os.path.join(ROOT, "data", f"line{ln}.ground.bin"), "rb") as f:
+            V, by = decode(f.read(), layout)
     x0, y0, x1, y1 = window
     n = int((x1 - x0) * px)
     im = Image.new("RGB", (n, n), (255, 255, 255))
