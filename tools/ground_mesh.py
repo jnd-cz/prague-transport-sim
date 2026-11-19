@@ -496,7 +496,9 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
         drop = np.zeros(len(faces), bool)
         drop[pi] = True
         faces = faces[~drop]
-    return faces
+    # Noding can rotate a ring when a distant line enters the tile. Co-circular corners then take the other
+    # Delaunay diagonal, moving the surface between them on a slope (#738). Give each ring one start and winding.
+    return shapely.normalize(faces)
 
 
 # ---------------------------------------------------------------- the build

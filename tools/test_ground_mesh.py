@@ -354,6 +354,27 @@ class Border(unittest.TestCase):
 
 
 class Faces(unittest.TestCase):
+    def test_distant_line_keeps_the_diagonal_and_height_of_a_lattice_face(self):
+        # A 5 m cell with four heights like the lidar green on line 23. Two entries per tree node reproduce
+        # the changed order of a real tile's spatial query with only one line outside this cell.
+        a, b, c, d = (5, 5), (10, 5), (10, 10), (5, 10)
+        sides = [shapely.LineString(edge) for edge in [(c, b), (b, a), (d, a), (c, d)]]
+        heights = {a: 207.07, b: 209.15, c: 212.81, d: 213.63}
+        centre = shapely.Point(7.5, 7.5)
+
+        def diagonal(extra):
+            lines = np.asarray(sides + extra, dtype=object)
+            tree = shapely.STRtree(lines, node_capacity=2)
+            faces = gm.tile_faces((0, 0, 40, 40), tree, lines, None, None)
+            cell = next(face for face in faces if face.contains(centre))
+            first, second = shapely.get_parts(shapely.constrained_delaunay_triangles(cell))
+            return frozenset(first.intersection(second).coords)
+
+        before = diagonal([])
+        after = diagonal([shapely.LineString([(1, 11), (2, 12)])])
+        self.assertEqual(sum(heights[p] for p in before) / 2, sum(heights[p] for p in after) / 2)
+        self.assertEqual(before, after)
+
     def test_neighbouring_squares_share_the_border_vertices(self):
         lines = np.asarray([shapely.box(0.3, 0.3, 1.7, 0.9).boundary, shapely.LineString([(0.1, 0.5), (1.9, 0.45)])], dtype=object)
         tree = shapely.STRtree(lines)
