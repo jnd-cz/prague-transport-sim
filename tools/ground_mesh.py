@@ -217,6 +217,55 @@ def city_at(G, px, py):
     return out
 
 
+MEET = ("paved",)  # (survey classes whose plane meets the raised areas at their edge: meet_raised, #638)
+MEET_STEP = 0.3  # m: a step to a raised area up to this is closed; a larger one stands (a terrace, a yard over a cellar)
+MEET_FADE = 3.0  # m: the shift fades to none this far in from the edge
+MEET_NEAR = 8  # edge corners weighed for each corner
+
+
+def meet_raised(sc, x, y, zs):
+    """The MEET classes' corners (a paved yard, a forecourt) shifted to meet the raised areas (RAISED: a sidewalk, an
+    island) where they share a corner: at each such corner the step to the raised one's height when within MEET_STEP,
+    pinned (no shift) where a corner is shared with any other survey class; every MEET corner within MEET_FADE of those edge
+    corners takes their inverse-distance-weighted shift, faded linearly to none at MEET_FADE. All MEET corners together,
+    so two yards sharing an edge shift alike. Returns (zs, per corner the shift, NaN where none applied)."""
+    from scipy.spatial import cKDTree
+    shift = np.full(len(zs), np.nan)
+    own = np.flatnonzero(np.isin(sc, MEET) & np.isfinite(zs))
+    if not len(own):
+        return zs, shift
+    key = np.round(x * Q).astype(np.int64) * 10_000_000_000 + np.round(y * Q).astype(np.int64)
+    oth = np.flatnonzero(~np.isin(sc, MEET) & np.isfinite(zs))
+    ko = np.unique(key[oth])
+    if not len(ko):
+        return zs, shift
+    up = oth[np.isin(sc[oth], list(RAISED))]
+    ku, fu = np.unique(key[up], return_index=True)
+    j = np.clip(np.searchsorted(ko, key[own]), 0, len(ko) - 1)
+    edge = own[ko[j] == key[own]]
+    dl = np.zeros(len(edge))
+    if len(ku):
+        ju = np.clip(np.searchsorted(ku, key[edge]), 0, len(ku) - 1)
+        at = ku[ju] == key[edge]
+        dl[at] = zs[up[fu[ju[at]]]] - zs[edge[at]]
+    dl[np.abs(dl) > MEET_STEP] = 0.0
+    if not len(edge) or not (dl != 0).any():
+        return zs, shift
+    d, i = cKDTree(np.column_stack([x[edge], y[edge]])).query(np.column_stack([x[own], y[own]]), k=min(MEET_NEAR, len(edge)),
+                                                              distance_upper_bound=MEET_FADE)
+    d, i = d.reshape(len(own), -1), i.reshape(len(own), -1)
+    ok = np.isfinite(d)
+    w = np.where(ok, 1.0 / np.maximum(d, 1e-3) ** 2, 0.0)
+    dv = np.where(ok, dl[np.minimum(i, len(edge) - 1)], 0.0)
+    has = ok.any(1)
+    s = np.zeros(len(own))
+    s[has] = (w[has] * dv[has]).sum(1) / w[has].sum(1) * np.clip(1 - d[has, 0] / MEET_FADE, 0, 1)
+    zs = zs.copy()
+    zs[own] += s
+    shift[own[has]] = s[has]
+    return zs, shift
+
+
 WALL_LATTICE = 1.0  # m: a survey wall's faces cut to this, their corners between its sides (across_outline, #653)
 WALL_SNAP = 0.3  # m: a street corner on a wall's or stairs' outline this near its height there takes it (#653)
 WALL_ON = 0.01  # m: a corner this near the outline lies on it (the faces are noded on it)
@@ -767,6 +816,13 @@ def build(ln, mesh=None, threads=8, log=print):
             zs[mm] = across_outline(segs, cx[m][mm], cy[m][mm])
         else:
             zs[mm] = surface.at(a, cx[m][mm], cy[m][mm])
+    # (a paved yard meets a sidewalk on their shared edge: on its outline's plane, which ran between far points, line 23
+    # s 557 (-2564.4, 434.0) stood 0.33 m under the sidewalk there, its nearest surveyed point 4 m off, a step with its
+    # wall. Its plane shifts to the sidewalk's at the edge, faded over 3 m inward; per corner (the street surface, the
+    # lidar, the plane, whichever reached) it seamed inside the yards wherever two met, #638)
+    # (pinned also at the terrain's, the plots' and the beds' corners, line 9 seamed more inside the yards: 859 seams over
+    # 10 cm against 847 unpinned, main 836)
+    zs, meet = meet_raised(sc, cx[m], cy[m], zs)
     # (a river or a pond is level: in OSM's water, at the level its banks give (WaterLevels, as OSM's water above: two of
     # line 17's survey water areas span a weir, Helmovský and Troja's, their own level 3.4-3.9 m under the water above it,
     # #632); elsewhere, as the page laid it (src/terrain.js DtmSurface), at its outline's WATER_LEVEL quantile: its
@@ -924,7 +980,10 @@ def build(ln, mesh=None, threads=8, log=print):
            "faces": len(faces), "vertices": int(len(V)), "triangles": int(len(F)),
            "triangles per class": {c: int((fcls_id == i).sum()) for c, i in CLASS_IDS.items()},
            "water triangles (the terrain's, OSM's water)": n_water, "water": prep.get("water"),
-           "steps": steps, "corners without a height (IPR's)": no_height, "seconds": {"partition": round(t_part, 1)}}
+           "steps": steps, "corners without a height (IPR's)": no_height, "seconds": {"partition": round(t_part, 1)},
+           "yards met to the raised areas (meet_raised)": {
+               "corners shifted": int((np.abs(np.nan_to_num(meet)) > 0.005).sum()),
+               "by over 5 / 10 / 20 cm": [int((np.abs(np.nan_to_num(meet)) > c / 100).sum()) for c in (5, 10, 20)]}}
     t1 = time.time()
     rep["edges"] = edge_check(V, F, box)
     log(f"  edges checked, {time.time() - t1:.0f} s")

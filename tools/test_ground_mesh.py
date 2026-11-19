@@ -269,6 +269,41 @@ class Lidar(unittest.TestCase):
         self.assertTrue(np.isnan(got[0]))  # (a triangle no class lies over is not asked)
 
 
+class MeetRaised(unittest.TestCase):
+    """A yard x 0-10 at 100 m; a sidewalk at x < 0 sharing its corners at x 0; a road at x > 10 sharing those at x 10."""
+    def corners(self, side):
+        # (sc, x, y, zs; sa: the areas, for the test of two yards)
+        ys = np.arange(0, 11, 1.0)
+        x = np.concatenate([np.zeros(11), np.full(11, 10.0), np.full(11, 1.0), np.full(11, 2.0), np.full(11, 5.0),
+                            np.zeros(11), np.full(11, 10.0)])
+        y = np.tile(ys, 7)
+        sc = np.array(["paved"] * 55 + ["sidewalk"] * 11 + ["road"] * 11)
+        sa = np.array([0] * 55 + [1] * 11 + [2] * 11)
+        zs = np.concatenate([np.full(55, 100.0), np.full(11, 100.0 + side), np.full(11, 99.9)])
+        return sc, sa, x, y, zs
+
+    def test_the_yard_meets_the_sidewalk_and_fades_inward(self):
+        sc, sa, x, y, zs = self.corners(0.2)
+        z, s = gm.meet_raised(sc, x, y, zs)
+        np.testing.assert_allclose(z[:11], 100.2)  # (on the edge: the sidewalk's)
+        self.assertTrue(np.all(z[22:33] < 100.2) and np.all(z[22:33] > 100.0))  # (1 m in: part of it)
+        np.testing.assert_allclose(z[44:55], 100.0)  # (5 m in: none)
+        np.testing.assert_allclose(z[11:22], 100.0)  # (at the road: pinned)
+        np.testing.assert_allclose(z[55:], zs[55:])  # (the others left)
+
+    def test_a_larger_step_stands(self):
+        sc, sa, x, y, zs = self.corners(0.5)
+        z, s = gm.meet_raised(sc, x, y, zs)
+        np.testing.assert_allclose(z, zs)
+
+    def test_two_yards_on_a_shared_edge_shift_alike(self):
+        # (the corners 1 m in shared by a second yard: each of the two corners at a place shifts alike)
+        sc, sa, x, y, zs = self.corners(0.2)
+        z, _ = gm.meet_raised(np.concatenate([sc, sc[22:33]]), np.concatenate([x, x[22:33]]), np.concatenate([y, y[22:33]]),
+                              np.concatenate([zs, zs[22:33]]))
+        np.testing.assert_allclose(z[-11:], z[22:33])
+
+
 class Steps(unittest.TestCase):
     def square_with_a_step(self):
         # two triangles meeting along x = 1000, the right one 0.1 m higher: its own vertices on the edge
