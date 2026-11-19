@@ -728,7 +728,7 @@ function trackRadius(g, MIN_RADIUS, EXCEPTION_RADIUS) {
 // tighter than both (Čechovo náměstí, line 22: 44 m over 5 m between halves of 125 and 250 m) and stays flagged.
 const STEP_SHORT = 2.5, STEP_LONG = 12.5, STEP_RATIO = 3, STEP_CURVE = 1500;
 const turn = (a, b, c) => Math.sign((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]));
-function steppedCurves(g) {
+export function steppedCurves(g) {
   const d = g.data, bad = new Map();
   let n = 0;
   [['our', d.path], ['opposite', d.pathBack]].forEach(([kind, p]) => {
