@@ -4416,7 +4416,7 @@
   }
  },
  "groundPlaces": {
-  "note": "The places the ground file is judged at (#757, tools/ground_place.py): each a point of a line (local m) and a reach round it, with the issue it comes from and what was said or measured there. A place stays in the list once its issue closes: it is then a case that must not come back.",
+  "note": "The places the ground file is judged at (#757, tools/ground_place.py): each a point of a line (local m) and a reach round it, with the issue it comes from and what was said or measured there. A place stays in the list once its issue closes: it is then a case that must not come back. `seen` is what street-level imagery shows there, in words, with where it was looked at from; `sections` are lines the ground is sampled along, each with the most of a measure the place may have (tools/ground_place.py).",
   "rasinovo-quay": {
    "line": "17",
    "at": [
@@ -4427,7 +4427,42 @@
    "issue": 697,
    "what": "the quay wall between the street and the lower quay: a straight wall, the sidewalk on its top at the street's level",
    "said": "there should be a wall and sidewalk on top, on the street level",
-   "source": "the user's report fb-20261118-160427-4cd2b219 (test site, 518adaf, line 17 s 12568.2), #697"
+   "source": "the user's report fb-20261118-160427-4cd2b219 (test site, 518adaf, line 17 s 12568.2), #697",
+   "seen": {
+    "what": "From the lower quay: a straight vertical wall of ashlar stone, about 8 m, from the cobbled lower quay up to a stone parapet at the street's sidewalk; arched doors of vaults in it. The lower quay is level, cobbled, about 13 m wide, with a low edge to the river. A flight of stairs runs down along the wall's face: its upper part of stone on corbels, its foot a metal landing and stair standing free over the quay. No slope anywhere between the street and the quay.",
+    "from": [
+     {
+      "at": [
+       50.0738156,
+       14.4136692
+      ],
+      "headings": [
+       25,
+       95,
+       160
+      ]
+     }
+    ],
+    "source": "Google Street View, seen 2026-11-19 (looked at, not copied)"
+   },
+   "sections": [
+    {
+     "name": "from the track across the sidewalk, the wall and the lower quay to the river",
+     "from": [
+      -728.0,
+      -1421.3
+     ],
+     "to": [
+      -758.0,
+      -1421.3
+     ],
+     "expect": {
+      "sloping m": 2.5,
+      "off the lidar m": 2.5
+     },
+     "why": "IPR's raster has the street level to 14 m from the track, the wall within 2 m (196.9 to 189.0) and the level quay to 27 m; the generated sidewalk surface (data/line17.streets.*) follows it within 0.6 m, but the ground file has corners only at the kerb (11.0 m), on the two sidewalk areas' shared edge (15.1 m, at the surface's mid-wall 191.95) and at 16.0 m: its 5 m lattice runs a straight line across the wall"
+    }
+   ]
   },
   "krejcarek-ramp": {
    "line": "37",
@@ -4437,9 +4472,80 @@
    ],
    "reach": 40,
    "issue": 653,
-   "what": "the sidewalk ramp from platform A (228.4 m) up to the road's sidewalk (230.6 m), round a retaining wall and a flight of stairs: one clean wall face, no jagged steps along the lattice",
+   "what": "the stop's access from the road Pod Krejcárkem: the road on a retaining wall over a ramp that falls along it to the platform, a cheek wall between ramp and landing tapering to nothing, a straight flight of stairs at the ramp's top",
    "said": "on Krejcárek I saw malformed sidewalk/ramp to the tram stop",
-   "source": "the user, 2026-11-17, #653"
+   "source": "the user, 2026-11-17, #653",
+   "seen": {
+    "what": "Three levels side by side. The road stands on a retaining wall (a concrete beam on ribbed pilasters, a railing on it), about 1 m over the ramp at the stairs and 2 m at the ramp's foot. The ramp, asphalt, about 3 m wide, falls evenly along that wall from the stairs' top to the platform's level over some 30 m. Between the ramp and the platform's landing runs a low concrete cheek wall with a railing, as high as the stairs at their top and tapering to nothing at the ramp's foot. The stairs are one straight flight of 8 granite steps, about 2 m wide, between that cheek wall's end and the white retaining wall, from the landing up to the ramp's top. The platform has a granite edge; the track through the stop is ballasted with sleepers, and setts begin past the platform's end.",
+    "from": [
+     {
+      "photos": "raw/reference/photos/krejcarek/user-2026-11-19-1..5 (SOURCES.md)"
+     },
+     {
+      "at": [
+       50.0950058,
+       14.4750885
+      ],
+      "headings": [
+       285,
+       345,
+       45
+      ],
+      "source": "Google Street View, seen 2026-11-19 (looked at, not copied)"
+     }
+    ],
+    "source": "the user's five photos of 2026-11-19 (session: \"Got some fresh photo from Krejcárek for reference: stop, ramps, stairs, wall\")",
+    "game": "with the stairs' rule (#447, PR #762) drawn from the photos' viewpoints 1 and 3 (tools/shot.py --line 37 --s 2975 --view review --at=3927.25,328.6 --yaw 58 --pitch 10 --dist 8; --at=3917.6,322.7 --yaw 238 --pitch 9 --dist 14): the road's wall, the ramp, the tapering cheek wall and the landing as in the photos, the stairs one even slope (no steps: the ground has none); thin shards at the stairs' track-side foot"
+   },
+   "sections": [
+    {
+     "name": "up the stairs (survey area 1339), foot to top",
+     "from": [
+      3926.25,
+      328.0
+     ],
+     "to": [
+      3928.25,
+      329.25
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the survey's outline has the foot at 228.56-228.82 and the top at 229.75-229.82: one even flight of 8 steps (#447)"
+    },
+    {
+     "name": "up the ramp along the road's wall, its foot to the stairs' top",
+     "from": [
+      3902.92,
+      310.53
+     ],
+     "to": [
+      3931.9,
+      328.3
+     ],
+     "expect": {
+      "off the chord m": 0.25,
+      "off the lidar m": 1.0,
+      "largest step m": 0.15
+     },
+     "why": "an even ramp of 4 %: 228.49 to 229.90 m over 33 m, within 5 cm of IPR's raster in the written file of 2026-11-19: right today, a case that must stay"
+    },
+    {
+     "name": "from the ramp across the cheek wall to the landing, 6 m before the stairs",
+     "from": [
+      3923.36,
+      323.08
+     ],
+     "to": [
+      3920.22,
+      328.19
+     ],
+     "expect": {
+      "sloping m": 1.0
+     },
+     "why": "the ramp at 229.41 m, the landing at 228.7 m, the cheek wall (survey wall area 1442) between them within 0.6 m"
+    }
+   ]
   },
   "garden-beds": {
    "line": "37",
@@ -4462,7 +4568,23 @@
    "issue": 676,
    "what": "the junction at Vozovna Žižkov: the embedded paving's outline against the asphalt without saw-teeth and stepped edges",
    "said": "Mixup of track styles within a junction and track crossings",
-   "source": "the user's report fb-20261113-130646-77302ec0 (test site, 455f6dd, line 37 s 1681.6), #676"
+   "source": "the user's report fb-20261113-130646-77302ec0 (test site, 455f6dd, line 37 s 1681.6), #676",
+   "seen": {
+    "what": "The junction's tracks lie in setts over the whole junction; the sett field ends about half a metre outside the outer rails along smooth curves that follow them, flush with the asphalt, with no step and no teeth.",
+    "from": [
+     {
+      "at": [
+       50.0915851,
+       14.4753086
+      ],
+      "headings": [
+       280,
+       60
+      ]
+     }
+    ],
+    "source": "Google Street View, seen 2026-11-19 (looked at, not copied)"
+   }
   },
   "yard-at-a-sidewalk": {
    "line": "23",
@@ -4484,7 +4606,88 @@
    "reach": 30,
    "issue": 738,
    "what": "a 5 m lattice cell on lidar green with corners far from a plane (207.07, 209.15, 212.81, 213.63 m): its diagonal the same whatever lines are added elsewhere in the tile",
-   "source": "found on #676: an unrelated change moved the ground here 210.3 -> 210.9 m, #738"
+   "source": "found on #676: an unrelated change moved the ground here 210.3 -> 210.9 m, #738",
+   "seen": {
+    "what": "From the track in Chotkova looking south: a lawn rising evenly from the road's edge to the trees; no wall seen at the road.",
+    "from": [
+     {
+      "at": [
+       50.092709,
+       14.407675
+      ],
+      "headings": [
+       184
+      ]
+     }
+    ],
+    "source": "a contributor's photosphere on Google Maps, seen 2026-11-19 (its position is the contributor's)"
+   }
+  },
+  "modrany-viaduct-ramps": {
+   "line": "17",
+   "at": [
+    -2385.0,
+    -9250.0
+   ],
+   "reach": 60,
+   "issue": 757,
+   "what": "the tram viaduct at Generála Šišky and Modřanská (s 3971-4152, rails 201.0 at its east end, 204.7 on it, 203.7 at its north end): the walled ramp up to it and the sidewalk and road along the wall's foot",
+   "said": "for the bridge ramps you can try here at Krejcárek https://maps.app.goo.gl/h4Ma3hN5VuqppSyW9 and at Generála Šišky x Modřanská: https://maps.app.goo.gl/XBfSoVMpTfcx6qqZA. The one near Nádraží Modřany isn't visible, only from the underpass there is street view",
+   "source": "the user, 2026-11-19 (session, two messages naming places to look at in street-level imagery), #757",
+   "seen": {
+    "what": "From Generála Šišky beside it: the ramp to the viaduct is concrete with an upright side wall, growing along the road from nothing to the abutment's full height (about 5 m), a door in it; the span's beam starts at the abutment's square end. The sidewalk and the road along the wall's foot are level and even. (From Modřanská to the north the track's other approach is hidden under trees.)",
+    "from": [
+     {
+      "at": [
+       50.0021899,
+       14.4057555
+      ],
+      "headings": [
+       135
+      ]
+     },
+     {
+      "at": [
+       50.0026816,
+       14.4045196
+      ],
+      "headings": [
+       165,
+       235
+      ]
+     }
+    ],
+    "source": "Google Street View at the user's link, seen 2026-11-19 (looked at, not copied)",
+    "game": "main 95b3162's data, the same camera (tools/shot.py --line 17 --s 4060 --view review --at=-2382.1,-9253.0 --yaw 143 --pitch 4 --dist 25): the wall stands, but the sidewalk along its foot rises against it in two peaks up to the deck, and the road swells towards it"
+   }
+  },
+  "krejcarek-abutment": {
+   "line": "37",
+   "at": [
+    3954.0,
+    380.0
+   ],
+   "reach": 40,
+   "issue": 742,
+   "what": "the Krejcárek viaduct's south abutment (s 3030-3038): the ground under and beside the deck's end",
+   "said": "for the bridge ramps you can try here at Krejcárek https://maps.app.goo.gl/h4Ma3hN5VuqppSyW9 and at Generála Šišky x Modřanská: https://maps.app.goo.gl/XBfSoVMpTfcx6qqZA. The one near Nádraží Modřany isn't visible, only from the underpass there is street view",
+   "source": "the user, 2026-11-19 (session), #757; the same place as #742 and #594's bridge ends",
+   "seen": {
+    "what": "From the path under the viaduct: the deck's beam lands on a concrete abutment with an upright ribbed wing wall; beside the wall the embankment falls away as an even slope under bushes; under the deck's end a cone of pitched stone with a narrow stair along it runs down to the path.",
+    "from": [
+     {
+      "at": [
+       50.0956967,
+       14.4751601
+      ],
+      "headings": [
+       130
+      ]
+     }
+    ],
+    "source": "Google Street View at the user's link, seen 2026-11-19 (looked at, not copied)",
+    "game": "main 95b3162's data, the same camera (tools/shot.py --line 37 --s 3030 --view review --at=3954.3,380.3 --yaw 138 --pitch 4 --dist 18): the deck and the embankment's slope are there; there is no abutment wall, and under the deck's end the ground is a facetted pit with a patch of the survey's tram area lying in it"
+   }
   }
  }
 }

@@ -18,12 +18,23 @@ line's build, of that box only. Then, per place, into reports/places/NAME/:
   still reads farther off. Each moved point is named by what gave it its height (the weld's label).
 - **measures** inside the reach, of the place's build and of the written file: the steps' walls (their length by
   height), the steep faces that are no wall (a crumpled slope), the area per class.
+- **sections** (a place's `sections`: a line from one point to another, and what is expected along it): the ground
+  sampled every SECTION_STEP m along the line, of the build, of the written file and of IPR's 1 m raster. Per section:
+  the metres that slope (neither level nor a wall: a rise over run between SLOPING's two), the metres more than
+  OFF_LIDAR off the raster, the largest step, the farthest the ground strays from the straight line between the
+  section's ends. `expect` gives the most of each the place may have: a wall with level ground either side expects few
+  sloping metres; a ramp or a flight of stairs little off its chord. A profile picture per section.
 - **pictures**: built.png and written.png, the ground from above at the reach (ground_mesh.picture).
+- --written: nothing built, the written file measured alone (seconds).
+- --overlay: the line's ground file with the place's middle tiles replaced by the build's, into
+  reports/places/NAME/overlay/data/, for tools/shot.py --overlay: the game drawn with the place's ground, nothing
+  published. (The network file is the written one; a tile's border may crack where the rule moved it.)
 
 Several places take a shared heavy-job turn (3 GB, the threads); one runs as it is.
 """
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -38,6 +49,9 @@ from geo import tile_box, tile_index, tile_name  # noqa: E402
 REACH = 60.0  # m: a place's reach where it names none
 WALL_BANDS = (0.1, 0.3, 1.0)  # m: the walls' lengths are counted over each height
 STEEP = 1.0  # rise over run: a face that is no wall and steeper than this (45 degrees) is counted as steep
+SECTION_STEP = 0.25  # m: a section's samples
+SLOPING = (0.2, 3.0)  # rise over run: between these the ground slopes; under, it is level; over, it is a wall
+OFF_LIDAR = 0.5  # m: the ground this far from IPR's raster is off it (the raster spreads a wall over 1-2 m)
 Q = 1000
 
 
@@ -195,29 +209,166 @@ def measures(V, F, cls, box):
     return out
 
 
+def section_line(a, b):
+    n = max(2, int(math.hypot(b[0] - a[0], b[1] - a[1]) / SECTION_STEP) + 1)
+    px, py = np.linspace(a[0], b[0], n), np.linspace(a[1], b[1], n)
+    return np.hypot(px - a[0], py - a[1]), px, py
+
+
+def lidar_at(px, py):
+    """IPR's raster at local points."""
+    from geo import Frame
+    from ipr_dtm import IprDtm
+    F = Frame()
+    return np.asarray(IprDtm().sample(px + F.E0, py + F.N0), float)
+
+
+def section_measures(d, z, lidar=None):
+    """What a profile (distances d, heights z, NaN off the mesh) does: see the module's text."""
+    run, rise = np.diff(d), np.abs(np.diff(z))
+    ok = np.isfinite(rise)
+    slope = np.where(ok, rise / np.maximum(run, 1e-9), 0.0)
+    fin = np.flatnonzero(np.isfinite(z))
+    out = {"m": round(float(d[-1]), 2), "off the mesh m": round(float(run[~ok].sum()), 2),
+           "sloping m": round(float(run[ok & (slope > SLOPING[0]) & (slope < SLOPING[1])].sum()), 2),
+           "largest step m": round(float(rise[ok].max()), 2) if ok.any() else 0.0}
+    if len(fin) >= 2:
+        i, j = fin[0], fin[-1]
+        chord = z[i] + (z[j] - z[i]) * (d - d[i]) / max(d[j] - d[i], 1e-9)
+        out["off the chord m"] = round(float(np.nanmax(np.abs(z - chord))), 2)
+        out["rise m"] = round(float(z[j] - z[i]), 2)
+    if lidar is not None:
+        off = np.abs(z - lidar) > OFF_LIDAR
+        out["off the lidar m"] = round(float(SECTION_STEP * np.count_nonzero(off & np.isfinite(z))), 2)
+    return out
+
+
+def held(m, expect):
+    """The expectations a section's measures break: {measure: (has, the most allowed)}."""
+    return {k: (m.get(k), v) for k, v in (expect or {}).items() if m.get(k) is None or m[k] > v}
+
+
+def profile_picture(path, d, lines, title=""):
+    """The profiles of one section, to scale: lines [(name, z, colour)]."""
+    from PIL import Image, ImageDraw
+    zs = np.concatenate([z[np.isfinite(z)] for _, z, _ in lines if np.isfinite(z).any()] or [np.zeros(1)])
+    z0, z1 = float(zs.min()) - 0.5, float(zs.max()) + 0.5
+    w = 900
+    px = (w - 60) / max(float(d[-1]), 1e-9)
+    h = int(min(700, max(160, (z1 - z0) * px + 50)))
+    pz = (h - 50) / (z1 - z0)
+    im = Image.new("RGB", (w, h), (255, 255, 255))
+    dr = ImageDraw.Draw(im)
+    for zt in range(int(math.ceil(z0)), int(z1) + 1):
+        y = h - 25 - (zt - z0) * pz
+        dr.line([(50, y), (w - 10, y)], fill=(225, 225, 225))
+        dr.text((4, y - 6), f"{zt}", fill=(120, 120, 120))
+    for k, (name, z, col) in enumerate(lines):
+        pts = [(50 + a * px, h - 25 - (b - z0) * pz) if np.isfinite(b) else None for a, b in zip(d.tolist(), z.tolist())]
+        for p, q in zip(pts, pts[1:]):
+            if p and q:
+                dr.line([p, q], fill=col, width=2)
+        dr.text((60 + 150 * k, 4), name, fill=col)
+    dr.text((60 + 150 * len(lines), 4), title, fill=(60, 60, 60))
+    im.save(path)
+
+
+def sections(pl, meshes, out):
+    """A place's sections on each mesh ({name: (V, F, cls)}): [{name, from, to, expect, per mesh its measures and what
+    they break}], and a profile picture each."""
+    import ground_mesh as gm
+    res = []
+    colours = {"built": (200, 40, 40), "written": (110, 110, 110)}
+    for k, sec in enumerate(pl.get("sections") or []):
+        d, px, py = section_line(sec["from"], sec["to"])
+        lid = lidar_at(px, py)
+        row = {"name": sec["name"], "from": sec["from"], "to": sec["to"], "expect": sec.get("expect") or {},
+               "lidar": section_measures(d, lid)}
+        lines = [("IPR 1 m raster", lid, (0, 160, 200))]
+        for name, m in meshes.items():
+            z = gm.mesh_at(m[0], m[1], px, py)
+            row[name] = section_measures(d, z, lid)
+            row[name]["breaks"] = held(row[name], sec.get("expect"))
+            lines.append((name, z, colours.get(name, (0, 0, 0))))
+        profile_picture(os.path.join(out, f"section{k + 1}.png"), d, lines, sec["name"])
+        res.append(row)
+    return res
+
+
+def overlay(ln, built, mid, out, root=ROOT):
+    """The written ground file of line ln with the tiles `mid` taken from `built`, into out/data/: (the tiles replaced,
+    those the written file lacks)."""
+    import ground_mesh as gm
+    with open(os.path.join(root, "data", f"line{ln}.ground.json"), encoding="utf-8") as f:
+        layout = json.load(f)
+    with open(os.path.join(root, "data", f"line{ln}.ground.bin"), "rb") as f:
+        blob = f.read()
+    V, F = built["V"], built["F"]
+    cen = V[F].mean(1) / Q
+    m = in_tiles(cen[:, 0], cen[:, 1], mid)
+    used, fl = np.unique(F[m], return_inverse=True)
+    nb, nl = gm.encode_tiles(V[used], fl.reshape(-1, 3), built["cls"][m], built["draw"][m], built["area"][m])
+    mine = {t["name"]: nb[t["offset"]:t["offset"] + t["bytes"]] for t in nl["tiles"]}
+    lay = {t["name"]: t["layout"] for t in nl["tiles"]}
+    parts, tiles, off, done = [], [], 0, []
+    for t in layout["tiles"]:
+        b = blob[t["offset"]:t["offset"] + t["bytes"]]
+        tl = t["layout"]
+        if t["name"] in mine:
+            b, tl = mine[t["name"]], lay[t["name"]]
+            done.append(t["name"])
+        tiles.append(dict(t, offset=off, bytes=len(b), layout=tl))
+        parts.append(b)
+        off += len(b)
+    layout["tiles"] = tiles
+    layout["vertices"] = int(sum(t["layout"]["vertices"] for t in tiles))
+    layout["classes"] = {c: int(sum(t["layout"]["classes"].get(c, 0) for t in tiles)) for c in gm.CLASS_IDS}
+    layout["triangles"] = int(sum(layout["classes"].values()))
+    for name in gm.LAYERS:
+        names = {}
+        for t in tiles:
+            for c, v in (t["layout"].get(name) or {}).items():
+                names.setdefault(c, set()).update(v)
+        if names:
+            layout[name] = {c: sorted(v) for c, v in names.items()}
+    d = os.path.join(out, "data")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, f"line{ln}.ground.bin"), "wb") as f:
+        f.write(b"".join(parts))
+    with open(os.path.join(d, f"line{ln}.ground.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(layout, f, separators=(",", ":"), ensure_ascii=False)
+    return done, [tile_name(e, n) for e, n in mid if tile_name(e, n) not in done]
+
+
 def by_class(V, F, cls):
     import ground_mesh as gm
     return V / Q, {c: F[cls == i] for c, i in gm.CLASS_IDS.items()}
 
 
-def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False):
-    """One place built, compared and measured: its report (also written to reports/places/NAME/place.json)."""
+def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False, build=True, over=False):
+    """One place built, compared and measured: its report (also written to reports/places/NAME/place.json). build=False:
+    the written file alone."""
     import ground_mesh as gm
     ln, at, reach = str(pl["line"]), pl["at"], float(pl.get("reach") or REACH)
     mid, within = tiles_of(at, reach, ring)
     box = (at[0] - reach, at[1] - reach, at[0] + reach, at[1] + reach)
     t0 = time.time()
-    built = gm.build(ln, mesh, threads, log=lambda s: None, within=within)
-    gm.fit_mouths(ln, built, log=lambda s: None)
+    built = mine = None
+    if build:
+        built = gm.build(ln, mesh, threads, log=lambda s: None, within=within)
+        gm.fit_mouths(ln, built, log=lambda s: None)
+        mine = middle(built, mid)
     secs = time.time() - t0
-    mine, theirs = middle(built, mid), written(ln, mid)
+    theirs = written(ln, mid)
     rep = {"place": name, "line": ln, "at": at, "reach": reach, "issue": pl.get("issue"),
-           "tiles": [tile_name(e, n) for e, n in mid], "ring": ring, "seconds": round(secs, 1),
-           "built": measures(*mine, box)}
+           "tiles": [tile_name(e, n) for e, n in mid], "ring": ring, "seconds": round(secs, 1)}
+    if mine is not None:
+        rep["built"] = measures(*mine, box)
     if theirs is not None:
         rep["written"] = measures(*theirs, box)
-        rep["locality"] = locality(mine, theirs, built.get("corners"))
-    if rings:  # (the same tools with one ring more: what in the middle depends on what lies past the ring)
+        if mine is not None:
+            rep["locality"] = locality(mine, theirs, built.get("corners"))
+    if rings and build:  # (the same tools with one ring more: what in the middle depends on what lies past the ring)
         wider = gm.build(ln, mesh, threads, log=lambda s: None, within=tiles_of(at, reach, ring + 1)[1])
         gm.fit_mouths(ln, wider, log=lambda s: None)
         rep["rings"] = locality(mine, middle(wider, mid), built.get("corners"))
@@ -225,7 +376,12 @@ def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False
     out = out or os.path.join(ROOT, "reports", "places", name)
     os.makedirs(out, exist_ok=True)
     px = max(2, min(8, int(900 / (2 * reach))))
-    gm.picture(ln, box, os.path.join(out, "built.png"), px, by_class(*mine))
+    if over and built is not None:
+        rep["overlay"] = dict(zip(("tiles replaced", "tiles the written file lacks"), overlay(ln, built, mid, os.path.join(out, "overlay"))))
+    meshes = {k: v for k, v in (("built", mine), ("written", theirs)) if v is not None}
+    rep["sections"] = sections(pl, meshes, out)
+    if mine is not None:
+        gm.picture(ln, box, os.path.join(out, "built.png"), px, by_class(*mine))
     if theirs is not None:
         gm.picture(ln, box, os.path.join(out, "written.png"), px, by_class(*theirs))
     with open(os.path.join(out, "place.json"), "w", encoding="utf-8", newline="\n") as f:
@@ -235,11 +391,18 @@ def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False
 
 
 def line_of(rep):
-    b, w, loc = rep["built"], rep.get("written"), rep.get("locality")
+    w, loc = rep.get("written"), rep.get("locality")
+    b = rep.get("built") or w
+    which = "built" if rep.get("built") else "written"
     s = (f"{rep['place']} (line {rep['line']}, {rep['at'][0]:.0f}, {rep['at'][1]:.0f}, #{rep['issue']}): {rep['seconds']:.0f} s; "
          f"walls over 0.3 m {b['walls']['m over 0.3 m']} m, tallest {b['walls']['tallest m']} m; "
          f"steep faces {b['steep faces that are no wall']['m2 in plan']} m2")
-    if w:
+    for sec in rep.get("sections") or []:
+        m = sec.get(which) or {}
+        s += (f"\n    section \"{sec['name']}\": {'FAILS ' + str(m['breaks']) if m.get('breaks') else 'holds' if sec['expect'] else 'no expectation'}"
+              f" (sloping {m.get('sloping m')} m, off the lidar {m.get('off the lidar m')} m, largest step {m.get('largest step m')} m, "
+              f"off the chord {m.get('off the chord m')} m)")
+    if w and rep.get("built"):
         s += f" (written: {w['walls']['m over 0.3 m']} m, {w['walls']['tallest m']} m, {w['steep faces that are no wall']['m2 in plan']} m2)"
     if loc:
         p = loc["points at another height"]
@@ -262,6 +425,8 @@ def main(argv=None):
     ap.add_argument("--reach", type=float)
     ap.add_argument("--ring", type=int, default=1)
     ap.add_argument("--rings", action="store_true", help="also build with one ring more and compare the two")
+    ap.add_argument("--written", action="store_true", help="build nothing: measure the written file alone")
+    ap.add_argument("--overlay", action="store_true", help="also write the line's ground file with the place's tiles replaced")
     ap.add_argument("--mesh")
     ap.add_argument("--threads", type=int, default=4)
     a = ap.parse_args(argv)
@@ -280,14 +445,14 @@ def main(argv=None):
         todo[k] = dict(known[k], **({"reach": a.reach} if a.reach else {}))
     if not todo:
         ap.error("a place's name, --all, --list, or --line with --at")
-    if len(todo) == 1 and not a.rings:
+    if a.written or (len(todo) == 1 and not a.rings):
         for k, v in todo.items():
-            run(k, v, a.ring, a.mesh, a.threads)
+            run(k, v, a.ring, a.mesh, a.threads, build=not a.written, over=a.overlay)
         return 0
     from baseline_store import HeavyJob
     with HeavyJob("ground places", share={"gb": 5 if a.rings else 3, "cores": a.threads}):
         for k, v in todo.items():
-            run(k, v, a.ring, a.mesh, a.threads, rings=a.rings)
+            run(k, v, a.ring, a.mesh, a.threads, rings=a.rings, over=a.overlay)
     return 0
 
 

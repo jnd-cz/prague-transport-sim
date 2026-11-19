@@ -4,6 +4,7 @@ key (tools/city_terrain.py code_hash): what it hashes of the code.
 
     python -P -E tools/test_ground_place.py
 """
+import json
 import os
 import sys
 import tempfile
@@ -106,6 +107,33 @@ class Measures(unittest.TestCase):
         self.assertEqual(gpl.measures(*self.wall(), (0, 0, 4, 5))["m2 by class"], {"survey": 25.0})
 
 
+class Overlay(unittest.TestCase):
+    def test_the_places_tile_is_the_builds_and_its_neighbour_the_written_files(self):
+        """x 306 m is the border between tiles e-1486 and e-1485 (tools/test_ground_mesh.py): a triangle either side."""
+        def mesh(z):
+            V = mm([300000, 0, z], [305000, 0, z], [305000, -1000, z], [307000, 0, z], [312000, 0, z], [312000, -1000, z])
+            return {"V": V, "F": np.array([[0, 1, 2], [3, 4, 5]]), "cls": np.array([S, S]),
+                    "draw": np.array(["road", "road"], dtype=object), "area": np.array(["road", "road"], dtype=object)}
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "data"))
+            w = mesh(200000)
+            blob, layout = gm.encode_tiles(w["V"], w["F"], w["cls"], w["draw"], w["area"])
+            with open(os.path.join(root, "data", "line99.ground.bin"), "wb") as f:
+                f.write(blob)
+            with open(os.path.join(root, "data", "line99.ground.json"), "w", encoding="utf-8") as f:
+                json.dump(layout, f)
+            left = tuple(int(v) for v in tile_index(302.0, -0.5))
+            done, lacking = gpl.overlay("99", mesh(205000), [left, (left[0], left[1] + 50)], os.path.join(root, "over"), root)
+            self.assertEqual((len(done), len(lacking)), (1, 1))
+            with open(os.path.join(root, "over", "data", "line99.ground.json"), encoding="utf-8") as f:
+                lay = json.load(f)
+            with open(os.path.join(root, "over", "data", "line99.ground.bin"), "rb") as f:
+                V, by = gm.decode(f.read(), lay)
+            z = {round(float(x)): float(h) for x, _, h in V.tolist()}
+            self.assertEqual((z[300], z[305], z[307], z[312]), (205.0, 205.0, 200.0, 200.0))
+            self.assertEqual((lay["triangles"], len(by["survey"])), (2, 2))
+
+
 class Places(unittest.TestCase):
     def test_every_place_names_its_line_point_issue_and_source(self):
         known = gpl.places()
@@ -115,6 +143,46 @@ class Places(unittest.TestCase):
             self.assertEqual(len(p["at"]), 2, name)
             self.assertTrue(p.get("issue") and p.get("what") and p.get("source"), name)
             self.assertLessEqual(float(p.get("reach") or gpl.REACH), 250, name)
+            for s in p.get("sections") or []:
+                self.assertTrue(s.get("name") and len(s["from"]) == 2 and len(s["to"]) == 2 and s.get("expect"), name)
+                self.assertLessEqual(max(abs(s[k][i] - p["at"][i]) for k in ("from", "to") for i in (0, 1)),
+                                     float(p.get("reach") or gpl.REACH), f"{name}: a section inside the place's reach")
+            if p.get("seen"):
+                self.assertTrue(p["seen"].get("what") and p["seen"].get("from") and p["seen"].get("source"), name)
+
+
+class Sections(unittest.TestCase):
+    def profile(self, heights):
+        d = np.arange(len(heights)) * gpl.SECTION_STEP
+        return d, np.asarray(heights, float)
+
+    def test_level_ground_a_wall_and_level_ground_does_not_slope(self):
+        d, z = self.profile([8.0] * 20 + [0.0] * 20)
+        m = gpl.section_measures(d, z, z)
+        self.assertEqual((m["sloping m"], m["largest step m"], m["off the lidar m"]), (0.0, 8.0, 0.0))
+        self.assertFalse(gpl.held(m, {"sloping m": 2.5, "off the lidar m": 2.5}))
+
+    def test_the_same_drop_as_a_slope_slopes_and_leaves_the_lidar(self):
+        d, wall = self.profile([8.0] * 20 + [0.0] * 20)
+        _, z = self.profile([8.0] * 4 + list(np.linspace(8.0, 0.0, 33)) + [0.0] * 3)
+        m = gpl.section_measures(d, z, wall)
+        self.assertEqual(m["sloping m"], 8.0)
+        self.assertGreater(m["off the lidar m"], 5.0)
+        self.assertEqual(set(gpl.held(m, {"sloping m": 2.5, "off the lidar m": 2.5})), {"sloping m", "off the lidar m"})
+
+    def test_an_even_flight_keeps_to_its_chord_a_warped_one_does_not(self):
+        d, even = self.profile(np.linspace(0.0, 1.1, 10))
+        self.assertEqual(gpl.section_measures(d, even)["off the chord m"], 0.0)
+        _, warped = self.profile([0.0, 0.0, 0.0, 0.1, 0.9, 1.0, 1.1, 1.1, 1.1, 1.1])
+        m = gpl.section_measures(d, warped)
+        self.assertGreater(m["off the chord m"], 0.3)
+        self.assertEqual(m["rise m"], 1.1)
+        self.assertIn("off the chord m", gpl.held(m, {"off the chord m": 0.15}))
+
+    def test_samples_off_the_mesh_are_counted_not_measured(self):
+        d, z = self.profile([1.0, 1.0, np.nan, np.nan, 1.0, 1.0])
+        m = gpl.section_measures(d, z)
+        self.assertEqual((m["off the mesh m"], m["sloping m"], m["largest step m"]), (0.75, 0.0, 0.0))
 
 
 class MeshKey(unittest.TestCase):
