@@ -4589,17 +4589,26 @@
   "modrany-viaduct-ramps": {
    "line": "17",
    "at": [
-    -2475.0,
-    -9215.5
+    -2385.0,
+    -9250.0
    ],
    "reach": 60,
    "issue": 757,
-   "what": "the tram viaduct over Komořanská (s 3971-4152, rails 201.0 at its east end, 204.7 on it, 203.7 at its north end, 199.8 at s 4240): the ramps up to it at both ends",
-   "said": "Modřany area show the bridge ramps for example",
-   "source": "the user, 2026-11-19 (session), naming places to look at in street-level imagery, #757",
+   "what": "the tram viaduct at Generála Šišky and Modřanská (s 3971-4152, rails 201.0 at its east end, 204.7 on it, 203.7 at its north end): the walled ramp up to it and the sidewalk and road along the wall's foot",
+   "said": "for the bridge ramps you can try here at Krejcárek https://maps.app.goo.gl/h4Ma3hN5VuqppSyW9 and at Generála Šišky x Modřanská: https://maps.app.goo.gl/XBfSoVMpTfcx6qqZA. The one near Nádraží Modřany isn't visible, only from the underpass there is street view",
+   "source": "the user, 2026-11-19 (session, two messages naming places to look at in street-level imagery), #757",
    "seen": {
-    "what": "From Modřanská north of it: the track climbs to the viaduct on an earth embankment under trees and bushes, no wall on the road's side; the viaduct is a beam bridge on piers over the road. The viaduct's own ends were not seen: no panorama on the track or under the bridge at the points tried.",
+    "what": "From Generála Šišky beside it: the ramp to the viaduct is concrete with an upright side wall, growing along the road from nothing to the abutment's full height (about 5 m), a door in it; the span's beam starts at the abutment's square end. The sidewalk and the road along the wall's foot are level and even. (From Modřanská to the north the track's other approach is hidden under trees.)",
     "from": [
+     {
+      "at": [
+       50.0021899,
+       14.4057555
+      ],
+      "headings": [
+       135
+      ]
+     },
      {
       "at": [
        50.0026816,
@@ -4611,7 +4620,36 @@
       ]
      }
     ],
-    "source": "Google Street View, seen 2026-11-19 (looked at, not copied)"
+    "source": "Google Street View at the user's link, seen 2026-11-19 (looked at, not copied)",
+    "game": "main 95b3162's data, the same camera (tools/shot.py --line 17 --s 4060 --view review --at=-2382.1,-9253.0 --yaw 143 --pitch 4 --dist 25): the wall stands, but the sidewalk along its foot rises against it in two peaks up to the deck, and the road swells towards it"
+   }
+  },
+  "krejcarek-abutment": {
+   "line": "37",
+   "at": [
+    3954.0,
+    380.0
+   ],
+   "reach": 40,
+   "issue": 742,
+   "what": "the Krejcárek viaduct's south abutment (s 3030-3038): the ground under and beside the deck's end",
+   "said": "for the bridge ramps you can try here at Krejcárek https://maps.app.goo.gl/h4Ma3hN5VuqppSyW9 and at Generála Šišky x Modřanská: https://maps.app.goo.gl/XBfSoVMpTfcx6qqZA. The one near Nádraží Modřany isn't visible, only from the underpass there is street view",
+   "source": "the user, 2026-11-19 (session), #757; the same place as #742 and #594's bridge ends",
+   "seen": {
+    "what": "From the path under the viaduct: the deck's beam lands on a concrete abutment with an upright ribbed wing wall; beside the wall the embankment falls away as an even slope under bushes; under the deck's end a cone of pitched stone with a narrow stair along it runs down to the path.",
+    "from": [
+     {
+      "at": [
+       50.0956967,
+       14.4751601
+      ],
+      "headings": [
+       130
+      ]
+     }
+    ],
+    "source": "Google Street View at the user's link, seen 2026-11-19 (looked at, not copied)",
+    "game": "main 95b3162's data, the same camera (tools/shot.py --line 37 --s 3030 --view review --at=3954.3,380.3 --yaw 138 --pitch 4 --dist 18): the deck and the embankment's slope are there; there is no abutment wall, and under the deck's end the ground is a facetted pit with a patch of the survey's tram area lying in it"
    }
   }
  }
