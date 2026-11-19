@@ -565,7 +565,7 @@ def describe(j, now=None):
     mins = max(0.0, ((now or time.time()) - j["since"]) / 60)  # (a ticket written after `now` was read: "-0 min")
     s = j.get("share")
     return (f"{j['what']} in {os.path.basename(os.path.normpath(j['root']))}, {j['state']} {mins:.0f} min"
-            + (f" (shared: {s['gb']:.0f} GB, {s['cores']} cores)" if s else ""))
+            + (f" (shared: {s['gb']:.0f} GB, {s['cores']} core{'s' * (s['cores'] != 1)})" if s else ""))
 
 
 def busy():
