@@ -294,12 +294,13 @@ def ipr_lidar():
     return lambda x, y: np.asarray(ipr.sample(np.asarray(x) + F.E0, np.asarray(y) + F.N0), float)
 
 
-def stretches(ln, root=ROOT, box=None, lidar=None):
+def stretches(ln, root=ROOT, box=None, lidar=None, extra=()):
     """The stepped stretches of line ln's wall lines (of_lines), those reaching a box where one is given (with SIDE's
     margin: a stretch is found from its own line alone, so a box's build finds what the line's build does)."""
     if box is not None:
         box = (box[0] - FIT[-1], box[1] - FIT[-1], box[2] + FIT[-1], box[3] + FIT[-1])
-    return of_lines(source_lines(ln, root, box), lidar or ipr_lidar(), wall_outlines(ln, root, box))
+    # (extra: more lines taken as wall lines, ground_mesh.abutments, #763)
+    return of_lines(source_lines(ln, root, box) + list(extra), lidar or ipr_lidar(), wall_outlines(ln, root, box))
 
 
 def main(argv=None):

@@ -305,6 +305,99 @@ WALL_HOLD = 1.5  # m: a corner this near a wall's line stands at the level of it
 # far, street_profile.SW_KERB_SMEAR; the street surface and the city mesh carry the smear)
 
 
+ABUT_AHEAD = (2.5, 3.0, 3.5, 4.0)  # m past a bed's end: where the lidar is read for the ground a deck leaves (wall_lines.FIT)
+ABUT_WING = 8.0  # m: an abutment's line reaches this far either side of the track for a surveyed wing wall
+ABUT_JOIN = 6.0  # m: bed ends this near each other are one abutment (a double track's two)
+
+
+def abutments(tracks, outline, bed_at, lidar, wall_segs, box=None):
+    """The lines across a structure where a track's bed ends high over the ground: [(2, 3) arrays, z NaN], for the wall
+    lines (wall_lines.of_lines reads their two sides). The survey has an abutment's wing walls along the ramp as wall
+    lines and stops where the deck lands: at the Modřany viaduct (line 17 (-2393, -9247)) the ramp's side strips fell
+    4.5 m in their last metre, the lidar's smear of the abutment's face (#763).
+    A bed's end: where a drawn track's line leaves the beds' outline on the ground. It is an abutment where the bed
+    there stands BED_OVER or more over the lidar ABUT_AHEAD past it. Its line runs square to the track through the
+    end, either way to the first surveyed wall line within ABUT_WING (the wing wall), else to the outline's edge;
+    ends within ABUT_JOIN are one line.
+    tracks: [(n, 2)], outline: the beds' outline, bed_at(x, y) the bed's surface, lidar(x, y), wall_segs: (A, B)
+    (m, 3) the survey's wall lines' segments (wall_lines.segments)."""
+    import wall_lines
+    if outline.is_empty or not tracks:
+        return []
+    ring = outline.boundary
+    shapely.prepare(outline)
+    ends = []  # (x, y, tx, ty): the end's point and the track's direction out of the outline
+    for tr in tracks:
+        tr = np.asarray(tr, float)[:, :2]
+        if len(tr) < 2:
+            continue
+        line = shapely.LineString(tr)
+        if box is not None and not line.intersects(shapely.box(*box)):
+            continue
+        hits = shapely.get_parts(shapely.intersection(line, ring))
+        for h in hits.tolist():
+            if h.geom_type != "Point" or (box is not None and not shapely.box(*box).contains(h)):
+                continue
+            d = line.project(h)
+            a, b = line.interpolate(max(d - 0.5, 0)), line.interpolate(min(d + 0.5, line.length))
+            t = np.array([b.x - a.x, b.y - a.y])
+            n = np.hypot(*t)
+            if n < 1e-6:
+                continue
+            t /= n
+            for sgn in (1.0, -1.0):  # (the direction that leaves the outline)
+                if not shapely.contains_xy(outline, h.x + sgn * t[0] * 0.6, h.y + sgn * t[1] * 0.6) and \
+                        shapely.contains_xy(outline, h.x - sgn * t[0] * 0.6, h.y - sgn * t[1] * 0.6):
+                    ends.append((h.x, h.y, sgn * t[0], sgn * t[1]))
+    if not ends:
+        return []
+    E = np.array(ends)
+    zb = np.asarray(bed_at(E[:, 0] - E[:, 2] * 0.3, E[:, 1] - E[:, 3] * 0.3), float)
+    zg = np.nanmedian(np.stack([np.asarray(lidar(E[:, 0] + E[:, 2] * o, E[:, 1] + E[:, 3] * o), float) for o in ABUT_AHEAD]), 0)
+    with np.errstate(invalid="ignore"):
+        E = E[np.isfinite(zb) & np.isfinite(zg) & (zb - zg >= BED_OVER)]
+    if not len(E):
+        return []
+    # (ends near each other: one abutment, its line through their middle, square to their mean direction)
+    left = list(range(len(E)))
+    groups = []
+    while left:
+        g = [left.pop(0)]
+        grew = True
+        while grew:
+            grew = False
+            for k in left[:]:
+                if min(np.hypot(E[k, 0] - E[j, 0], E[k, 1] - E[j, 1]) for j in g) <= ABUT_JOIN and \
+                        E[k, 2] * E[g[0], 2] + E[k, 3] * E[g[0], 3] > 0.7:
+                    g.append(k)
+                    left.remove(k)
+                    grew = True
+        groups.append(g)
+    A, B = wall_segs if wall_segs is not None else (np.zeros((0, 3)), np.zeros((0, 3)))
+    out = []
+    for g in groups:
+        t = E[g, 2:4].mean(0)
+        t /= max(np.hypot(*t), 1e-9)
+        nrm = np.array([-t[1], t[0]])
+        c = E[g, :2].mean(0)
+        off = (E[g, :2] - c) @ nrm
+        ends2 = []
+        for sgn, far in ((1.0, off.max()), (-1.0, off.min())):
+            p0 = c + nrm * far  # (the outermost end's point on this side)
+            P, Q = p0[None, :] + sgn * nrm[None, :] * 0.05, p0[None, :] + sgn * nrm[None, :] * ABUT_WING
+            tt, seg, _ = wall_lines._cross(P, Q, A[:, :2], B[:, :2])
+            if seg[0] >= 0:
+                reach = 0.05 + tt[0] * (ABUT_WING - 0.05)
+            else:  # (no wing wall: to the outline's edge)
+                x = shapely.intersection(shapely.LineString([p0 + sgn * nrm * 0.05, p0 + sgn * nrm * ABUT_WING]), ring)
+                ds = [float(np.hypot(q.x - p0[0], q.y - p0[1])) for q in shapely.get_parts(x).tolist() if q.geom_type == "Point"]
+                reach = min(ds) if ds else 0.0
+            ends2.append(p0 + sgn * nrm * reach)
+        if np.hypot(*(ends2[0] - ends2[1])) >= 1.0:
+            out.append(np.array([[ends2[0][0], ends2[0][1], np.nan], [ends2[1][0], ends2[1][1], np.nan]]))
+    return out
+
+
 def hold_at_walls(cx, cy, tx, ty, z, eligible, walls):
     """Heights z of corners (cx, cy) with each eligible one within WALL_HOLD of a wall stretch (wall_lines.stretches)
     set to the ground of the side of the wall its triangle's centre (tx, ty) lies on: that side's level at the nearest
@@ -846,7 +939,13 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (the walls the survey has as lines, where the ground steps across them: their lines among the faces' lines, so
     # corners lie on them, #697)
     import wall_lines
-    walls = wall_stretches = wall_lines.stretches(ln, box=box.bounds)
+    # (and across a structure where a bed ends high over the ground: the abutment the survey's wing walls stop at, #763)
+    lidar_w = wall_lines.ipr_lidar()
+    abut = abutments([np.asarray(t["p"], float)[:, :2] for t in L.get("tracks") or [] if len(t.get("p") or []) > 1], outline,
+                     lambda px, py: beds.surface_at(px, py, BED_REACH), lidar_w,
+                     wall_lines.segments(wall_lines.source_lines(ln, box=box.bounds)), box.bounds)
+    walls = wall_stretches = wall_lines.stretches(ln, box=box.bounds, lidar=lidar_w, extra=abut)
+    log(f"  {len(abut)} abutment lines, {len(walls)} wall stretches")
     for w in walls:
         g = shapely.LineString(w["p"]).intersection(box)
         if not g.is_empty:
