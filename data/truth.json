@@ -4830,6 +4830,50 @@
      "why": "a wall stands at the road's edge (the survey's strip: its foot 191.85 m, its top 194.3 m at x = 197-210), the bank rising behind it at about 1:1. Built on #765: one step of 2.65 m, 0.5 m sloping (the top's first half metre). The written file of 2026-11-19: a step of 0.81 m and 0.75 m of slope here, and teeth 10 m wide along the wall"
     }
    ]
+  },
+  "stairs-in-a-sidewalk": {
+   "line": "37",
+   "at": [
+    4001.4,
+    1412.0
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a stairs area in a sidewalk (survey area 2169, 1.5 m by 13 m): its outline has a flight's 14 step noses along its west side, 182.67-186.42 m, down to 4 m under the sidewalk, and the sidewalk's level along its east side (186.4-186.9 m). IPR's bare-earth raster is level at 186.5-187.05 m over it and round it. The ground is drawn at that level, no sheet folded between the two sides; a flight down from it is a structure's, not the ground's",
+   "source": "the survey's outline (data/line37.dtm.json, area 2169) and IPR's 1 m raster, measured 2026-11-19, #447; not looked at in street imagery",
+   "sections": [
+    {
+     "name": "along the stairs area's middle (survey area 2169), south to north",
+     "from": [
+      4001.4,
+      1406.5
+     ],
+     "to": [
+      4001.4,
+      1417.5
+     ],
+     "expect": {
+      "off the lidar m": 1.0,
+      "sloping m": 1.0
+     },
+     "why": "the raster is level at 186.7-187.05 m along it, as over the sidewalk either side. The outline's triangles lay at 184.5-185.3 m there, a sheet folded between the noses on the west side and the level on the east: 10 of the area's 19 m2 steeper than 1:1 (#447)"
+    },
+    {
+     "name": "across it at y = 1415, sidewalk to sidewalk",
+     "from": [
+      3999.4,
+      1415.0
+     ],
+     "to": [
+      4003.4,
+      1415.0
+     ],
+     "expect": {
+      "off the lidar m": 0.5
+     },
+     "why": "the raster is level at 186.6-186.8 m across; the outline's triangles fell to 184.05 m at the west side's nose there"
+    }
+   ]
   }
  }
 }
