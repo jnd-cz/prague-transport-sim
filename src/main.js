@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
-import { Terrain, Profile, makeGround, corridorWalls, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
+import { Terrain, Profile, makeGround, rockTunnels, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
 import { buildWorld, WORLD_PARTS } from './world.js';
 import { widenTramStreets, buildStreetDetail } from './streets.js';
 import { groundStyles } from './groundDraw.js';
@@ -154,7 +154,7 @@ useGroundLookup(ground, groundLookup);
 ground.tiles = groundTiles;
 ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
-ground.walls = corridorWalls(terrain, route, profile, dtm); // the rock tunnels and the retaining walls
+ground.rock = rockTunnels(terrain, route, profile); // our tunnels through rock
 route.ground = ground;
 
 // ------------------------------------------------------------------ renderer & scene

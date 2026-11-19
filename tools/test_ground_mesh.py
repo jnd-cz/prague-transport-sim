@@ -391,6 +391,31 @@ class Terraces(unittest.TestCase):
         self.assertEqual(gm.beside(self.D, [7, 8], set(), self.lidar), set())
 
 
+class TwoSided(unittest.TestCase):
+    """#765: the wall under Letná, line 17 area 4166: a paved strip 0.44 m across, its foot's line along the road and
+    its top's behind it, joining gradually at the ends."""
+
+    @staticmethod
+    def strip(top, n=16, step=2.0, width=0.44):
+        foot = [[i * step, 0.0, 191.2] for i in range(n + 1)]
+        back = [[i * step, width, 191.2 + top * min(1.0, i / 3, (n - i) / 3)] for i in range(n, -1, -1)]
+        return {"c": "paved", "r": foot + back}
+
+    def test_a_strip_with_its_foot_one_side_and_its_top_the_other_is_a_wall(self):
+        a = self.strip(3.0)
+        self.assertFalse(gm.climbs(a))
+        self.assertTrue(gm.two_sided(a))
+        self.assertTrue(gm.wall_like(a))
+
+    def test_a_level_strip_and_a_low_edging_are_not(self):
+        self.assertFalse(gm.two_sided(self.strip(0.0)))
+        self.assertFalse(gm.wall_like(self.strip(0.4)))  # (under WALL_FACE)
+
+    def test_a_strip_on_the_lidar_and_a_wide_area_are_not_walls(self):
+        self.assertFalse(gm.wall_like(dict(self.strip(3.0), g=1)))
+        self.assertFalse(gm.wall_like(self.strip(3.0, width=4.0)))
+
+
 class Abutments(unittest.TestCase):
     """#763: the Modřany viaduct's abutment, line 17 (-2393, -9247): the bed's end 1.3 m over the face, the wing
     walls' lines turning at its corners and running on at the street's level."""

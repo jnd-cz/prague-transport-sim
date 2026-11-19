@@ -278,72 +278,19 @@ export class Profile {
   }
 }
 
-// The track corridor's tunnels through rock and its retaining walls, judged on the terrain grid (10 x 15 m). Where the
-// hillside rises more than WALL_MIN m above the track at BENCH m from it, a retaining wall stands there (src/structures.js
-// buildWalls). Returns the wall runs and the rock tunnels. (The grid was carved here too, a bench at the track level
-// with blended slopes; near the track the ground file answers since #509, and the carving went, #510.)
-const BENCH = 7, WALL_MIN = 1.5, WALL_REACH = 22;
-// `dtm`: where the surveyed streets describe the ground beside the track, the survey decides and no
-// retaining wall is invented (the 10 m lidar grid rising beside a street is not a wall)
-export function corridorWalls(T, route, profile, dtm = null) {
+// Our route's tunnels through rock, judged on the terrain grid (10 x 15 m): an OSM tunnel with the lidar ground more
+// than 8 m over the track on average (the Vyšehrad tunnel; not a covered stretch under a station or a bridge). The
+// hill stays whole over the track there and src/structures.js draws the vault and the portals. (Retaining walls were
+// invented here too, where the grid rose over 1.5 m beside the track: up to 21.5 m at the Vyšehrad tunnel's mouths.
+// The ground file has the survey's and Geoportál's walls, tools/wall_lines.py, and they went, #765.)
+export function rockTunnels(T, route, profile) {
   // (the grid itself, not T.height: the ground file's lookup answers that near the route, main.js useGroundLookup)
   const grid = new Grid(T.x0, T.y0, T.dx, T.dy, T.nx, T.ny, T.h);
-  const origAt = (x, y) => grid.height(x, y);
-  // Tunnels of our route through rock (OSM tunnel, the lidar ground more than 8 m over the track on
-  // average: the Vyšehrad tunnel; not a covered stretch under a station or a bridge): nothing is
-  // carved there, the hill stays whole over the track and src/structures.js draws the vault and the portals
-  const rock = (profile.tunnels || []).filter(([a, b]) => {
+  return (profile.tunnels || []).filter(([a, b]) => {
     let acc = 0, n = 0;
-    for (let s = a; s <= b; s += 4) { const q = route.at(s); acc += origAt(q.x, q.y) - profile.height(s); n++; }
+    for (let s = a; s <= b; s += 4) { const q = route.at(s); acc += grid.height(q.x, q.y) - profile.height(s); n++; }
     return n && acc / n > 8;
   });
-  const inRock = (s) => rock.some(([a, b]) => s > a - 1 && s < b + 1);
-  // where along each side the hillside needs a retaining wall, and how tall
-  const WSTEP = 3, nw = Math.ceil(route.length / WSTEP) + 1;
-  const wallTop = { 1: new Float32Array(nw).fill(NaN), '-1': new Float32Array(nw).fill(NaN) };
-  for (let i = 0; i < nw; i++) {
-    const s = i * WSTEP;
-    if (profile.onBridge(s) || inRock(s)) continue;
-    const zp = profile.height(s) - profile.lift(s); // (the bed: src/heights.js)
-    for (const side of [1, -1]) {
-      let top = -Infinity;
-      for (const lat of [BENCH + 1, BENCH + 4, BENCH + 8]) {
-        const o = route.offset(s, side * lat);
-        top = Math.max(top, origAt(o.x, o.y));
-      }
-      const foot = route.offset(s, side * (BENCH + 0.5)), at = route.offset(s, side * BENCH);
-      if (dtm && (dtm.surfaceAt(foot.x, foot.y) || dtm.surfaceAt(at.x, at.y))) continue;
-      if (top - zp > WALL_MIN) wallTop[side][i] = top;
-    }
-  }
-  // drop isolated wall samples, so walls come in runs of at least ~12 m
-  for (const side of [1, -1]) {
-    const w = wallTop[side];
-    for (let i = 0; i < nw; i++) {
-      if (isNaN(w[i])) continue;
-      let run = 0;
-      for (let k = i - 2; k <= i + 2; k++) if (k >= 0 && k < nw && !isNaN(w[k])) run++;
-      if (run < 3) w[i] = NaN;
-    }
-  }
-  // collect wall runs per side
-  const runs = [];
-  for (const side of [1, -1]) {
-    let cur = null;
-    for (let i = 0; i < nw; i++) {
-      const top = wallTop[side][i];
-      if (!isNaN(top)) {
-        if (!cur) { cur = { side, pts: [] }; runs.push(cur); }
-        cur.pts.push({ s: i * WSTEP, top });
-      } else cur = null;
-    }
-  }
-  for (const r of runs) {
-    // smooth the wall crest a little
-    const t = r.pts.map((q) => q.top);
-    r.pts.forEach((q, i) => { q.top = (t[Math.max(0, i - 1)] + t[i] + t[Math.min(t.length - 1, i + 1)]) / 3; });
-  }
-  return { runs, bench: BENCH, reach: WALL_REACH, rock };
 }
 
 // Combined ground function used by all scenery: near the route (and on its bridges)

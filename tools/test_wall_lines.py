@@ -124,6 +124,29 @@ class Stretches(unittest.TestCase):
         self.assertEqual(wl.of_lines([line], ramp)[0]["zr"][[0, 5, -1]].tolist(), [203.0, 206.0, 203.0])
         self.assertEqual(wl.of_lines([line], ramp, (), {0})[0]["zr"][[0, 5, -1]].tolist(), [206.0, 206.0, 206.0])
 
+    def test_a_wall_of_another_source_counts_where_the_survey_has_none_near(self):
+        # (#765: Geoportál's retaining wall along x = 0; the survey has the same wall 0.4 m beside it for y 10-20)
+        geo = [np.array([[0.0, 0.0, np.nan], [0.0, 30.0, np.nan]])]
+        survey = [np.array([[0.4, 10.0, 205.0], [0.4, 20.0, 205.0]])]
+        got = wl.off_survey(geo, survey)
+        self.assertEqual(wl.HOLD, gm.WALL_HOLD)
+        self.assertEqual([(q[0, 1], q[-1, 1]) for q in got], [(0.0, 8.0), (22.0, 30.0)])
+        self.assertEqual([(q[0, 1], q[-1, 1]) for q in wl.off_survey(geo, [])], [(0.0, 30.0)])
+        self.assertEqual(wl.off_survey(geo, [np.array([[0.4, 1.0, 205.0], [0.4, 29.0, 205.0]])]), [])  # (1 m ends: no run)
+
+    def test_a_wall_known_by_its_height_stands_that_tall_under_a_bank_the_raster_has_no_step_in(self):
+        # (#765: under Letná, line 17 (150, 806): the road level at 191.2 m, the raster rising 1 m per metre behind the
+        # line, the wall 3.5 m by Geoportál)
+        def bank(x, y):
+            return 191.2 + np.clip(np.asarray(x, float), 0, 6)
+        line = np.array([[0.0, 30.0, np.nan], [0.0, 0.0, np.nan]])  # (running south: its left is east, the bank)
+        s = wl.of_lines([line], bank, (), (), {0: 3.5})[0]
+        self.assertTrue(np.allclose(s["zr"], 191.2) and np.allclose(s["zl"], 194.7))
+        self.assertTrue(np.allclose(s["zl"] + s["gl"] * wl.HOLD, 192.7))  # (the raster where the hold ends)
+        low = wl.of_lines([line], lambda x, y: 191.2 + np.clip(np.asarray(x, float), 0, 6) / 3, (), (), {0: 3.5})[0]
+        self.assertTrue(np.allclose(low["zl"], 192.53, atol=0.01))  # (no higher than the ground 4 m behind)
+        self.assertEqual(wl.of_lines([line], lambda x, y: np.full(np.shape(x), 191.2), (), (), {0: 3.5}), [])  # (nothing held: no wall)
+
     def test_runs_close_small_gaps_and_drop_short_ones(self):
         d = np.arange(12.0)
         on = np.array([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0], bool)

@@ -27,6 +27,8 @@ to its right at every point:
   and then the wall stands at the higher line;
 - a point is on a stretch where the two sides' levels at the wall differ by STEP or more; a stretch runs at least
   MIN_LEN, gaps up to GAP closed; levels and slopes smoothed along it over SMOOTH points;
+- Geoportál's retaining walls are wall lines too where the survey has none within GEO_NEAR (geoportal_lines, #765),
+  their top from their own height over the foot (retained);
 - a stretch is cut where its line turns by over TURN, and a piece under PIECE between two turns is none: a side is
   read square to the line, so at a corner it is another ground, and smoothed round the corner it was carried there.
   At the Modřany abutment's corner (line 17 (-2392.7, -9250.8)) the wall's line jogs 0.5 m before it runs along the
@@ -57,6 +59,8 @@ GAP = 2.0  # m: a shorter gap between two runs is closed
 SMOOTH = 9  # samples: the running median along a stretch
 TURN = 30.0  # degrees: a stretch is cut where its line turns by more
 PIECE = 1.0  # m: a piece between two turns shorter than this is no stretch
+GEO_NEAR = 2.0  # m: Geoportál's retaining wall this near a survey wall line or wall area's outline is that wall
+HOLD = 1.5  # m: the ground is held to a wall's levels this far from its line (ground_mesh.WALL_HOLD)
 
 
 def _median(v, n=SMOOTH):
@@ -186,6 +190,42 @@ def levels(S, lidar, walls=None):
     return np.where(own_l, z, zl), gl, np.where(own_r, z, zr), gr
 
 
+def retained(S, lidar, h, walls=None):
+    """(zl, gl, zr, gr) of sampled points S of a retaining wall known by its line and its height h over its foot
+    (Geoportál's, geoportal_lines), where the ground behind it stands STEP or more over its foot; else no step.
+    Such a line lies a metre or so off the raster's rise, and under a steep bank the raster has no step to read: under
+    Letná (line 17 (150, 806), a wall of 3.5 m along the road) it rises 1 m per metre for 4 m, and a side's fit read
+    back to the line gave the top anywhere between 191.3 and 195.3 m within 30 m of wall, teeth instead of a wall.
+    - The foot is the lower side's level, read as any side's (_side); the line has one high side, the one the raster
+      rises to at FIT along most of it.
+    - The top is the foot plus h, no higher than the ground FIT m behind (a retaining wall ends at the ground it
+      holds) and no lower than the ground HOLD m behind.
+    - Behind the top the ground runs straight to the raster's height HOLD m behind, where the hold ends: no step there.
+      (Where the line lies before the real wall the ground dips behind the top, as the slab the page drew stood proud
+      of it, src/structures.js buildWalls until #765.)"""
+    d = np.asarray(FIT, float)
+    (zl, gl, _), (zr, gr, _) = _side(S, lidar, 1.0, walls), _side(S, lidar, -1.0, walls)
+
+    def behind(sign, offs):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            return np.nanmax(np.stack([np.asarray(lidar(S[:, 0] + sign * S[:, 3] * o, S[:, 1] + sign * S[:, 4] * o), float) for o in offs]), 0)
+    fl, fr = behind(1.0, d), behind(-1.0, d)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        left = bool(np.nanmedian(fl - fr) > 0)
+    sign = 1.0 if left else -1.0
+    foot, far = (zr, fl) if left else (zl, fr)
+    near = behind(sign, [HOLD])
+    with np.errstate(invalid="ignore"):
+        top = np.fmax(np.fmin(foot + h, far), near)
+        top = np.where(np.isfinite(far) & (far - foot >= STEP), top, foot)
+    top = _median(np.where(np.isfinite(top), top, foot))
+    g = np.where(np.isfinite(near), (near - top) / HOLD, 0.0)
+    g = np.where(top - foot >= STEP, np.clip(g, -SLOPE, 0.0), 0.0)
+    return (top, g, zr, gr) if left else (zl, gl, top, g)
+
+
 def segments(lines):
     """Polylines ([(n, 3)]) as segments (A, B), each (m, 3)."""
     if not len(lines):
@@ -223,18 +263,20 @@ def straight(S, d, a, b):
     return [(i, j, j != b) for i, j in zip(cuts, cuts[1:]) if d[j] - d[i] >= PIECE]
 
 
-def of_lines(lines, lidar, others=(), meeting=()):
+def of_lines(lines, lidar, others=(), meeting=(), heights=None):
     """The stretches of polylines ([(n, 3) arrays]): [{"p": (m, 2), "zl", "gl", "zr", "gr": (m,)}]. others: more lines
     a side's readings stop at (the survey's wall areas' outlines). meeting: the lines (their indexes) whose two ends
     stand on other walls (an abutment's line between its wing walls' corners, ground_mesh.abutments): an end's
-    readings run along that wall, through the raster's smear of it, and the point next to the end stands for it."""
+    readings run along that wall, through the raster's smear of it, and the point next to the end stands for it.
+    heights: {a line's index: its wall's height over its foot}, for the lines known by a height (retained)."""
     out = []
     walls = segments(list(lines) + list(others))
     for n_line, p in enumerate(lines):
         S = sample(np.asarray(p, float))
         if len(S) < 2:
             continue
-        zl, gl, zr, gr = levels(S, lidar, walls)
+        h = (heights or {}).get(n_line)
+        zl, gl, zr, gr = levels(S, lidar, walls) if h is None else retained(S, lidar, h, walls)
         if n_line in meeting and len(S) > 3:
             for q in (zl, gl, zr, gr):
                 q[0], q[-1] = q[1], q[-2]
@@ -245,6 +287,8 @@ def of_lines(lines, lidar, others=(), meeting=()):
                 for q in v:
                     q[-1] = q[-2]
             out.append({"p": S[a:b + 1, :2].copy(), "zl": _median(v[0]), "gl": _median(v[1]), "zr": _median(v[2]), "gr": _median(v[3])})
+            if h is not None:
+                out[-1]["h"] = h
     return out
 
 
@@ -274,8 +318,14 @@ def source_lines(ln, root=ROOT, box=None):
     return out
 
 
-def wall_outlines(ln, root=ROOT, box=None):
-    """The outlines of the survey's wall areas of line ln ([(n, 3)], closed), those reaching a box where one is given."""
+STRIP = 1.0  # m: a paved survey area this wide or narrower is a strip: a parapet, an edging, a wall's top
+
+
+def wall_outlines(ln, root=ROOT, box=None, strips=False):
+    """The outlines of the survey's wall areas of line ln ([(n, 3)], closed), those reaching a box where one is given.
+    strips: and of its paved strips up to STRIP wide (twice the area over the perimeter): the survey has many a wall's
+    top as one (under Letná, line 17 (26..317, 800), area 4166: 0.44 m wide and 290 m long at 191.4-196.3 m, the
+    wall Geoportál has as a line)."""
     path = os.path.join(root, "data", f"line{ln}.dtm.json")
     if not os.path.exists(path):
         return []
@@ -283,13 +333,66 @@ def wall_outlines(ln, root=ROOT, box=None):
         d = json.load(f)
     out = []
     for a in d.get("areas") or []:
-        if a.get("c") != "wall" or len(a.get("r") or []) < 3:
+        if a.get("c") not in (("wall", "paved") if strips else ("wall",)) or len(a.get("r") or []) < 3:
             continue
         p = np.array([[v if v is not None else np.nan for v in q[:3]] for q in a["r"] + a["r"][:1]], float)
+        if a["c"] == "paved":
+            x, y = p[:, 0], p[:, 1]
+            per = float(np.hypot(np.diff(x), np.diff(y)).sum())
+            if a.get("g") or not per or abs(float((x[:-1] * y[1:] - x[1:] * y[:-1]).sum())) / per > STRIP:
+                continue
         if box is not None and (p[:, 0].max() < box[0] or p[:, 0].min() > box[2] or p[:, 1].max() < box[1] or p[:, 1].min() > box[3]):
             continue
         out.append(p)
     return out
+
+
+def off_survey(lines, survey, near=GEO_NEAR):
+    """The runs of polylines ([(n, 3)]) farther than `near` from the lines `survey` ([(m, 3)]), MIN_LEN or longer:
+    [(k, 3)], sampled every SPACING."""
+    import shapely
+    if not len(lines):
+        return []
+    tree = shapely.STRtree([shapely.LineString(np.asarray(q, float)[:, :2]) for q in survey]) if len(survey) else None
+    out = []
+    for p in lines:
+        S = sample(np.asarray(p, float))
+        if len(S) < 2:
+            continue
+        far = np.ones(len(S), bool)
+        if tree is not None:
+            qi, _ = tree.query(shapely.points(S[:, 0], S[:, 1]), predicate="dwithin", distance=near)
+            far[np.unique(qi)] = False
+        d = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(S[:, 0]), np.diff(S[:, 1])))])
+        edge = np.flatnonzero(np.diff(np.concatenate([[False], far, [False]]).astype(int)))
+        for a, b in zip(edge[::2], edge[1::2] - 1):
+            if d[b] - d[a] >= MIN_LEN:
+                out.append(S[a:b + 1, :3].copy())
+    return out
+
+
+def geoportal_lines(ln, root=ROOT, box=None, survey=()):
+    """Geoportál's retaining walls of line ln (data/lineN.geo.json `walls`: a line in plan and a height over its foot,
+    tools/geoportal.py) as wall lines without heights of their points: ([(n, 3)] with z NaN, [each one's height over
+    its foot]), their runs off the survey's own walls (off_survey). 54-75 % of their length lies within GEO_NEAR of a survey wall line or wall area, the same wall a
+    second time; of the rest 107-679 m a line step by STEP or more (line 17 (145, 806): 215 m, up to 4.4 m), walls the
+    survey lacks. The page drew every one as a slab on the ground (src/structures.js buildWalls, until #765)."""
+    path = os.path.join(root, "data", f"line{ln}.geo.json")
+    if not os.path.exists(path):
+        return [], []
+    with open(path, encoding="utf-8") as f:
+        d = json.load(f)
+    out, hs = [], []
+    for w in d.get("walls") or []:
+        p = np.array([[q[0], q[1], np.nan] for q in w.get("p") or []], float)
+        if len(p) < 2:
+            continue
+        if box is not None and (p[:, 0].max() < box[0] or p[:, 0].min() > box[2] or p[:, 1].max() < box[1] or p[:, 1].min() > box[3]):
+            continue
+        runs = off_survey([p], survey)
+        out += runs
+        hs += [float(w.get("h") or 2.0)] * len(runs)
+    return out, hs
 
 
 def ipr_lidar():
@@ -305,8 +408,11 @@ def stretches(ln, root=ROOT, box=None, lidar=None, extra=()):
     if box is not None:
         box = (box[0] - FIT[-1], box[1] - FIT[-1], box[2] + FIT[-1], box[3] + FIT[-1])
     # (extra: more lines taken as wall lines, ground_mesh.abutments, #763)
-    src = source_lines(ln, root, box)
-    return of_lines(src + list(extra), lidar or ipr_lidar(), wall_outlines(ln, root, box), set(range(len(src), len(src) + len(extra))))
+    src, areas = source_lines(ln, root, box), wall_outlines(ln, root, box)
+    geo, hs = geoportal_lines(ln, root, box, src + wall_outlines(ln, root, box, strips=True))
+    n = len(src) + len(geo)
+    return of_lines(src + geo + list(extra), lidar or ipr_lidar(), areas, set(range(n, n + len(extra))),
+                    {len(src) + k: h for k, h in enumerate(hs)})
 
 
 def main(argv=None):

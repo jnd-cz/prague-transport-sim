@@ -205,8 +205,8 @@ tram, dark glass is the game.
 
 ### The city
 
-- Terrain: the track corridor is carved into the lidar terrain; retaining walls where the line is cut into
-  a hillside (Chotkova), Most Legií on a deck with piers.
+- Terrain: the ground follows the city's survey and the lidar; the retaining walls of the survey and of the
+  city's data are part of it (Chotkova, the embankment under Letná), Most Legií on a deck with piers.
 - Signs: classic red Prague stop signs; the speed signs of the D 1/2 rules (a restriction in black on yellow,
   a Rychlostník in white on black, the warning triangle, the "r" of a small-radius curve, the dangerous climb
   and descent), twice their real size so they can be read on a screen. Contact

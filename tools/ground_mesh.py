@@ -728,15 +728,53 @@ def wall_width(a):
     return 2 * g.area / g.length if g.length > 0 else 0.0
 
 
+SIDES_STEP = 2.0  # m between the points the outline is looked across from
+SIDES_SHARE = 0.5  # of the outline's length with its other side WALL_FACE or more off it: the strip is a wall's face
+
+
+def two_sided(a):
+    """Whether a survey area is a wall's face in plan, its foot's line one side of it and its top's the other: from
+    SIDES_SHARE or more of its outline the other side across it, within WALL_WIDE, stands WALL_FACE or more higher or
+    lower. Under Letná (line 17 (26..317, 806), paved area 4166: 0.44 m across and 290 m long, a wall of 2-3.5 m along
+    the road) the top's line steps 0.6 m at a time and the two lines join gradually at the ends: no two neighbouring
+    points climb a wall (climbs), and its outline's triangles stood as teeth 10 m wide (#765)."""
+    segs = ring_segments(a)
+    if not len(segs):
+        return False
+    g = shapely.Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
+    if not g.is_valid or g.is_empty:
+        return False
+    e = segs[:, 1, :2] - segs[:, 0, :2]
+    L = np.hypot(e[:, 0], e[:, 1])
+    xs, ys, ws = [], [], []
+    for (p, _), v, l in zip(segs, e, L):
+        k = max(1, int(math.ceil(l / SIDES_STEP)))
+        t = (np.arange(k) + 0.5) / k
+        n = np.array([-v[1], v[0]]) / max(l, 1e-9)
+        for sgn in (1.0, -1.0):
+            xs.append(p[0] + v[0] * t + sgn * n[0] * WALL_IN)
+            ys.append(p[1] + v[1] * t + sgn * n[1] * WALL_IN)
+            ws.append(np.full(k, l / k))
+    x, y, w = np.concatenate(xs), np.concatenate(ys), np.concatenate(ws)
+    inside = shapely.contains_xy(g, x, y)
+    if not inside.any():
+        return False
+    z1, d1, z2, d2 = _sides(segs, x[inside], y[inside])
+    with np.errstate(invalid="ignore"):
+        face = np.isfinite(d2) & (np.abs(z1 - z2) >= WALL_FACE) & (d1 + d2 <= WALL_WIDE)
+    return float(w[inside][face].sum()) >= SIDES_SHARE * float(L.sum())
+
+
 def wall_like(a):
     """Whether a survey area takes a wall's heights (wall_face): a wall; or a paved strip off the lidar, a wall's
-    thickness across (WALL_WIDE), whose outline climbs a wall (climbs()). 46-128 paved areas a line are such strips
+    thickness across (WALL_WIDE), whose outline climbs a wall (climbs()) or has a wall's foot and top as its two sides
+    (two_sided()). 46-128 paved areas a line are such strips
     under 1 m across, 6-35 more up to 2.5 m (parapets and low walls along paths: line 17 area 4189 at (1194, 2409),
     line 23 area 956 at (-1117, 806)): their foot's side and their top's triangulated to a leaning sheet, 0.03-0.17 ha
     a line steeper than 1:1 (#697)."""
     if a["c"] == "wall":
         return True
-    return a["c"] == "paved" and not a.get("g") and wall_width(a) <= WALL_WIDE and climbs(a)
+    return a["c"] == "paved" and not a.get("g") and wall_width(a) <= WALL_WIDE and (climbs(a) or two_sided(a))
 
 
 def wall_face(ring_segs, x, y, tx, ty):
