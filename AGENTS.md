@@ -121,7 +121,10 @@ things are done, and why a rule exists, is in the files it points to:
   `city_terrain.py`, `ground_mesh.py`; `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py`,
   `street_profile.py` and `ground_partition.py` when run alone; `test_all.py` for the whole suite. Anything
   else runs through `python -I tools/heavy.py "what" -- CMD ...`. Start one in the background and let it wait;
-  never start a second beside it. Timings always run alone; count runs and builds may share once #728 lands.
+  never start a second beside it. A timing runs alone (`frametime.py`, a bench, the whole test suite, plain
+  `heavy.py`). Count runs and builds (`headless.py`, `rebuild.py`, `ground_mesh.py`, `city_terrain.py`,
+  `heavy.py --shared GB,CORES` for pictures and the like) run beside each other while their memory and cores
+  fit (the user, 2026-11-19, #728). A wait that ends with "does nothing" names a stuck job: look at that one.
 - **A long job pins its checkout:** work on another issue meanwhile in its own worktree.
 - **Which checks a change needs** (`/regress` picks them from the diff and has the commands; a change of two
   kinds runs both):

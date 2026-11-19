@@ -539,6 +539,7 @@ ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-
         "--disable-backgrounding-occluded-windows"]
 GPU_ARGS = [*gpu.HARDWARE, *ARGS[3:]]  # (WebGL on the machine's GPU, tools/gpu.py)
 PAGES = 8  # pages at once by default (sysinfo.workers caps it by cores and free memory)
+PAGE_GB, PAGE_CORES = 4.0, 2  # a page's memory and cores, as the queue counts them (HeavyJob's share, #728)
 PAGE = {"draw": False, "viewport": (960, 540), "gpu": False, "keepgeo": True}  # (how the pages draw: --draw, --viewport, --gpu,
 # #411; keepgeo: every ground tile held and the geometry kept, as the checks read it; False: as a player loads it, #30)
 
@@ -903,14 +904,19 @@ def main():
         return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs, load)
                 for c in DRIVE if (line, c, seed) in asked]
 
-    heavy = HeavyJob("headless")  # (waits its turn among the heavy jobs, and the nightly baseline for it: #280)
+    # (waits its turn among the heavy jobs, and the nightly baseline for it: #280. A count run: it runs beside other
+    # counts and builds, a page being PAGE_GB of memory and PAGE_CORES cores, #728)
+    heavy = HeavyJob("headless", share={"gb": PAGE_GB * (a.jobs or 1), "cores": PAGE_CORES * (a.jobs or 1)})
     try:
         heavy.__enter__()
         t0 = time.time()  # (the run's time, not the wait's)
         if a.jobs is None:
             # (sized by the memory free once its turn comes; at most 8: without drawing a page takes ~2 cores, and 75
-            # runs took 1633 s drawing at 4 pages, 721 s at 8 and 706 s at 12 without, #411)
-            a.jobs = workers(4.0, most=PAGES)
+            # runs took 1633 s drawing at 4 pages, 721 s at 8 and 706 s at 12 without, #411; beside other shared jobs,
+            # by what they leave)
+            room = heavy.room()
+            a.jobs = max(1, min(workers(PAGE_GB, most=PAGES), int(room["gb"] // PAGE_GB), room["cores"] // PAGE_CORES))
+            heavy.claim(gb=PAGE_GB * a.jobs, cores=PAGE_CORES * a.jobs)
         os.makedirs(a.out, exist_ok=True)
         # (u3, redruns and stops of a line and seed: one drive; then batches of one line's runs, each in one page)
         runs = list(jobs) if a.separate else merge_drives(jobs)

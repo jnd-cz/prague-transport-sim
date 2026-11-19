@@ -144,11 +144,17 @@ class Checkpoints(unittest.TestCase):
 
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
+# (a job that holds its turn until a file appears. argv[4]: the test's settings, run first: `share` for a shared job,
+# `spin` for what it does meanwhile, the queue's constants)
 JOB = ("import os, sys, time; sys.path.insert(0, sys.argv[1]); import baseline_store as b\n"
        "b.HeavyJob.POLL = 0.1\n"
-       "with b.HeavyJob(sys.argv[2]):\n"
+       "share, spin = None, lambda: time.sleep(0.05)\n"
+       "exec(sys.argv[4])\n"
+       "with b.HeavyJob(sys.argv[2], share=share):\n"
        "    print('in', flush=True)\n"
-       "    while not os.path.exists(sys.argv[3]): time.sleep(0.05)\n")
+       "    while not os.path.exists(sys.argv[3]): spin()\n")
+# (a machine of the test's own: 8 cores, 40 GB free, 2 kept)
+MACHINE = "b.HeavyJob.FREE = staticmethod(lambda: 40.0); b.HeavyJob.CORES = 8; b.HeavyJob.KEEP = 2.0; "
 
 
 class Queue(unittest.TestCase):
@@ -166,9 +172,9 @@ class Queue(unittest.TestCase):
         self.env.pop("TRAM_HEAVY_NOWAIT", None)
         self.kids = []
 
-    def job(self, name):
+    def job(self, name, setup=""):
         release = os.path.join(self.tmp.name, f"release-{name}")
-        p = subprocess.Popen([sys.executable, "-I", "-c", JOB, TOOLS, name, release], env=self.env,
+        p = subprocess.Popen([sys.executable, "-I", "-c", JOB, TOOLS, name, release, setup], env=self.env,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.kids.append(p)
         self.addCleanup(lambda: (p.kill(), p.wait(), p.stdout.close(), p.stderr.close()))
@@ -183,6 +189,134 @@ class Queue(unittest.TestCase):
 
     def states(self):
         return [(j["what"], j["state"]) for j in baseline_store.queue()]
+
+    def shared(self, name, gb=4, cores=2):
+        """A count run or a build on the test's machine (MACHINE), with its peak memory and its cores."""
+        return self.job(name, MACHINE + f"share = {{'gb': {gb}, 'cores': {cores}}}")
+
+    def test_shared_jobs_run_side_by_side_while_memory_and_cores_fit(self):
+        a, release_a = self.shared("a")
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        b, release_b = self.shared("b")
+        self.assertEqual(b.stdout.readline().strip(), "in")  # (beside a: 8 of 38 GB, 4 of 8 cores)
+        self.assertEqual(sorted(self.states()), [("a", "running"), ("b", "running")])
+        for r in (release_a, release_b):
+            open(r, "w").close()
+        self.assertEqual((a.wait(10), b.wait(10)), (0, 0))
+
+    def test_a_shared_job_waits_for_the_memory_another_declared(self):
+        a, release_a = self.shared("a", gb=30)  # (it holds a few MB yet: its 30 GB are kept for it)
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        b, release_b = self.shared("b", gb=10)  # (40 free - 2 kept - 30 declared: 8)
+        self.wait_for(lambda: self.states() == [("a", "running"), ("b", "waiting")])
+        c, release_c = self.shared("c", gb=4)  # (it would fit, but b came first: a big job is not passed for good)
+        self.wait_for(lambda: self.states() == [("a", "running"), ("b", "waiting"), ("c", "waiting")])
+        open(release_a, "w").close()
+        self.assertEqual(b.stdout.readline().strip(), "in")
+        self.assertEqual(c.stdout.readline().strip(), "in")  # (beside b: 14 of 38 GB)
+        for r in (release_b, release_c):
+            open(r, "w").close()
+        self.assertEqual((b.wait(10), c.wait(10)), (0, 0))
+        self.assertRegex(b.stderr.read(), r"b waits for memory \(8 GB free to share, 10 needed\) beside a in ")
+
+    def test_a_shared_job_waits_for_cores(self):
+        a, release_a = self.shared("a", cores=6)
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        b, release_b = self.shared("b", cores=4)
+        self.wait_for(lambda: self.states() == [("a", "running"), ("b", "waiting")])
+        open(release_a, "w").close()
+        self.assertEqual(b.stdout.readline().strip(), "in")
+        open(release_b, "w").close()
+        self.assertEqual(b.wait(10), 0)
+        self.assertIn("b waits for cores (2 of 8 free, 4 needed) beside a in ", b.stderr.read())
+
+    def test_a_timing_waits_for_the_shared_jobs_and_holds_those_after_it(self):
+        a, release_a = self.shared("a")
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        x, release_x = self.job("timing")
+        self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting")])
+        c, release_c = self.shared("c")  # (it would fit beside a: the timing queued before it goes first)
+        self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting"), ("c", "waiting")])
+        open(release_a, "w").close()
+        self.assertEqual(x.stdout.readline().strip(), "in")
+        self.assertEqual(a.wait(10), 0)
+        time.sleep(0.5)
+        self.assertEqual(self.states(), [("timing", "running"), ("c", "waiting")])  # (alone)
+        open(release_x, "w").close()
+        self.assertEqual(c.stdout.readline().strip(), "in")
+        open(release_c, "w").close()
+        self.assertEqual((x.wait(10), c.wait(10)), (0, 0))
+
+    def test_a_shared_job_waits_for_an_older_tools_job(self):
+        # (a ticket with no share, as a checkout from before #728 writes it: a job alone)
+        # (its process: not this one, which starts b: a job never waits for a process that started it)
+        other = subprocess.Popen([sys.executable, "-I", "-c", "import time; time.sleep(60)"])
+        self.addCleanup(lambda: (other.kill(), other.wait()))
+        os.makedirs(baseline_store.LOCKS)
+        old = os.path.join(baseline_store.LOCKS, f"{other.pid}.lock")
+        with open(old, "w", encoding="utf-8") as f:
+            json.dump({"what": "old", "root": "C:/x/transport-game-1", "pid": other.pid, "t": time.time(),
+                       "state": "running", "since": time.time()}, f)
+        b, release_b = self.shared("b")
+        self.wait_for(lambda: self.states() == [("old", "running"), ("b", "waiting")])
+        time.sleep(0.5)
+        self.assertEqual(self.states(), [("old", "running"), ("b", "waiting")])
+        os.remove(old)
+        self.assertEqual(b.stdout.readline().strip(), "in")
+        open(release_b, "w").close()
+        self.assertEqual(b.wait(10), 0)
+
+    def test_room_is_what_the_running_shared_jobs_leave_and_a_claim_is_kept(self):
+        a, release_a = self.shared("a", gb=30, cores=3)
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        with mock.patch.multiple(baseline_store.HeavyJob, FREE=staticmethod(lambda: 40.0), CORES=8, KEEP=2.0):
+            with baseline_store.HeavyJob("me", wait=False, share={"gb": 4, "cores": 2}) as me:
+                room = me.room()
+                self.assertEqual(room["cores"], 5)
+                self.assertTrue(8.0 <= room["gb"] < 8.5, room)  # (40 - 2 - 30, and the few MB a holds already)
+                mine = next(j for j in baseline_store.queue() if j["what"] == "me")
+                me.claim(gb=16, cores=5)
+                now = next(j for j in baseline_store.queue() if j["what"] == "me")
+                self.assertEqual((now["share"], now["since"], now["state"]), ({"gb": 16.0, "cores": 5}, mine["since"], "running"))
+                self.assertTrue(baseline_store.describe(now).endswith(" (shared: 16 GB, 5 cores)"))
+        open(release_a, "w").close()
+        self.assertEqual(a.wait(10), 0)
+
+    def test_a_wait_behind_a_job_doing_nothing_ends_with_an_error(self):
+        a, release_a = self.job("a")  # (it sleeps until released)
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        b, _ = self.job("b", "b.HeavyJob.IDLE, b.HeavyJob.IDLE_CPU, b.HeavyJob.LOOK = 1.0, 2.0, 0.2")
+        self.assertEqual(b.wait(30), 1)
+        err = b.stderr.read()
+        self.assertRegex(err, r"b ends its wait after \d+ min: a in .*running \d+ min \(pid %d\)" % a.pid)
+        self.assertIn("It does nothing", err)
+        self.assertEqual(self.states(), [("a", "running")])  # (b's ticket went with it)
+        open(release_a, "w").close()
+        self.assertEqual(a.wait(10), 0)
+
+    def test_a_job_at_work_is_waited_for(self):
+        a, release_a = self.job("a", "spin = lambda: sum(range(200000))")  # (a core kept busy)
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        b, release_b = self.job("b", "b.HeavyJob.IDLE, b.HeavyJob.IDLE_CPU, b.HeavyJob.LOOK = 1.0, 0.3, 0.2")
+        self.wait_for(lambda: self.states() == [("a", "running"), ("b", "waiting")])
+        time.sleep(4)
+        self.assertIsNone(b.poll())
+        open(release_a, "w").close()
+        self.assertEqual(b.stdout.readline().strip(), "in")
+        open(release_b, "w").close()
+        self.assertEqual(b.wait(10), 0)
+
+    def test_usage_is_a_process_with_what_it_started(self):
+        own = baseline_store.usage(os.getpid())
+        self.assertGreater(own[0], 0)
+        self.assertGreater(own[1], 0.005)
+        kid = subprocess.Popen([sys.executable, "-I", "-c", "import time; x = b'x' * 200_000_000; print('held', flush=True); time.sleep(60)"],
+                               stdout=subprocess.PIPE, text=True)
+        self.addCleanup(lambda: (kid.kill(), kid.wait(), kid.stdout.close()))
+        self.assertEqual(kid.stdout.readline().strip(), "held")
+        with_kid = baseline_store.usage(os.getpid())
+        self.assertGreater(with_kid[1], own[1] + 0.15)
+        self.assertLess(baseline_store.usage(os.getpid(), skip=(kid.pid,))[1], with_kid[1] - 0.15)
 
     def test_the_second_job_waits_for_the_first_then_runs(self):
         a, release_a = self.job("a")

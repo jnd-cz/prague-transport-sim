@@ -17,8 +17,8 @@ full nightly run, and autodeploy would skip measuring it.
     python -I tools/baseline_store.py rm-checkpoint NAME # remove one (a test's, or one to measure again)
 
 Heavy jobs (headless.py, rebuild.py, frametime.py) queue for the machine with a ticket in the system temp
-folder and run one at a time (`HeavyJob`, #280); the nightly measurement does not start while any job
-waits or runs.
+folder (`HeavyJob`, #280): a timing runs alone, count runs and builds side by side while their memory and
+cores fit (#728); the nightly measurement does not start while any job waits or runs.
 """
 import ctypes
 import hashlib
@@ -230,10 +230,9 @@ def alive(pid):
 HELD = "TRAM_HEAVY_HELD"  # (set for a job's children: a step of a heavy job runs in its parent's turn)
 
 
-def ancestors(pid=None):
-    """The pids of this process's parent, its parent and so on (#585). A job whose ancestor holds a ticket runs in that
-    turn even when HELD did not reach it (a child started with a clean environment): waiting would wait for itself."""
-    pid = os.getpid() if pid is None else pid
+def processes():
+    """{pid: its parent's pid} of every process on the machine (Windows: a Toolhelp snapshot; elsewhere /proc); {} where
+    neither answers."""
     parent = {}
     if os.name == "nt":
         class Entry(ctypes.Structure):  # (PROCESSENTRY32W)
@@ -245,7 +244,7 @@ def ancestors(pid=None):
         k.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
         snap = k.CreateToolhelp32Snapshot(2, 0)  # TH32CS_SNAPPROCESS
         if snap in (None, ctypes.c_void_p(-1).value):
-            return []
+            return parent
         try:
             e = Entry()
             e.dwSize = ctypes.sizeof(Entry)
@@ -255,12 +254,93 @@ def ancestors(pid=None):
                 ok = k.Process32NextW(ctypes.c_void_p(snap), ctypes.byref(e))
         finally:
             k.CloseHandle(ctypes.c_void_p(snap))
+    elif os.path.isdir("/proc"):
+        for n in os.listdir("/proc"):
+            if n.isdigit() and (s := _stat(int(n))):
+                parent[int(n)] = int(s[1])
+    return parent
+
+
+def _stat(pid):
+    """/proc/<pid>/stat's fields from the state on (0 state, 1 parent, 11 utime, 12 stime, 19 start, 21 rss pages)."""
+    try:
+        with open(f"/proc/{pid}/stat", encoding="ascii", errors="replace") as f:
+            s = f.read().rsplit(")", 1)[1].split()
+        return s if len(s) > 21 else None
+    except (OSError, IndexError):
+        return None
+
+
+def _process(pid):
+    """(started, CPU seconds so far, bytes of memory held) of one process; None where it cannot be read."""
+    if os.name == "nt":
+        class Counters(ctypes.Structure):  # (PROCESS_MEMORY_COUNTERS)
+            _fields_ = [("cb", ctypes.c_ulong), ("PageFaultCount", ctypes.c_ulong)] + [
+                (n, ctypes.c_size_t) for n in ("PeakWorkingSetSize", "WorkingSetSize", "QuotaPeakPagedPoolUsage",
+                                               "QuotaPagedPoolUsage", "QuotaPeakNonPagedPoolUsage",
+                                               "QuotaNonPagedPoolUsage", "PagefileUsage", "PeakPagefileUsage")]
+        k = ctypes.WinDLL("kernel32")  # (its own: the handle's type set here is not windll's for everyone)
+        k.OpenProcess.restype = ctypes.c_void_p
+        h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return None
+        try:
+            made, gone, kernel, user = (ctypes.c_ulonglong() for _ in range(4))  # (FILETIMEs: 100 ns)
+            if not k.GetProcessTimes(ctypes.c_void_p(h), *(ctypes.byref(v) for v in (made, gone, kernel, user))):
+                return None
+            m = Counters()
+            m.cb = ctypes.sizeof(m)
+            held = m.WorkingSetSize if k.K32GetProcessMemoryInfo(ctypes.c_void_p(h), ctypes.byref(m), m.cb) else 0
+            return made.value, (kernel.value + user.value) / 1e7, held
+        finally:
+            k.CloseHandle(ctypes.c_void_p(h))
+    s = _stat(pid)
+    if not s:
+        return None
+    try:
+        return int(s[19]), (int(s[11]) + int(s[12])) / os.sysconf("SC_CLK_TCK"), int(s[21]) * os.sysconf("SC_PAGE_SIZE")
+    except (ValueError, OSError):
+        return None
+
+
+def usage(pid, table=None, skip=()):
+    """(CPU seconds so far, GB held now) of a process and of everything it started that still runs, without the pids in
+    `skip` and what they started; None where the process cannot be read. The CPU of a child that has ended is gone
+    from the sum: it can fall. (Windows keeps a dead parent's pid, which may be reused: a child older than its parent
+    is not that process's.)"""
+    table = processes() if table is None else table
+    kids = {}
+    for p, q in table.items():
+        kids.setdefault(q, []).append(p)
+    top = _process(pid)
+    if top is None:
+        return None
+    cpu, held, seen, todo = top[1], top[2], {pid, *skip}, [(pid, top[0])]
+    while todo and len(seen) < 4096:
+        p, made = todo.pop()
+        for c in kids.get(p, ()):
+            if c in seen:
+                continue
+            seen.add(c)
+            if (u := _process(c)) and u[0] >= made:
+                cpu, held = cpu + u[1], held + u[2]
+                todo.append((c, u[0]))
+    return cpu, held / 1e9
+
+
+def ancestors(pid=None):
+    """The pids of this process's parent, its parent and so on (#585). A job whose ancestor holds a ticket runs in that
+    turn even when HELD did not reach it (a child started with a clean environment): waiting would wait for itself."""
+    pid = os.getpid() if pid is None else pid
+    parent = {}
+    if os.name == "nt":
+        parent = processes()
     else:
         def ppid(p):
+            s = _stat(p)
             try:
-                with open(f"/proc/{p}/stat", encoding="ascii") as f:
-                    return int(f.read().rsplit(")", 1)[1].split()[1])
-            except (OSError, ValueError, IndexError):
+                return int(s[1]) if s else (os.getppid() if p == os.getpid() else None)
+            except ValueError:
                 return os.getppid() if p == os.getpid() else None
         q = pid
         while q and q not in parent and len(parent) < 64:
@@ -273,31 +353,59 @@ def ancestors(pid=None):
     return out
 
 
-class HeavyJob:
-    """with HeavyJob('headless'): ... waits its turn among the machine's heavy jobs, then runs (#280).
+def _free_gb():
+    import sysinfo
+    return sysinfo.available_gb()
 
-    One heavy job at a time, first come first served: two of them side by side (two sessions' check
-    runs, a rebuild beside a check run) each sized itself by the memory free at its start and both
-    slowed. A ticket in LOCKS says what waits or runs, where, and since when; tools/board.py shows the
-    queue. TRAM_HEAVY_NOWAIT=1 runs a job at once beside the others (it still shows in the queue)."""
+
+class Stuck(SystemExit):
+    """A wait ended: the job ahead does nothing (HeavyJob.IDLE). Exits with its message and code 1 when not caught."""
+
+
+class HeavyJob:
+    """with HeavyJob('frametime'): ... waits its turn among the machine's heavy jobs, then runs (#280).
+
+    Two kinds (#728; the user, 2026-11-19: count runs and builds may share the machine when memory allows, the rule of
+    2026-11-12 stays for timings):
+    - alone (no `share`): a timing, or a job of unknown size. It waits for every job queued before it and every job
+      running, and every job queued after it waits for it: two side by side would spoil each other's times.
+    - shared (`share={"gb": its peak memory, "cores": the cores it keeps busy}`): a count run or a build, which gives
+      the same result beside another job, only later. It waits for the alone jobs queued before it or running and for
+      the shared ones queued before it; then it runs beside the shared jobs running while its cores fit beside theirs
+      and its memory fits in what is free, less what they declared and do not hold yet, less KEEP. With no other job
+      running it starts whatever the memory. `room()` says what it may take, `claim()` what it then takes.
+    A ticket in LOCKS says what waits or runs, where, since when and its share; tools/board.py shows the queue. A
+    ticket without a share (an older checkout's too) is a job alone. TRAM_HEAVY_NOWAIT=1 runs a job at once beside the
+    others (it still shows in the queue). A job that waits IDLE s behind a running one whose processes use no CPU
+    ends with an error (Stuck) instead of waiting for good (#585: a night lost behind a job waiting for its own
+    child)."""
     POLL = 5.0
     TELL = 300.0  # (seconds between "still waiting" lines)
+    KEEP = 8.0  # (GB left free beside shared jobs: city_terrain.py stops itself under 6, ground_mesh.py under 4)
+    IDLE, IDLE_CPU, LOOK = 600.0, 2.0, 60.0  # (a job ahead does nothing: under IDLE_CPU s of CPU in IDLE s, read every LOOK s)
+    CORES = os.cpu_count() or 2
+    FREE = staticmethod(_free_gb)  # (the machine's free memory in GB, None if unknown: a test's own)
 
-    def __init__(self, what, wait=None, out=None):
+    def __init__(self, what, wait=None, out=None, share=None):
         self.path = os.path.join(LOCKS, f"{os.getpid()}.lock")
         self.what = what
+        self.share = None if share is None else {"gb": float(share.get("gb", 0)), "cores": int(share.get("cores", 1))}
         parent = os.environ.get(HELD, "")
         nested = parent.isdigit() and int(parent) != os.getpid() and alive(int(parent))
         self.wait = (os.environ.get("TRAM_HEAVY_NOWAIT") != "1" and not nested) if wait is None else wait
         self.out = out or sys.stderr
         self.t = None
+        self.state, self.since = None, None
+        self.why = ""  # (what a shared job waits for beside the jobs running: "memory …", "cores …")
         self.held = None  # (HELD as __enter__ found it, put back by __exit__: a nested job's end must not end its parent's turn)
 
     def _write(self, state):
+        if state != self.state:
+            self.state, self.since = state, time.time()
         tmp = f"{self.path}.{state}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump({"what": self.what, "root": ROOT, "pid": os.getpid(), "t": self.t, "state": state,
-                       "since": time.time()}, f)
+                       "since": self.since, "share": self.share}, f)
         for wait in (0.05, 0.2, 0.5, 1, 2, 0):  # (Windows refuses while a queue() in another process reads the ticket;
             try:                                # measured 2026-11-06: a check run died at its turn, #282)
                 os.replace(tmp, self.path)
@@ -307,10 +415,67 @@ class HeavyJob:
                     raise
                 time.sleep(wait)
 
+    def room(self, jobs=None):
+        """What a shared job may take beside the shared jobs running now: {"gb", "cores"}. The free memory less KEEP
+        and less what each of them declared and does not hold yet; the machine's cores less theirs."""
+        jobs = queue() if jobs is None else jobs
+        free, table = self.FREE(), None
+        gb, cores = (1e9 if free is None else free) - self.KEEP, self.CORES
+        for j in jobs:
+            if j["pid"] == os.getpid() or j["state"] != "running" or not j.get("share"):
+                continue
+            table = processes() if table is None else table
+            used = usage(j["pid"], table)
+            gb -= max(0.0, j["share"]["gb"] - (used[1] if used else 0.0))
+            cores -= j["share"]["cores"]
+        return {"gb": gb, "cores": cores}
+
+    def claim(self, gb=None, cores=None):
+        """A shared job says what it takes, once it has sized itself (headless.py: its pages)."""
+        if self.share is None:
+            return
+        self.share = {"gb": self.share["gb"] if gb is None else float(gb),
+                      "cores": self.share["cores"] if cores is None else int(cores)}
+        if self.state:
+            self._write(self.state)
+
     def ahead(self):
-        """The jobs this one waits for: every ticket before it, and any job running now."""
+        """The jobs this one waits for. Alone: every ticket before it, and any job running now. Shared: the alone jobs
+        among those and the shared ones queued before it; with none, the shared jobs running while its cores or its
+        memory do not fit beside them (self.why says which)."""
         me = (self.t, os.getpid())
-        return [j for j in queue() if j["pid"] != os.getpid() and ((j["t"], j["pid"]) < me or j["state"] == "running")]
+        jobs = queue()
+        others = [j for j in jobs if j["pid"] != os.getpid()]
+        self.why = ""
+
+        def first(j):
+            return (j["t"], j["pid"]) < me
+        if not self.share:
+            return [j for j in others if first(j) or j["state"] == "running"]
+        turn = [j for j in others if (first(j) or j["state"] == "running") and (not j.get("share") or j["state"] == "waiting")]
+        beside = [j for j in others if j["state"] == "running"]
+        if turn or not beside:
+            return turn
+        room = self.room(jobs)
+        if room["cores"] < self.share["cores"]:
+            self.why = f"cores ({max(0, room['cores'])} of {self.CORES} free, {self.share['cores']} needed)"
+        elif room["gb"] < self.share["gb"]:
+            self.why = f"memory ({max(0.0, room['gb']):.0f} GB free to share, {self.share['gb']:.0f} needed)"
+        return beside if self.why else []
+
+    def _idle(self, ahead, marks, now):
+        """The running job ahead that does nothing, as (job, its CPU seconds since, the seconds watched), or None.
+        marks: {pid: (when, CPU)} of each job when first seen or when its CPU last moved (or fell: a child ended)."""
+        table = processes()
+        for j in ahead:
+            if j["state"] != "running" or not (u := usage(j["pid"], table, skip=(os.getpid(),))):
+                continue
+            at = marks.get(j["pid"])
+            if at is None or u[0] - at[1] >= self.IDLE_CPU or u[0] < at[1]:
+                marks[j["pid"]] = (now, u[0])
+            elif now - at[0] >= self.IDLE:
+                return j, u[0] - at[1], now - at[0]
+        return None
 
     def __enter__(self):
         os.makedirs(LOCKS, exist_ok=True)
@@ -320,14 +485,25 @@ class HeavyJob:
                   file=self.out, flush=True)
             self.wait = False
         self._write("waiting" if self.wait else "running")
-        told, last = None, 0.0
+        told, last, marks, looked = None, 0.0, {}, 0.0
         while self.wait and (ahead := self.ahead()):
             now = time.time()
-            ids = [(j["pid"], j["state"]) for j in ahead]  # (said again when they change, or every TELL s)
+            ids = [(j["pid"], j["state"]) for j in ahead] + [self.why[:5]]  # (said again when they change, or every TELL s)
             if ids != told or now - last > self.TELL:
-                print(f"heavy jobs: {self.what} waits for {'; '.join(describe(j, now) for j in ahead)}",
-                      file=self.out, flush=True)
+                print(f"heavy jobs: {self.what} waits for {self.why + ' beside ' if self.why else ''}"
+                      f"{'; '.join(describe(j, now) for j in ahead)}", file=self.out, flush=True)
                 told, last = ids, now
+            if now - looked >= self.LOOK:
+                looked = now
+                if idle := self._idle(ahead, marks, now):
+                    j, cpu, secs = idle
+                    try:
+                        os.remove(self.path)
+                    except OSError:
+                        pass
+                    raise Stuck(f"heavy jobs: {self.what} ends its wait after {(now - self.t) / 60:.0f} min: "
+                                f"{describe(j, now)} (pid {j['pid']}) and what it started used {cpu:.1f} s of CPU in "
+                                f"{secs / 60:.0f} min. It does nothing: look at it, end it, and start this job again.")
             time.sleep(self.POLL)
         if self.wait and told:
             print(f"heavy jobs: {self.what} starts after {time.time() - self.t:.0f} s", file=self.out, flush=True)
@@ -350,8 +526,8 @@ class HeavyJob:
 
 def queue():
     """The machine's heavy jobs, first come first: dicts with what, root, pid, t (queued at), state
-    (waiting / running) and since. Tickets of dead processes are removed; a lock in the older format
-    ("what root" text) counts as running since its file's time."""
+    (waiting / running), since and share (None or absent: a job alone). Tickets of dead processes are removed; a
+    lock in the older format ("what root" text) counts as running since its file's time."""
     out = []
     if not os.path.isdir(LOCKS):
         return out
@@ -385,9 +561,11 @@ def queue():
 
 
 def describe(j, now=None):
-    """'headless in transport-game-268, running 12 min'"""
+    """'frametime in transport-game-268, running 12 min'; a shared job: '…, running 12 min (shared: 16 GB, 8 cores)'"""
     mins = max(0.0, ((now or time.time()) - j["since"]) / 60)  # (a ticket written after `now` was read: "-0 min")
-    return f"{j['what']} in {os.path.basename(os.path.normpath(j['root']))}, {j['state']} {mins:.0f} min"
+    s = j.get("share")
+    return (f"{j['what']} in {os.path.basename(os.path.normpath(j['root']))}, {j['state']} {mins:.0f} min"
+            + (f" (shared: {s['gb']:.0f} GB, {s['cores']} cores)" if s else ""))
 
 
 def busy():

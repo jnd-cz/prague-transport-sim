@@ -112,7 +112,7 @@ pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live
 `tools/sound_encode.py` also needs lameenc).
 Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait their turn among the heavy jobs, as
 `rebuild.py` does; under it they run in its turn. Any other long run (a profile, a bench, a comparison) goes through
-`python -I tools/heavy.py "what" -- CMD ...` (AGENTS.md, #536):
+`python -I tools/heavy.py "what" -- CMD ...` (AGENTS.md, #536; `--shared GB,CORES` for one that is no timing, #728):
 
 | step | writes | what |
 |---|---|---|
@@ -498,14 +498,25 @@ check before a PR, `/housekeeping` is the weekly pass (also every Monday at 06:3
 architecture review at a world checkpoint ([docs/housekeeping.md](docs/housekeeping.md)). Housekeeping posts on
 the pinned #291 and only proposes.
 
-**Heavy jobs** (`baseline_store.HeavyJob`, first come first served; #280, #536):
+**Heavy jobs** (`baseline_store.HeavyJob`, first come first served; #280, #536, #728):
+- Two kinds. A job alone (a timing, or one of unknown size: every tool that does not say otherwise, plain
+  `heavy.py`) waits for every job before it and every job running, and holds those after it. A shared job (a count
+  run or a build: its result is the same beside another job, only later) declares its peak memory and its cores:
+  `headless.py` 4 GB and 2 cores a page, `rebuild.py` 2.5 GB a line built side by side and half the cores,
+  `ground_mesh.py` 21 GB and its threads, `city_terrain.py` 15 GB and its threads, `heavy.py --shared GB,CORES`
+  what it is told. It waits for the jobs alone and for the shared ones queued before it, then runs beside the
+  shared ones running while its cores fit beside theirs and its memory fits in what is free, less what they
+  declared and do not hold yet, less 8 GB kept (`city_terrain.py` stops itself under 6 GB free, `ground_mesh.py`
+  under 4). `headless.py` sizes its pages by what that leaves. A ticket from a checkout older than #728 is a job
+  alone, and such a checkout's jobs wait for every job as before. A tool becomes shared when its peak is measured
+  and written at its `HeavyJob(...)`.
+- A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that
+  names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
   started with a clean environment: a job never waits for a process that started it (#585). A job that waits
   with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
 - Each job prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
   (`tools/sysinfo.py`). `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
-- #728 splits the queue: timings alone, count runs and builds beside each other while memory allows (the user,
-  2026-11-19: "yes").
 
 **Stacked work:** an issue that needs another branch's unmerged work branches from it and opens its PR with
 `--base` on that branch. Before the base's PR merges, move the stacked PR onto main (`gh pr edit N --base main`):
@@ -560,6 +571,7 @@ replayed up to route s and handed over paused: a stuck scene as it was, #157).
 | no seeded checks on a world change | they measure traffic reshuffled by the new data (#156). The user, 2026-11-05: "build up the static world … without regression checks at every step where they don't make sense yet (like traffic behavior because of shifting terrain)" |
 | the world first, a lane may pause | the user, 2026-11-05: "pause simulation work after finishing the current PRs"; the simulation lane waited for checkpoint W2 and resumed there (#414) |
 | heavy jobs take turns | the user, 2026-11-12, #516: "Make sure to run any comparison or heavy job in a queue to not affect other work" |
+| count runs and builds share the machine | the user, 2026-11-19, #728, asked whether they may when memory allows, the rule above staying for timings: "yes". A night's sessions waited in one line: 33 min behind another job's count run (PR #461) |
 | one rebuild at a time | two branches publishing rebuilt data overwrite each other's lines (#280) |
 | findings off the path go on a lane's list | issues opened faster than closed: 410 against 251 in 26 days. The user, 2026-11-19: "yes" (#731) |
 | a security hole is not written up in public | the repository is public and the alpha is live. The user, 2026-11-19: "fix and file privately" |
