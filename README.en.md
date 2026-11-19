@@ -267,8 +267,9 @@ left and the dashboard between them.
 
 **Full screen:** a phone asks once in the menu; with "Full screen", every shift starts in full screen, turned
 sideways where the browser allows it (Chrome on Android), elsewhere the game asks you to turn the phone. ⛶ in the
-menu switches it any time; the back gesture leaves it until the next start. Safari on an iPhone doesn't allow a page
-full screen: the game says once to use Share ⬆ → Add to Home Screen, and started from that icon it runs full screen.
+menu, and in a shift on the pause panel (II), switches it any time; the back gesture leaves it until the next start or
+⛶. Safari on an iPhone doesn't allow a page full screen: the game says once to use Share ⬆ → Add to Home Screen, and
+started from that icon it runs full screen.
 
 ### With a gamepad
 

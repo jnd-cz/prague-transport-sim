@@ -112,7 +112,7 @@ pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live
 `tools/sound_encode.py` also needs lameenc).
 Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait their turn among the heavy jobs, as
 `rebuild.py` does; under it they run in its turn. Any other long run (a profile, a bench, a comparison) goes through
-`python -I tools/heavy.py "what" -- CMD ...` (AGENTS.md, #536):
+`python -I tools/heavy.py "what" -- CMD ...` (AGENTS.md, #536; `--shared GB,CORES` for one that is no timing, #728):
 
 | step | writes | what |
 |---|---|---|
@@ -222,8 +222,8 @@ the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 ## Dev
 
 **Headless checks from the command line** (Playwright, see DATA.md setup): the benches and lints below,
-each in a fresh headless page, with pass / fail per run (exit code 1 on a failure) and the results in
-`reports/headless/`:
+a line's runs batched in headless pages (#205, #413; `--batch 1`: a fresh page per run), with pass / fail per
+run (exit code 1 on a failure; the thresholds are `judge` in the tool) and the results in `reports/headless/`:
 
 ```bash
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
@@ -248,17 +248,39 @@ The harness verifies its own server before launching a job. An occupied `--port`
 or stopping the existing listener; use `--port 0` to allocate a free port atomically. `--url` explicitly
 uses an already-running server.
 
-Regression checks compare with main's baseline in the data store: the key counts of each run, with the code and data they were measured on. `--baseline` also keeps a local copy in `reports/baseline/`, ignored by git.
+### Baselines
+
+Regression checks compare a run with main's stored baseline (#89, #156, #282; `/regress` picks the lines and checks):
 
 ```bash
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --compare
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --baseline
+python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --compare
 ```
 
-`--compare` prints baseline → now per run (also in `reports/headless/compare.md`, for the PR) and marks
-problem counts that rose (traffic counts beyond a 15 % + 5 noise band). It warns when the baseline was not
-measured on main's code and data. `--baseline` stores the run as the new baseline; it needs the game,
-the in-page checks and `data/MANIFEST.json` committed and `data/` matching the manifest.
+- **What is stored:** the key counts of each run and their places, under a key of what the counts depend on
+  (`tools/baseline_store.py` `MEASURED`: `src/`, `index.html`, the in-page checks, `data/MANIFEST.json`,
+  `data/truth.json`), in the data store.
+- **Who measures main:** the deploy PC, at night, after a merge that changes one of those (`tools/autodeploy.py`,
+  2 pages at once, not while a heavy job runs). A PR does not refresh the baseline. `--baseline` stores a run as
+  one (it needs the game, the checks and `data/MANIFEST.json` committed and `data/` matching the manifest) and
+  keeps a local copy in `reports/baseline/`.
+- **`--compare`** takes the baseline of the branch's merge base and prints baseline → now per run (also in
+  `reports/headless/compare.md`, for the PR), with the places new and gone (#157). It warns when main has moved
+  since.
+- **Seeded counts** (seeds 1-5 by default) are judged by the branch's mean against the min–max of main's seeds: a
+  change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside the spread are listed as
+  noise. Stuck, unfinished and penalty runs are listed per seed and need a reason, as does every mean outside the
+  spread and every move of a seedless check (lint, surfaces).
+- **Which baseline each tier compares with** (#282):
+  - a checkpoint's run stores itself under its name (`--baseline --publish --checkpoint W1`: every check, seeds 1-5);
+  - every check compares with main at the merge base: its baseline (the night's, or this machine's), else measured
+    there once in a pinned worktree through the queue and kept on this machine by its key. A seeded check is
+    measured with the seeds asked (#709), so the first compare on a base takes about twice as long;
+  - `--against W1` compares with a checkpoint instead; `--no-measure-base` leaves the measuring out, and a seeded
+    run then takes the latest checkpoint's.
+- **A seeded compare against a checkpoint is not a compare with main** (the note says "not with main"): read no
+  move from it. #582's stops moved by up to 50 late seconds against W2 and were identical to main's.
+- **One drive a seed:** `u3`, `redruns` and `stops` asked together come from one drive of each line and seed, its
+  watchers reporting each (#205, #708; `--separate`: a drive each).
 
 For a combined GTFS run, independently check every logged pair and the built timetable against the
 pinned GTFS, including eligible pairs omitted from both the log and timetable:
@@ -466,6 +488,93 @@ the places that look wrong, worst first: kerb steps, wheels on a sidewalk, heigh
 floating or sunken cars and walkers, gaps in the surveyed streets, bumpy footways. Click a row (or
 `n` / `b`) to fly there; arrows orbit, `+` / `−` zoom; coloured posts mark every place.
 `window.streetBot` holds the result (`stats`, `findings`, `raw` samples). One run takes about a minute.
+
+## Working rules in detail
+
+What [AGENTS.md](AGENTS.md) states in a line: how it is done, and where the rule came from.
+
+**Skills** (Claude Code, `.claude/skills/`): `/issue N` starts an issue's session, `/regress` runs the regression
+check before a PR, `/housekeeping` is the weekly pass (also every Monday at 06:30) and with `checkpoint` the
+architecture review at a world checkpoint ([docs/housekeeping.md](docs/housekeeping.md)). Housekeeping posts on
+the pinned #291 and only proposes.
+
+**Heavy jobs** (`baseline_store.HeavyJob`, first come first served; #280, #536, #728):
+- Two kinds. A job alone (a timing, or one of unknown size: every tool that does not say otherwise, plain
+  `heavy.py`) waits for every job before it and every job running, and holds those after it. A shared job (a count
+  run or a build: its result is the same beside another job, only later) declares its peak memory and its cores:
+  `headless.py` 4 GB and 2 cores a page, `rebuild.py` 2.5 GB a line built side by side and half the cores,
+  `ground_mesh.py` 21 GB and its threads, `city_terrain.py` 15 GB and its threads, `heavy.py --shared GB,CORES`
+  what it is told. It waits for the jobs alone and for the shared ones queued before it, then runs beside the
+  shared ones running while its cores fit beside theirs and its memory fits in what is free, less what they
+  declared and do not hold yet, less 8 GB kept (`city_terrain.py` stops itself under 6 GB free, `ground_mesh.py`
+  under 4). `headless.py` sizes its pages by what that leaves. A ticket from a checkout older than #728 is a job
+  alone, and such a checkout's jobs wait for every job as before. A tool becomes shared when its peak is measured
+  and written at its `HeavyJob(...)`.
+- A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that
+  names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
+- What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
+  started with a clean environment: a job never waits for a process that started it (#585). A job that waits
+  with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
+- Each job prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
+  (`tools/sysinfo.py`). `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
+
+**Stacked work:** an issue that needs another branch's unmerged work branches from it and opens its PR with
+`--base` on that branch. Before the base's PR merges, move the stacked PR onto main (`gh pr edit N --base main`):
+deleting the base's branch closes a PR still based on it, and a closed PR cannot change its base (#745, reopened
+by putting the branch back for a moment). Once the base squash-merges, merge main into the stacked branch (no
+force-push); a conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and
+merge (#578 on #575).
+
+**Unattended runs:** an investigation script is committed only when it runs like the other tools: its own server
+on a free port (as `headless.py`), no fixed agent port, a usage line at the top. Without issues allowed, findings
+go into a "Findings" section of the PR.
+
+**Facts in `data/truth.json`:**
+- A new section names its reader in the file's `readers`, or says it is reference only (#224).
+- No check exemptions, agent audits or lists of generated array indexes: #177's allowlist would have failed every
+  line on the next rebuild. What a check can decide from geometry stays a rule in the check, counted per class
+  with its places, so `--compare` shows what a rebuild moved.
+- A fact that overrides a source records what the source said, and the tool applying it states whether it is
+  still needed (DATA.md, Facts over a source; #670).
+- Built files carry their `provenance` from `tools/sources.py` (a layer's fallback order, date, credits).
+
+**Review findings files** (`reports/review/`, above):
+- Offer only answers an importer turns into evidence, and say on the card why another answer stays held (#162,
+  #176).
+- The file names its `issue` and `line` (or `lines`): the review directory (`reviews.html`, #288) lists it under
+  them, and lists the sets of closed issues apart.
+- A set whose issue is closed while findings wait is deleted (the user, 2026-11-05: "If the issue is closed and
+  reviews are unasnwered then it's out of date and can be deleted"), unless a build reads it
+  (`tools/review_sets.py` `READ_BY`: deleting one broke the build, #416).
+
+**Page checks and tests:**
+- In a page: `tools/lint.js` on a page loaded with `?keepgeo` (`lint()`; `lint({ traffic: true })` averages seeds
+  22, 7, 1234); benches in `tools/bench/` (u3, redruns, walkers; `batch.html`).
+- Run long browser jobs unawaited and poll: script calls time out at 45 s. A background window throttles frames,
+  so no fps readings from one.
+- A test that drives a page limits the whole test (`faulthandler.dump_traceback_later`, as `tools/test_review.py`):
+  Playwright's `page.evaluate` has no limit, and a promise that never resolves hangs the run without output.
+- A test that needs `data/` or `raw/` skips without them, saying what to fetch.
+
+**Dev switches:** `?line=N`, `?inspect`, `?review` (findings on the map), `?bot`, `?keepgeo`, `?notunnels`,
+`?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile
+from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N,
+replayed up to route s and handed over paused: a stuck scene as it was, #157).
+
+**Where some rules came from:**
+
+| rule | from |
+|---|---|
+| `Closes #N` only with every point met | #146 was nearly closed with six places still awaiting the user's answers |
+| calibrate a check before it holds data | #119's survey check held 4.6 km of line 17's open track: it was calibrated on street track only |
+| don't reformat what you don't change | #119's reflow buried its changes |
+| no seeded checks on a world change | they measure traffic reshuffled by the new data (#156). The user, 2026-11-05: "build up the static world … without regression checks at every step where they don't make sense yet (like traffic behavior because of shifting terrain)" |
+| the world first, a lane may pause | the user, 2026-11-05: "pause simulation work after finishing the current PRs"; the simulation lane waited for checkpoint W2 and resumed there (#414) |
+| heavy jobs take turns | the user, 2026-11-12, #516: "Make sure to run any comparison or heavy job in a queue to not affect other work" |
+| count runs and builds share the machine | the user, 2026-11-19, #728, asked whether they may when memory allows, the rule above staying for timings: "yes". A night's sessions waited in one line: 33 min behind another job's count run (PR #461) |
+| one rebuild at a time | two branches publishing rebuilt data overwrite each other's lines (#280) |
+| findings off the path go on a lane's list | issues opened faster than closed: 410 against 251 in 26 days. The user, 2026-11-19: "yes" (#731) |
+| a security hole is not written up in public | the repository is public and the alpha is live. The user, 2026-11-19: "fix and file privately" |
 
 ## How the game's parts work
 

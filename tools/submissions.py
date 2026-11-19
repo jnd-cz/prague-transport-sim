@@ -47,6 +47,7 @@ def _dest():
 DEST = _dest()
 HOSTED = os.path.join(DEST, "hosted")   # accepted packs the project hosts: deploy uploads them as hosted/<name>
 ID = re.compile(r"sub-\d{8}-\d{6}-[0-9a-f]{8}")
+VERSION = re.compile(r"\d+\.\d+\.\d+")   # (a package's: major.minor.patch, src/packages.js manifestProblems)
 # (the caps of tools/submit.php, which tools/serve.py applies locally: change both. The user, 2026-11-15, #580: "these
 # sound like reasonable limits for now": 10 an hour from everyone together, 64 MB each, 2 GB kept until a pull)
 MAX_META = 65536          # bytes of the meta field
@@ -83,7 +84,20 @@ def meta_problem(meta, has_pack):
         return "pack or url"   # (one of them: the archive, or its address)
     if not isinstance(meta.get("packages"), list) or not meta["packages"] or len(meta["packages"]) > 50:
         return "packages"
+    r = rules()
+    if not all(package_ok(p, r) for p in meta["packages"]):
+        return "packages"
     return None
+
+
+def package_ok(p, r=None):
+    """A submission's package names itself as the game's check passes it (src/packageRules.json `id`, a version of
+    three numbers). The page sends only checked packages; the two become a hosted file's name and a catalogue entry
+    (accept), so they are held here too."""
+    r = r or rules()
+    return (isinstance(p, dict) and isinstance(p.get("id"), str) and re.fullmatch(r["id"], p["id"]) is not None
+            and p["id"] not in r.get("reserved", ())
+            and isinstance(p.get("version"), str) and VERSION.fullmatch(p["version"]) is not None)
 
 
 def zip_problem(data, r=None):
@@ -240,6 +254,9 @@ def accept(sid, url=None, home=None, catalogue=CATALOGUE, dest=None):
     dest = dest or DEST
     site, folder, meta, _ = find(sid, dest)
     pack = os.path.join(folder, "pack.zip")
+    # (a meta stored before the check held the names, or put there by hand: the names below come from it)
+    if not isinstance(meta.get("packages"), list) or not meta["packages"] or not all(package_ok(p) for p in meta["packages"]):
+        raise SystemExit(f"submissions: {sid}: a package's id or version is not one the game's check passes; not accepted")
     if meta.get("host"):
         src = pack if os.path.isfile(pack) else None
         if not src:

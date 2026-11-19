@@ -1764,7 +1764,8 @@ def main(argv=None):
     threading.Thread(target=guard, daemon=True).start()
     os.makedirs(rep_dir, exist_ok=True)
     from baseline_store import HeavyJob
-    with HeavyJob("ground_mesh"):
+    # (a build: beside counts and other builds while its peak, 21 GB on lines 22 and 17, and its threads fit, #728)
+    with HeavyJob("ground_mesh", share={"gb": 21, "cores": a.threads}):
         for ln in lines:
             built = build(ln, a.mesh, a.threads)
             rep = built["rep"]

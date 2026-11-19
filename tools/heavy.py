@@ -5,7 +5,11 @@
 
     python -I tools/heavy.py "profile line_heights" -- python -P -E profile.py ...   # any command, in its turn
     python -I tools/heavy.py "#516 options" -- bash job.sh
+    python -I tools/heavy.py --shared 4,2 "#707 pictures" -- bash shots.sh   # beside other counts and builds (#728)
 
+A timing needs the machine to itself: the plain form, which waits for every other job and holds them. --shared GB,CORES
+is for a command whose result does not depend on what runs beside it (pictures, counts, a build): its peak memory and
+the cores it keeps busy, by which it runs beside the other shared jobs while they fit (HeavyJob has the rule).
 What the command starts (rebuild.py, headless.py, a heavy step) runs in its turn and does not wait again. On Windows a
 plain `bash` or `sh` runs Git Bash's, next to git (Windows finds WSL's bash.exe in System32 before it reads PATH, #645).
 A tool that is a heavy job when run alone calls turn(what) at its start (AGENTS.md lists them). tools/board.py shows the
@@ -29,16 +33,17 @@ def held():
     return v.isdigit() and int(v) != os.getpid()
 
 
-def turn(what):
-    """This process's turn among the heavy jobs, held until it exits: for a tool that is a heavy job when run alone. In
-    another job's turn it does nothing: no ticket, and baseline_store is not imported (a build step's key holds the
-    modules it imports, tools/stepcache.py; the queue's code is not what the step builds from)."""
+def turn(what, share=None):
+    """This process's turn among the heavy jobs, held until it exits: for a tool that is a heavy job when run alone
+    (share: HeavyJob's, for one that may run beside others). In another job's turn it does nothing: no ticket, and
+    baseline_store is not imported (a build step's key holds the modules it imports, tools/stepcache.py; the queue's
+    code is not what the step builds from)."""
     if held():
         return None
     if TOOLS not in sys.path:
         sys.path.insert(0, TOOLS)
     from baseline_store import HeavyJob
-    job = HeavyJob(what)
+    job = HeavyJob(what, share=share)
     job.__enter__()
     atexit.register(job.__exit__)
     return job
@@ -73,7 +78,21 @@ def program(cmd, windows=os.name == "nt", git=None):
     return [exe, *cmd[1:]] if exe else cmd
 
 
+def shared(text):
+    """--shared's "GB,CORES" as HeavyJob's share; None when it is not two numbers."""
+    try:
+        gb, cores = text.split(",")
+        return {"gb": float(gb), "cores": int(cores)}
+    except ValueError:
+        return None
+
+
 def main(argv):
+    share = None
+    if len(argv) > 1 and argv[0] == "--shared":
+        share, argv = shared(argv[1]), argv[2:]
+        if share is None:
+            argv = []
     if len(argv) < 3 or argv[1] != "--":
         print(__doc__.split("\n\n")[1].rstrip(), file=sys.stderr)
         return 2
@@ -81,7 +100,7 @@ def main(argv):
     if TOOLS not in sys.path:
         sys.path.insert(0, TOOLS)
     from baseline_store import HeavyJob
-    with HeavyJob(what):
+    with HeavyJob(what, share=share):
         t = time.time()
         print(f"heavy.py: {what} starts {time.strftime('%H:%M:%S')}", file=sys.stderr, flush=True)
         rc = subprocess.call(cmd)

@@ -93,6 +93,40 @@ class Queue(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
         self.assertIn("tools/heavy.py", r.stderr)
 
+    def test_a_shared_command_runs_beside_a_shared_job_and_a_plain_one_waits(self):
+        """#728: --shared GB,CORES for a count run or a build; the plain form is a timing, alone."""
+        release = os.path.join(self.tmp.name, "release")
+        hold = HOLD.replace("wait=False", "wait=False, share={'gb': 1, 'cores': 1}")
+        a = subprocess.Popen([sys.executable, "-I", "-c", hold, str(TOOLS), "a", release], env=self.env,
+                             stdout=subprocess.PIPE, text=True)
+        try:
+            self.assertEqual(a.stdout.readline().strip(), "in")
+            code = ("import json, os, sys; d = sys.argv[1]\n"
+                    "print(sorted((j['what'], j['state'], j['share']) for j in (json.load(open(os.path.join(d, n), encoding='utf-8'))"
+                    " for n in os.listdir(d) if n.endswith('.lock')))[1])")
+            r = subprocess.run(self.heavy("--shared", "0.5,1", "b", "--", sys.executable, "-I", "-c", code, self.locks),
+                               env=self.env, capture_output=True, text=True, timeout=60)
+            self.assertEqual((r.returncode, r.stdout.strip()), (0, "('b', 'running', {'gb': 0.5, 'cores': 1})"), r.stderr)
+            b = subprocess.Popen(self.heavy("timing", "--", sys.executable, "-I", "-c", "pass"), env=self.env,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            t = time.time()
+            while ("timing", "waiting") not in self.states() and time.time() - t < 30:
+                time.sleep(0.1)
+            self.assertEqual(self.states(), [("a", "running"), ("timing", "waiting")])
+        finally:
+            open(release, "w").close()
+            a.wait(timeout=30)
+            a.stdout.close()
+        _, err = b.communicate(timeout=60)
+        self.assertEqual(b.returncode, 0, err)
+
+    def test_shared_takes_two_numbers(self):
+        self.assertEqual(heavy.shared("4,2"), {"gb": 4.0, "cores": 2})
+        self.assertIsNone(heavy.shared("4"))
+        r = subprocess.run(self.heavy("--shared", "lots", "a job", "--", sys.executable, "-I", "-c", "pass"), env=self.env,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 2)
+
     def test_a_tools_turn_held_until_it_exits(self):
         r = self.py("import os, sys; sys.path.insert(0, sys.argv[1]); import heavy, baseline_store as b\n"
                     "heavy.turn('a tool')\n"

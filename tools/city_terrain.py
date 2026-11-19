@@ -1065,7 +1065,8 @@ def main(argv):
     import contextlib
     import sysinfo
     heavy = shape[0] * shape[1] > SMALL
-    with HeavyJob("city_terrain") if heavy else contextlib.nullcontext():
+    # (a build: beside counts and other builds while the whole city's 15 GB and its threads fit, #728)
+    with HeavyJob("city_terrain", share={"gb": 15, "cores": threads}) if heavy else contextlib.nullcontext():
         def guard():  # (the machine is shared: this run ends itself rather than push other jobs into swapping)
             while True:
                 if (sysinfo.available_gb() or 99) < min_free:

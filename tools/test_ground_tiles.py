@@ -4,7 +4,8 @@
 each tile within the detail's reach of the camera is drawn in detail and each within the fog's end at least far, fewer
 tiles are drawn than the file has, fewer keep their lookup, and the height lookup answers on the route. A shift
 started with the window at the line's far end judges as many platforms surveyed as the first (Start reads no survey: the
-build's network says, #658; with the lookups gone past the window Start judged 30 of 40 unsurveyed, #654).
+build's network says, #658; with the lookups gone past the window Start judged 30 of 40 unsurveyed, #654). Every
+terrain mesh and every far one carries its vertices' land class (src/weather.js landCls: none did from #510 to #707).
 
     python -P -E tools/test_ground_tiles.py
 A browser test (it loads the game, about a minute). Skipped without line 37's data (python -I tools/snapshot.py
@@ -56,6 +57,11 @@ class Window(unittest.TestCase):
                 # (the lookup on the route where its tile is held: the route at the camera's step)
                 on = page.evaluate("""() => { const g = window.groundTiles, p = window.game.route.at(0);
                   return [g.lookup.height(p.x, p.y), g.lookups.has(g.keyAt(p.x, p.y))]; }""")
+                # (the meshes the terrain's material draws: [how many, how many with the land class])
+                land = page.evaluate("""() => { let n = 0, with_ = 0;
+                  window.scene.traverse((m) => { if (m.userData.surfaceKind !== 'terrain' && !m.userData.coarseGround) return;
+                    n++; if (m.geometry.getAttribute('landCls')) with_++; });
+                  return [n, with_]; }""")
                 page.close()
                 browser.close()
         finally:
@@ -71,6 +77,8 @@ class Window(unittest.TestCase):
         self.assertGreater(first, 0)
         self.assertEqual(again, first)
         self.assertEqual(r["all"]["drawn"], r["all"]["tiles"])  # (every tile at the end: the drive's last step)
+        self.assertGreater(land[0], 0)
+        self.assertEqual(land[1], land[0])
         z, held = on
         self.assertTrue(held)
         self.assertIsNotNone(z)

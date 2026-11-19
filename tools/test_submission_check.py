@@ -58,7 +58,7 @@ def main():
             fails.append(why)
             print("FAIL", why)
 
-    good, broken, _ = samples()
+    good, broken, *_ = samples()
     vm, vf = vehicle()
     author = {f"{AUTHOR}/package.json": json.dumps(vm).encode(), **{f"{AUTHOR}/{k}": v for k, v in vf.items()}}
     local = os.path.join(tmp, "local")

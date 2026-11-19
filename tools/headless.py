@@ -17,12 +17,12 @@ collisions, stuck tram or signal penalty; redruns no red runs; traffic must fini
 thresholds, `--compare` shows its moves).
 
 Needs Playwright (`python -m pip install --user playwright`, `python -m playwright install chromium`).
-Starts its own tools/serve.py on --port (0 picks a free port) and verifies its launch identity before
+Starts its own tools/serve.py on a free port (--port names one) and verifies its launch identity before
 any job; an occupied port fails. --url explicitly uses an existing server. The pages draw
 nothing (#411): they keep what a draw did for the checks, the world matrices and the walkers' poses. The counts
 are the same, run by run, on every check of every line, at a sixth of the CPU (--draw: once a second in
 software as before; --gpu: on the machine's GPU, tools/gpu.py). A batch runs checks of one line one after another in one
-loaded page, starting a new shift for each: the load (~60 s) once per batch instead of once per run, the
+loaded page, starting a new shift for each: the load (6-27 s a line on the dev PC, 2026-11-19) once per batch instead of once per run, the
 counts the same as in fresh pages (#205: all 21 of line 17's runs, run by run). The batches are planned from
 this machine's run times (TIMINGS, kept by every run): each line split so that the pages, taking the longest
 batch first, finish soonest (#413); --batch N: at most N runs a batch instead (1: a fresh page per run). --jobs N runs N pages
@@ -39,10 +39,11 @@ measured at night (tools/autodeploy.py), not by PRs:
 
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint,surfaces --compare
 
-What --compare reads (#282): --against NAME that checkpoint's run. Otherwise, per run, main's baseline of the merge
-base, committed or published; where there is none, a seeded run takes the latest world checkpoint's, and a seedless
-run is measured on demand at the merge base in a pinned worktree (--no-measure-base leaves it out) and kept on this
-machine by its key for the next branch on the same base. A checkpoint is stored by
+What --compare reads (#282, #709): --against NAME that checkpoint's run. Otherwise, per run, main's baseline of the
+merge base, committed or published; where there is none, the run is measured on demand at the merge base in a pinned
+worktree (a seeded check with the seeds asked) and kept on this machine by its key for the next branch on the same
+base. --no-measure-base leaves that out: a seeded run then takes the latest world checkpoint's, which is not a
+compare with main (the note says so, #582). A checkpoint is stored by
 `--baseline --publish --checkpoint W1`; a name other than W<n> is a test's: stored under that name only, since a
 partial run under the key would stop the nightly measurement of main.
 
@@ -82,9 +83,12 @@ sys.stdout.reconfigure(encoding="utf-8")
 CALLS = {
     "u3": "const { run } = await import('/tools/bench/u3.js'); return await run(SEED);",
     "redruns": "const { run } = await import('/tools/bench/redruns.js'); return await run(SEED);",
-    # u3 and redruns drive the same trip with the same seed: one drive, both watchers (#205), reported as both
+    # u3, redruns and stops drive the same trip with the same seed: one drive, their watchers (#205, #708), reported
+    # as each one asked (DRIVE). A watcher only reads, so the counts are those of the checks run alone.
     "drive": "const { run } = await import('/tools/bench/u3.js'); const { redrunsWatch } = await import('/tools/bench/redruns.js');"
-             "const r = await run(SEED, { also: [redrunsWatch] }); const red = r.also[0]; delete r.also; return { u3: r, redruns: red };",
+             "const { stopsWatch } = await import('/tools/bench/stops.js');"
+             "const r = await run(SEED, { also: [redrunsWatch, stopsWatch] }); const [red, stops] = r.also; delete r.also;"
+             "return { u3: r, redruns: red, stops };",
     "stops": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED);",
     "autumn": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED, { weather: 'leaves', full: true });",
     # (the other weathers the game has: rain lowers the grip everywhere, snow packs ice into the rails at the crossings, #242)
@@ -113,6 +117,20 @@ CALLS = {
               "const { run } = await import('/tools/bench/speedLimits.js'); return run();",
 }
 SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights", "limits"}
+DRIVE = ("u3", "redruns", "stops")  # the checks one drive serves: two or more of a line and seed run as one "drive"
+
+
+def merge_drives(jobs):
+    """The runs for the jobs (line, check, seed): where two or more of DRIVE are asked for one line and seed, one
+    "drive" in the place of the first and the others left out (#205, #708)."""
+    asked = {}
+    for line, check, seed in jobs:
+        if check in DRIVE:
+            asked.setdefault((line, seed), []).append(check)
+    first = {(line, cs[0], seed) for (line, seed), cs in asked.items() if len(cs) > 1}
+    merged = {k for k, cs in asked.items() if len(cs) > 1}
+    return [(line, "drive", seed) if (line, check, seed) in first else (line, check, seed) for line, check, seed in jobs
+            if (line, check, seed) in first or check not in DRIVE or (line, seed) not in merged]
 
 
 def judge(check, r):
@@ -521,6 +539,7 @@ ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-
         "--disable-backgrounding-occluded-windows"]
 GPU_ARGS = [*gpu.HARDWARE, *ARGS[3:]]  # (WebGL on the machine's GPU, tools/gpu.py)
 PAGES = 8  # pages at once by default (sysinfo.workers caps it by cores and free memory)
+PAGE_GB, PAGE_CORES = 4.0, 2  # a page's memory and cores, as the queue counts them (HeavyJob's share, #728)
 PAGE = {"draw": False, "viewport": (960, 540), "gpu": False, "keepgeo": True}  # (how the pages draw: --draw, --viewport, --gpu,
 # #411; keepgeo: every ground tile held and the geometry kept, as the checks read it; False: as a player loads it, #30)
 
@@ -726,9 +745,10 @@ def run_one(page, errors, check, seed, timeout, load=0):
 
 
 def choose_baseline(base, stored_places, results, main_rev, want, measure=True, store=baseline_store):
-    """What each run compares with, when no checkpoint is named (#282): main's own at the merge base, this machine's or
-    published; for a seedless run without one, what this machine measured there, or a measurement now; for a seeded
-    run without one, the latest world checkpoint's. Returns (base, places, the runs left on an older baseline)."""
+    """What each run compares with, when no checkpoint is named (#282, #709): main's own at the merge base, this
+    machine's or published; for a run without one, what this machine measured there, or a measurement now (a seeded
+    check with the seeds asked); only where that is left out or gives nothing, a seeded run takes the latest world
+    checkpoint's. Returns (base, places, the runs left on an older baseline)."""
     jobs = {key_of(*job): job for job in results}
     missing = lambda b: {j for j in jobs if (b.get(j) or {}).get("measured_on") != want}  # noqa: E731
     if missing(base):
@@ -757,16 +777,32 @@ def choose_baseline(base, stored_places, results, main_rev, want, measure=True, 
         counts, places = store.measure_at(main_rev, lines, checks, want)
         store.keep(store.key(want), counts, places)
         take(counts, places, seedless())
-    seeded = {j for j in missing(base) if jobs[j][1] not in SEEDLESS}
-    named = store.latest_checkpoint(store.checkpoints()) if seeded else None
+    def seeded():
+        return {j for j in missing(base) if jobs[j][1] not in SEEDLESS}
+
+    # (a seeded run without main's baseline: measured at the merge base too, with the seeds asked, #709. A checkpoint
+    # in its place read #582's stops as 50 s late against W2 when they were main's to the second)
+    if seeded():
+        take(*store.kept(store.key(want)), seeded())
+    if seeded() and measure:
+        need = [jobs[j] for j in seeded()]
+        lines, checks, seeds = (sorted({j[k] for j in need}, key=str) for k in range(3))
+        print(f"note: main has no baseline of {len(need)} seeded runs at {main_rev[:7]}: measuring them there, kept on this machine")
+        counts, places = store.measure_at(main_rev, lines, checks, want, seeds=seeds)
+        store.keep(store.key(want), counts, places)
+        take(counts, places, seeded())
+    # (what is still without one, measuring left out or failed: the latest checkpoint's, said loudly)
+    left = seeded()
+    named = store.latest_checkpoint(store.checkpoints()) if left else None
     if named:
         counts, places = store.fetch_checkpoint(named)
-        seeded &= set(counts or {})
-        take(counts or {}, places or {}, seeded)
-        print(f"note: {len(seeded)} seeded runs compare with checkpoint {named}: main has no baseline at {main_rev[:7]}")
+        left &= set(counts or {})
+        take(counts or {}, places or {}, left)
+        print(f"note: {len(left)} seeded runs compare with checkpoint {named}, not with main: main has no baseline at "
+              f"{main_rev[:7]}. Read no move from them before the same seeds are run on main at the merge base")
     else:
-        seeded = set()
-    return base, stored_places, sorted(j for j in missing(base) - seeded if j in base)
+        left = set()
+    return base, stored_places, sorted(j for j in missing(base) - left if j in base)
 
 
 def main():
@@ -774,14 +810,15 @@ def main():
     ap.add_argument("--lines", default="17")
     ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, stops, autumn, rain, winter, load10, load90, traffic, lint, canted, crossing, surfaces, spacing, heights")
     ap.add_argument("--seeds", help=f"default 1-3; {SPREAD_SEEDS} with --baseline or --compare (the seed spread)")
-    ap.add_argument("--port", type=int, default=8745, help="own server port; 0 chooses a free port atomically")
+    # (a free port by default: a run beside another, or queued behind one, found the fixed 8745 taken and ended, #728)
+    ap.add_argument("--port", type=int, default=0, help="own server port; 0, the default, chooses a free port atomically")
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")
     ap.add_argument("--headed", action="store_true", help="show the browser (debugging)")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
     ap.add_argument("--jobs", type=int, default=None,
                     help="pages at once (worker processes); default by cores and free memory, up to ~4 GB a page (line 17)")
     ap.add_argument("--separate", action="store_true",
-                    help="u3 and redruns as two drives (default: one drive watched by both, the same counts)")
+                    help="u3, redruns and stops each as a drive of its own (default: one drive watched by those asked, the same counts)")
     ap.add_argument("--batch", type=int, default=None,
                     help="at most N runs of one line per page load (1: a fresh page per run; default: planned from this "
                          "machine's run times, #413); the counts are the same (#205)")
@@ -852,8 +889,10 @@ def main():
         print(f"[{i}/{len(jobs)}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}")
               + f" … {'pass' if ok else 'FAIL'} ({secs} s) {text}", flush=True)
 
+    asked = set(jobs)
+
     def split(res):
-        """A drive's result as the u3 and redruns results it holds (an error goes to both); its time noted."""
+        """A drive's result as the results of the checks asked of it (an error goes to each); its time noted."""
         (line, check, seed), r, secs, *rest = res
         load = rest[0] if rest else 0
         if not r.get("error") and secs - load > 0:  # (a timeout or a failed load says nothing of the run's length)
@@ -864,25 +903,27 @@ def main():
             return [((line, check, seed), r, secs, load)]
         extra = {"pageErrors": r["pageErrors"]} if r.get("pageErrors") else {}
         return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs, load)
-                for c in ("u3", "redruns")]
+                for c in DRIVE if (line, c, seed) in asked]
 
-    heavy = HeavyJob("headless")  # (waits its turn among the heavy jobs, and the nightly baseline for it: #280)
+    # (waits its turn among the heavy jobs, and the nightly baseline for it: #280. A count run: it runs beside other
+    # counts and builds, a page being PAGE_GB of memory and PAGE_CORES cores, #728)
+    heavy = HeavyJob("headless", share={"gb": PAGE_GB * (a.jobs or 1), "cores": PAGE_CORES * (a.jobs or 1)})
     try:
         heavy.__enter__()
         t0 = time.time()  # (the run's time, not the wait's)
         if a.jobs is None:
             # (sized by the memory free once its turn comes; at most 8: without drawing a page takes ~2 cores, and 75
-            # runs took 1633 s drawing at 4 pages, 721 s at 8 and 706 s at 12 without, #411)
-            a.jobs = workers(4.0, most=PAGES)
+            # runs took 1633 s drawing at 4 pages, 721 s at 8 and 706 s at 12 without, #411; beside other shared jobs,
+            # by what they leave)
+            room = heavy.room()
+            a.jobs = max(1, min(workers(PAGE_GB, most=PAGES), int(room["gb"] // PAGE_GB), room["cores"] // PAGE_CORES))
         os.makedirs(a.out, exist_ok=True)
-        # (u3 and redruns of a line and seed: one drive; then batches of one line's runs, each in one page)
-        runs = list(jobs)
-        if not a.separate:
-            both = {(l, s) for l, c, s in jobs if c == "u3"} & {(l, s) for l, c, s in jobs if c == "redruns"}
-            runs = [(l, "drive", s) if c == "u3" and (l, s) in both else (l, c, s) for l, c, s in jobs
-                    if not (c == "redruns" and (l, s) in both)]
+        # (u3, redruns and stops of a line and seed: one drive; then batches of one line's runs, each in one page)
+        runs = list(jobs) if a.separate else merge_drives(jobs)
         t = load_timings() if TIMINGS else {"runs": {}, "loads": {}}
         batches = plan(runs, a.jobs, t, a.batch and max(1, a.batch))
+        pages = min(a.jobs, len(batches))  # (what the queue keeps for this run: the pages it opens, #728)
+        heavy.claim(gb=PAGE_GB * pages, cores=PAGE_CORES * pages)
         dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
         print(f"{len(runs)} runs in {len(batches)} batches on {min(a.jobs, len(batches))} pages, longest first; "
               f"expected {finish(dur, a.jobs):.0f} s from {len(t['runs'])} timed runs", flush=True)

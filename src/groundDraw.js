@@ -157,17 +157,22 @@ const DTM_KIND = { road: 'street', parking: 'street', tram: 'street', cycle: 'st
 // The ground file's draw classes as the page colours them (#509): the colours of the layers they replace (the terrain's
 // land cover in buildTerrain, the survey's DTM_COLORS, the beds' styles, the kerbs' sides), and the material groups
 const TERRAIN_HEX = { '': '#8d8c80', grass: '#6f8a4e', wood: '#566f3c', water: '#5d7f95' };
+// (the terrain's land class, src/weather.js landCls: grass and woods turn in autumn and do not darken in the wet,
+// water takes no snow; the worker hands it on per vertex, #707)
+const TERRAIN_LAND = { '': 0, grass: 1, wood: 2, water: 3 };
 export const STYLE_BED_HEX = { grass: '#5d7c3a', ballast: '#6e6457', panels: '#a3a097', embedded: '#55565a', setts: '#7a7268' };
 const KERB_SIDE = '#8e8a82', BED_HEX = '#77736a';
 export const GROUND_GROUPS = ['terrain', 'street', 'other', 'green', 'water', 'bed'];
 const RAISED_DRAW = new Set(['sidewalk', 'island', 'median', 'platform']);
-// styles[class][draw name] = [group, r, g, b] (src/groundWorker.js); a wall is drawn as the face above it, a kerb's side grey
+// styles[class][draw name] = [group, r, g, b] (src/groundWorker.js), the terrain's and the surveyed water's with the land
+// class as a fifth (the far ground draws both with the terrain's material); a wall is drawn as the face above it, a
+// kerb's side grey
 export function groundStyles(layout) {
   const G = (name) => GROUND_GROUPS.indexOf(name), rgb = (hex) => new THREE.Color(hex).toArray();
   const out = { terrain: {}, survey: {}, bed: { '': [G('bed'), ...rgb(BED_HEX)] }, plot: {}, wall: {} };
-  for (const [k, hex] of Object.entries(TERRAIN_HEX)) out.terrain[k] = [G('terrain'), ...rgb(hex)];
+  for (const [k, hex] of Object.entries(TERRAIN_HEX)) out.terrain[k] = [G('terrain'), ...rgb(hex), TERRAIN_LAND[k]];
   out.plot = out.terrain; // (a building's footprint is ground, drawn by its land cover: the 3D city model's buildings stand on it, #632)
-  for (const [c, hex] of Object.entries(DTM_COLORS)) out.survey[c] = [G(DTM_KIND[c] || 'other'), ...rgb(hex)];
+  for (const [c, hex] of Object.entries(DTM_COLORS)) out.survey[c] = [G(DTM_KIND[c] || 'other'), ...rgb(hex), ...(DTM_KIND[c] === 'water' ? [TERRAIN_LAND.water] : [])];
   for (const [k, hex] of Object.entries(STYLE_BED_HEX)) out.bed[k] = [G('bed'), ...rgb(hex)];
   const kerb = () => [G('other'), ...rgb(KERB_SIDE)];
   for (const name of [...(layout.draw?.wall || []), '']) {
@@ -220,10 +225,12 @@ export function attachGround(group, tiles, hole = null, near = []) {
       g.setAttribute('position', new THREE.BufferAttribute(m.pos, 3));
       g.setAttribute('normal', new THREE.BufferAttribute(m.nor, 3));
       g.setAttribute('color', new THREE.BufferAttribute(m.col, 3));
+      const kind = GROUND_GROUPS[m.group];
+      if (m.cls && mats[kind].userData.weather.veg) g.setAttribute('landCls', new THREE.BufferAttribute(m.cls, 1));
       g.setIndex(new THREE.BufferAttribute(idx, 1));
       g.computeBoundingSphere();
       if (!tiles.keep) { g.userData.release = true; for (const at of Object.values(g.attributes)) at.onUpload(free); g.index.onUpload(free); }
-      const kind = GROUND_GROUPS[m.group], mesh = new THREE.Mesh(g, mats[kind]);
+      const mesh = new THREE.Mesh(g, mats[kind]);
       mesh.position.set(bx, 0, -by);
       mesh.updateMatrix();
       mesh.matrixAutoUpdate = false;
@@ -242,6 +249,7 @@ export function attachGround(group, tiles, hole = null, near = []) {
     g.setAttribute('position', new THREE.BufferAttribute(c.pos, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(c.nor, 3));
     g.setAttribute('color', new THREE.BufferAttribute(c.col, 3));
+    if (c.cls) g.setAttribute('landCls', new THREE.BufferAttribute(c.cls, 1));
     g.setIndex(new THREE.BufferAttribute(c.idx, 1));
     g.computeBoundingSphere();
     if (!tiles.keep) { g.userData.release = true; for (const at of Object.values(g.attributes)) at.onUpload(free); g.index.onUpload(free); }
