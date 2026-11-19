@@ -4571,7 +4571,24 @@
    "reach": 40,
    "issue": 663,
    "what": "a courtyard's raised garden beds: the beds at their walls' top, no wall standing as a blade over a sunk bed",
-   "source": "found on #653 (PR #660): survey green areas laid on the lidar 2.1-3.7 m under their own outline, #663"
+   "source": "found on #653 (PR #660): survey green areas laid on the lidar 2.1-3.7 m under their own outline, #663",
+   "sections": [
+    {
+     "name": "from the footpath over a bed's wall into the bed, x = 7593",
+     "from": [
+      7593.0,
+      742.2
+     ],
+     "to": [
+      7593.0,
+      748.0
+     ],
+     "expect": {
+      "largest step m": 0.5
+     },
+     "why": "the survey's own heights there: the footpath (sidewalk 2962) 210.17, the wall's top (wall 3322) 210.17 and 209.88, the bed (green 4245) 209.88: one level, the wall 0.3 m over the bed. IPR's raster has 206.4 under all of it, and the written file of 2026-11-19 drops 3.65 m from the wall into the bed (#663)"
+    }
+   ]
   },
   "zizkov-depot-paving": {
    "line": "37",
