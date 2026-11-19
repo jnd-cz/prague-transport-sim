@@ -116,6 +116,23 @@ class Lattice(unittest.TestCase):
         self.assertTrue(g.buffer(1e-9).contains(L))
         self.assertIsNone(gm.lattice(shapely.box(7, 5, 10, 8), 5.0))
 
+    def test_a_cell_the_surface_bends_in_is_cut_finer_and_no_other(self):
+        """#697: three 5 m cells in a row (x 1-6, 6-11, 11-16), a wall of 8 m in the middle one."""
+        g = shapely.box(1, 4, 16, 9)
+        got = gm.bends(g, lambda px, py: np.where(px < 8.5, 8.0, 0.0), 5.0)
+        xy = shapely.get_coordinates(got)
+        self.assertGreaterEqual(xy[:, 0].min(), 6.0)
+        self.assertLessEqual(xy[:, 0].max(), 11.0)
+        fine = int(round(5.0 / gm.LATTICE_FINE)) - 1
+        self.assertAlmostEqual(shapely.length(got), 2 * fine * 5.0)  # (lines along and across the cell, on the grid)
+        self.assertEqual(sorted({round(v, 6) for v in xy[:, 0]} - {6.0, 11.0}), [6.0 + gm.LATTICE_FINE * k for k in range(1, fine + 1)])
+
+    def test_a_plane_and_a_roads_crown_cut_nothing(self):
+        g = shapely.box(1, 4, 16, 9)
+        self.assertIsNone(gm.bends(g, lambda px, py: 200 + 0.03 * px + 0.01 * py, 5.0))
+        self.assertIsNone(gm.bends(g, lambda px, py: 200 - 0.025 * np.abs(px - 8.5), 5.0))  # (a crown: 2.5 % each way)
+        self.assertIsNone(gm.bends(shapely.box(7, 5, 10, 8), lambda px, py: np.full(len(px), np.nan), 5.0))  # (no surface)
+
 
 class Weirs(unittest.TestCase):
     def test_a_corner_on_a_cut_is_seen_square_off_it_on_its_triangles_side(self):
@@ -151,6 +168,28 @@ class LoweredKerbs(unittest.TestCase):
         self.assertEqual(low.tolist(), [[1.0, 2.0, 0.02]])
         self.assertEqual((w, r), (4.0, 0.125))
         self.assertEqual(len(gm.lowered_kerbs({})[0]), 0)
+
+
+class Stairs(unittest.TestCase):
+    # (Krejcárek's stairs, line 37 survey area 1339: the foot at 228.56-228.82, the top at 229.75-229.82)
+    KREJCAREK = {"c": "stairs", "l": 0, "r": [[3925.7, 328.8, 228.82], [3926.8, 327.2, 228.56], [3928.7, 328.4, 229.82],
+                                               [3928.8, 328.5, 229.76], [3927.8, 330.1, 229.75]]}
+
+    def test_one_flight_is_its_plane_foot_to_top(self):
+        """#447: the outline's heights triangulated strayed 0.39 m from the straight line between foot and top."""
+        s = gm.SurveySurface({"areas": [self.KREJCAREK]}, [0])
+        self.assertIn(0, s.flights)
+        t = np.linspace(0, 1, 9)
+        z = s.at(0, 3926.25 + 2.0 * t, 328.0 + 1.25 * t)
+        self.assertLess(float(np.abs(z - (z[0] + (z[-1] - z[0]) * t)).max()), 1e-9)
+        self.assertAlmostEqual(float(z[-1] - z[0]), 1.09, delta=0.1)
+
+    def test_stairs_with_a_turn_keep_their_outline(self):
+        turn = {"c": "stairs", "l": 0, "r": [[0, 0, 200.0], [2, 0, 200.0], [2, 3, 201.5], [5, 3, 203.0], [5, 5, 203.0], [0, 5, 201.5]]}
+        self.assertIsNone(gm.flight(turn))
+        s = gm.SurveySurface({"areas": [turn, {"c": "paved", "l": 0, "r": [[0, 0, 1.0], [1, 0, 1.0], [0, 1, 2.0]]}]}, [0, 1])
+        self.assertEqual(s.flights, {})
+        self.assertAlmostEqual(float(s.at(0, np.array([1.0]), np.array([0.0]))[0]), 200.0)
 
 
 class Walls(unittest.TestCase):
@@ -254,6 +293,70 @@ class Walls(unittest.TestCase):
         o = np.array([1, 0, 4, 3, 2, 6, 5, 8, 7])
         zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o])
         self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
+
+    def test_a_wall_area_whose_sides_part_stands_upright(self):
+        # (#697: Chotkova's road wall, line 23 area 842: its foot's side at 205.3 m, its top's 1.7 m behind at 208.5)
+        segs = gm.ring_segments({"r": [[0, 0, 205.3], [30, 0, 205.3], [30, 1.7, 208.5], [0, 1.7, 208.5]]})
+        x = np.full(4, 15.0)
+        y = np.array([0.0, 0.85, 1.7, 0.0])  # (on the foot's outline, inside, on the top's outline, on the foot's again)
+        z, lifted = gm.wall_face(segs, x, y, x + 0.3, np.array([0.4, 0.9, 1.3, 0.4]))
+        self.assertTrue(np.allclose(z, 208.5))  # (the top level right across, the foot's corners lifted to it)
+        self.assertEqual(lifted.tolist(), [True, False, False, True])
+        # (a low wall, its sides 0.5 m apart in height: between them as before, #653)
+        low = gm.ring_segments({"r": [[0, 0, 205.3], [30, 0, 205.3], [30, 1.7, 205.8], [0, 1.7, 205.8]]})
+        z, lifted = gm.wall_face(low, x, y, x + 0.3, np.array([0.4, 0.9, 1.3, 0.4]))
+        self.assertTrue(np.allclose(z, [205.3, 205.55, 205.8, 205.3], atol=0.02))
+        self.assertFalse(lifted.any())
+        # (a bastion's battered face, 5 m across and 16.5 m up, line 23 area 860: between its sides too)
+        wide = gm.ring_segments({"r": [[0, 0, 307.8], [60, 0, 307.8], [60, 5, 324.3], [0, 5, 324.3]]})
+        z, lifted = gm.wall_face(wide, np.full(2, 30.0), np.array([0.0, 2.5]), np.full(2, 30.3), np.array([0.4, 2.8]))
+        self.assertTrue(np.allclose(z, [307.8, 316.05], atol=0.1))
+        self.assertFalse(lifted.any())
+
+    def test_a_paved_strip_that_climbs_a_wall_is_a_wall(self):
+        # (#697: a parapet along a path surveyed as paved, 0.4 m across, its foot's side 1.5 m under its top's)
+        strip = [[0, 0, 186.0], [40, 0, 186.2], [40, 0.4, 187.7], [0, 0.4, 187.5]]
+        self.assertTrue(gm.wall_like({"c": "wall", "r": strip}))
+        self.assertTrue(gm.wall_like({"c": "paved", "r": strip}))
+        self.assertFalse(gm.wall_like({"c": "paved", "g": 1, "r": strip}))  # (on the lidar: the city mesh's)
+        self.assertFalse(gm.wall_like({"c": "paved", "r": [[0, 0, 186.0], [40, 0, 186.2], [40, 0.4, 186.3], [0, 0.4, 186.1]]}))
+        yard = [[0, 0, 186.0], [40, 0, 186.2], [40, 0.4, 187.7], [40, 12, 187.7], [0, 12, 187.5]]  # (a yard: 12 m across)
+        self.assertFalse(gm.wall_like({"c": "paved", "r": yard}))
+        self.assertFalse(gm.wall_like({"c": "green", "r": strip}))
+
+    def test_a_lifted_wall_corner_is_welded_apart_from_the_ground_at_its_foot(self):
+        cx, cy = np.zeros(4), np.zeros(4)
+        zc = np.array([208.5, 208.5, 205.3, 205.36])  # (two wall faces' corners at the top; the road and a lawn at the foot)
+        prio = np.array([2.05, 2.05, 2.02, 2.09])
+        kind = np.array(["survey"] * 4, dtype=object)
+        zf, _, _ = gm.weld(cx, cy, zc, prio, kind)
+        self.assertEqual(np.round(zf, 2).tolist(), [205.3, 205.3, 205.3, 205.3])
+        zf, _, _ = gm.weld(cx, cy, zc, prio, kind, apart=np.array([True, True, False, False]))
+        self.assertEqual(np.round(zf, 2).tolist(), [208.5, 208.5, 205.3, 205.3])
+
+    def test_step_faces_on_a_wall_line(self):
+        V = np.array([[0, 0, 0], [1000, 0, 0], [1000, 0, 3000], [0, 5000, 0], [1000, 5000, 0], [1000, 5000, 2000]])
+        W = np.array([[0, 1, 2], [3, 4, 5]])
+        self.assertEqual(gm.on_lines(V, W, [np.array([[-2.0, 0.0], [4.0, 0.0]])]).tolist(), [True, False])
+
+    def test_an_outline_that_climbs_a_wall_is_on_two_levels(self):
+        # (#761: the Modřany abutment's sidewalk, area 7214 of line 17: 198.48 -> 200.80 m in 0.49 m of its outline)
+        street = {"r": [[0, 0, 198.0], [10, 0, 198.15], [10, 3, 198.3], [0, 3, 198.1]]}  # (a kerb's 15 cm is no wall)
+        self.assertFalse(gm.climbs(street))
+        two = {"r": [[0, 0, 198.15], [1.1, 0, 198.48], [1.15, 0.49, 200.8], [10, 0.5, 200.4], [10, 3, 204.0], [0, 3, 201.7]]}
+        self.assertTrue(gm.climbs(two))
+        self.assertTrue(gm.climbs({"r": street["r"], "h": [[[4, 1, 198.1], [4.3, 1, 199.4], [4.3, 2, 199.4]]]}))  # (a hole's outline too)
+        self.assertFalse(gm.climbs({"r": [[0, 0, None], [0.5, 0, 203.0], [5, 4, 203.0]]}))  # (a point without a height)
+        self.assertFalse(gm.climbs({"r": [[0, 0, 198.0], [6, 0, 201.0], [6, 5, 201.0]]}))  # (a ramp: 3 m in 6 m)
+
+    def test_the_terrains_two_sides_of_a_held_wall_keep_their_levels(self):
+        # (#697: two terrain corners at one point on a surveyed wall line, held at its sides' levels, took the middle;
+        # unheld ones still do)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0]), np.zeros(4)
+        zc = np.array([208.6, 211.6, 208.6, 211.6])
+        prio, kind = np.full(4, 3.0), np.array(["terrain"] * 4, dtype=object)
+        zf, _, _ = gm.weld(cx, cy, zc, prio, kind, held=np.array([True, True, False, False]))
+        self.assertEqual(np.round(zf, 3).tolist(), [208.6, 211.6, 210.1, 210.1])
 
 
 class Lidar(unittest.TestCase):

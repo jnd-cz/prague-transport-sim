@@ -553,6 +553,66 @@ Sections:
   ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`). What reaches a rail without crossing
   the track lies at the bed's height within 5 cm of it (`ground_mesh.rail_band`): line 17 s 17128's stop island, classed
   sidewalk, lies along the outer rail (9.5 cm over it before), line 9's depot hall (a plot) over its tracks' ends.
+- **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
+  is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
+  (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of
+  that mesh is left: the area's outline (the survey's points, a few metres apart) and lattice lines every 5 m make its
+  faces, and each corner reads a surface there: the street surface on roads, tram areas and sidewalks (0.5 m cells,
+  `street_profile.py`), the city mesh under green and yards on the lidar, the outline's own heights elsewhere. So
+  between a street's kerbs and inside a lawn the ground is a 5 m grid of readings, each right to centimetres, with
+  straight triangles between them: a step the survey has no area for crossed a cell as one slope (the quay, Chotkova's
+  terraces). Since #697 a cell whose surface leaves its plane by over 0.5 m is cut to 1 m, and a surveyed wall line is
+  an edge of the faces with a height on either side. Built whole (2026-11-19, 610c3e7, without writing), that costs
+  4.2-7.8 % more triangles a line (18.25 M -> 19.28 M on the five) and the ground lies a little nearer the raster:
+  within 10 m of a track its mean distance 3.98-5.66 -> 3.94-5.33 cm, the p99 27.9-54.9 -> 27.0-41.4 cm. At the
+  places picked for their walls the cost is 2-28 %.
+- **Where walls stand** (#697, measured 2026-11-19 on the five lines; the user: "can we use the open data sources to
+  infer where walls should really stand as opposed to blending between the different height points?"). Four sources,
+  best first:
+  - *The survey's wall areas* (`lineN.dtm.json` class `wall`): used since #653. They lie under only 2-5 % of the
+    survey's wall lines.
+    An area's outline has its foot's side at the foot's height and its top's side at the top's. Where they part by
+    0.7 m or more and the area is a wall's thickness across (twice its area over its outline's length up to 2.5 m:
+    95 % of lines 23's and 37's wall areas are under 2.1 m), it stands upright, its top level at the higher side's
+    height and its face on its foot's outline (`ground_mesh.wall_face`): Chotkova's road wall, 3.2 m tall and 1.7 m
+    across, leaned as a ramp between its sides. A wider one is a battered face and keeps the ramp: the bastion at
+    Strahov (line 23, area 860), 16.5 m up over 5 m.
+  - *The survey's wall lines* (`lineN.zps.json` kind `Zeď`: a wall too thin to be an area, with heights at its points;
+    at level 0 and on structures, a walled ramp's sides being level 1): 7.3-14.0 km a line, to the survey's
+    centimetres. IPR's raster steps by 0.7 m or more across 3.7-7.5 km of them (`tools/wall_lines.py` prints the
+    table: 368-579 stretches a line; over 4 m on 0.5-1.9 km). The line's own height is the foot
+    on about a third of the stepped length, the top on a third and neither on the rest, so the two sides' levels are
+    read from the raster 2.5-4 m off the line (past its smear of the step, 2 m at an 8 m wall) as a level and a slope,
+    and the line's height replaces a side's where it is within 0.5 m of it. Rašínovo nábřeží's quay wall is such a
+    line, 7 cm from the two sidewalk areas' shared edge; no wall area crosses there.
+    A side is read up to the next wall only: 28-38 % of the wall lines' sides have another wall line or a wall area's
+    outline within the readings' 4 m, 25-30 % within 1 m (a wall's two faces, at one height; or its face's foot and
+    top lines, 0.15 m apart under Chotkova at 208.6 and 211.6 m). There the survey's own heights are the levels: the
+    raster 2.5-4 m off lies on another terrace. Under Chotkova (line 23 (-896, 720)) the road at 205.3 m, a wall, a
+    footpath at 208.5, a wall to 211.5, a terrace, a wall to 214.0 stand within 9 m; the raster is one slope through
+    them, and read past the next wall it gave walls of 1.5-2.5 m with wavy tops. With the lines' own heights the
+    section is the survey's staircase to 0.1 m. So read, the line's own height is a side's level on 68-74 % of the
+    wall lines' length, and 3.0-6.6 km a line are stretches.
+  - *OSM `barrier=retaining_wall`*: 12.7-41.5 km a line inside the 1,200 m corridor, 73-78 % of it across a raster
+    step of 0.7 m or more (the same reading as for the survey's lines), so its positions are good enough to find the
+    step. Most of that (7-27 km a line) lies outside the survey's areas, on the terrain; inside them, 1.5-3.8 km a
+    line has neither a survey wall stretch nor a wall area within 2 m. Not used yet: its position is to a metre or
+    two and it has no heights.
+  - *Geoportál's retaining walls* (`lineN.geo.json` `walls`, with a height): 0.6-1.6 km a line. Not used by the
+    ground.
+  - *A survey area's own outline* can hold a wall too: two points next to each other on it within 1 m and 1 m or more
+    apart in height (`ground_mesh.climbs`). 27-97 sidewalks and 9-30 roads a line have one, and 91-291 paved and
+    104-249 green areas. Such an area lies on two levels and its outline's heights, triangulated, are no surface. On
+    a span, where a street keeps its own outline, it now takes the street surface (#761: the Modřany abutment's
+    sidewalk, area 7214, rose 3.4 m in 12 m under the bridge, where the raster and the street surface are level to
+    0.1 m). The paved areas off the lidar still triangulate their outline: not measured yet.
+  - *Paved strips*: parapets, edgings and low walls are often surveyed as paved areas half a metre across. Of the
+    58-174 paved areas a line off the lidar whose outline climbs a wall, 46-128 are under 1 m across and 6-35 more up
+    to 2.5 m; 7-24 % of their area, triangulated on the outline, is steeper than 1:1 (1-2 % of the other paved
+    areas'). They take a wall's heights (`ground_mesh.wall_like`): a terraced garden's edgings, line 23 (-1117, 806),
+    stood as fins up to 2 m across its lawns. The wider ones (6-23 a line, 0.25-0.53 ha) keep their outline.
+  The survey also has 65 km of `Terénní_hrana` (the tops and feet of slopes) on line 17 and 8.4 km of
+  `Hranice_schodiště`; neither is read by the ground yet (#447 for the stairs).
 
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 
