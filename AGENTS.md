@@ -110,7 +110,7 @@ things are done, and why a rule exists, is in the files it points to:
 
 - **Python:** `python -I` for stdlib-only tools, `python -P -E` for those needing the user site packages
   (DEVELOPING.md lists them). Multi-line scripts go into a file, not a shell heredoc.
-- **Ports:** dev server `python tools/serve.py 8742` (Claude; Codex 8743; `headless.py` 8745). Port 8740 may be
+- **Ports:** dev server `python tools/serve.py 8742` (Claude; Codex 8743). Port 8740 may be
   another session's: never use or stop it. A tool or test that needs a page starts its own server on a free port.
 - **Tests:** `python -I tools/test_all.py` (`--browser` adds the page tests, `-k name` picks some). A change to a
   tool runs `tools/test_<tool>.py`; a new tool gets one. A test that drives a page sets a time limit for the

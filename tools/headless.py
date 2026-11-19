@@ -17,7 +17,7 @@ collisions, stuck tram or signal penalty; redruns no red runs; traffic must fini
 thresholds, `--compare` shows its moves).
 
 Needs Playwright (`python -m pip install --user playwright`, `python -m playwright install chromium`).
-Starts its own tools/serve.py on --port (0 picks a free port) and verifies its launch identity before
+Starts its own tools/serve.py on a free port (--port names one) and verifies its launch identity before
 any job; an occupied port fails. --url explicitly uses an existing server. The pages draw
 nothing (#411): they keep what a draw did for the checks, the world matrices and the walkers' poses. The counts
 are the same, run by run, on every check of every line, at a sixth of the CPU (--draw: once a second in
@@ -810,7 +810,8 @@ def main():
     ap.add_argument("--lines", default="17")
     ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, stops, autumn, rain, winter, load10, load90, traffic, lint, canted, crossing, surfaces, spacing, heights")
     ap.add_argument("--seeds", help=f"default 1-3; {SPREAD_SEEDS} with --baseline or --compare (the seed spread)")
-    ap.add_argument("--port", type=int, default=8745, help="own server port; 0 chooses a free port atomically")
+    # (a free port by default: a run beside another, or queued behind one, found the fixed 8745 taken and ended, #728)
+    ap.add_argument("--port", type=int, default=0, help="own server port; 0, the default, chooses a free port atomically")
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")
     ap.add_argument("--headed", action="store_true", help="show the browser (debugging)")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
