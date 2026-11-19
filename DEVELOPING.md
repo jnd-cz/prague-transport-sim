@@ -525,6 +525,12 @@ by putting the branch back for a moment). Once the base squash-merges, merge mai
 force-push); a conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and
 merge (#578 on #575).
 
+**Merging** (`python -I tools/session.py merge N`, on the user's word): one open PR of the issue's branch, none
+standing on it, mergeable, its checks passed, the worktree's changed and untracked files looked at; then the squash
+as `<PR title> (#PR)`, the worktree, the local and the remote branch removed and the agent's label taken off. gh's
+own `--delete-branch` removes the worktree folder with its untracked files at once (gh 2.103.3, seen at #751 and
+#752: each folder was gone right after its merge).
+
 **Unattended runs:** an investigation script is committed only when it runs like the other tools: its own server
 on a free port (as `headless.py`), no fixed agent port, a usage line at the top. Without issues allowed, findings
 go into a "Findings" section of the PR.

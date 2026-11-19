@@ -34,5 +34,6 @@ runs them in order; read AGENTS.md first if it is not in context yet.
 
 Then start the work. Ask the user only for decisions the issue leaves open, not about the setup.
 
-When the issue's PR has merged: `python -I tools/session.py finish $ARGUMENTS` (it lists the worktree's changed and
-untracked files and stops; look at them, then `--discard`).
+On the user's word to merge: `python -I tools/session.py merge $ARGUMENTS` (it lists the worktree's changed and
+untracked files first and stops until they have been looked at, then merges the PR as `<PR title> (#PR)` and removes
+the worktree, the branch and the label; `finish $ARGUMENTS` for a PR merged another way).

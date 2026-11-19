@@ -23,8 +23,9 @@ things are done, and why a rule exists, is in the files it points to:
    `../<repo>-N` on a branch `N-short-name` from `origin/main`, the repository's author email, the built data from
    the machine cache, the agent's label.
 4. `gh issue view N --comments`: what is now, where, and when it is done. The known failures (below) are not yours.
-5. When its PR merges: `python -I tools/session.py finish N` removes the worktree, the branch and the label. It
-   lists changed and untracked files first and stops until they have been looked at.
+5. On the user's word to merge: `python -I tools/session.py merge N` lists the worktree's changed and untracked
+   files and stops until they have been looked at, then merges the PR and removes the worktree, the branch and the
+   label (`finish N` does the removing for a PR merged another way).
 
 ## What to work on
 
@@ -67,7 +68,8 @@ things are done, and why a rule exists, is in the files it points to:
   answers, an import, a rebuild, a publish, another line) makes it `Part of #N`, and the PR and a comment on the
   issue list what remains. A reviewer who finds an open point changes the keyword before the merge.
 - **Merge windows:** the user merges in batches. A PR is marked ready and merged on the user's word only, as a squash titled
-  `<PR title> (#PR)` (the title ends with `(#issue)`), the branch deleted. A session whose checks are done says
+  `<PR title> (#PR)` (the title ends with `(#issue)`), the branch deleted: `session.py merge N`, not gh's
+  `--delete-branch`, which removes the worktree with its untracked files. A session whose checks are done says
   so and waits. A draft idle for 48 h is closed or labelled `parked`, saying what is left.
 - **Review findings** go in a PR comment ("To fix before merge", "Smaller"); the author answers point by point
   and pushes.
