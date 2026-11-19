@@ -22,11 +22,10 @@ runs them in order; read AGENTS.md first if it is not in context yet.
    lacks one of them, work it out from the code and say what you assumed. Check its blocked-by links
    (an open blocker means it is not ready: say so) and the known failures table in AGENTS.md, so you
    know which failures are not yours.
-4. **Worktree and branch:** `git worktree add ../<repo>-$ARGUMENTS -b $ARGUMENTS-<two or three words from
-   the title, kebab-case> origin/main`, and in it: `git config user.email
-   "2506000+jnd-cz@users.noreply.github.com"`, `python -I tools/snapshot.py data-fetch` (and
-   `python -I tools/snapshot.py fetch` if the issue needs a rebuild; from the machine cache in seconds).
-   Label the issue: `gh issue edit $ARGUMENTS --add-label agent:claude` (and its lane label if it has none).
+4. **Worktree and branch:** `python -I tools/session.py start $ARGUMENTS` (`--name two-or-three-words` when the
+   name it takes from the title says little; `--fetch-raw` if the issue needs a rebuild). It makes
+   `../<repo>-$ARGUMENTS` on its branch from `origin/main`, sets the author email, fetches the built data from the
+   machine cache and labels the issue `agent:claude`. Give the issue its lane label if it has none.
 5. **Plan:** say in a few lines what you will change (files, the rule, not a spot fix), and which checks
    prove it: the issue's Checks and the tier of the change (AGENTS.md, "Which checks a change needs"),
    with `/regress` before the PR. If the issue changes built data, the plan ends with rebuild, the checks,
@@ -34,3 +33,6 @@ runs them in order; read AGENTS.md first if it is not in context yet.
    nobody holds it, or say whom it waits for.
 
 Then start the work. Ask the user only for decisions the issue leaves open, not about the setup.
+
+When the issue's PR has merged: `python -I tools/session.py finish $ARGUMENTS` (it lists the worktree's changed and
+untracked files and stops; look at them, then `--discard`).

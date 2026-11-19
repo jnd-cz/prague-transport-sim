@@ -15,17 +15,16 @@ things are done, and why a rule exists, is in the files it points to:
 
 ## Start (one issue per session; `/issue N` does it in Claude Code)
 
-1. **The main checkout stays on `main`.** Work in the issue's own worktree:
-   `git worktree add ../<repo>-N -b N-short-name origin/main`, and in it
-   `git config user.email 2506000+jnd-cz@users.noreply.github.com` and `python -I tools/snapshot.py data-fetch`
-   (seconds, from the machine cache; a build also needs `fetch` for `raw/`).
-2. `python --version` is 3.12 or newer.
-3. `python -I tools/board.py`: who works where, the heavy-job queue, the holder of the `rebuild` label, clashes,
+1. **The main checkout stays on `main`.** `python --version` is 3.12 or newer.
+2. `python -I tools/board.py`: who works where, the heavy-job queue, the holder of the `rebuild` label, clashes,
    the lanes. A clash with files the issue will touch is settled first: wait for that branch, branch from it, or
    take another issue.
-4. `gh issue view N --comments`, and label it `agent:claude` or `agent:codex`. The issue says what is now, where,
-   and when it is done. The known failures (below) are not yours.
-5. When its PR merges: the worktree (after a look at its untracked files), the branch and the label go.
+3. `python -I tools/session.py start N` (`--agent codex`; `--fetch-raw` for a build): the issue's own worktree
+   `../<repo>-N` on a branch `N-short-name` from `origin/main`, the repository's author email, the built data from
+   the machine cache, the agent's label.
+4. `gh issue view N --comments`: what is now, where, and when it is done. The known failures (below) are not yours.
+5. When its PR merges: `python -I tools/session.py finish N` removes the worktree, the branch and the label. It
+   lists changed and untracked files first and stops until they have been looked at.
 
 ## What to work on
 
