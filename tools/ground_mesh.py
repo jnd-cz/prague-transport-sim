@@ -223,6 +223,9 @@ OWN_PLANE = ("paved", "parking", "median", "cycle")  # (survey classes on their 
 # paths 98 % (48), parking 95 % (947); paved areas spread (11,030: p50 0.16 m, 32 % over it: yards over cellars, terraces)
 OWN_GROUND = 0.3
 OWN_ON = 0.01  # m: a corner this near its area's outline lies on it
+# m: the street surface (street_profile) is taken where it lies this near the lidar; further it reached past its
+# street, 0.8 m off on a slope (line 23 s 248), and stepped against the lidar beside it
+OWN_STREET = 0.15
 
 
 def own_ground(D, a, ipr=None):
@@ -239,10 +242,10 @@ def own_ground(D, a, ipr=None):
 
 
 def own_heights(D, G, streets, sc, sa, x, y, zs, need, ipr=None):
-    """The OWN_PLANE classes' corners but their surveyed points (a median's: off its outline; `need`: those the loop
-    above gave their outline's plane):
-    the street surface where it reaches (a parking area the carriageway's, else the sidewalks'; the others the
-    sidewalks'), else the lidar (city_at) where the area lies on the ground (own_ground), else the plane as it was.
+    """The OWN_PLANE classes' corners but their surveyed points (a median's and a parking area's: off their outline;
+    `need`: those the loop above gave their outline's plane), where the area lies on the ground (own_ground): the
+    street surface where it reaches and lies within OWN_STREET of the lidar (a parking area the carriageway's, the
+    others the sidewalks'), else the lidar (city_at), else the plane. An area off the ground keeps its plane whole.
     Returns (zs, per corner what gave it: "", "street", "lidar", "plane")."""
     from ipr_dtm import IprDtm
     src = np.full(len(zs), "", dtype=object)
@@ -260,7 +263,12 @@ def own_heights(D, G, streets, sc, sa, x, y, zs, need, ipr=None):
         segs = ring_segments(D["areas"][a])
         if not len(segs):
             continue
-        if D["areas"][a]["c"] in RAISED:  # (a median's outline is its kerb's top: only off it, where lidar or a sidewalk meets it)
+        if not own_ground(D, a, ipr):  # (a yard over a cellar, a terrace: the street's or the lidar's height on part
+            src[k] = "plane"           # of it stepped inside it, 0.8 m on line 9 s 596)
+            continue
+        if D["areas"][a]["c"] in RAISED or D["areas"][a]["c"] == "parking":
+            # (a median's outline is its kerb's top, a parking area's its kerb's foot: kept, only off it the street
+            # or the lidar; on it they took the sidewalk's height and flattened 400 kerbs on the five lines)
             ring = shapely.MultiLineString([s_[:, :2] for s_ in segs])
             offs.append(k[shapely.distance(ring, shapely.points(x[k], y[k])) > OWN_ON])
         else:  # (elsewhere every corner but its surveyed points: its outline's long edges ran between far points too)
@@ -269,23 +277,21 @@ def own_heights(D, G, streets, sc, sa, x, y, zs, need, ipr=None):
     off = np.concatenate(offs) if offs else np.zeros(0, int)
     if not len(off):
         return zs, src
-    z = np.full(len(off), np.nan)
+    zl = city_at(G, x[off], y[off])
+    zt = np.full(len(off), np.nan)
     park = sc[off] == "parking"
     if park.any():
-        z[park] = streets.at("road", x[off][park], y[off][park])
-    miss = np.isnan(z)
-    if miss.any():
-        z[miss] = streets.at("sidewalk", x[off][miss], y[off][miss])
-    src[off[np.isfinite(z)]] = "street"
-    miss = np.flatnonzero(np.isnan(z))
-    if len(miss):
-        ground = {a: own_ground(D, a, ipr) for a in np.unique(sa[off[miss]]).tolist()}
-        miss = miss[np.array([ground[a] for a in sa[off[miss]].tolist()], bool)]
-    if len(miss):
-        zl = city_at(G, x[off][miss], y[off][miss])
-        z[miss] = zl
-        src[off[miss[np.isfinite(zl)]]] = "lidar"
-    src[off[np.isnan(z)]] = "plane"
+        zt[park] = streets.at("road", x[off][park], y[off][park])
+    if (~park).any():
+        zt[~park] = streets.at("sidewalk", x[off][~park], y[off][~park])
+    st = np.isfinite(zt) & ~(np.abs(zt - zl) > OWN_STREET)  # (no lidar there: the street's)
+    # (neither further than OWN_GROUND from the outline's plane: on a slope steeper than its corners the lidar folded
+    # at them, 0.4-0.6 m seams inside a yard on line 9 s 2140 and line 23 s 248, where the plane runs straight)
+    pz = zs[off]
+    st &= np.abs(zt - pz) <= OWN_GROUND
+    zl = np.where(np.abs(zl - pz) <= OWN_GROUND, zl, np.nan)
+    z = np.where(st, zt, zl)
+    src[off] = np.where(st, "street", np.where(np.isfinite(zl), "lidar", "plane"))
     zs[off] = np.where(np.isfinite(z), z, zs[off])
     return zs, src
 
