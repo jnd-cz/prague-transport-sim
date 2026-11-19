@@ -126,7 +126,8 @@ things are done, and why a rule exists, is in the files it points to:
   machine's other heavy jobs and holds its turn, so that it does not spoil another's measurement (the user,
   2026-11-12, #516). These take their turn themselves: `headless.py`, `rebuild.py`, `frametime.py`,
   `city_terrain.py`, `ground_mesh.py`; `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py`,
-  `street_profile.py` and `ground_partition.py` when run alone; `test_all.py` for the whole suite. Anything
+  `street_profile.py` and `ground_partition.py` when run alone; `ground_place.py` for several places or
+  `--rings` (one place runs as it is); `test_all.py` for the whole suite. Anything
   else runs through `python -I tools/heavy.py "what" -- CMD ...`. Start one in the background and let it wait;
   never start a second beside it. A timing runs alone (`frametime.py`, a bench, the whole test suite, plain
   `heavy.py`). Count runs and builds (`headless.py`, `rebuild.py`, `ground_mesh.py`, `city_terrain.py`,
