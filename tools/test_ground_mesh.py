@@ -116,6 +116,23 @@ class Lattice(unittest.TestCase):
         self.assertTrue(g.buffer(1e-9).contains(L))
         self.assertIsNone(gm.lattice(shapely.box(7, 5, 10, 8), 5.0))
 
+    def test_a_cell_the_surface_bends_in_is_cut_finer_and_no_other(self):
+        """#697: three 5 m cells in a row (x 1-6, 6-11, 11-16), a wall of 8 m in the middle one."""
+        g = shapely.box(1, 4, 16, 9)
+        got = gm.bends(g, lambda px, py: np.where(px < 8.5, 8.0, 0.0), 5.0)
+        xy = shapely.get_coordinates(got)
+        self.assertGreaterEqual(xy[:, 0].min(), 6.0)
+        self.assertLessEqual(xy[:, 0].max(), 11.0)
+        fine = int(round(5.0 / gm.LATTICE_FINE)) - 1
+        self.assertAlmostEqual(shapely.length(got), 2 * fine * 5.0)  # (lines along and across the cell, on the grid)
+        self.assertEqual(sorted({round(v, 6) for v in xy[:, 0]} - {6.0, 11.0}), [6.0 + gm.LATTICE_FINE * k for k in range(1, fine + 1)])
+
+    def test_a_plane_and_a_roads_crown_cut_nothing(self):
+        g = shapely.box(1, 4, 16, 9)
+        self.assertIsNone(gm.bends(g, lambda px, py: 200 + 0.03 * px + 0.01 * py, 5.0))
+        self.assertIsNone(gm.bends(g, lambda px, py: 200 - 0.025 * np.abs(px - 8.5), 5.0))  # (a crown: 2.5 % each way)
+        self.assertIsNone(gm.bends(shapely.box(7, 5, 10, 8), lambda px, py: np.full(len(px), np.nan), 5.0))  # (no surface)
+
 
 class Weirs(unittest.TestCase):
     def test_a_corner_on_a_cut_is_seen_square_off_it_on_its_triangles_side(self):

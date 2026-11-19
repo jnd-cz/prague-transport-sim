@@ -202,19 +202,75 @@ def lattice(g, step=None):
     return shapely.intersection(shapely.MultiLineString(segs), g)
 
 
+LATTICE_FINE = 1.0  # m: a lattice cell its surface bends in is cut to this
+LATTICE_BEND = 0.50  # m: a surface this far off the plane through its lattice cell bends in it (a road's crown over a
+# 5 m cell is 3 cm off; a wall the survey has no area for crosses a cell by metres)
+
+
+def bends(g, at, step=None, fine=LATTICE_FINE, tol=LATTICE_BEND):
+    """Lines every `fine` m, on the tiles' grid, inside the lattice cells of g in which the surface at(x, y) leaves the
+    plane through its samples there by more than tol (None when none does). The mesh reads a surface at its corners
+    only: a wall between level grounds that the survey has no area for (Rašínovo nábřeží, line 17 (-743, -1421): the
+    sidewalk level to the quay wall's top, 8 m over the lower quay) crossed a 5 m cell as one straight slope from the
+    kerb down, #697."""
+    step = step or SURVEY_LATTICE
+    x0, y0, x1, y1 = g.bounds
+    gx, gy = on_grid(x0, step, 0) - step, on_grid(y0, step, 1) - step
+    nx, ny = int(math.ceil((x1 - gx) / step)), int(math.ceil((y1 - gy) / step))
+    if nx < 1 or ny < 1:
+        return None
+    h = fine / 2
+    m = int(round(step / h))
+    # (samples at the cells' insides: half a sample in from their edges, so each belongs to one cell)
+    X, Y = np.meshgrid(gx + (np.arange(nx * m) + 0.5) * h, gy + (np.arange(ny * m) + 0.5) * h)
+    shapely.prepare(g)
+    ok = shapely.contains_xy(g, X.ravel(), Y.ravel())
+    if not ok.any():
+        return None
+    Z = np.full(X.size, np.nan)
+    Z[ok] = at(X.ravel()[ok], Y.ravel()[ok])
+    Z = Z.reshape(ny, m, nx, m).transpose(0, 2, 1, 3).reshape(ny, nx, m * m)
+    Xc = X.reshape(ny, m, nx, m).transpose(0, 2, 1, 3).reshape(ny, nx, m * m)
+    Yc = Y.reshape(ny, m, nx, m).transpose(0, 2, 1, 3).reshape(ny, nx, m * m)
+    segs = []
+    for j, i in zip(*np.nonzero(np.isfinite(Z).sum(2) >= 4)):
+        z = Z[j, i]
+        f = np.isfinite(z)
+        A = np.column_stack([Xc[j, i][f], Yc[j, i][f], np.ones(int(f.sum()))])
+        coef = np.linalg.lstsq(A, z[f], rcond=None)[0]
+        if np.abs(A @ coef - z[f]).max() <= tol:
+            continue
+        cx, cy = gx + i * step, gy + j * step
+        for k in range(1, int(round(step / fine))):
+            segs.append(((cx + k * fine, cy), (cx + k * fine, cy + step)))
+            segs.append(((cx, cy + k * fine), (cx + step, cy + k * fine)))
+    if not segs:
+        return None
+    return shapely.intersection(shapely.MultiLineString(segs), g)
+
+
 def city_at(G, px, py):
     """The city mesh's height at points under the classes above the terrain (ground_partition's "under" triangles):
     its triangle's plane, NaN where none holds a point."""
-    out = np.full(len(px), np.nan)
+    return city_sampler(G)(px, py)
+
+
+def city_sampler(G):
+    """city_at for many calls: the triangles' tree built once."""
     U = np.asarray(G["under"], int)
-    if not len(px) or not len(U):
-        return out
+    if not len(U):
+        return lambda px, py: np.full(len(px), np.nan)
     x, y, z, T = G["x"], G["y"], G["z"], G["T"][U]
     tri = np.stack([np.column_stack([x[T[:, k]], y[T[:, k]], z[T[:, k]]]) for k in range(3)], 1)
     tree = shapely.STRtree(shapely.polygons(tri[:, [0, 1, 2, 0], :2]))
-    pi, ti = tree.query(shapely.points(px, py), predicate="intersects")
-    out[pi] = plane(tri[ti], px[pi], py[pi])
-    return out
+
+    def at(px, py):
+        out = np.full(len(px), np.nan)
+        if len(px):
+            pi, ti = tree.query(shapely.points(px, py), predicate="intersects")
+            out[pi] = plane(tri[ti], px[pi], py[pi])
+        return out
+    return at
 
 
 MEET = ("paved",)  # (survey classes whose plane meets the raised areas at their edge: meet_raised, #638)
@@ -616,15 +672,28 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     ti, tj = tile_index(tb[:, [0, 2]], tb[:, [1, 3]])
     whole = (ti[:, 0] == ti[:, 1]) & (tj[:, 0] == tj[:, 1])  # (inside one square: no square's border crosses it)
     lines, owners = [], []  # (owners: what the face inside a line's polygon is: (class, id))
+    streets = Streets(ln)
+    under_at = city_sampler(G)
+    n_bent = 0
     for k, q in enumerate(pieces["survey"]):
         lines.append(q["g"].boundary)
         owners.append(("survey", k, q["g"]))
         # (a street or a ground on the lidar has a surface between its outline's points: lattice lines inside it, so its
-        # faces are cut to SURVEY_LATTICE m and their corners lie on that surface, #632)
-        if q["c"] in STREETS_ROAD | STREETS_WALK or (D.get("areas") or [{}] * (q["area"] + 1))[q["area"]].get("g"):
+        # faces are cut to SURVEY_LATTICE m and their corners lie on that surface, #632; and finer where the surface
+        # bends inside a cell, #697)
+        on_lidar_ = bool((D.get("areas") or [{}] * (q["area"] + 1))[q["area"]].get("g"))
+        if q["c"] in STREETS_ROAD | STREETS_WALK or on_lidar_:
             g = lattice(q["g"])
             if g is not None and not g.is_empty:
                 lines.append(g)
+            if on_lidar_:
+                g = bends(q["g"], under_at)
+            else:
+                kd = "road" if q["c"] in STREETS_ROAD else "sidewalk"
+                g = bends(q["g"], lambda px, py, kd=kd: streets.at(kd, px, py))
+            if g is not None and not g.is_empty:
+                lines.append(g)
+                n_bent += 1
         elif q["c"] == "water":
             g = lattice(q["g"], WATER_LATTICE)
             if g is not None and not g.is_empty:
@@ -694,7 +763,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     kept_polys = shapely.polygons(np.concatenate([tri_xy[kept_whole], tri_xy[kept_whole][:, :1]], 1)) if len(kept_whole) else None
     kept_tree = shapely.STRtree(kept_polys) if kept_polys is not None else None
 
-    log(f"  {len(lines):,} lines, {int(touch.sum()):,} whole triangles noded with them, {time.time() - t1:.0f} s")
+    log(f"  {len(lines):,} lines, {int(touch.sum()):,} whole triangles noded with them, {n_bent} street and lidar pieces "
+        f"cut finer where their surface bends, {time.time() - t1:.0f} s")
     (e0, e1), (n0, n1) = tile_index([bx0, bx1], [by0, by1])
     rects = [(max(bx0, b[0]), max(by0, b[1]), min(bx1, b[2]), min(by1, b[3]))
              for b in (tile_box(e, n) for e in range(int(e0), int(e1) + 1) for n in range(int(n0), int(n1) + 1))]
@@ -747,7 +817,6 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     kind = np.full(len(cx), "", dtype=object)
     from track_styles import RANK
     surface = SurveySurface(D, [pieces["survey"][owners[o][1]]["area"] for o in owner if owners[o][0] == "survey"])
-    streets = Streets(ln)
     # terrain: the parent triangle's plane
     m = corner_cls == "terrain"
     par = np.array([owners[o][1] for o in owner])[corner_face[m]]
