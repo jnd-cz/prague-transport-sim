@@ -4803,19 +4803,19 @@
    },
    "sections": [
     {
-     "name": "from the road across the wall up the bank, x = 200",
+     "name": "from the road across the wall onto its top, x = 200",
      "from": [
       200.0,
       803.0
      ],
      "to": [
       200.0,
-      811.0
+      807.5
      ],
      "expect": {
-      "sloping m": 3.5
+      "sloping m": 0.5
      },
-     "why": "a wall stands at the road's edge (the survey's strip: its foot 191.85 m, its top 194.3 m at x = 197-210) and the bank rises behind it at about 1:1. The written file of 2026-11-19 is one slope from the road up"
+     "why": "a wall stands at the road's edge (the survey's strip: its foot 191.85 m, its top 194.3 m at x = 197-210), the bank rising behind it at about 1:1. Built on #765: one step of 2.65 m, 0.5 m sloping (the top's first half metre). The written file of 2026-11-19: a step of 0.81 m and 0.75 m of slope here, and teeth 10 m wide along the wall"
     }
    ]
   }
