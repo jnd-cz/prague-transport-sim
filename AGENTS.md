@@ -61,7 +61,8 @@ things are done, and why a rule exists, is in the files it points to:
   straight to `main`.
 - **The PR's text:** `Closes #N.` or `Part of #N.`, what changes and why, a check table (line × check, before →
   after), and for rebuilt data what changed per line. The verdict, the table and any "Questions for the user"
-  come first. Pictures go in from the branch by commit SHA (DEVELOPING.md, Pictures in a PR).
+  come first. Pictures go in from the branch by commit SHA (DEVELOPING.md, Pictures in a PR). CI holds the title
+  to its `(#issue)` and the text to its keyword (`tools/pr_text.py`).
 - **`Closes #N` only when the PR meets every point of the issue's "Done when".** Anything open (the user's
   answers, an import, a rebuild, a publish, another line) makes it `Part of #N`, and the PR and a comment on the
   issue list what remains. A reviewer who finds an open point changes the keyword before the merge.
@@ -170,7 +171,8 @@ things are done, and why a rule exists, is in the files it points to:
 
 - Don't reformat code you are not changing. Match the surrounding code: plain modules, short names in hot loops,
   comments that say why (the data quirk, the measured case). Units are metres, seconds, m/s unless named.
-- A new source file in `src/` or `tools/` starts with `SPDX-License-Identifier: AGPL-3.0-or-later` in a comment.
+- A new source file in `src/` or `tools/` starts with `SPDX-License-Identifier: AGPL-3.0-or-later` in a comment
+  (`tools/test_pr_text.py` holds every one to it).
 - No new dependencies or build steps without an issue that decides it. Tests and benches: Python + Playwright;
   Node / Deno only once the simulation core is split out.
 - Randomness is reproducible: simulation code takes it from one seeded place (`src/random.js`), never `Math.random`.

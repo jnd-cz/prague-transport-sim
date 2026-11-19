@@ -1,0 +1,22 @@
+# A pull request names its issue: its title ends with (#N), its text says Closes #N or Part of #N (#727; AGENTS.md,
+# Branch, PR, merge). Its own workflow, so that an edited text is checked again in seconds without the tests running.
+name: pr-text
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  names-its-issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # (the title and the text come from the event's file, read by the script: nothing of them is put into a command)
+      - run: python -I tools/pr_text.py
