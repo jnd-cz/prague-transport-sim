@@ -7,9 +7,11 @@ Makes the sample packages here (a box the size of a T3 car as a tier-1 glTF vehi
 - a bundle .zip holding three packages in their folders, the vehicle, a sound pack and a fleet for it, installed
   through the page's .zip input. The vehicle shows in the model menu after its check, credits itself when picked, and
   our tram runs as it with the fleet's numbers; all three survive a reload (the browser's origin private file system).
-- seven broken ones, each refused with its reason: a bad manifest (no names), a missing file, a wrong hash, wrong axes
+- nine broken ones, each refused with its reason: a bad manifest (no names), a missing file, a wrong hash, wrong axes
   (the box lying across the track), a claimed tier without its nodes (a rig naming bogies the model lacks), over the
-  triangle budget, longer than a vehicle may be (34 m: the cap is 33 m).
+  triangle budget, longer than a vehicle may be (34 m: the cap is 33 m), a file's name that is not a plain one, a
+  model that links to an address outside the package.
+- a .gltf with its .bin beside it among the files installs; the loading screen writes any file's name as text.
 - a 25 m box installs with a warning: longer than its type, it runs on the type's pivots (articulated types: #579).
 - removing the vehicle takes it out of the menu, and its sound pack and fleet out of the registry.
 - each glTF vehicle of the repository loads and measures within src/packageRules.json's fit and budget (the rules' calibration).
@@ -39,11 +41,13 @@ import gpu  # noqa: E402
 RULES = json.load(open(os.path.join(ROOT, "src", "packageRules.json"), encoding="utf-8"))
 VID = "sample.box-tram"
 CREDIT = "Sample box tram (tools/test_packages.py), CC0"
+MARKUP = "<img src=x onerror=window.marked=1>.txt"   # (a file's name that would be markup if it were written as such)
 
 
-def glb(size=(2.4, 3.2, 14.0), cells=1, names=("body",)):
+def glb(size=(2.4, 3.2, 14.0), cells=1, names=("body",), image=None, split=None):
     """A GLB of boxes (one node and mesh per name, each the whole box) of size (x across, y up, z along) standing on
-    y = 0, each face cut into cells × cells squares: 12 × cells² triangles a box."""
+    y = 0, each face cut into cells × cells squares: 12 × cells² triangles a box. image: an image the model links to by
+    that uri; split: the name of a .bin beside it, and the result is (the .gltf, the .bin) instead of one GLB."""
     sx, sy, sz = size
     pos, idx = [], []
     for axis in range(3):
@@ -76,6 +80,11 @@ def glb(size=(2.4, 3.2, 14.0), cells=1, names=("body",)):
         "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": len(pb)}, {"buffer": 0, "byteOffset": len(pb), "byteLength": len(ib)}],
         "buffers": [{"byteLength": len(binary)}],
     }
+    if image:
+        doc["images"] = [{"uri": image}]
+    if split:
+        doc["buffers"][0]["uri"] = split
+        return json.dumps(doc).encode(), binary
     js = json.dumps(doc).encode()
     js += b" " * (-len(js) % 4)
     binary += b"\0" * (-len(binary) % 4)
@@ -150,8 +159,17 @@ def samples():
     broken["over budget"] = (zipped([("", m, f)]), "triangles a car, over the budget")
     m, f = vehicle("sample.too-long", model=glb(size=(2.4, 3.2, 34.0)))
     broken["too long"] = (zipped([("", m, f)]), f"over the {RULES['fit']['maxLength']} m a vehicle may be")
+    # a file's name is a plain one (it is shown on the loading screen), and a model links only to its package's files
+    m, f = vehicle("sample.markup", extra={MARKUP: b"x"})
+    broken["markup in a file's name"] = (zipped([("", m, f)]), "not a path inside the package")
+    m, f = vehicle("sample.linked", model=glb(image="https://example.invalid/t.png"))
+    broken["a model linking elsewhere"] = (zipped([("", m, f)]), "links to https://example.invalid/t.png")
+    gltf, binary = glb(split="box.bin")
+    sf = {"box.gltf": gltf, "box.bin": binary}
+    sm = manifest("vehicle", "sample.split", sf, type="T3", loader="gltf", model="box.gltf", tier=1,
+                  fleet={"operator": "Test", "types": {"T3": {"ranges": [[9001, 9010]]}}})
     m, f = vehicle("sample.long", model=glb(size=(2.4, 3.2, 25.0)))
-    return good, broken, zipped([("", m, f)])
+    return good, broken, zipped([("", m, f)]), zipped([("", sm, sf)])
 
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
@@ -202,7 +220,7 @@ def main():
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=ROOT))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_port}"
-    good, broken, long = samples()
+    good, broken, long, split = samples()
     fails = []
 
     def need(ok, why):
@@ -255,6 +273,22 @@ def main():
             print("long:", rep)
             need(len(rep) == 1 and rep[0].startswith("✓") and "runs on T3's bogie pivots" in rep[0], f"the 25 m box: wants installed with a warning, got {rep}")
             page.evaluate("async () => (await import('/src/packages.js')).remove('sample.long')")
+            rep = put(page, "split.zip", split)
+            print("split:", rep)
+            need(len(rep) == 1 and rep[0].startswith("✓"), f"a .gltf with its .bin beside it among the files: wants installed, got {rep}")
+            page.evaluate("async () => (await import('/src/packages.js')).remove('sample.split')")
+            # the loading screen writes a file's name as text, whatever it is
+            shown = page.evaluate("""async (name) => {
+              const { Loader } = await import('/src/loading.js');
+              const l = new Loader();
+              l.prefetch('data/none-' + Date.now() + '.bin', 0, name);
+              l.render(true);
+              const cells = [...document.querySelectorAll('#loadFiles td:first-child')].map((c) => c.textContent);
+              const out = { text: cells.includes(name), nodes: document.querySelectorAll('#loadFiles img').length };
+              removeEventListener('error', l.onError);
+              return out; }""", MARKUP)
+            page.wait_for_timeout(300)
+            need(shown == {"text": True, "nodes": 0} and page.evaluate("window.marked") is None, f"a file's name on the loading screen is not plain text: {shown}")
             s = page.evaluate(STATE)
             need(sorted(x["id"] for x in s["state"]) == sorted([VID, "sample.box-sounds", "sample.box-fleet"]),
                  f"installed after the broken ones: {[x['id'] for x in s['state']]}")
@@ -288,7 +322,8 @@ def main():
             browser.close()
     finally:
         server.shutdown()
-    print("vehicle packages: bundle installed, 7 broken refused, a long one warned, reload, credit, drive, removal: " + ("pass" if not fails else f"{len(fails)} failures"))
+    print(f"vehicle packages: bundle installed, {len(broken)} broken refused, a long one warned, a split one installed, reload, credit, drive, removal: "
+          + ("pass" if not fails else f"{len(fails)} failures"))
     return 1 if fails else 0
 
 

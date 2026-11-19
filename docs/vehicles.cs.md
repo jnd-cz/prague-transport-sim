@@ -102,6 +102,8 @@ Hráč si instaluje balíčky v menu *Vozidla…* (#530; rozhodnutí, oddíly 1,
 balíčků, každý ve své složce. Hra každý zkontroluje podle `src/packageRules.json` (stejná pravidla čte
 `tools/test_vehicles.py`): pole, typy souborů, velikosti a otisky SHA-256, licenci; model vozidla načte vlastním
 loaderem a změří vůz proti jeho typu a rozpočtu trojúhelníků a volání kreslení; pohyblivé díly podle `moves`.
+Cesty souborů jsou prostá jména ve složkách (písmena bez diakritiky, číslice, `.`, `_`, `-` a mezery) a model odkazuje
+jen na data v sobě nebo na soubory balíčku vedle sebe.
 Balíček, který neprojde, odmítne s důvody. Instalované leží v úložišti prohlížeče (OPFS) a hra je při startu
 kontroluje znovu. Pole, kontrola a jak balíček přihlásit do seznamu `assets/catalogue.json`: anglická verze,
 [Packages](vehicles.md#packages).
