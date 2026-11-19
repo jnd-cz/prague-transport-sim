@@ -215,6 +215,12 @@ the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the dep
 minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
 the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 
+**The HUD's cost** (`python -P -E tools/bench/hud.py`, #706): what one update of the HUD changes in the page (0 when
+nothing changed: texts are written only when they change, `src/hud.js` `put`) and how long it takes with the CPU
+throttled 4 times. Line 17, 2026-11-19, before -> after: 13 -> 0 changes an idle update, an update 7.2 -> 2.9 ms (the
+minimap 4.2 -> 0.35 ms), a frame 45 -> 32-40 ms. A drawing routine that needs an element's box takes it from
+`src/boxes.js` `rectOf`, not from the page on every frame.
+
 **The site's icons** (#485): `assets/icons/icon-{32,180,192,512}.png`, the favicon, the iPhone's home-screen icon
 (`apple-touch-icon` in `index.html`) and the web manifest's (`app.webmanifest`), are drawn by
 `python -P -E tools/make_icons.py`: change the drawing there and run it, never the PNGs by hand.

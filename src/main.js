@@ -613,6 +613,7 @@ async function start(extra = {}) {
   game.autopilot = !!pilot;
   pedalKey = null;
   window.game = game; // handy for debugging from the console
+  window.hud = hud; // (its cost measured: tools/bench/hud.py)
   game.provenance = { files: built, fallbacks: () => fallbacks(built) }; // where each list came from (#10)
   game.mirror = mirror.stats;
   window.camera = camera;
