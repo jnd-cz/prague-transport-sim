@@ -562,7 +562,10 @@ Sections:
   between a street's kerbs and inside a lawn the ground is a 5 m grid of readings, each right to centimetres, with
   straight triangles between them: a step the survey has no area for crossed a cell as one slope (the quay, Chotkova's
   terraces). Since #697 a cell whose surface leaves its plane by over 0.5 m is cut to 1 m, and a surveyed wall line is
-  an edge of the faces with a height on either side.
+  an edge of the faces with a height on either side. Built whole (2026-11-19, 610c3e7, without writing), that costs
+  4.2-7.8 % more triangles a line (18.25 M -> 19.28 M on the five) and the ground lies a little nearer the raster:
+  within 10 m of a track its mean distance 3.98-5.66 -> 3.94-5.33 cm, the p99 27.9-54.9 -> 27.0-41.4 cm. At the
+  places picked for their walls the cost is 2-28 %.
 - **Where walls stand** (#697, measured 2026-11-19 on the five lines; the user: "can we use the open data sources to
   infer where walls should really stand as opposed to blending between the different height points?"). Four sources,
   best first:
@@ -603,6 +606,11 @@ Sections:
     a span, where a street keeps its own outline, it now takes the street surface (#761: the Modřany abutment's
     sidewalk, area 7214, rose 3.4 m in 12 m under the bridge, where the raster and the street surface are level to
     0.1 m). The paved areas off the lidar still triangulate their outline: not measured yet.
+  - *Paved strips*: parapets, edgings and low walls are often surveyed as paved areas half a metre across. Of the
+    58-174 paved areas a line off the lidar whose outline climbs a wall, 46-128 are under 1 m across and 6-35 more up
+    to 2.5 m; 7-24 % of their area, triangulated on the outline, is steeper than 1:1 (1-2 % of the other paved
+    areas'). They take a wall's heights (`ground_mesh.wall_like`): a terraced garden's edgings, line 23 (-1117, 806),
+    stood as fins up to 2 m across its lawns. The wider ones (6-23 a line, 0.25-0.53 ha) keep their outline.
   The survey also has 65 km of `Terénní_hrana` (the tops and feet of slopes) on line 17 and 8.4 km of
   `Hranice_schodiště`; neither is read by the ground yet (#447 for the stairs).
 
