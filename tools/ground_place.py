@@ -4,7 +4,8 @@
     python -P -E tools/ground_place.py krejcarek-ramp           # a place of data/truth.json groundPlaces
     python -P -E tools/ground_place.py --all | --list
     python -P -E tools/ground_place.py --line 37 --at 3915,316 [--reach 60]
-    (--ring N: tiles built round the place's own, default 1; --mesh DIR: a city mesh folder other than the current inputs')
+    (--ring N: tiles built round the place's own, default 1; --rings: also built with one ring more and the two
+    compared; --mesh DIR: a city mesh folder other than the current inputs')
 
 A place is a point of a line and a reach round it. Its ground is built for the tiles its reach touches (the middle) and
 `ring` tiles round them, by tools/ground_mesh.py build(within=...): the same partition, faces, heights and weld as the
@@ -12,8 +13,9 @@ line's build, of that box only. Then, per place, into reports/places/NAME/:
 
 - **locality**: the middle tiles against the line's written file (data/lineN.ground.*), vertex for vertex and triangle
   for triangle. A tile's ground should depend on the tile and its ring only; a vertex at another height or a triangle
-  cut another way is a rule that read something farther off (or the written file is of other code or data: say which
-  with --ref). Each is named by what gave the vertex its height (the weld's label).
+  cut another way is a rule that read something farther off, or the written file is of other tools or data: after a
+  rule's change the written file says what the change moved, and --rings (the same tools, one ring more) says what
+  still reads farther off. Each moved point is named by what gave it its height (the weld's label).
 - **measures** inside the reach, of the place's build and of the written file: the steps' walls (their length by
   height), the steep faces that are no wall (a crumpled slope), the area per class.
 - **pictures**: built.png and written.png, the ground from above at the reach (ground_mesh.picture).
@@ -198,7 +200,7 @@ def by_class(V, F, cls):
     return V / Q, {c: F[cls == i] for c, i in gm.CLASS_IDS.items()}
 
 
-def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print):
+def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False):
     """One place built, compared and measured: its report (also written to reports/places/NAME/place.json)."""
     import ground_mesh as gm
     ln, at, reach = str(pl["line"]), pl["at"], float(pl.get("reach") or REACH)
@@ -215,6 +217,11 @@ def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print):
     if theirs is not None:
         rep["written"] = measures(*theirs, box)
         rep["locality"] = locality(mine, theirs, built.get("corners"))
+    if rings:  # (the same tools with one ring more: what in the middle depends on what lies past the ring)
+        wider = gm.build(ln, mesh, threads, log=lambda s: None, within=tiles_of(at, reach, ring + 1)[1])
+        gm.fit_mouths(ln, wider, log=lambda s: None)
+        rep["rings"] = locality(mine, middle(wider, mid), built.get("corners"))
+        rep["seconds with the wider ring"] = round(time.time() - t0, 1)
     out = out or os.path.join(ROOT, "reports", "places", name)
     os.makedirs(out, exist_ok=True)
     px = max(2, min(8, int(900 / (2 * reach))))
@@ -238,6 +245,10 @@ def line_of(rep):
         p = loc["points at another height"]
         s += (f"; locality {loc['same %']} %: {p['points']} points at another height (max {p['max cm']} cm), "
               f"{loc['triangles']['only built']} triangles cut another way")
+    if rep.get("rings"):
+        p, r = rep["rings"]["points at another height"], rep["rings"]
+        s += (f"; against one ring more {r['same %']} %: {p['points']} points at another height (max {p['max cm']} cm), "
+              f"{r['triangles']['only built']} triangles cut another way")
     return s
 
 
@@ -250,6 +261,7 @@ def main(argv=None):
     ap.add_argument("--at", help="X,Y of a place not in the list (with --line)")
     ap.add_argument("--reach", type=float)
     ap.add_argument("--ring", type=int, default=1)
+    ap.add_argument("--rings", action="store_true", help="also build with one ring more and compare the two")
     ap.add_argument("--mesh")
     ap.add_argument("--threads", type=int, default=4)
     a = ap.parse_args(argv)
@@ -268,14 +280,14 @@ def main(argv=None):
         todo[k] = dict(known[k], **({"reach": a.reach} if a.reach else {}))
     if not todo:
         ap.error("a place's name, --all, --list, or --line with --at")
-    if len(todo) == 1:
+    if len(todo) == 1 and not a.rings:
         for k, v in todo.items():
             run(k, v, a.ring, a.mesh, a.threads)
         return 0
     from baseline_store import HeavyJob
-    with HeavyJob("ground places", share={"gb": 3, "cores": a.threads}):
+    with HeavyJob("ground places", share={"gb": 5 if a.rings else 3, "cores": a.threads}):
         for k, v in todo.items():
-            run(k, v, a.ring, a.mesh, a.threads)
+            run(k, v, a.ring, a.mesh, a.threads, rings=a.rings)
     return 0
 
 
