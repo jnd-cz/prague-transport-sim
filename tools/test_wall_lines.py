@@ -56,6 +56,16 @@ class Stretches(unittest.TestCase):
         s = wl.of_lines([np.array([[0.0, 0.0, np.nan], [0.0, 30.0, np.nan]])], wide)[0]
         self.assertTrue(np.allclose(s["zl"], 196.9) and np.allclose(s["zr"], 188.6))
 
+    def test_a_kerb_in_the_readings_does_not_tilt_a_level_side(self):
+        """The Modřany ramp's foot, line 17 (-2385, -9250): a sidewalk, its kerb 3.2 m from the wall and the road beyond.
+        The line through those readings fell 10 % and, carried back to the wall, stood the sidewalk 0.3 m high there."""
+        def street(x, y):  # (the wall at x = 0, the ramp's top to its west; east the sidewalk at 198.2, the road 0.15 lower)
+            x = np.asarray(x, float)
+            return np.where(x < 0, 204.0, np.where(x < 3.2, 198.2, 198.05))
+        s = wl.of_lines([np.array([[0.0, 0.0, np.nan], [0.0, 30.0, np.nan]])], street)[0]
+        self.assertTrue(np.allclose(s["gr"], 0.0))
+        self.assertTrue(np.all(np.abs(s["zr"] - 198.2) <= 0.15))
+
     def test_runs_close_small_gaps_and_drop_short_ones(self):
         d = np.arange(12.0)
         on = np.array([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0], bool)

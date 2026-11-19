@@ -276,6 +276,8 @@ def bends(g, at, step=None, fine=LATTICE_FINE, tol=LATTICE_BEND):
     return shapely.intersection(shapely.MultiLineString(segs), g)
 
 
+BED_OVER = 2.0  # m: a survey area this far under the bed over it in plan is under a structure, not on the bed (#761; the
+# troughs beside a bed, #548, are under 1 m)
 WALL_HOLD = 1.5  # m: a corner this near a wall's line stands at the level of its side (IPR's raster smears a step this
 # far, street_profile.SW_KERB_SMEAR; the street surface and the city mesh carry the smear)
 
@@ -1020,9 +1022,10 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     zs = snap_to_walls(D, cx[m], cy[m], zs, np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span)
     zc[m] = zs
     # (a wall the survey has as a line: the street, the lidar ground and the terrain beside it stand at its side's level
-    # up to it, #697)
+    # up to it, #697; a street under a bridge too, which keeps the survey's own outline (on_span): the sidewalk along
+    # the Modřany ramp's wall, line 17 (-2385, -9250), has the wall's heights in its outline and rose 2 m against it)
     elig = corner_cls == "terrain"
-    elig[m] = (np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span) | on_lidar
+    elig[m] = np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) | on_lidar
     cen = fc.mean(1)
     zc, at_wall = hold_at_walls(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, elig, walls)
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc]) + np.where(on_lidar | in_osm, YIELD, 0.0)
@@ -1056,7 +1059,12 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     m = np.flatnonzero(((np.repeat(t_in_bed, 3) | on_rail) & ((kind != "raised") | c_across) & (corner_cls != "plot")) | c_band)
     zb = beds.surface_at(cx[m], cy[m], BED_REACH)
     zb = np.where(on_rail[m], np.where(zl[m] < zr[m] - RAIL_TOL, zl[m], zr[m]), zb)
-    ok = np.isfinite(zb)
+    # (a survey area more than BED_OVER under the bed lies under the track's structure, not on its bed: it keeps its
+    # level. The bed reaches a deck's end (#594), and at the Modřany viaduct's abutment, line 17 s 4062-4064, that end
+    # stands 1.5 m past the abutment's face over the street's sidewalk (survey area 7214, 198.2 m): as a crossing the
+    # sidewalk took the rails' 204.8 m there and rose against the wall in two peaks, #761)
+    under_bed = (corner_cls[m] == "survey") & np.isfinite(zc[m]) & (zc[m] < zb - BED_OVER)
+    ok = np.isfinite(zb) & ~under_bed
     zc[m[ok]], prio[m[ok]], kind[m[ok]] = zb[ok], 1.0, "bed"
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}

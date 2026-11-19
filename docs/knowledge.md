@@ -558,9 +558,10 @@ Sections:
   best first:
   - *The survey's wall areas* (`lineN.dtm.json` class `wall`): used since #653. They lie under only 2-5 % of the
     survey's wall lines.
-  - *The survey's wall lines* (`lineN.zps.json` kind `Zeď`, level 0: a wall too thin to be an area, with heights at its
-    points): 7.2-13.6 km a line, to the survey's centimetres. IPR's raster steps by 0.7 m or more across 3.5-7.1 km of
-    them (`tools/wall_lines.py` prints the table: 326-537 stretches a line; over 4 m on 0.4-1.8 km). The line's own height is the foot
+  - *The survey's wall lines* (`lineN.zps.json` kind `Zeď`: a wall too thin to be an area, with heights at its points;
+    at level 0 and on structures, a walled ramp's sides being level 1): 7.3-14.0 km a line, to the survey's
+    centimetres. IPR's raster steps by 0.7 m or more across 3.7-7.5 km of them (`tools/wall_lines.py` prints the
+    table: 368-579 stretches a line; over 4 m on 0.5-1.9 km). The line's own height is the foot
     on about a third of the stepped length, the top on a third and neither on the rest, so the two sides' levels are
     read from the raster 2.5-4 m off the line (past its smear of the step, 2 m at an 8 m wall) as a level and a slope,
     and the line's height replaces a side's where it is within 0.5 m of it. Rašínovo nábřeží's quay wall is such a
