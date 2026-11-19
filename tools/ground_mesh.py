@@ -435,16 +435,14 @@ WALL_ON = 0.01  # m: a corner this near the outline lies on it (the faces are no
 WALL_CLASSES = ("wall", "stairs")
 
 
-def across_outline(ring_segs, x, y):
-    """Heights of points inside a survey area between its sides: the outline's height at the nearest point on it, and at
-    the nearest point on its other side (the direction from the point turned past 90 degrees), weighted by the other's
-    distance. On the outline, its height. A battered wall's strip, 0.9 m across and 35 m long with 3 and 4 outline points
-    along its foot and its top (line 37 (3915, 316), area 1444), triangulated on its outline alone folded into a W 2 m
-    tall (#653); between its sides it runs straight across. ring_segs: (n, 2, 3) the outline's edges."""
+def _sides(ring_segs, x, y):
+    """Per point inside a survey area: (z1, d1, z2, d2), the outline's height at the nearest point on it and its distance,
+    and the same of the nearest point on its other side (the direction from the point turned past 90 degrees; d2 inf
+    where there is none). ring_segs: (n, 2, 3) the outline's edges."""
     a, b = ring_segs[:, 0], ring_segs[:, 1]
     e = b[:, :2] - a[:, :2]
     l2 = np.maximum((e ** 2).sum(1), 1e-12)
-    out = np.full(len(x), np.nan)
+    z1, d1, z2, d2 = (np.full(len(x), np.nan) for _ in range(4))
     for k in range(0, len(x), 2000):
         px, py = x[k:k + 2000, None], y[k:k + 2000, None]
         t = np.clip(((px - a[:, 0]) * e[:, 0] + (py - a[:, 1]) * e[:, 1]) / l2, 0, 1)
@@ -453,16 +451,59 @@ def across_outline(ring_segs, x, y):
         d = np.hypot(qx - px, qy - py)
         r = np.arange(len(px))
         j = d.argmin(1)
-        d1, z1 = d[r, j], qz[r, j]
         ux, uy = qx[r, j] - px[:, 0], qy[r, j] - py[:, 0]
         back = (qx - px) * ux[:, None] + (qy - py) * uy[:, None] < 0
         d2m = np.where(back, d, np.inf)
         j2 = d2m.argmin(1)
-        d2, z2 = d2m[r, j2], qz[r, j2]
-        with np.errstate(invalid="ignore"):  # (no other side: inf, its own height taken)
-            z = np.where(np.isfinite(d2) & (d1 > 1e-6), (z1 * d2 + z2 * d1) / np.maximum(d1 + d2, 1e-12), z1)
-        out[k:k + 2000] = z
-    return out
+        z1[k:k + 2000], d1[k:k + 2000], z2[k:k + 2000], d2[k:k + 2000] = qz[r, j], d[r, j], qz[r, j2], d2m[r, j2]
+    return z1, d1, z2, d2
+
+
+def across_outline(ring_segs, x, y):
+    """Heights of points inside a survey area between its sides: the outline's height at the nearest point on it, and at
+    the nearest point on its other side (the direction from the point turned past 90 degrees), weighted by the other's
+    distance. On the outline, its height. A battered wall's strip, 0.9 m across and 35 m long with 3 and 4 outline points
+    along its foot and its top (line 37 (3915, 316), area 1444), triangulated on its outline alone folded into a W 2 m
+    tall (#653); between its sides it runs straight across. ring_segs: (n, 2, 3) the outline's edges."""
+    z1, d1, z2, d2 = _sides(ring_segs, x, y)
+    with np.errstate(invalid="ignore"):  # (no other side: inf, its own height taken)
+        return np.where(np.isfinite(d2) & (d1 > 1e-6), (z1 * d2 + z2 * d1) / np.maximum(d1 + d2, 1e-12), z1)
+
+
+WALL_FACE = 0.7  # m: a survey wall area whose two sides part by this or more stands upright (wall_lines.STEP: a wall)
+WALL_WIDE = 2.5  # m: across more than this it is no wall's thickness: a bastion's or an earthwork's battered face (95 % of
+# lines 23's and 37's wall areas are under 2.1 m across, twice their area over their outline's length)
+WALL_IN = 0.02  # m: a wall's corner is seen from this far inside its own triangle (on the outline it has no other side)
+
+
+def wall_width(a):
+    """How far across a survey area is: twice its area over its outline's length (a strip's width)."""
+    g = shapely.Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
+    return 2 * g.area / g.length if g.length > 0 else 0.0
+
+
+def wall_face(ring_segs, x, y, tx, ty):
+    """Heights of a survey wall area's corners (x, y), each in a triangle with centre (tx, ty), and which of them were
+    lifted off the outline: (z, lifted). Where the area's two sides there part by WALL_FACE or more it is a retaining
+    wall: its top is level at the higher side's height right across, and a corner on the lower side's outline stands at
+    the top too (`lifted`: the weld keeps it apart from the ground at its foot, an upright face). Below WALL_FACE, and
+    where it is over WALL_WIDE across there (and for a whole area that wide, wall_width: the build), as across_outline:
+    the bastion at Strahov (line 23, area 860: 16.5 m up over 5 m across, 3.7 m as a whole) is a battered face, and level
+    across at its top it moved 4,000 corners by up to 16.5 m. Chotkova's road wall (line 23, area 842: its foot's side at 205.3 m, 1.7 m from its top's at 208.5)
+    leaned as a ramp between its sides where a stone wall stands with a footpath on its top (the user's photo,
+    2026-11-19, #697)."""
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    vx, vy = np.asarray(tx, float) - x, np.asarray(ty, float) - y
+    n = np.maximum(np.hypot(vx, vy), 1e-9)
+    step = np.minimum(WALL_IN, n / 2)
+    z1, d1, z2, d2 = _sides(ring_segs, x + vx / n * step, y + vy / n * step)
+    _, d0, _, _ = _sides(ring_segs, x, y)
+    with np.errstate(invalid="ignore"):
+        between = np.where(np.isfinite(d2) & (d0 > 1e-6), (z1 * d2 + z2 * d1) / np.maximum(d1 + d2, 1e-12), z1)
+        face = np.isfinite(d2) & (np.abs(z1 - z2) >= WALL_FACE) & (d1 + d2 <= WALL_WIDE)
+        z = np.where(face, np.fmax(z1, z2), between)
+        lifted = face & (d0 <= WALL_ON) & (z2 > z1)
+    return z, lifted
 
 
 def ring_segments(a):
@@ -663,7 +704,7 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
 
 
 # ---------------------------------------------------------------- the build
-def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None):
+def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
     """The corners' heights welded at each point: (each corner's height, the steps kept by pair, the points). A point takes
     its top-priority corners' height, whatever their order (#664: it took the first top corner's, the order of the
     partition's pieces; drawing the survey's walls reordered them and moved line 22's corner at (-1114, -537), shared by
@@ -676,8 +717,12 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None):
       water); the pair is judged against the lowest top corner's kind;
     - a lidar corner (`label` "lidar") that yielded to its rank (YIELD) keeps its own where its area's outline there
       (`zown`) stands over LIDAR_APART off.
+    - corners `apart` (a wall area's, lifted to its top on its foot's outline: wall_face) are welded among themselves
+      only, and the others at their point without them: the wall's face stands on the ground at its foot.
     `label`: what gave each corner its height (default `kind`), for the report and the lidar's rule."""
     key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
+    if apart is not None:
+        key = key * 2 + apart
     uk, inv = np.unique(key, return_inverse=True)
     top_p = np.full(len(uk), np.inf)
     np.minimum.at(top_p, inv, prio)
@@ -790,7 +835,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (the walls the survey has as lines, where the ground steps across them: their lines among the faces' lines, so
     # corners lie on them, #697)
     import wall_lines
-    walls = wall_lines.stretches(ln, box=box.bounds)
+    walls = wall_stretches = wall_lines.stretches(ln, box=box.bounds)
     for w in walls:
         g = shapely.LineString(w["p"]).intersection(box)
         if not g.is_empty:
@@ -1004,11 +1049,15 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     if on_lidar.any():
         zs[on_lidar] = city_at(G, cx[m][on_lidar], cy[m][on_lidar])
     need = np.isnan(zs)
+    lifted = np.zeros(len(m), bool)
     for a in np.unique(sa[need]).tolist():
         mm = need & (sa == a)
         segs = ring_segments(D["areas"][a]) if D["areas"][a]["c"] == "wall" else None
-        if segs is not None and len(segs):  # (a wall's face between its sides, #653)
+        if segs is not None and len(segs) and wall_width(D["areas"][a]) > WALL_WIDE:  # (a battered face, #653)
             zs[mm] = across_outline(segs, cx[m][mm], cy[m][mm])
+        elif segs is not None and len(segs):  # (a wall: between its sides, #653; upright where they part, #697)
+            c3 = fc[m[mm] // 3].mean(1)
+            zs[mm], lifted[mm] = wall_face(segs, cx[m][mm], cy[m][mm], c3[:, 0], c3[:, 1])
         else:
             zs[mm] = surface.at(a, cx[m][mm], cy[m][mm])
     # (a paved yard meets a sidewalk on their shared edge: on its outline's plane, which ran between far points, line 23
@@ -1112,7 +1161,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     label = kind.copy()
     keep = kind[sv_m] != "bed"
     label[sv_m[keep]] = sv_label[keep]
-    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"))
+    c_lift = np.zeros(len(cx), bool)
+    c_lift[sv_m] = lifted
+    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"))
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
     vkey = np.stack([np.round(cx * Q).astype(np.int64), np.round(cy * Q).astype(np.int64), zq], 1)
@@ -1175,6 +1226,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     names = {i: c for c, i in CLASS_IDS.items()}
     wall_draw = np.array([f"{names[int(fcls_id[u])]}:{draw[u]}" if draw[u] else names[int(fcls_id[u])] for u in up.tolist()],
                          dtype=object)
+    # (the face a surveyed wall line makes is a wall's, whatever lies above it: under a lawn it was painted grass, #697)
+    if len(walls) and wall_stretches:
+        wall_draw[on_lines(V, walls, [w["p"] for w in wall_stretches])] = "survey:wall"
     F = np.vstack([F, walls]) if len(walls) else F
     fcls_id = np.concatenate([fcls_id, np.full(len(walls), CLASS_IDS["wall"])])
     draw = np.concatenate([draw, wall_draw]) if len(walls) else draw
@@ -1211,6 +1265,19 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     if within is not None:
         out["corners"] = {"x": cx, "y": cy, "z": zf, "label": label}
     return out
+
+
+def on_lines(V, W, lines, tol=None):
+    """Which triangles W (vertex ids of V, mm) have every corner within tol (WALL_ON) of the polylines `lines` ([(n, 2)]) in
+    plan: the step faces standing on a line."""
+    tol = WALL_ON if tol is None else tol
+    tree = shapely.STRtree([shapely.LineString(p) for p in lines if len(p) > 1])
+    P = V[W].astype(float) / Q
+    pts = shapely.points(P[:, :, 0].ravel(), P[:, :, 1].ravel())
+    pi, _ = tree.query(pts, predicate="dwithin", distance=tol)
+    on = np.zeros(len(pts), bool)
+    on[pi] = True
+    return on.reshape(-1, 3).all(1)
 
 
 def xy_ids(V):

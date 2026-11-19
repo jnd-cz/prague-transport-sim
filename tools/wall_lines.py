@@ -26,7 +26,11 @@ to its right at every point:
   wall's face between its foot's line and its top's (the same walls: the two lines 0.15 m apart, 208.6 and 211.6 m),
   and then the wall stands at the higher line;
 - a point is on a stretch where the two sides' levels at the wall differ by STEP or more; a stretch runs at least
-  MIN_LEN, gaps up to GAP closed; levels and slopes smoothed along it over SMOOTH points.
+  MIN_LEN, gaps up to GAP closed; levels and slopes smoothed along it over SMOOTH points;
+- a stretch is cut where its line turns by over TURN, and a piece under PIECE between two turns is none: a side is
+  read square to the line, so at a corner it is another ground, and smoothed round the corner it was carried there.
+  At the Modřany abutment's corner (line 17 (-2392.7, -9250.8)) the wall's line jogs 0.5 m before it runs along the
+  ramp; the ramp's top (204 m), carried round the jog, stood as shards on the sidewalk under the bridge (198.3 m).
 """
 import json
 import math
@@ -51,6 +55,8 @@ STEP = 0.7  # m: the ground steps across the line by this or more (a kerb and a 
 MIN_LEN = 2.0  # m: a shorter run is no stretch
 GAP = 2.0  # m: a shorter gap between two runs is closed
 SMOOTH = 9  # samples: the running median along a stretch
+TURN = 30.0  # degrees: a stretch is cut where its line turns by more
+PIECE = 1.0  # m: a piece between two turns shorter than this is no stretch
 
 
 def _median(v, n=SMOOTH):
@@ -203,6 +209,20 @@ def runs(on, d):
     return [(a, b) for a, b in out if d[b] - d[a] >= MIN_LEN]
 
 
+def straight(S, d, a, b):
+    """The run a..b of sampled points S (distances d) cut at its turns over TURN: [(i, j, whether it ends at a turn)],
+    the pieces under PIECE left out (the whole run where it has no turn)."""
+    if b - a < 2:
+        return [(a, b, False)]
+    v = np.diff(S[a:b + 1, :2], axis=0)
+    ang = np.arctan2(v[:, 1], v[:, 0])
+    turn = np.abs((np.diff(ang) + np.pi) % (2 * np.pi) - np.pi) > math.radians(TURN)
+    cuts = [a] + [a + 1 + int(k) for k in np.flatnonzero(turn)] + [b]
+    if len(cuts) == 2:
+        return [(a, b, False)]
+    return [(i, j, j != b) for i, j in zip(cuts, cuts[1:]) if d[j] - d[i] >= PIECE]
+
+
 def of_lines(lines, lidar, others=()):
     """The stretches of polylines ([(n, 3) arrays]): [{"p": (m, 2), "zl", "gl", "zr", "gr": (m,)}]. others: more lines
     a side's readings stop at (the survey's wall areas' outlines)."""
@@ -214,9 +234,12 @@ def of_lines(lines, lidar, others=()):
             continue
         zl, gl, zr, gr = levels(S, lidar, walls)
         d = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(S[:, 0]), np.diff(S[:, 1])))])
-        for a, b in runs(np.abs(zl - zr) >= STEP, d):
-            out.append({"p": S[a:b + 1, :2].copy(), "zl": _median(zl[a:b + 1]), "gl": _median(gl[a:b + 1]),
-                        "zr": _median(zr[a:b + 1]), "gr": _median(gr[a:b + 1])})
+        for a, b, turns in (q for r in runs(np.abs(zl - zr) >= STEP, d) for q in straight(S, d, *r)):
+            v = [np.array(q[a:b + 1], float) for q in (zl, gl, zr, gr)]
+            if turns:  # (the point at the turn is read square to the line past it: the one before it stands for it)
+                for q in v:
+                    q[-1] = q[-2]
+            out.append({"p": S[a:b + 1, :2].copy(), "zl": _median(v[0]), "gl": _median(v[1]), "zr": _median(v[2]), "gr": _median(v[3])})
     return out
 
 

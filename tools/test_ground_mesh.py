@@ -294,6 +294,40 @@ class Walls(unittest.TestCase):
         zf2, _, _ = gm.weld(cx[o], cy[o], zc[o], prio[o], kind[o])
         self.assertEqual(np.round(zf2, 3).tolist(), np.round(zf[o], 3).tolist())
 
+    def test_a_wall_area_whose_sides_part_stands_upright(self):
+        # (#697: Chotkova's road wall, line 23 area 842: its foot's side at 205.3 m, its top's 1.7 m behind at 208.5)
+        segs = gm.ring_segments({"r": [[0, 0, 205.3], [30, 0, 205.3], [30, 1.7, 208.5], [0, 1.7, 208.5]]})
+        x = np.full(4, 15.0)
+        y = np.array([0.0, 0.85, 1.7, 0.0])  # (on the foot's outline, inside, on the top's outline, on the foot's again)
+        z, lifted = gm.wall_face(segs, x, y, x + 0.3, np.array([0.4, 0.9, 1.3, 0.4]))
+        self.assertTrue(np.allclose(z, 208.5))  # (the top level right across, the foot's corners lifted to it)
+        self.assertEqual(lifted.tolist(), [True, False, False, True])
+        # (a low wall, its sides 0.5 m apart in height: between them as before, #653)
+        low = gm.ring_segments({"r": [[0, 0, 205.3], [30, 0, 205.3], [30, 1.7, 205.8], [0, 1.7, 205.8]]})
+        z, lifted = gm.wall_face(low, x, y, x + 0.3, np.array([0.4, 0.9, 1.3, 0.4]))
+        self.assertTrue(np.allclose(z, [205.3, 205.55, 205.8, 205.3], atol=0.02))
+        self.assertFalse(lifted.any())
+        # (a bastion's battered face, 5 m across and 16.5 m up, line 23 area 860: between its sides too)
+        wide = gm.ring_segments({"r": [[0, 0, 307.8], [60, 0, 307.8], [60, 5, 324.3], [0, 5, 324.3]]})
+        z, lifted = gm.wall_face(wide, np.full(2, 30.0), np.array([0.0, 2.5]), np.full(2, 30.3), np.array([0.4, 2.8]))
+        self.assertTrue(np.allclose(z, [307.8, 316.05], atol=0.1))
+        self.assertFalse(lifted.any())
+
+    def test_a_lifted_wall_corner_is_welded_apart_from_the_ground_at_its_foot(self):
+        cx, cy = np.zeros(4), np.zeros(4)
+        zc = np.array([208.5, 208.5, 205.3, 205.36])  # (two wall faces' corners at the top; the road and a lawn at the foot)
+        prio = np.array([2.05, 2.05, 2.02, 2.09])
+        kind = np.array(["survey"] * 4, dtype=object)
+        zf, _, _ = gm.weld(cx, cy, zc, prio, kind)
+        self.assertEqual(np.round(zf, 2).tolist(), [205.3, 205.3, 205.3, 205.3])
+        zf, _, _ = gm.weld(cx, cy, zc, prio, kind, apart=np.array([True, True, False, False]))
+        self.assertEqual(np.round(zf, 2).tolist(), [208.5, 208.5, 205.3, 205.3])
+
+    def test_step_faces_on_a_wall_line(self):
+        V = np.array([[0, 0, 0], [1000, 0, 0], [1000, 0, 3000], [0, 5000, 0], [1000, 5000, 0], [1000, 5000, 2000]])
+        W = np.array([[0, 1, 2], [3, 4, 5]])
+        self.assertEqual(gm.on_lines(V, W, [np.array([[-2.0, 0.0], [4.0, 0.0]])]).tolist(), [True, False])
+
     def test_an_outline_that_climbs_a_wall_is_on_two_levels(self):
         # (#761: the Modřany abutment's sidewalk, area 7214 of line 17: 198.48 -> 200.80 m in 0.49 m of its outline)
         street = {"r": [[0, 0, 198.0], [10, 0, 198.15], [10, 3, 198.3], [0, 3, 198.1]]}  # (a kerb's 15 cm is no wall)

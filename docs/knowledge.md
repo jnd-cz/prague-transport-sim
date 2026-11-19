@@ -568,6 +568,12 @@ Sections:
   best first:
   - *The survey's wall areas* (`lineN.dtm.json` class `wall`): used since #653. They lie under only 2-5 % of the
     survey's wall lines.
+    An area's outline has its foot's side at the foot's height and its top's side at the top's. Where they part by
+    0.7 m or more and the area is a wall's thickness across (twice its area over its outline's length up to 2.5 m:
+    95 % of lines 23's and 37's wall areas are under 2.1 m), it stands upright, its top level at the higher side's
+    height and its face on its foot's outline (`ground_mesh.wall_face`): Chotkova's road wall, 3.2 m tall and 1.7 m
+    across, leaned as a ramp between its sides. A wider one is a battered face and keeps the ramp: the bastion at
+    Strahov (line 23, area 860), 16.5 m up over 5 m.
   - *The survey's wall lines* (`lineN.zps.json` kind `Zeď`: a wall too thin to be an area, with heights at its points;
     at level 0 and on structures, a walled ramp's sides being level 1): 7.3-14.0 km a line, to the survey's
     centimetres. IPR's raster steps by 0.7 m or more across 3.7-7.5 km of them (`tools/wall_lines.py` prints the

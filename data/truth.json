@@ -4544,6 +4544,21 @@
       "sloping m": 1.0
      },
      "why": "the ramp at 229.41 m, the landing at 228.7 m, the cheek wall (survey wall area 1442) between them within 0.6 m"
+    },
+    {
+     "name": "from the far edge of Pod Krejcárkem across the verge and the low wall under the park",
+     "from": [
+      3933.59,
+      313.86
+     ],
+     "to": [
+      3935.28,
+      310.91
+     ],
+     "expect": {
+      "sloping m": 0.75
+     },
+     "why": "a stone wall about 1.2 m tall stands 1.5 m behind the kerb along the road's south-east side, a grass verge before it and the wooded slope above (Google Street View from the road, 50.0950058, 14.4750885, headings 75 and 150, seen 2026-11-19, looked at, not copied). The survey has it as wall lines: its foot at 230.51, its top's two faces 0.5 m apart at 231.87 and 231.82, the road's edge at 230.73. IPR's raster and the written file of 2026-11-19 are one slope there (#697)"
     }
    ]
   },

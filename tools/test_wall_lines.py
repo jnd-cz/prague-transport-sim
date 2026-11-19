@@ -92,6 +92,27 @@ class Stretches(unittest.TestCase):
         st = wl.of_lines([wall], two, [area])[0]
         self.assertTrue(np.allclose(st["zl"], 200.0) and np.allclose(st["zr"], 203.0))
 
+    def test_a_stretch_is_cut_at_a_turn_and_a_jog_is_none(self):
+        """The Modřany abutment's corner, line 17 (-2392.7, -9250.8): the wall's line jogs 0.5 m north, then runs east
+        along the ramp. West of the jog the street lies at 198.3 m, south of the run a ledge at 200.5, north of it the
+        ramp's top: the ground steps across the jog too, and the ramp's top was carried round it."""
+        def ramp(x, y):
+            x, y = np.asarray(x, float), np.asarray(y, float)
+            return np.where((x >= 0) & (y > 0.5), 204.0, np.where(x > 0, 200.5, 198.3))
+        line = np.array([[0.0, 0.0, np.nan], [0.0, 0.5, np.nan], [30.0, 0.5, np.nan]])
+        st = wl.of_lines([line], ramp)
+        self.assertEqual(len(st), 1)
+        self.assertEqual(st[0]["p"][0].tolist(), [0.0, 0.5])  # (the run alone, from the corner: the jog is under PIECE)
+        self.assertTrue(np.all(st[0]["zl"] == 204.0) and np.allclose(st[0]["zr"][3:], 200.5))
+        # (a wall round a terrace's corner: two stretches, each read square to its own side)
+        def terrace(x, y):
+            x, y = np.asarray(x, float), np.asarray(y, float)
+            return np.where((x >= 0) & (y >= 0), 203.0, 200.0)
+        st = wl.of_lines([np.array([[0.0, 20.0, np.nan], [0.0, 0.0, np.nan], [20.0, 0.0, np.nan]])], terrace)
+        self.assertEqual(len(st), 2)
+        for s in st:
+            self.assertTrue(np.allclose(s["zl"], 203.0) and np.allclose(s["zr"], 200.0), (s["zl"], s["zr"]))
+
     def test_runs_close_small_gaps_and_drop_short_ones(self):
         d = np.arange(12.0)
         on = np.array([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0], bool)
