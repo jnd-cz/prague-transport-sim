@@ -4460,7 +4460,7 @@
       "sloping m": 2.5,
       "off the lidar m": 2.5
      },
-     "why": "IPR's raster has the street level to 14 m from the track, the wall within 2 m (196.9 to 189.0) and the level quay to 27 m; the survey's sidewalk outlines (areas 843 and 171) carry the stairs' landing (191.35) on the wall's line"
+     "why": "IPR's raster has the street level to 14 m from the track, the wall within 2 m (196.9 to 189.0) and the level quay to 27 m; the generated sidewalk surface (data/line17.streets.*) follows it within 0.6 m, but the ground file has corners only at the kerb (11.0 m), on the two sidewalk areas' shared edge (15.1 m, at the surface's mid-wall 191.95) and at 16.0 m: its 5 m lattice runs a straight line across the wall"
     }
    ]
   },
