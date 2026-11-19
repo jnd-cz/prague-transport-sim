@@ -4659,6 +4659,17 @@
     }
    ]
   },
+  "garden-edgings": {
+   "line": "23",
+   "at": [
+    -1116.8,
+    806.1
+   ],
+   "reach": 30,
+   "issue": 697,
+   "what": "a terraced garden's edgings and low walls surveyed as paved strips half a metre across (survey areas 946 and 956, 138 and 71 outline points over 232.6-245.7 m): level lawns between level strips, no sheet leaning across a lawn",
+   "source": "found on #697 measuring the paved areas whose outline climbs a wall: 46-128 a line are strips under 1 m across. The written file of 2026-11-19 triangulates each strip's outline, its foot's side and its top's, and they stand as fins up to 2 m over the lawns; as walls (ground_mesh.wall_like) the place's steep faces go 144.4 -> 92.6 m2"
+  },
   "modrany-viaduct-ramps": {
    "line": "17",
    "at": [

@@ -313,6 +313,17 @@ class Walls(unittest.TestCase):
         self.assertTrue(np.allclose(z, [307.8, 316.05], atol=0.1))
         self.assertFalse(lifted.any())
 
+    def test_a_paved_strip_that_climbs_a_wall_is_a_wall(self):
+        # (#697: a parapet along a path surveyed as paved, 0.4 m across, its foot's side 1.5 m under its top's)
+        strip = [[0, 0, 186.0], [40, 0, 186.2], [40, 0.4, 187.7], [0, 0.4, 187.5]]
+        self.assertTrue(gm.wall_like({"c": "wall", "r": strip}))
+        self.assertTrue(gm.wall_like({"c": "paved", "r": strip}))
+        self.assertFalse(gm.wall_like({"c": "paved", "g": 1, "r": strip}))  # (on the lidar: the city mesh's)
+        self.assertFalse(gm.wall_like({"c": "paved", "r": [[0, 0, 186.0], [40, 0, 186.2], [40, 0.4, 186.3], [0, 0.4, 186.1]]}))
+        yard = [[0, 0, 186.0], [40, 0, 186.2], [40, 0.4, 187.7], [40, 12, 187.7], [0, 12, 187.5]]  # (a yard: 12 m across)
+        self.assertFalse(gm.wall_like({"c": "paved", "r": yard}))
+        self.assertFalse(gm.wall_like({"c": "green", "r": strip}))
+
     def test_a_lifted_wall_corner_is_welded_apart_from_the_ground_at_its_foot(self):
         cx, cy = np.zeros(4), np.zeros(4)
         zc = np.array([208.5, 208.5, 205.3, 205.36])  # (two wall faces' corners at the top; the road and a lawn at the foot)

@@ -482,6 +482,17 @@ def wall_width(a):
     return 2 * g.area / g.length if g.length > 0 else 0.0
 
 
+def wall_like(a):
+    """Whether a survey area takes a wall's heights (wall_face): a wall; or a paved strip off the lidar, a wall's
+    thickness across (WALL_WIDE), whose outline climbs a wall (climbs()). 46-128 paved areas a line are such strips
+    under 1 m across, 6-35 more up to 2.5 m (parapets and low walls along paths: line 17 area 4189 at (1194, 2409),
+    line 23 area 956 at (-1117, 806)): their foot's side and their top's triangulated to a leaning sheet, 0.03-0.17 ha
+    a line steeper than 1:1 (#697)."""
+    if a["c"] == "wall":
+        return True
+    return a["c"] == "paved" and not a.get("g") and wall_width(a) <= WALL_WIDE and climbs(a)
+
+
 def wall_face(ring_segs, x, y, tx, ty):
     """Heights of a survey wall area's corners (x, y), each in a triangle with centre (tx, ty), and which of them were
     lifted off the outline: (z, lifted). Where the area's two sides there part by WALL_FACE or more it is a retaining
@@ -1052,7 +1063,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     lifted = np.zeros(len(m), bool)
     for a in np.unique(sa[need]).tolist():
         mm = need & (sa == a)
-        segs = ring_segments(D["areas"][a]) if D["areas"][a]["c"] == "wall" else None
+        segs = ring_segments(D["areas"][a]) if wall_like(D["areas"][a]) else None
         if segs is not None and len(segs) and wall_width(D["areas"][a]) > WALL_WIDE:  # (a battered face, #653)
             zs[mm] = across_outline(segs, cx[m][mm], cy[m][mm])
         elif segs is not None and len(segs):  # (a wall: between its sides, #653; upright where they part, #697)
