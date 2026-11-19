@@ -29,7 +29,8 @@ things are done, and why a rule exists, is in the files it points to:
 
 ## What to work on
 
-- **The order:** ROADMAP.md. Until the city's tram world runs (#731): the small fixes, the city data model, one
+- **The order:** ROADMAP.md. Until the city's tram world runs (#731): the fused ground stable on its places (#757),
+  the small fixes, the city data model, one
   tram world built per tile, driving on the track graph, the simulation's core apart from drawing. Scenery (W4)
   and Backlog wait for it.
 - **Tasks are GitHub issues** (`jnd-cz/prague-transport-sim`). A new one says what is now (with numbers), where
@@ -173,6 +174,7 @@ things are done, and why a rule exists, is in the files it points to:
 
 | check | line | symptom | issue |
 |---|---|---|---|
+| stops, load10 | 9 seed 2; 17 `load10` seed 5 | one brake-to-drive change with nothing in front, 1.7 m before the stop point (Klamovka s 6087; Strossmayerovo náměstí s 16329) | #756 |
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
 
 ## Code and docs
