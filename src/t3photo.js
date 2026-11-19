@@ -236,10 +236,36 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
       } else surface(body, 'End_moulding', rows, mat);
     }
     surface(body, 'Cream_window_sill', [angles.map(a => endPoint(a, 1.66, sign)), angles.map(a => endPoint(a, windowY(a, false, sign), sign))], cream);
-    const rows = [0, .5, 1].map(t => angles.map(a => endPoint(a, THREE.MathUtils.lerp(windowY(a, false, sign), windowY(a, true, sign), t), sign, .012)));
-    surface(body, sign > 0 ? 'Windscreen_with_quarter_lights' : 'Rear_window', rows, glass);
-    for (const top of [false, true]) tube(detail, 'End_window_seal', angles.map(a => V(...endPoint(a, windowY(a, top, sign), sign))), .018, rubber);
-    for (const a of [-Math.PI / 2, -.75, .75, Math.PI / 2]) {
+    if (sign > 0) {
+      // The quarter-lights on 6312 roll into a cream pillar. In the curved shell's
+      // coordinates these are quarter ellipses, tangent to both sill and jamb.
+      const shoulder = angles[42], jamb = 1.50;
+      const corner = Array.from({ length: 9 }, (_, i) => {
+        const t = Math.PI * i / 16;
+        return [shoulder + (jamb - shoulder) * Math.sin(t), 1 - Math.cos(t)];
+      });
+      const sections = [...corner.slice().reverse().map(([a, k]) => [-a, k]),
+        ...angles.slice(7, 42).map(a => [a, 0]), ...corner];
+      const edge = (a, k, top) => windowY(a, top) + k * (top ? -.235 : .125);
+      const pane = (a, k, t, inset) => endPoint(a, THREE.MathUtils.lerp(edge(a, k, false), edge(a, k, true), t), 1, inset);
+      surface(body, 'Windscreen_with_quarter_lights', [0, .5, 1].map(t =>
+        sections.map(([a, k]) => pane(a, k, t, .012))), glass);
+      for (const side of [-1, 1]) {
+        for (const top of [false, true]) surface(body, 'Quarter_light_corner', [false, true].map(cut =>
+          corner.map(([a, k]) => endPoint(side * a, cut ? edge(a, k, top) : windowY(a, top), 1))), cream);
+        surface(body, 'Quarter_light_pillar', [false, true].map(top =>
+          [jamb, Math.PI / 2].map(a => endPoint(side * a, windowY(a, top), 1))), cream);
+      }
+      const across = t => sections.map(([a, k]) => V(...pane(a, k, t, 0)));
+      const jambPoints = side => [.25, .5, .75].map(t => V(...pane(side * jamb, 1, t, 0)));
+      tube(detail, 'Panoramic_window_gasket', [...across(0), ...jambPoints(1),
+        ...across(1).reverse(), ...jambPoints(-1).reverse()], .017, rubber, true);
+    } else {
+      const rows = [0, .5, 1].map(t => angles.map(a => endPoint(a, THREE.MathUtils.lerp(windowY(a, false, sign), windowY(a, true, sign), t), sign, .012)));
+      surface(body, 'Rear_window', rows, glass);
+      for (const top of [false, true]) tube(detail, 'End_window_seal', angles.map(a => V(...endPoint(a, windowY(a, top, sign), sign))), .018, rubber);
+    }
+    for (const a of (sign > 0 ? [-.75, .75] : [-Math.PI / 2, -.75, .75, Math.PI / 2])) {
       rod(detail, 'End_window_mullion', V(...endPoint(a, windowY(a, false, sign), sign)), V(...endPoint(a, windowY(a, true, sign), sign)), .018, chrome);
     }
     surface(body, 'Overhanging_brow', [0, .12, .88, 1].map(t => angles.map(a => browPoint(a, t, sign))), cream);

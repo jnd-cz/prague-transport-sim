@@ -105,6 +105,13 @@ CHECK = """async () => {
   let shoulderWidth = 0;
   for (let i = 0; i < endVertices.count; i++) if (Math.abs(endVertices.getZ(i)) > 6.5) shoulderWidth = Math.max(shoulderWidth, Math.abs(endVertices.getX(i)));
   checks.taperedEndShoulders = shoulderWidth > .6 && shoulderWidth < 1.05;
+  // Across each front quarter-light the exposed glass is shorter by the jamb.
+  const frontMaterials = [shell, m.getObjectByName('Body_Window_glass')];
+  checks.roundedQuarterLightOpenings = [-1, 1].every(side => {
+    const at = (y, z) => hit([side * 2, y, z], [-side, 0, 0], frontMaterials)?.object;
+    return at(2.20, 6.10) === frontMaterials[1] && [1.86, 2.47].every(y =>
+      at(y, 6.10) === shell && at(y, 6.42) === frontMaterials[1]);
+  });
   const browHit = hit([0, 2.68, 8], [0, 0, -1], [shell]);
   const glassHit = hit([0, 2.64, 8], [0, 0, -1], [m.getObjectByName('Body_Window_glass')]);
   checks.browOverhangsGlass = browHit && glassHit && browHit.point.z > glassHit.point.z + .025;
