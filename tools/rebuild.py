@@ -288,5 +288,8 @@ if __name__ == "__main__":
     from baseline_store import HeavyJob
     from board import check_rebuild_label
     check_rebuild_label("rebuild", warn_only=True)  # (a local rebuild is fine; its publish needs the label, #280)
-    with HeavyJob("rebuild"):  # (waits its turn among the heavy jobs, and the nightly baseline for it)
+    lines, par, _ = args(sys.argv[1:])
+    # (waits its turn among the heavy jobs, and the nightly baseline for it; a build: beside counts and other builds
+    # while 2.5 GB a line built side by side and half the cores fit, #728)
+    with HeavyJob("rebuild", share={"gb": 2.5 * (len(lines) if par else 1), "cores": max(1, (os.cpu_count() or 2) // 2)}):
         main()

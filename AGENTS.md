@@ -110,7 +110,7 @@ things are done, and why a rule exists, is in the files it points to:
 
 - **Python:** `python -I` for stdlib-only tools, `python -P -E` for those needing the user site packages
   (DEVELOPING.md lists them). Multi-line scripts go into a file, not a shell heredoc.
-- **Ports:** dev server `python tools/serve.py 8742` (Claude; Codex 8743; `headless.py` 8745). Port 8740 may be
+- **Ports:** dev server `python tools/serve.py 8742` (Claude; Codex 8743). Port 8740 may be
   another session's: never use or stop it. A tool or test that needs a page starts its own server on a free port.
 - **Tests:** `python -I tools/test_all.py` (`--browser` adds the page tests, `-k name` picks some). A change to a
   tool runs `tools/test_<tool>.py`; a new tool gets one. A test that drives a page sets a time limit for the
@@ -121,7 +121,10 @@ things are done, and why a rule exists, is in the files it points to:
   `city_terrain.py`, `ground_mesh.py`; `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py`,
   `street_profile.py` and `ground_partition.py` when run alone; `test_all.py` for the whole suite. Anything
   else runs through `python -I tools/heavy.py "what" -- CMD ...`. Start one in the background and let it wait;
-  never start a second beside it. Timings always run alone; count runs and builds may share once #728 lands.
+  never start a second beside it. A timing runs alone (`frametime.py`, a bench, the whole test suite, plain
+  `heavy.py`). Count runs and builds (`headless.py`, `rebuild.py`, `ground_mesh.py`, `city_terrain.py`,
+  `heavy.py --shared GB,CORES` for pictures and the like) run beside each other while their memory and cores
+  fit (the user, 2026-11-19, #728). A wait that ends with "does nothing" names a stuck job: look at that one.
 - **A long job pins its checkout:** work on another issue meanwhile in its own worktree.
 - **Which checks a change needs** (`/regress` picks them from the diff and has the commands; a change of two
   kinds runs both):

@@ -36,7 +36,7 @@ run). `--against W1` names a checkpoint instead.
    waits for, so start it and let it wait rather than starting a second one beside it. Every check on
    every line takes 27 minutes with 4 pages at once (#205), the geometry checks a few minutes a line.
    `python -P -E tools/headless.py --lines <lines> --checks <the tier's checks> --compare`
-   (`--port 0` when another headless run uses 8745). Seeded counts are judged against main's spread over
+   Seeded counts are judged against main's spread over
    its seeds (#156); fewer seeds (`--seeds 1-2`) still compare against the full spread, only less surely.
 4. **Read the result:**
    - A stale-baseline warning: main moved since its baseline. Say so, and read the differences as main's

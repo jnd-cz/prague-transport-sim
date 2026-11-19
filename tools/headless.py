@@ -17,7 +17,7 @@ collisions, stuck tram or signal penalty; redruns no red runs; traffic must fini
 thresholds, `--compare` shows its moves).
 
 Needs Playwright (`python -m pip install --user playwright`, `python -m playwright install chromium`).
-Starts its own tools/serve.py on --port (0 picks a free port) and verifies its launch identity before
+Starts its own tools/serve.py on a free port (--port names one) and verifies its launch identity before
 any job; an occupied port fails. --url explicitly uses an existing server. The pages draw
 nothing (#411): they keep what a draw did for the checks, the world matrices and the walkers' poses. The counts
 are the same, run by run, on every check of every line, at a sixth of the CPU (--draw: once a second in
@@ -539,6 +539,7 @@ ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-
         "--disable-backgrounding-occluded-windows"]
 GPU_ARGS = [*gpu.HARDWARE, *ARGS[3:]]  # (WebGL on the machine's GPU, tools/gpu.py)
 PAGES = 8  # pages at once by default (sysinfo.workers caps it by cores and free memory)
+PAGE_GB, PAGE_CORES = 4.0, 2  # a page's memory and cores, as the queue counts them (HeavyJob's share, #728)
 PAGE = {"draw": False, "viewport": (960, 540), "gpu": False, "keepgeo": True}  # (how the pages draw: --draw, --viewport, --gpu,
 # #411; keepgeo: every ground tile held and the geometry kept, as the checks read it; False: as a player loads it, #30)
 
@@ -809,7 +810,8 @@ def main():
     ap.add_argument("--lines", default="17")
     ap.add_argument("--checks", default="u3,redruns", help="u3, redruns, stops, autumn, rain, winter, load10, load90, traffic, lint, canted, crossing, surfaces, spacing, heights")
     ap.add_argument("--seeds", help=f"default 1-3; {SPREAD_SEEDS} with --baseline or --compare (the seed spread)")
-    ap.add_argument("--port", type=int, default=8745, help="own server port; 0 chooses a free port atomically")
+    # (a free port by default: a run beside another, or queued behind one, found the fixed 8745 taken and ended, #728)
+    ap.add_argument("--port", type=int, default=0, help="own server port; 0, the default, chooses a free port atomically")
     ap.add_argument("--url", help="use a running server instead of starting tools/serve.py")
     ap.add_argument("--headed", action="store_true", help="show the browser (debugging)")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
@@ -903,19 +905,25 @@ def main():
         return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs, load)
                 for c in DRIVE if (line, c, seed) in asked]
 
-    heavy = HeavyJob("headless")  # (waits its turn among the heavy jobs, and the nightly baseline for it: #280)
+    # (waits its turn among the heavy jobs, and the nightly baseline for it: #280. A count run: it runs beside other
+    # counts and builds, a page being PAGE_GB of memory and PAGE_CORES cores, #728)
+    heavy = HeavyJob("headless", share={"gb": PAGE_GB * (a.jobs or 1), "cores": PAGE_CORES * (a.jobs or 1)})
     try:
         heavy.__enter__()
         t0 = time.time()  # (the run's time, not the wait's)
         if a.jobs is None:
             # (sized by the memory free once its turn comes; at most 8: without drawing a page takes ~2 cores, and 75
-            # runs took 1633 s drawing at 4 pages, 721 s at 8 and 706 s at 12 without, #411)
-            a.jobs = workers(4.0, most=PAGES)
+            # runs took 1633 s drawing at 4 pages, 721 s at 8 and 706 s at 12 without, #411; beside other shared jobs,
+            # by what they leave)
+            room = heavy.room()
+            a.jobs = max(1, min(workers(PAGE_GB, most=PAGES), int(room["gb"] // PAGE_GB), room["cores"] // PAGE_CORES))
         os.makedirs(a.out, exist_ok=True)
         # (u3, redruns and stops of a line and seed: one drive; then batches of one line's runs, each in one page)
         runs = list(jobs) if a.separate else merge_drives(jobs)
         t = load_timings() if TIMINGS else {"runs": {}, "loads": {}}
         batches = plan(runs, a.jobs, t, a.batch and max(1, a.batch))
+        pages = min(a.jobs, len(batches))  # (what the queue keeps for this run: the pages it opens, #728)
+        heavy.claim(gb=PAGE_GB * pages, cores=PAGE_CORES * pages)
         dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
         print(f"{len(runs)} runs in {len(batches)} batches on {min(a.jobs, len(batches))} pages, longest first; "
               f"expected {finish(dur, a.jobs):.0f} s from {len(t['runs'])} timed runs", flush=True)
