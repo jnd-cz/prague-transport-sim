@@ -269,6 +269,59 @@ class Lidar(unittest.TestCase):
         self.assertTrue(np.isnan(got[0]))  # (a triangle no class lies over is not asked)
 
 
+class OwnPlane(unittest.TestCase):
+    class Streets:
+        """A sidewalk surface at 100.5 m for x < 2 (where it reaches), none elsewhere; no carriageway."""
+        def at(self, kind, x, y):
+            return np.where((x < 2) & (kind == "sidewalk"), 100.5, np.nan)
+
+    class Ipr:
+        """IPR's ground `dz` m off the yard's outline (100 m at x 0 rising to 104 m at x 10)."""
+        def __init__(self, dz):
+            from geo import Frame
+            self.dz, self.E0 = dz, Frame().E0
+
+        def sample(self, E, N):
+            return 100 + 0.4 * (np.asarray(E, float) - self.E0) + self.dz
+
+    def setUp(self):
+        # (a yard 0-10 x 0-10 whose outline stands at 100 m at x 0 and 104 m at x 10; the city mesh at 100.2 m)
+        self.D = {"areas": [{"c": "paved", "l": 0, "r": [[0, 0, 100], [10, 0, 104], [10, 10, 104], [0, 10, 100]]}]}
+        x, y = np.array([-20., 30, 30, -20]), np.array([-20., -20, 30, 30])
+        self.G = {"x": x, "y": y, "z": np.full(4, 100.2), "T": np.array([[0, 1, 2], [0, 2, 3]]), "under": np.array([0, 1])}
+        # (corners: at a surveyed point (0, 0); on a cut through it near a sidewalk at (1, 5) and far from one at (6, 5);
+        # on its long edge at (0, 5), near the sidewalk)
+        self.x, self.y = np.array([0., 1, 6, 0]), np.array([0., 5, 5, 5])
+        self.sc, self.sa = np.array(["paved"] * 4), np.array([0, 0, 0, 0])
+        self.z0 = np.array([100., 100.4, 102.4, 100.])  # (the outline's plane)
+
+    def test_off_its_outline_the_street_surface_then_the_lidar(self):
+        z, src = gm.own_heights(self.D, self.G, self.Streets(), self.sc, self.sa, self.x, self.y, self.z0.copy(),
+                                np.ones(4, bool), ipr=self.Ipr(0.1))
+        self.assertEqual(src.tolist(), ["", "street", "lidar", "street"])
+        self.assertEqual(np.round(z, 3).tolist(), [100.0, 100.5, 100.2, 100.5])
+
+    def test_an_area_off_the_ground_keeps_its_plane(self):
+        # (IPR 3 m under its outline: a yard over a cellar, a terrace)
+        z, src = gm.own_heights(self.D, self.G, self.Streets(), self.sc, self.sa, self.x, self.y, self.z0.copy(),
+                                np.ones(4, bool), ipr=self.Ipr(-3.0))
+        self.assertEqual(src.tolist(), ["", "street", "plane", "street"])
+        self.assertEqual(np.round(z, 3).tolist(), [100.0, 100.5, 102.4, 100.5])
+
+    def test_a_median_keeps_its_outline(self):
+        # (its outline is its kerb's top: only the corners off it change)
+        self.D["areas"][0]["c"] = "median"
+        z, src = gm.own_heights(self.D, self.G, self.Streets(), np.array(["median"] * 4), self.sa, self.x, self.y,
+                                self.z0.copy(), np.ones(4, bool), ipr=self.Ipr(0.1))
+        self.assertEqual(src.tolist(), ["", "street", "lidar", ""])
+
+    def test_other_classes_are_left(self):
+        sc = np.array(["sidewalk"] * 4)
+        z, src = gm.own_heights(self.D, self.G, self.Streets(), sc, self.sa, self.x, self.y, self.z0.copy(),
+                                np.ones(4, bool), ipr=self.Ipr(0.0))
+        self.assertEqual(z.tolist(), self.z0.tolist())
+
+
 class Steps(unittest.TestCase):
     def square_with_a_step(self):
         # two triangles meeting along x = 1000, the right one 0.1 m higher: its own vertices on the edge

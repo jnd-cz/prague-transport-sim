@@ -217,6 +217,71 @@ def city_at(G, px, py):
     return out
 
 
+OWN_PLANE = ("paved", "parking", "median", "cycle")  # (survey classes on their outline's plane: own_heights, #638)
+# m: an area whose outline lies within this of IPR's ground (its ring's median |difference|) is on the ground and laid on
+# the lidar inside. Calibrated on the five lines (median |outline - IPR| per area): medians 100 % within it (76), cycle
+# paths 98 % (48), parking 95 % (947); paved areas spread (11,030: p50 0.16 m, 32 % over it: yards over cellars, terraces)
+OWN_GROUND = 0.3
+OWN_ON = 0.01  # m: a corner this near its area's outline lies on it
+
+
+def own_ground(D, a, ipr=None):
+    """Whether survey area `a` lies on the ground: its outline's median |height - IPR's| within OWN_GROUND."""
+    from geo import Frame
+    from ipr_dtm import IprDtm
+    r = np.array([q[:3] for q in D["areas"][a]["r"] if q[2] is not None], float)
+    if len(r) < 3:
+        return False
+    F = Frame()
+    g = np.asarray((ipr or IprDtm()).sample(r[:, 0] + F.E0, r[:, 1] + F.N0), float)
+    ok = np.isfinite(g)
+    return bool(ok.sum() >= 3 and np.median(np.abs(r[ok, 2] - g[ok])) <= OWN_GROUND)
+
+
+def own_heights(D, G, streets, sc, sa, x, y, zs, need, ipr=None):
+    """The OWN_PLANE classes' corners but their surveyed points (a median's: off its outline; `need`: those the loop
+    above gave their outline's plane):
+    the street surface where it reaches (a parking area the carriageway's, else the sidewalks'; the others the
+    sidewalks'), else the lidar (city_at) where the area lies on the ground (own_ground), else the plane as it was.
+    Returns (zs, per corner what gave it: "", "street", "lidar", "plane")."""
+    from ipr_dtm import IprDtm
+    src = np.full(len(zs), "", dtype=object)
+    cand = np.flatnonzero(need & np.isin(sc, OWN_PLANE))
+    if not len(cand):
+        return zs, src
+    ipr = ipr or IprDtm()
+    zs = zs.copy()
+    for a in np.unique(sa[cand]).tolist():
+        k = cand[sa[cand] == a]
+        segs = ring_segments(D["areas"][a])
+        if not len(segs):
+            continue
+        c = D["areas"][a]["c"]
+        if c in RAISED:  # (a median's outline is its kerb's top: only off it, where lidar or a sidewalk meets it)
+            ring = shapely.MultiLineString([s_[:, :2] for s_ in segs])
+            off = k[shapely.distance(ring, shapely.points(x[k], y[k])) > OWN_ON]
+        else:  # (elsewhere every corner but its surveyed points: its outline's long edges ran between far points too)
+            from scipy.spatial import cKDTree
+            d, _ = cKDTree(segs[:, 0, :2]).query(np.column_stack([x[k], y[k]]))
+            off = k[d > OWN_ON]
+        if not len(off):
+            continue
+        z = np.full(len(off), np.nan)
+        for kd in (("road", "sidewalk") if c == "parking" else ("sidewalk",)):
+            miss = np.isnan(z)
+            if miss.any():
+                z[miss] = streets.at(kd, x[off][miss], y[off][miss])
+        src[off[np.isfinite(z)]] = "street"
+        miss = np.isnan(z)
+        if miss.any() and own_ground(D, a, ipr):
+            zl = city_at(G, x[off][miss], y[off][miss])
+            z[np.flatnonzero(miss)] = zl
+            src[off[np.flatnonzero(miss)[np.isfinite(zl)]]] = "lidar"
+        src[off[np.isnan(z)]] = "plane"
+        zs[off] = np.where(np.isfinite(z), z, zs[off])
+    return zs, src
+
+
 WALL_LATTICE = 1.0  # m: a survey wall's faces cut to this, their corners between its sides (across_outline, #653)
 WALL_SNAP = 0.3  # m: a street corner on a wall's or stairs' outline this near its height there takes it (#653)
 WALL_ON = 0.01  # m: a corner this near the outline lies on it (the faces are noded on it)
@@ -767,6 +832,12 @@ def build(ln, mesh=None, threads=8, log=print):
             zs[mm] = across_outline(segs, cx[m][mm], cy[m][mm])
         else:
             zs[mm] = surface.at(a, cx[m][mm], cy[m][mm])
+    # (a paved yard, a parking area or a cycle path but at its surveyed points, a median off its outline (on an edge a
+    # higher area cut through its inside, another's lattice on it, a long edge of its outline): its outline's plane there
+    # ran between far points: line 23 s 557 (-2564.4, 434.0), a yard 0.33 m under the sidewalk on their shared edge,
+    # its nearest surveyed point 4 m off, a step with its wall. It meets its neighbours instead:
+    # the street surface where it reaches, else the lidar where the area lies on the ground, else its outline, #638)
+    zs, own_src = own_heights(D, G, streets, sc, sa, cx[m], cy[m], zs, need)
     # (a river or a pond is level: in OSM's water, at the level its banks give (WaterLevels, as OSM's water above: two of
     # line 17's survey water areas span a weir, Helmovský and Troja's, their own level 3.4-3.9 m under the water above it,
     # #632); elsewhere, as the page laid it (src/terrain.js DtmSurface), at its outline's WATER_LEVEL quantile: its
@@ -924,7 +995,9 @@ def build(ln, mesh=None, threads=8, log=print):
            "faces": len(faces), "vertices": int(len(V)), "triangles": int(len(F)),
            "triangles per class": {c: int((fcls_id == i).sum()) for c, i in CLASS_IDS.items()},
            "water triangles (the terrain's, OSM's water)": n_water, "water": prep.get("water"),
-           "steps": steps, "corners without a height (IPR's)": no_height, "seconds": {"partition": round(t_part, 1)}}
+           "steps": steps, "corners without a height (IPR's)": no_height, "seconds": {"partition": round(t_part, 1)},
+           "corners but their surveyed points (own_heights)": {c: dict(collections.Counter(own_src[(sc == c) & (own_src != "")].tolist()))
+                                                   for c in OWN_PLANE if ((sc == c) & (own_src != "")).any()}}
     t1 = time.time()
     rep["edges"] = edge_check(V, F, box)
     log(f"  edges checked, {time.time() - t1:.0f} s")
