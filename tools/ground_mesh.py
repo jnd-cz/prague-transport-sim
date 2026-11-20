@@ -1180,6 +1180,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         g = shapely.LineString(w["p"]).intersection(box)
         if not g.is_empty:
             lines.append(g)
+    by_walls = shapely.union_all([shapely.LineString(w["p"]).buffer(SURVEY_LATTICE) for w in walls]) if walls else None
     for k, q in enumerate(pieces["survey"]):
         lines.append(q["g"].boundary)
         owners.append(("survey", k, q["g"]))
@@ -1192,7 +1193,12 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
             if g is not None and not g.is_empty:
                 lines.append(g)
             if on_lidar_:
-                g = bends(q["g"], under_at)
+                # (the lidar's ground is cut finer only by a wall: between Chotkova's terraces the fine cells carry the
+                # levels the walls hold; on an open bank they drew the raster's bumps, a paved bank creased where it was
+                # smooth, line 37 s 2348 (3397, 3), and the seams of 10 cm rose 441 -> 536 on that line, #770)
+                g = bends(q["g"], under_at) if by_walls is not None and by_walls.intersects(q["g"]) else None
+                if g is not None and not g.is_empty:
+                    g = g.intersection(by_walls)
             else:
                 kd = "road" if q["c"] in STREETS_ROAD else "sidewalk"
                 g = bends(q["g"], lambda px, py, kd=kd: streets.at(kd, px, py))

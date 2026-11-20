@@ -601,6 +601,16 @@ Sections:
   none of its points over (2-3 a line, up to 2.3 ha) and stays on the street surface. Not solved: one area on both
   levels (line 37 green 4451, 8,164 m², 37 % of its points over): its strip between a wall and the footpath is a
   pit.
+- **Fine cells only by a wall** (#770, measured 2026-11-20). #762 cut every street and lidar-ground cell that bends
+  by 0.5 m to 1 m cells, so that the ground beside a wall could carry its two levels. On the lidar's ground away from
+  any wall the fine cells draw the raster's bumps: the banks of line 37's cutting at s 2340 as lumps with a spike, a
+  paved bank at (3397, 3) creased where it was smooth. The batch's seams of 10 cm (441 -> 536 on line 37, mostly
+  paved / paved and not at a wall) come from there. A lidar-ground cell is cut finer only within 5 m of a wall
+  stretch: every place's section holds as before (Chotkova's terraces need the fine cells: without any, 2.25 m of its
+  section slope against 1.75), and the steep faces that are no wall fall at four places (Žižkov's depot 41.6 -> 21.9
+  m², Krejcárek's abutment 88.5 -> 70.3, Letná 149.0 -> 125.0, Chotkova 498.2 -> 482.2). The price: the ground lies
+  farther from the raster where the raster bumps (4.5 m of a 24 m section along that bank more than 0.5 m off, none
+  before). Streets keep their fine cells.
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of
