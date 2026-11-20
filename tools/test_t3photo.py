@@ -122,9 +122,28 @@ CHECK = """async () => {
   const forkCheek = hit([-.11, .46, 8], [0, 0, -1], [frontCoupler]);
   checks.couplerHasOpenFork = forkCentre && forkCheek && forkCheek.point.z - forkCentre.point.z > .10;
   checks.couplerHasBoredEye = !hit([-.112, 1, 7.45], [0, -1, 0], [frontCoupler]) && !!hit([-.16, 1, 7.45], [0, -1, 0], [frontCoupler]);
-  checks.rearWiperRig = r.wipers.length === 3 && !!m.getObjectByName('Wiper_rear_pivot');
+  const rearGlassAt = (x, y) => hit([x, y, -8], [0, 0, 1], [frontMaterials[1]]);
+  const lowRear = rearGlassAt(0, 1.75), highRear = rearGlassAt(0, 2.63);
+  checks.rearSillAndRake = !!lowRear && !!highRear && highRear.point.z > lowRear.point.z
+    && highRear.point.z - lowRear.point.z < .05
+    && hit([0, 1.69, -8], [0, 0, 1], frontMaterials)?.object === shell;
+  const rearWiper = m.getObjectByName('Wiper_rear_pivot');
+  const blade = r.rearCarrier.children.find(o => o.material?.name === 'Rubber');
+  const tip = () => {
+    const box = new THREE.Box3().setFromObject(blade, true);
+    return new THREE.Vector3(box.getCenter(new THREE.Vector3()).x, box.min.y, box.min.z);
+  };
+  const pivot = pos(rearWiper), parked = tip();
+  checks.rearWiperHangsFromBrow = r.wipers.length === 3 && pivot.y > 2.68
+    && parked.y > 1.85 && parked.y < 2.05 && Math.abs(parked.x - pivot.x) < .03
+    && parked.z < rearGlassAt(parked.x, parked.y).point.z;
   const before = pos(r.doors[0].pairs[0].inner);
   s.pose(m, { doors: [1, .5, 0], bogies: [.2, -.2], wheelAngle: 1.2, wipers: 1, couplers: [.15, -.15], pantograph: 1 });
+  const swept = tip();
+  checks.rearWiperSweep = pivot.distanceTo(pos(rearWiper)) < 1e-6
+    && Math.abs(swept.x - parked.x) > .25 && swept.y > parked.y + .09
+    && r.rearLink.localToWorld(new THREE.Vector3(.012, -.56, .01)).distanceTo(
+       r.rearCarrier.localToWorld(new THREE.Vector3(.057, 0, .01))) < .001;
   checks.doorsFoldInward = pos(r.doors[0].pairs[0].inner).x > before.x + .3;
   checks.independentDoors = near(r.doors[2].pairs[0].outer.rotation.y, 0) && near(Math.abs(r.doors[1].pairs[0].outer.rotation.y), T3_PHOTO.doorMaxAngle / 2);
   checks.doorsStopShortOf90 = near(Math.abs(r.doors[0].pairs[0].outer.rotation.y), 84 * Math.PI / 180);
@@ -150,7 +169,9 @@ CHECK = """async () => {
   bindPhotoT3(gltf.scene);
   s.pose(gltf.scene, { doors: [1, .5, 0], pantograph: .3, wipers: 1 });
   checks.importedRigMoves = near(Math.abs(gltf.scene.rig.doors[0].pairs[0].outer.rotation.y), T3_PHOTO.doorMaxAngle)
-    && near(gltf.scene.rig.wipers[0].rotation.z, -.52) && near(gltf.scene.rig.wipers[1].rotation.z, .52);
+    && near(gltf.scene.rig.wipers[0].rotation.z, -.52) && near(gltf.scene.rig.wipers[1].rotation.z, .52)
+    && near(gltf.scene.rig.wipers[2].rotation.z, .65) && near(gltf.scene.rig.rearCarrier.rotation.z, -.65)
+    && near(gltf.scene.rig.rearLink.rotation.z, .65) && pivot.distanceTo(pos(gltf.scene.rig.wipers[2])) < .001;
   s.pose(gltf.scene); s.roundTrip = gltf.scene;
   const originalBounds = new THREE.Box3().setFromObject(m), importedBounds = new THREE.Box3().setFromObject(gltf.scene);
   checks.glbBounds = originalBounds.min.distanceTo(importedBounds.min) < .001 && originalBounds.max.distanceTo(importedBounds.max) < .001;

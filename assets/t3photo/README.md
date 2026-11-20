@@ -30,6 +30,7 @@ The five user photographs supplied in the 2026-11-09 session are visual referenc
 |---|---|
 | `17823.jpg` | 6892 front: cream brow, two headlights, number, blue route board, orange collector |
 | `17824.jpg` | 6892 rear: window, cream skirt, red face, coupler recess |
+| `C5R09032.JPG`, `C5R09035.JPG` (2026-11-20) | 6892 straight-on rear and open rear doorway. These show the top-mounted wiper, narrow cream sill and rounded quarter-light beside the last door. |
 | `16806.jpg` | 6921: sloping windscreen, folding door leaves, steps, mirror and lamp housings |
 | `16447.jpg` | 8080: left side windows, skirt, wheel recesses and louvres |
 | `16191.jpg` | 8015: three right-side doors, four leaves each, long body proportions |
@@ -102,7 +103,8 @@ assemblies; movable groups retain their pivots and stable names. `userData` beco
 | `Pantograph_contact_head` | Y translation; stays level at both arm tips |
 | `Coupler_front`, `Coupler_rear` | Local Y yaw; shank pivot at z = ±6.25 m |
 | `Wiper_left/right` → `Wiper_left/right_pivot` | Parent aligns the local Z axis to the raked windscreen |
-| `Wiper_rear` → `Wiper_rear_pivot` | Upright rear blade, local Z sweep |
+| `Wiper_rear` → `Wiper_rear_pivot` and `Wiper_rear_link` | Two parallel arms pivot from the cream brow above the rear glass. The estimated 0.65 rad sweep moves the blade sideways. |
+| `Wiper_rear_carrier` | Counter-rotates under the main arm to keep the blade upright. Link lengths and sweep are estimated from the parked position. |
 | `Route_plate` | Static plate and holder aligned to the front brow |
 | `Body` / `Interior` / `Exterior_details` | Static rigid assemblies |
 
@@ -136,7 +138,7 @@ The studio works without world data. Its first load needs the same CDN as the ga
 
 | Files | Author / origin | Licence |
 |---|---|---|
-| `tatra-t3-6892.glb`, generated lettering | Original model made for this project by Codex, 2026-11-09, revised 2026-11-19 | AGPL-3.0-or-later |
+| `tatra-t3-6892.glb`, generated lettering | Original model made for this project by Codex, 2026-11-09, revised 2026-11-20 | AGPL-3.0-or-later |
 | `rig.json`, `preview.png`, `doors-open.png` | Rig manifest and renders of the original model | AGPL-3.0-or-later |
 | `../../src/t3photo.js` | Reproducible geometry and pose source | AGPL-3.0-or-later |
 

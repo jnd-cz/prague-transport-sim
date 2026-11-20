@@ -746,14 +746,14 @@
       "parent": "Tatra_T3_6892",
       "translation": [
         0,
-        1.81,
-        -6.995
+        2.801,
+        -6.9806
       ],
       "rotation": [
-        -3.977300034003461e-18,
-        0.9978882436713011,
-        -0.0649542388347826,
-        6.110303217594165e-17
+        1.2239127694340331e-18,
+        0.9998002197243681,
+        0.01998801238505941,
+        6.122010694361339e-17
       ]
     },
     {
@@ -761,6 +761,38 @@
       "parent": "Wiper_rear",
       "translation": [
         0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Z"
+    },
+    {
+      "name": "Wiper_rear_carrier",
+      "parent": "Wiper_rear_pivot",
+      "translation": [
+        0.012,
+        -0.56,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": "Z"
+    },
+    {
+      "name": "Wiper_rear_link",
+      "parent": "Wiper_rear",
+      "translation": [
+        0.057,
         0,
         0
       ],

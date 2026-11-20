@@ -206,8 +206,9 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
 
   // Rounded front/rear mouldings. The front glazing rakes back; the rear is almost upright.
   const taper = z => 1 - .10 * Math.max(0, Math.abs(z) - 4.65);
+  const rearRake = .04;
   const endPoint = (a, y, sign, inset = 0) => {
-    const r = 1.25 - inset, rake = y > 1.64 ? (y - 1.64) * (sign > 0 ? .43 : .13) : 0;
+    const r = 1.25 - inset, rake = y > 1.64 ? (y - 1.64) * (sign > 0 ? .43 : rearRake) : 0;
     // A shallow centre bow meets the much tighter quarter-light cheeks (6312 photos).
     const c = Math.max(0, Math.cos(a));
     const reach = 1.01 * c * (1.36 - .36 * c * c);
@@ -218,7 +219,8 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   const angles = Array.from({ length: 49 }, (_, i) => -Math.PI / 2 + Math.PI * i / 48);
   const windowY = (a, top, sign = 1) => {
     const corner = clamp((Math.abs(a) - .73) / (Math.PI / 2 - .73));
-    return top ? 2.65 - (sign > 0 ? .17 : .09) * corner ** 2 : 1.77 + .08 * corner ** 2;
+    if (sign < 0) return top ? 2.65 - .035 * corner ** 2 : 1.73 + .02 * corner ** 2;
+    return top ? 2.65 - .17 * corner ** 2 : 1.77 + .08 * corner ** 2;
   };
   const browPoint = (a, t, sign) => {
     const lower = endPoint(a, windowY(a, true, sign), sign, sign > 0 ? -.045 : -.025);
@@ -236,42 +238,39 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
       } else surface(body, 'End_moulding', rows, mat);
     }
     surface(body, 'Cream_window_sill', [angles.map(a => endPoint(a, 1.66, sign)), angles.map(a => endPoint(a, windowY(a, false, sign), sign))], cream);
-    if (sign > 0) {
-      // The quarter-lights on 6312 roll into a cream pillar. In the curved shell's
-      // coordinates these are quarter ellipses, tangent to both sill and jamb.
-      const shoulder = angles[42], jamb = 1.50;
+    {
+      // Quarter ellipses meet the sill and jamb tangentially. 6892's rear
+      // quarter-lights have tighter corners, especially at the sill.
+      const shoulder = angles[sign > 0 ? 42 : 44], jamb = sign > 0 ? 1.50 : 1.52;
       const corner = Array.from({ length: 9 }, (_, i) => {
         const t = Math.PI * i / 16;
         return [shoulder + (jamb - shoulder) * Math.sin(t), 1 - Math.cos(t)];
       });
       const sections = [...corner.slice().reverse().map(([a, k]) => [-a, k]),
-        ...angles.slice(7, 42).map(a => [a, 0]), ...corner];
-      const edge = (a, k, top) => windowY(a, top) + k * (top ? -.235 : .125);
-      const pane = (a, k, t, inset) => endPoint(a, THREE.MathUtils.lerp(edge(a, k, false), edge(a, k, true), t), 1, inset);
+        ...angles.filter(a => Math.abs(a) < shoulder - 1e-9).map(a => [a, 0]), ...corner];
+      const upperRadius = sign > 0 ? .235 : .093, lowerRadius = sign > 0 ? .125 : .045;
+      const edge = (a, k, top) => windowY(a, top, sign) + k * (top ? -upperRadius : lowerRadius);
+      const pane = (a, k, t, inset) => endPoint(a, THREE.MathUtils.lerp(edge(a, k, false), edge(a, k, true), t), sign, inset);
       surface(body, 'Windscreen_with_quarter_lights', [0, .5, 1].map(t =>
         sections.map(([a, k]) => pane(a, k, t, .012))), glass);
       for (const side of [-1, 1]) {
         for (const top of [false, true]) surface(body, 'Quarter_light_corner', [false, true].map(cut =>
-          corner.map(([a, k]) => endPoint(side * a, cut ? edge(a, k, top) : windowY(a, top), 1))), cream);
+          corner.map(([a, k]) => endPoint(side * a, cut ? edge(a, k, top) : windowY(a, top, sign), sign))), cream);
         surface(body, 'Quarter_light_pillar', [false, true].map(top =>
-          [jamb, Math.PI / 2].map(a => endPoint(side * a, windowY(a, top), 1))), cream);
+          [jamb, Math.PI / 2].map(a => endPoint(side * a, windowY(a, top, sign), sign))), cream);
       }
       const across = t => sections.map(([a, k]) => V(...pane(a, k, t, 0)));
       const jambPoints = side => [.25, .5, .75].map(t => V(...pane(side * jamb, 1, t, 0)));
       tube(detail, 'Panoramic_window_gasket', [...across(0), ...jambPoints(1),
         ...across(1).reverse(), ...jambPoints(-1).reverse()], .017, rubber, true);
-    } else {
-      const rows = [0, .5, 1].map(t => angles.map(a => endPoint(a, THREE.MathUtils.lerp(windowY(a, false, sign), windowY(a, true, sign), t), sign, .012)));
-      surface(body, 'Rear_window', rows, glass);
-      for (const top of [false, true]) tube(detail, 'End_window_seal', angles.map(a => V(...endPoint(a, windowY(a, top, sign), sign))), .018, rubber);
     }
-    for (const a of (sign > 0 ? [-.75, .75] : [-Math.PI / 2, -.75, .75, Math.PI / 2])) {
+    for (const a of [-.75, .75]) {
       rod(detail, 'End_window_mullion', V(...endPoint(a, windowY(a, false, sign), sign)), V(...endPoint(a, windowY(a, true, sign), sign)), .018, chrome);
     }
     surface(body, 'Overhanging_brow', [0, .12, .88, 1].map(t => angles.map(a => browPoint(a, t, sign))), cream);
     surface(detail, 'Brow_underside', [angles.map(a => endPoint(a, windowY(a, true, sign), sign)), angles.map(a => browPoint(a, 0, sign))], rubber);
     tube(detail, 'Brow_drip_edge', angles.map(a => V(...browPoint(a, 0, sign))), .012, chrome);
-    for (const [dy, radius, mat] of [[.012, .013, chrome], [-.012, .008, red]]) {
+    if (sign > 0) for (const [dy, radius, mat] of [[.012, .013, chrome], [-.012, .008, red]]) {
       tube(detail, 'Windscreen_sill_trim', angles.map(a => V(...endPoint(a, windowY(a, false, sign) + dy, sign, -.016))), radius, mat);
     }
     // Broad aluminium bumper with two fine red inserts, as the 7000 close-up shows.
@@ -549,11 +548,20 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     rod(pivot, 'Wiper_blade', V(Math.sign(x) * .10, .29, .025), V(Math.sign(x) * .10, .77, .025), .016, rubber);
     rig.wipers.push(pivot);
   }
-  const rearWiper = group(root, 'Wiper_rear', 0, 1.81, -6.995);
-  rearWiper.rotation.set(-.13, Math.PI, 0);
+  // C5R09032: the arm hangs from the brow on a small twin-spindle plate.
+  const mount = browPoint(0, .40, -1);
+  const rearWiper = group(root, 'Wiper_rear', 0, mount[1], mount[2] - .012);
+  rearWiper.rotation.set(Math.atan(rearRake), Math.PI, 0);
+  box(rearWiper, 'Rear_wiper_mount', [.105, .046, .026], [.025, 0, 0], cream);
   const rearPivot = group(rearWiper, 'Wiper_rear_pivot'); rearPivot.userData.axis = 'Z';
-  rod(rearPivot, 'Rear_wiper_arm', V(0, 0, 0), V(0, .65, 0), .009, dark);
-  rod(rearPivot, 'Rear_wiper_blade', V(.022, .28, .016), V(.022, .80, .016), .014, rubber);
+  const rearLink = group(rearWiper, 'Wiper_rear_link', .057, 0, 0);
+  const rearCarrier = group(rearPivot, 'Wiper_rear_carrier', .012, -.56, 0);
+  rig.rearLink = rearLink; rig.rearCarrier = rearCarrier;
+  for (const node of [rearLink, rearCarrier]) { node.userData.axis = 'Z'; node.userData.assembly = true; }
+  rod(rearPivot, 'Rear_wiper_arm', V(0, 0, .017), V(.012, -.56, .010), .011, dark);
+  rod(rearLink, 'Rear_wiper_link', V(0, 0, .017), V(.012, -.56, .010), .005, dark);
+  rod(rearCarrier, 'Rear_wiper_bridge', V(.057, 0, .010), V(0, 0, -.010), .008, dark);
+  rod(rearCarrier, 'Rear_wiper_blade', V(0, .25, -.010), V(0, -.27, -.010), .011, rubber);
   rig.wipers.push(rearPivot);
   const mirror = group(detail, 'Mirror_arm');
   tube(mirror, 'Mirror_support', [V(-1.12, 2.79, 6.1), V(-1.52, 2.81, 6.34), V(-1.64, 2.42, 6.37)], .022, steel);
@@ -649,6 +657,10 @@ export function posePhotoT3(root, { doors = [0, 0, 0], bogies = [0, 0], wheelAng
   r.wheelsets.forEach(w => { w.rotation.x = wheelAngle; });
   r.couplers.forEach((c, i) => { c.rotation.y = couplers[i] ?? 0; });
   r.wipers.forEach(w => { w.rotation.z = w.name === 'Wiper_rear_pivot' ? clamp(wipers) * .65 : (w.name === 'Wiper_right_pivot' ? 1 : -1) * (.33 - clamp(wipers) * .85); });
+  if (r.rearLink && r.rearCarrier) {
+    r.rearLink.rotation.z = r.wipers[2].rotation.z;
+    r.rearCarrier.rotation.z = -r.rearLink.rotation.z;
+  }
   const p = r.pantograph, a = THREE.MathUtils.lerp(1.45, .28, clamp(pantograph));
   p.arms.forEach(({ lower, upper, sign }) => { lower.rotation.x = sign * a; upper.rotation.x = -sign * 2 * a; });
   p.head.position.y = .16 + 2 * p.armLength * Math.cos(a);
@@ -673,6 +685,7 @@ export function bindPhotoT3(root) {
     wheelsets: [1, 2].flatMap(i => [1, 2].map(j => need(`Wheelset_${i}_${j}`))),
     couplers: ['front', 'rear'].map(s => need(`Coupler_${s}`)),
     wipers: ['right', 'left', 'rear'].map(s => need(`Wiper_${s}_pivot`)),
+    rearLink: root.getObjectByName('Wiper_rear_link'), rearCarrier: root.getObjectByName('Wiper_rear_carrier'),
     pantograph: { node: need('Pantograph'), head: need('Pantograph_contact_head'), armLength: 1.55,
       arms: [-1, 1].map(sign => { const s = sign < 0 ? 'rear' : 'front';
         return { lower: need(`Pantograph_lower_${s}`), upper: need(`Pantograph_upper_${s}`), sign };
