@@ -139,7 +139,8 @@ def _next_wall(S, sign, walls):
 
 
 def _side(S, lidar, sign, walls=None):
-    """(the level at the line, the slope away from it, whether a survey height gave it) of the ground on one side of
+    """(the level at the line, the slope away from it, whether a survey height gave it, IPR past the next wall where
+    one did) of the ground on one side of
     sampled points: the least-squares line through IPR's readings FIT m off, up to the next wall, where the ground slopes
     by FLAT or more; where it does not, the readings' median and no slope (a line through a sidewalk, its kerb and the
     road beyond falls a little, and carried back to the wall it raised the sidewalk against the Modřany ramp's wall by
@@ -165,6 +166,7 @@ def _side(S, lidar, sign, walls=None):
     # (the next wall nearer than the readings: a strip between two walls)
     strip = (n == 0) & np.isfinite(reach)
     surveyed = np.zeros(len(S), bool)
+    past = np.full(len(S), np.nan)
     if strip.any():
         i = np.flatnonzero(strip)
         own, other = S[i, 2], zhit[i]
@@ -176,19 +178,26 @@ def _side(S, lidar, sign, walls=None):
         surveyed[i] = np.isfinite(z)
         lvl[i] = np.where(np.isfinite(z), z, mid)
         g[i] = 0.0
-    return lvl, g, surveyed
+        with warnings.catch_warnings():  # (the ground past the next wall: FIT m beyond it)
+            warnings.simplefilter("ignore", RuntimeWarning)
+            past[i] = np.nanmedian(np.stack([np.asarray(lidar(S[i, 0] + sign * S[i, 3] * (reach[i] + o),
+                                                              S[i, 1] + sign * S[i, 4] * (reach[i] + o)), float) for o in d]), 0)
+    return lvl, g, surveyed, past
 
 
-def levels(S, lidar, walls=None):
+def levels(S, lidar, walls=None, strips=False):
     """The ground to the left and to the right of sampled points S (sample()), lidar(x, y) IPR's raster, walls the
     segments ((A, B), each (m, 3)) a side's readings stop at: (zl, gl, zr, gr), each side's level at the line and its
-    slope away from it (see the module's text)."""
-    (zl, gl, sl), (zr, gr, sr) = _side(S, lidar, 1.0, walls), _side(S, lidar, -1.0, walls)
+    slope away from it (see the module's text). strips: and per side, where it is the strip to the next wall line (a
+    surveyed height, _side) and IPR past that line (of_lines: a slot)."""
+    (zl, gl, sl, pl), (zr, gr, sr, pr) = _side(S, lidar, 1.0, walls), _side(S, lidar, -1.0, walls)
     z = S[:, 2]
     # (the line's own height is the side's it lies nearer, within OWN; a strip's level is a surveyed height already)
     dl, dr = np.abs(z - zl), np.abs(z - zr)
     own_l = np.isfinite(z) & (dl <= OWN) & (dl <= dr) & ~sl
     own_r = np.isfinite(z) & (dr <= OWN) & (dr < dl) & ~sr
+    if strips:
+        return np.where(own_l, z, zl), gl, np.where(own_r, z, zr), gr, (sl, pl), (sr, pr)
     return np.where(own_l, z, zl), gl, np.where(own_r, z, zr), gr
 
 
@@ -206,7 +215,7 @@ def retained(S, lidar, h, walls=None):
       (Where the line lies before the real wall the ground dips behind the top, as the slab the page drew stood proud
       of it, src/structures.js buildWalls until #765.)"""
     d = np.asarray(FIT, float)
-    (zl, gl, _), (zr, gr, _) = _side(S, lidar, 1.0, walls), _side(S, lidar, -1.0, walls)
+    (zl, gl, _, _), (zr, gr, _, _) = _side(S, lidar, 1.0, walls), _side(S, lidar, -1.0, walls)
 
     def behind(sign, offs):
         with warnings.catch_warnings():
@@ -272,7 +281,11 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
     readings run along that wall, through the raster's smear of it, and the point next to the end stands for it.
     heights: {a line's index: its wall's height over its foot}, for the lines known by a height (retained).
     outside: {a line's index: "l" or "r"}, for a strip's outline: the side that is not the strip (`out` of its
-    stretches: ground_mesh.hold_at_walls)."""
+    stretches: ground_mesh.hold_at_walls). A stretch one of whose sides is a slot carries `sl` / `sr`, per point whether
+    that side is: the strip to the next wall line there (levels()), its level STEP or more under the ground on both
+    sides of the pair, the stretch's other side and IPR past the next line (a
+    stairwell, an areaway; between a terrace's foot line and top line the strip is level with the lower ground). The
+    slot ends where the pair does, and its level holds nothing past the stretch's end (hold_at_walls)."""
     out = []
     walls = segments(list(lines) + list(others))
     for n_line, p in enumerate(lines):
@@ -280,7 +293,11 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
         if len(S) < 2:
             continue
         h = (heights or {}).get(n_line)
-        zl, gl, zr, gr = levels(S, lidar, walls) if h is None else retained(S, lidar, h, walls)
+        if h is None:
+            zl, gl, zr, gr, sl, sr = levels(S, lidar, walls, strips=True)
+        else:
+            zl, gl, zr, gr = retained(S, lidar, h, walls)
+            sl = sr = (np.zeros(len(S), bool), np.full(len(S), np.nan))
         if n_line in meeting and len(S) > 3:
             for q in (zl, gl, zr, gr):
                 q[0], q[-1] = q[1], q[-2]
@@ -291,6 +308,11 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
                 for q in v:
                     q[-1] = q[-2]
             out.append({"p": S[a:b + 1, :2].copy(), "zl": _median(v[0]), "gl": _median(v[1]), "zr": _median(v[2]), "gr": _median(v[3])})
+            for key, (strip, past), mine, other in (("sl", sl, "zl", "zr"), ("sr", sr, "zr", "zl")):
+                with np.errstate(invalid="ignore"):
+                    slot = strip[a:b + 1] & (past[a:b + 1] - out[-1][mine] >= STEP) & (out[-1][other] - out[-1][mine] >= STEP)
+                if slot.any():
+                    out[-1][key] = slot
             if h is not None:
                 out[-1]["h"] = h
             if n_line in meeting:  # (a line across a structure: ground_mesh.hold_at_walls leaves the deck's own surface)

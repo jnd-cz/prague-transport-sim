@@ -598,6 +598,30 @@ class BesideAThinWall(unittest.TestCase):
             np.testing.assert_allclose(z, [at_wall, 258.0 + grade * (1.0 if grade < 0.2 else 1.5)], atol=1e-9)
 
 
+class APairsEnd(unittest.TestCase):
+    def test_the_strip_between_two_wall_lines_holds_nothing_past_their_end(self):
+        # (#770: a wall's foot line along x = 0 from y = 0 north, its right side the strip to the top line at 271.18 m,
+        # its left the ground at 272.5 m. A corner on the strip's side beside the line takes the strip's level; 0.4 m
+        # past the end, within reach of the stretch's second segment, it is left; 1 m past it is out of reach)
+        n = 6
+        foot = {"p": np.column_stack([np.zeros(n), np.arange(n, dtype=float)]), "zl": np.full(n, 272.5), "zr": np.full(n, 271.18),
+                "gl": np.zeros(n), "gr": np.zeros(n), "sr": np.ones(n, bool)}
+        cx = np.array([0.3, 0.3, 0.3])
+        cy = np.array([2.0, -0.4, -1.0])
+        z, held = gm.hold_at_walls(cx, cy, cx, cy - 0.1, np.full(3, 272.6), np.ones(3, bool), [foot])
+        self.assertEqual((held.tolist(), np.round(z, 2).tolist()), ([True, False, False], [271.18, 272.6, 272.6]))
+        # (a side read from the raster holds on there, as before)
+        plain = {k: v for k, v in foot.items() if k != "sr"}
+        z0, _ = gm.hold_at_walls(cx, cy, cx, cy - 0.1, np.full(3, 272.6), np.ones(3, bool), [plain])
+        self.assertEqual(np.round(z0, 2).tolist(), [271.18, 271.18, 272.6])
+        # (the same line cut in two at y = 3: at the joint the strip runs on, and the corners beside it are held)
+        a = {k: v[:4] for k, v in foot.items()}
+        b = {k: v[3:] for k, v in foot.items()}
+        z, held = gm.hold_at_walls(np.array([0.3, 0.3]), np.array([2.9, 3.1]), np.array([0.4, 0.4]), np.array([3.1, 2.9]),
+                                   np.full(2, 272.6), np.ones(2, bool), [a, b])
+        self.assertEqual(np.round(z, 2).tolist(), [271.18, 271.18])
+
+
 class UnderADeck(unittest.TestCase):
     def test_a_street_corner_at_the_decks_level_under_a_span_lies_on_the_lidar(self):
         # (#761: the road under the Modřany viaduct; the ramp's own strip, 0.3 m off the lidar, keeps the street surface)
