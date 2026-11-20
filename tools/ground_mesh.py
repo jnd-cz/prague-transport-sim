@@ -450,6 +450,40 @@ def in_the_rock(L, rock, x, y):
     return inside, rail
 
 
+PORTAL_REACH = 15.0  # m past a rock tunnel's corridor, along the route and across it: a portal's wing walls
+
+
+def portal_masonry(L, rock, inside, rail, x, y, z, area, is_wall):
+    """in_the_rock's (inside, rail) with a portal's own masonry added: every corner, within PORTAL_REACH of a rock
+    tunnel's corridor, of a wall-like survey area (is_wall(its id), `area` per corner) that stands TUNNEL_OVER or more
+    over the rails at a corner inside the corridor. The survey has the Vyšehrad tunnel's north gate as one strip
+    0.64 m across (line 17, area 1237): the arch's line across the road and track, and the wing wall along the
+    sidewalk as a sliver from the pier, 197.22 m at s 11424.8, to a point on the ground 12 m on (193.15 m). Stood up
+    as a wall its top fell with that line: seen from inside the tunnel a grey cone 4 m tall by the road. A gate is no
+    ground, and nothing draws the portal's masonry yet: the whole strip lies at the rails' level (#771)."""
+    x, y, z = np.asarray(x, float), np.asarray(y, float), np.asarray(z, float)
+    area = np.asarray(area)
+    with np.errstate(invalid="ignore"):
+        high = inside & (z - rail >= TUNNEL_OVER)
+    ids = [a for a in np.unique(area[high]).tolist() if is_wall(a)]
+    more = np.isin(area, ids) & ~inside
+    if not more.any():
+        return inside, rail
+    k = np.flatnonzero(more)
+    route = shapely.LineString(np.asarray(L["path"], float)[:, :2])
+    pts = shapely.points(x[k], y[k])
+    s_ = shapely.line_locate_point(route, pts)
+    near = shapely.distance(route, pts) < TUNNEL_ACROSS + PORTAL_REACH
+    by = np.zeros(len(k), bool)
+    for a, b in rock:
+        by |= (s_ > a - TUNNEL_OUT - PORTAL_REACH) & (s_ < b + TUNNEL_OUT + PORTAL_REACH)
+    k, s_ = k[near & by], s_[near & by]
+    inside, rail = inside.copy(), rail.copy()
+    inside[k] = True
+    rail[k] = rail_top(L, s_)
+    return inside, rail
+
+
 def off_the_hill(z, rail):
     """(Heights z of survey corners in a rock tunnel's corridor with those TUNNEL_OVER or more over the rails beside
     them set to the rails' level, which ones). The lidar there is the hill over the tunnel, and the street surface and a
@@ -1528,8 +1562,11 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (a street corner shared with a survey wall or stairs takes its height within WALL_SNAP, #653)
     zs = snap_to_walls(D, cx[m], cy[m], zs, np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span)
     # (in a rock tunnel's corridor the survey's corners lie at the rails' level, not on the hill over it: off_the_hill, #771)
-    in_rock, rail_z = in_the_rock(L, rock_tunnels(L, lidar_), cx[m], cy[m])
+    rock = rock_tunnels(L, lidar_)
+    in_rock, rail_z = in_the_rock(L, rock, cx[m], cy[m])
+    in_rock, rail_z = portal_masonry(L, rock, in_rock, rail_z, cx[m], cy[m], zs, sa, lambda a: wall_like(D["areas"][a]))
     zs, on_hill = off_the_hill(zs, np.where(in_rock, rail_z, np.nan))
+    lifted &= ~on_hill  # (no face stands there: it welds with the ground beside it)
     zc[m] = zs
     # (a wall the survey has as a line: the street, the lidar ground and the terrain beside it stand at its side's level
     # up to it, #697; a street under a bridge too, which keeps the survey's own outline (on_span): the sidewalk along

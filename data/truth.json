@@ -4930,8 +4930,34 @@
    ],
    "reach": 40,
    "issue": 771,
-   "what": "the Vyšehrad tunnel through the rock (s 11385.8-11424.0) and its two mouths: the opening clear of ground, the survey's road and walls inside it at the rails' level (193.0-193.2 m), not on the hill's lidar (203-217 m). No section: the hill over the tunnel is in the ground file too, and a section reads the highest surface; the lines' check surveyOverTrack and the pictures hold it",
-   "source": "found on #770 (the batch's surveyOverTrack 2 -> 3 on line 17); from the cab at s 11376 a dark spike 4 m tall stood in the south mouth on main 2a8ddf2 and 3de07bd (tools/shot.py --line 17 --s 11376 --view cab), and two grey slabs in the north mouth seen from inside (--s 11408)"
+   "what": "the Vyšehrad tunnel through the rock (s 11385.8-11424.0) and its two mouths: the opening clear of ground, the survey's road and walls inside it at the rails' level (193.0-193.2 m), not on the hill's lidar (203-217 m). The north gate's masonry (survey area 1237: the arch's line across the road and the wing wall along the sidewalk in one strip 0.64 m across) lies at the rails' level too: nothing draws a portal yet. No section: the hill over the tunnel is in the ground file too, and a section reads the highest surface; the lines' check surveyOverTrack and the pictures hold it",
+   "source": "found on #770 (the batch's surveyOverTrack 2 -> 3 on line 17); from the cab at s 11376 a dark spike 4 m tall stood in the south mouth on main 2a8ddf2 and 3de07bd (tools/shot.py --line 17 --s 11376 --view cab), and two grey slabs in the north mouth seen from inside (--s 11408); and on the first build of #771 a grey cone 4 m tall by the road outside the north mouth (--s 11408): the gate's wing wall, its top falling from the pier's 197.22 m to a point on the ground 12 m on",
+   "seen": {
+    "what": "The north mouth, from the road. A stone gate with battlements stands at the rock; the road through it is flat, the two tracks in its surface. On the river side a sidewalk at a kerb, parted from the road by temporary concrete dividers with a railing. On the rock side a narrow sidewalk at a kerb and, behind it, the gate's stone wing wall with battlements and turrets, about 6 m tall, running some 12 m north from the gate's pier; then a shrub and the gatehouse. Nothing stands on the road or the sidewalks.",
+    "from": [
+     {
+      "at": [
+       50.0636723,
+       14.4161176
+      ],
+      "headings": [
+       191,
+       20
+      ]
+     },
+     {
+      "at": [
+       50.0638466,
+       14.4160002
+      ],
+      "headings": [
+       146
+      ]
+     }
+    ],
+    "source": "Google Street View of September 2025 at the two viewpoints the user linked, seen 2026-11-20 (this session, on PR 772: \"There's temporary concrete dividers for the sidewalk, we don't have to include it. Otherwise there is flat road surface and kerb for the sidewalk.\"; of the rock side: \"there is better view here\")",
+    "game": "main has two slabs in the mouth; the first build of #771 a cone by the road outside it, the gate's strip stood up as a wall. With the strip at the rails' level: the flat road, the kerbs and the sidewalks. The gate, its wing wall and the dividers are not drawn."
+   }
   }
  }
 }
