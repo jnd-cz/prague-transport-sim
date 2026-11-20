@@ -1145,6 +1145,7 @@ def standing(cx, cy, z, wall, street):
 THIN_WALL = 1.0  # m: a survey wall area this far across or less is a wall's thickness in plan (wall_lines.STRIP)
 ROAD_GRADE = 0.2  # rise over run: a road's own grade towards a wall is held to this (a garage ramp's 14-17 %); a
 # steeper reading is another wall's smear, and the surface runs level instead
+SMEAR_MIN = 0.05  # m: a road's corner by a wall this near its surface carried on from past the smear is left as it is
 
 
 def thin_walls(D):
@@ -1161,13 +1162,34 @@ def thin_walls(D):
     return np.asarray(segs, float).reshape(-1, 2, 2)
 
 
-def off_the_smear(walls, x, y, tx, ty, z, lidar, own):
+def kerb_walls(D, road_at):
+    """The survey's sidewalks' kerb edges that are a wall's top (street_profile.wall_tops: their own height stands
+    over the road beyond them, road_at(x, y) its surface), as edges (n, 2, 2): the survey has no wall area along such
+    an edge, and the road at its foot carries the raster's smear of the wall as at any wall's (off_the_smear). The
+    garage ramp's side along the sidewalk on Na Vápence, line 37 (3868, -19): the ramp's edge 258.84-259.35 m where
+    the ramp lies at 257.9 m, a spike in the corner by the door (#779)."""
+    import street_profile
+    segs = []
+    for q, n, own in street_profile.kerb_edges(D)[0]:
+        if not np.isfinite(own).any():
+            continue
+        top, e = street_profile.wall_tops(q, n, own, road_at(*(q - n * 0.5).T))
+        if top.any():
+            segs.append(e[:, :, :2])
+    return np.concatenate(segs) if segs else np.zeros((0, 2, 2))
+
+
+def off_the_smear(walls, x, y, tx, ty, z, own):
     """Heights z of a road's corners (x, y), each in a triangle with centre (tx, ty), with those within WALL_HOLD of a
     thin wall's outline (walls: thin_walls) set to the road's own surface WALL_HOLD out from the outline on their side
     (own(px, py), NaN where the road has none there: the corner is left), run on to the corner at the surface's grade
     between there and twice as far out (up to ROAD_GRADE; level where it has no surface that far, or a steeper one),
-    where IPR's raster steps WALL_FACE or more across the wall there (read WALL_HOLD off this side and that far past
-    THIN_WALL off the other): (z, which ones).
+    where that is SMEAR_MIN or more off its height: (z, which ones). (Whether the raster steps across the wall is not
+    asked: read past the wall's end beside another wall, it showed none.) In a corner of two walls the point out from one lies in the other's
+    smear: it is moved out to WALL_HOLD from that one too, and the surface runs level from there. Of the edges near a
+    corner it takes the nearest whose point out its triangle's centre sees without a wall between: at a wall's end
+    the short edge across it points through the wall (the road behind the door's wall, at the wall's end, read the
+    pit: 259.38 m for 260.9).
     The generated road surface follows IPR, whose 1 m raster spreads a wall's face over 1-1.5 m, and nothing held it:
     at the foot of the wall over the garage ramp's door on Na Vápence, line 37 (3871, -18), wall area 1419 (0.26 m
     across, its top alone surveyed), the ramp rose from 258.00 m 1 m before the wall to 258.76 m at it, a toothed
@@ -1188,21 +1210,37 @@ def off_the_smear(walls, x, y, tx, ty, z, lidar, own):
     t = np.clip(((x[s][pi] - a[si, 0]) * e[:, 0] + (y[s][pi] - a[si, 1]) * e[:, 1]) / l2, 0, 1)
     fx, fy = a[si, 0] + e[:, 0] * t, a[si, 1] + e[:, 1] * t
     d = np.hypot(x[s][pi] - fx, y[s][pi] - fy)
-    o = np.lexsort((d, pi))  # (per corner, its nearest edge)
-    o = o[np.r_[True, pi[o][1:] != pi[o][:-1]]]
-    c, fx, fy, e, l2, d = s[pi[o]], fx[o], fy[o], e[o], l2[o], d[o]
+    c = s[pi]
     nx, ny = -e[:, 1] / np.sqrt(l2), e[:, 0] / np.sqrt(l2)
     side = np.where((tx[c] - fx) * nx + (ty[c] - fy) * ny >= 0, 1.0, -1.0)  # (the corner's triangle's side of the edge)
     qx, qy = fx + side * nx * WALL_HOLD, fy + side * ny * WALL_HOLD
-    far = WALL_HOLD + THIN_WALL
-    with np.errstate(invalid="ignore"):
-        step = np.abs(np.asarray(lidar(qx, qy), float) - np.asarray(lidar(fx - side * nx * far, fy - side * ny * far), float)) >= WALL_FACE
+    moved = np.zeros(len(c), bool)
+    for _ in range(2):
+        (k, j), dj = tree.query_nearest(shapely.points(qx, qy), max_distance=WALL_HOLD - 0.05, return_distance=True, all_matches=False)
+        k, j, dj = k[dj > 1e-6], j[dj > 1e-6], dj[dj > 1e-6]
+        if not len(k):
+            break
+        ej = b[j] - a[j]
+        tj = np.clip(((qx[k] - a[j, 0]) * ej[:, 0] + (qy[k] - a[j, 1]) * ej[:, 1]) / np.maximum((ej ** 2).sum(1), 1e-12), 0, 1)
+        gx, gy = a[j, 0] + ej[:, 0] * tj, a[j, 1] + ej[:, 1] * tj
+        qx[k], qy[k] = gx + (qx[k] - gx) / dj * WALL_HOLD, gy + (qy[k] - gy) / dj * WALL_HOLD
+        moved[k] = True
+    sees = np.ones(len(c), bool)
+    li, _ = tree.query(shapely.linestrings(np.stack([np.column_stack([tx[c], ty[c]]), np.column_stack([qx, qy])], 1)),
+                       predicate="intersects")
+    sees[np.unique(li)] = False
+    o = np.lexsort((d, ~sees, pi))  # (per corner, its nearest edge with a clear point out)
+    o = o[np.r_[True, pi[o][1:] != pi[o][:-1]]]
+    o = o[sees[o]]
+    c, fx, fy, nx, ny, side, d, qx, qy, moved = (v[o] for v in (c, fx, fy, nx, ny, side, d, qx, qy, moved))
     zq = np.asarray(own(qx, qy), float)
     with np.errstate(invalid="ignore"):
         g = (zq - np.asarray(own(fx + side * nx * 2 * WALL_HOLD, fy + side * ny * 2 * WALL_HOLD), float)) / WALL_HOLD
-        g = np.where(np.abs(g) <= ROAD_GRADE, g, 0.0)
-    ok = step & np.isfinite(zq)
-    z[c[ok]] = (zq + g * (WALL_HOLD - d))[ok]
+        g = np.where((np.abs(g) <= ROAD_GRADE) & ~moved, g, 0.0)
+    zn = zq + g * (WALL_HOLD - d)
+    with np.errstate(invalid="ignore"):
+        ok = np.isfinite(zn) & (np.abs(zn - z[c]) >= SMEAR_MIN)
+    z[c[ok]] = zn[ok]
     held[c[ok]] = True
     return z, held
 
@@ -1771,12 +1809,12 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         if mm.any():
             zs[mm] = streets.at(kd, cx[m][mm], cy[m][mm])
     # (a road beside a thin wall keeps its own surface from where the raster's smear of the wall ends: off_the_smear, #779)
-    tw = thin_walls(D)
+    tw = np.concatenate([thin_walls(D), kerb_walls(D, lambda px, py: streets.at("road", px, py))])
     mm = np.isin(sc, list(STREETS_ROAD)) & ~on_span & ~on_terrace
     n_smear = 0
     if len(tw) and mm.any():
         c3 = fc[m[mm] // 3].mean(1)
-        zs[mm], off = off_the_smear(tw, cx[m][mm], cy[m][mm], c3[:, 0], c3[:, 1], zs[mm], lidar_,
+        zs[mm], off = off_the_smear(tw, cx[m][mm], cy[m][mm], c3[:, 0], c3[:, 1], zs[mm],
                                     lambda px, py: streets.at("road", px, py))
         n_smear = int(off.sum())
     # (a tree pit or a small bed in a sidewalk lies flush with it, on the sidewalk's street surface: pits, #696)
