@@ -401,6 +401,12 @@ OFF_LIDAR = 0.10  # m: a fit further than this off the smoothed lidar is held by
 LOOSEN = 20.0  # m either side of such a place over which the radius is halved
 R_FLOOR = 25.0  # m: the tightest radius a street is given (the calibration's tightest, RADII[0])
 OWN_LANES = 3.0  # m either side of a street's centreline where it lies inside the street that governs it (a lane)
+FALL_FIT = 0.15  # m: a street's crown (its centre's height and its side's crossfall) further than this off IPR for 1 m
+# across is not the road's surface there: the street's width ends before it
+FALL_CLOSE = 0.05  # m: the width ends at the last point before that where the crown lies this near IPR (BAND)
+FALL_ALONG = 3  # samples either side: a street's width is the least its neighbours' crowns reach
+FALL_MIN = 3.0  # m: the least half width that leaves a street (OWN_LANES: a lane, with the drive line LANE from the centre
+# and a car's wheels AXLE / 2 past it; left 1.5 m, the drive lines ran on the fill and line 23's jumps went from 45 to 75)
 
 
 def surface_tris(areas, classes):
@@ -563,6 +569,28 @@ def crossfall(F, ipr, p, t, road, s):
             fall[:, side] = np.clip(tp.whittaker(s, v, 20.0, robust=0.02), -FALL_MAX, FALL_MAX)
         else:
             fall[:, side] = 0.0
+    # (a street's surface is its crown only as far across as the crown holds IPR: the crossfall is smoothed along the
+    # street, and where a side street leaves it downhill the smooth is not the ground. Nad Ohradou, line 37
+    # (3877, -10): its road area runs 10 m south into Na Vápence's mouth, the ground falling 6.5 % there and the
+    # smoothed crossfall 1.3 %; carried across, the crown lay 0.55 m over IPR 9 m out, Na Vápence was pinned to it and
+    # 69 m2 of road stood 0.3-0.6 m up beside the garage ramp, #780. Past the crown's reach the road is the junctions'
+    # fill, which follows IPR. The width ends where the crown still lies on IPR (FALL_CLOSE), and no further than its
+    # neighbours' along the street: ended where the crown had left IPR by FALL_FIT, sample by sample, the fill met the
+    # street across a step and between single samples of it: line 23's jumps over 0.15 m in 1 m went from 45 to 71)
+    for side, sel in ((0, off < -0.25), (1, off > 0.25)):
+        order = np.argsort(np.abs(off[sel]))
+        o = np.abs(off[sel])[order]
+        with np.errstate(invalid="ignore"):
+            d = np.abs(Z[:, sel][:, order] - (z0[:, None] + fall[:, side][:, None] * o[None]))
+            miss = d > FALL_FIT
+            close = d <= FALL_CLOSE
+        run = miss[:, :-1] & miss[:, 1:]
+        first = np.argmax(run, axis=1)
+        before = close & (np.arange(len(o))[None] <= first[:, None])
+        last = np.where(before.any(1), len(o) - 1 - np.argmax(before[:, ::-1], axis=1), -1)
+        reach = np.where(run.any(1), np.maximum(np.where(last >= 0, o[np.maximum(last, 0)], 0.0), FALL_MIN), np.inf)
+        reach = np.array([reach[max(k - FALL_ALONG, 0):k + FALL_ALONG + 1].min() for k in range(len(reach))])
+        width[:, side] = np.where(width[:, side] > 0, np.minimum(width[:, side], reach), width[:, side])
     return fall, width
 
 
