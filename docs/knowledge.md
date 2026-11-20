@@ -616,6 +616,38 @@ Sections:
   none of its points over (2-3 a line, up to 2.3 ha) and stays on the street surface. Not solved: one area on both
   levels (line 37 green 4451, 8,164 m², 37 % of its points over): its strip between a wall and the footpath is a
   pit.
+- **Fine cells only by a wall** (#770, measured 2026-11-20). #762 cut every street and lidar-ground cell that bends
+  by 0.5 m to 1 m cells, so that the ground beside a wall could carry its two levels. On the lidar's ground away from
+  any wall the fine cells draw the raster's bumps: the sides of line 37's cutting at s 2340 as lumps with a spike
+  (walls the build had no line of: the next entry). The batch's seams of 10 cm (441 -> 536 on line 37, mostly
+  paved / paved and not at a wall) come from there. A lidar-ground cell is cut finer only within 5 m of a wall
+  stretch: every place's section holds as before (Chotkova's terraces need the fine cells: without any, 2.25 m of its
+  section slope against 1.75), and the steep faces that are no wall fall at four places (Žižkov's depot 41.6 -> 21.9
+  m², Krejcárek's abutment 88.5 -> 70.3, Letná 149.0 -> 125.0, Chotkova 498.2 -> 482.2). The price: the ground lies
+  farther from the raster where the raster bumps (4.5 m of a 24 m section along that bank more than 0.5 m off, none
+  before). Streets keep their fine cells.
+- **A wall the survey has only as a strip** (#770, measured 2026-11-20). The tram's cutting north of Ohrada (line 37
+  (3400, 1)) runs between two upright concrete walls of 4.7 and 5.8 m with a ledge at each foot (the user's photos
+  from the footbridge, 2026-11-20). The survey has no `Zeď` line, no wall area and Geoportál no wall there: only a
+  paved strip in plan for each, inside paved ground on the lidar. The west wall's top is area 1847 (0.32 m across,
+  with heights); the east wall area 1818 (0.53 m across, on the lidar's ground: its outline's heights are neither the
+  foot's nor the top's). The raster spreads each wall over 2.5 m, and the ground was a bank. A paved strip up to 1 m
+  across is a wall line (`wall_lines.strip_lines`) where the survey has no wall line within 2 m: one with heights by
+  its outline (the strip keeps its own level, the ground outside it is held at the raster's level 2.5-4 m off), one
+  on the lidar by its low side's edge alone. Such stretches hold the lidar's ground and the terrain, not a street,
+  which has its own surface up to the strip. The five lines have 503-1,505 strips with heights and 3-18 on the lidar;
+  they make 280-1,014 stretches a line (2.2-7.4 km, the step 1.1-1.4 m at the median, most under 5 m long: parapets,
+  edgings, low walls) and the lines' stretches go from 326-610 to 628-1,622. Three things came with it:
+  - the weld let a lidar corner on the wall's line, held at the foot, take the strip's top wherever the area's own
+    outline there was near the top (one area runs behind the wall's top and along its foot): a spike on the ledge
+    every 2 m. A lidar corner a wall holds keeps the wall's level where that is over 0.5 m off the edge it yielded
+    to, whatever that edge's rank (`ground_mesh.weld`);
+  - past a strip's corner the wedge outside it is outside the strip, whichever side of the last segment's line the
+    triangle's centre lies on (`out` of a strip's stretches, `ground_mesh.hold_at_walls`);
+  - tried and not taken: wall lines traced along the raster's own faces inside paved lidar ground (a rise of 1.5 m in
+    a metre, marching squares): 2.6 km on line 9 in 679 stretches, 532 of them under 5 m, and no place needs them.
+  On the place the steep faces that are no wall fall from 220.7 to 41.4 m² and its three sections, which the written
+  file fails (3.25, 1.82 and 8.84 m sloping), hold (0.5, 0.78, 0.0).
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of

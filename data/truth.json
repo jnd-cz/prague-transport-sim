@@ -4846,6 +4846,82 @@
     }
    ]
   },
+  "ohrada-cutting-walls": {
+   "line": "37",
+   "at": [
+    3400.5,
+    1.0
+   ],
+   "reach": 30,
+   "issue": 770,
+   "what": "the tram's cutting north of Ohrada between two upright concrete walls. The survey has each wall only as a strip in plan, inside paved ground on the lidar (areas 1848 and 1817): the west wall's top (area 1847: 0.32 m across, 87 m long, with heights 248.2-248.6 m) and the east wall (area 1818: 0.53 m across, 250 m long, on the lidar's ground). IPR's raster spreads the west wall's 4.7 m and the east wall's 5.8 m over 2.5 m each",
+   "source": "found on #770 as a paved bank creased by the raster's bumps (the seams of 10 cm on line 37 rose 441 -> 536 with the batch, 24 of the new ones here at s 2348); the user, 2026-11-20, on the draft's picture of plain banks: \"it's a straight wall, attaching photos from the top of footwalk bridge\"",
+   "seen": {
+    "what": "From the footbridge over the cutting. North: the two ballasted tracks between upright concrete walls 4-5 m tall, as far as the road bridge that crosses the cutting at a slant; the west wall carries the road's sidewalk and a railing on its top and stands straight up from a narrow concrete ledge beside the ballast; the east wall, concrete panels with a railing and a lawn behind it, stands on a ledge about 1.5 m wide where the catenary poles stand. South, to the junction at Ohrada: the same two walls with railings, a ledge 1-1.5 m wide at each foot with spare rails stored on it, the walls lower as the track climbs to the street, a road at street level on either side. No bank anywhere: every face is upright.",
+    "from": [
+     {
+      "photos": "raw/reference/photos/ohrada/user-2026-11-20-1..2 (SOURCES.md)"
+     },
+     {
+      "at": [
+       3396.5,
+       -9.0
+      ],
+      "what": "local metres: the footbridge over the cutting, its deck at 254.4 m"
+     }
+    ],
+    "source": "the user's two photos from the footbridge, 2026-11-20 (this session, on PR 773: \"it's a straight wall, attaching photos from the top of footwalk bridge\"; kept in raw/reference/photos/ohrada/, not published: number plates on them)",
+    "corrects": "the place's entry of 2026-11-20 (paved-bank-by-the-track) took area 1848 for a paved bank and held it to an even slope",
+    "game": "main draws both walls as the raster's banks, 2.5 m across, lumpy since the batch of #757. With the survey's strips read as wall lines (#770): a face at each strip's edge to the track, the ledges at the track's level."
+   },
+   "sections": [
+    {
+     "name": "across the west wall, 7.5 m from the road to the track",
+     "from": [
+      3393.21,
+      5.26
+     ],
+     "to": [
+      3399.75,
+      1.58
+     ],
+     "expect": {
+      "sloping m": 1.0
+     },
+     "why": "the road's edge, the wall's top, one upright face of 4.7 m at the strip's edge to the track (3396.8, 3.2), the ledge and the ballast at the track's level. The written file of 2026-11-20 has 3.25 m of the 7.5 sloping (the foot in the raster's smear), the build with the strips as wall lines 0.5 m (the top's crossfall)"
+    },
+    {
+     "name": "across the east wall, 6.5 m from the track to the wall's top",
+     "from": [
+      3402.8,
+      -0.14
+     ],
+     "to": [
+      3408.46,
+      -3.32
+     ],
+     "expect": {
+      "sloping m": 1.0
+     },
+     "why": "the ballast, the ledge at the track's level, one upright face of 5.8 m at the strip's edge to the track, the ground behind the wall's top at 249.5 m. The written file has 1.82 m of the 6.5 sloping and no step over 1.7 m; the build one step of 6.3 m and 0.78 m sloping (the top's fall to the road)"
+    },
+    {
+     "name": "along the west wall's foot, 24 m on the ledge from (3397.5, 2.9) south-west",
+     "from": [
+      3397.48,
+      2.86
+     ],
+     "to": [
+      3385.7,
+      -18.05
+     ],
+     "expect": {
+      "sloping m": 1.0
+     },
+     "why": "the ledge at the wall's foot runs with the track beside it (it climbs 1.6 m in the 24 m, under the measure's slope): the written file has 8.8 m of it sloping, spikes of 1 m every 2 m where the foot's corner on the wall's line took the top's height; the build none"
+    }
+   ]
+  },
   "vysehrad-tunnel-mouths": {
    "line": "17",
    "at": [

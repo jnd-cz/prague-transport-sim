@@ -658,7 +658,7 @@ def off_the_deck(z, zl):
     return np.where(low, zl, z), low
 
 
-def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None):
+def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     """Heights z of corners (cx, cy) with each eligible one within WALL_HOLD of a wall stretch (wall_lines.stretches)
     set to the ground of the side of the wall its triangle's centre (tx, ty) lies on: that side's level at the nearest
     point of the line plus its slope over the corner's distance from it. A corner on the line itself so takes the top
@@ -670,11 +670,19 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None):
     structure (an abutment's line, `across`) does not hold them: on a short bridge the survey has the track's area at
     level 0 right across the deck, and pulled down to the ground the deck leaves it was a trench across the track
     1.5 m wide at either abutment (line 17 s 3088, (-1456, -9105): the rails 3.49 m over the first surface, #763).
+    A stretch along a strip's outline (`out`: the side that is not the strip, wall_lines.strip_lines) gives a corner
+    that side's level also where its triangle's centre lies on the strip's side past the stretch's end: the wedge
+    outside the strip's corner, never the strip's own (#771). Beside the stretch a corner on the strip's side is the
+    ground behind the strip and stands at the strip's level, as at any wall line: behind the top of the cutting's wall
+    north of Ohrada (line 37 (3396, 4), a strip 0.3 m across) the ground between the road and the strip (#770).
+    It does not hold a street's corners (`street`): a street has its own surface up to the strip, and line 9 alone has
+    7.4 km of such stretches (1,014 of them, 637 under 5 m: parapets, edgings, low walls) whose raster levels would
+    run through its sidewalks; the lidar's ground and the terrain have none and climbed the strip (#770).
     Returns (z, the corners held)."""
     held = np.zeros(len(cx), bool)
     if not walls or not eligible.any():
         return z, held
-    A, B, ZL, ZR, GL, GR, END, ACROSS = [], [], [], [], [], [], [], []
+    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP = [], [], [], [], [], [], [], [], [], []
     wl = np.array([shapely.LineString(np.asarray(w["p"], float)[:, :2]) for w in walls], object)
     wtree = shapely.STRtree(wl)
     free = np.ones((len(walls), 2), bool)
@@ -691,15 +699,22 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None):
             v = np.zeros(n + 1) if v is None else np.asarray(v, float)
             out.append(np.column_stack([v[:-1], v[1:]]))
         ACROSS.append(np.full(n, bool(w.get("across"))))
+        OUT.append(np.full(n, {"l": 1, "r": -1}.get(w.get("out"), 0)))
         e = np.zeros((n, 2), bool)  # (a segment's end that is its stretch's free end)
         e[0, 0], e[-1, 1] = free[len(END)]
         END.append(e)
-    A, B, ZL, ZR, GL, GR, END, ACROSS = (np.concatenate(v) for v in (A, B, ZL, ZR, GL, GR, END, ACROSS))
+        e = np.zeros((n, 2), bool)  # (a segment's end that is its stretch's end, free or not)
+        e[0, 0] = e[-1, 1] = True
+        TIP.append(e)
+    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP = (np.concatenate(v) for v in (A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP))
     tree = shapely.STRtree(shapely.linestrings(np.stack([A, B], 1)))
     idx = np.flatnonzero(eligible)
     pi, si = tree.query(shapely.points(cx[idx], cy[idx]), predicate="dwithin", distance=WALL_HOLD)
     if deck is not None and len(pi):
         keep = ~(ACROSS[si] & np.asarray(deck, bool)[idx[pi]])
+        pi, si = pi[keep], si[keep]
+    if street is not None and len(pi):
+        keep = ~((OUT[si] != 0) & np.asarray(street, bool)[idx[pi]])
         pi, si = pi[keep], si[keep]
     if not len(pi):
         return z, held
@@ -727,6 +742,8 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None):
     c, s, t, d, raw = idx[pi[k]], si[k], t[k], d[k], raw[k]
     v = B[s] - A[s]
     left = v[:, 0] * (ty[c] - A[s, 1]) - v[:, 1] * (tx[c] - A[s, 0]) > 0
+    rc = ((tx[c] - A[s, 0]) * v[:, 0] + (ty[c] - A[s, 1]) * v[:, 1]) / np.maximum((v * v).sum(1), 1e-12)
+    left = np.where((OUT[s] != 0) & (((rc < 0) & TIP[s, 0]) | ((rc > 1) & TIP[s, 1])), OUT[s] > 0, left)
 
     def along(Q):
         return Q[s, 0] + (Q[s, 1] - Q[s, 0]) * t
@@ -1148,7 +1165,12 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
     - a corner below the top keeps its own height where it differs by more than its pair's STEP (a kerb, a wall, the
       water); the pair is judged against the lowest top corner's kind;
     - a lidar corner (`label` "lidar") that yielded to its rank (YIELD) keeps its own where its area's outline there
-      (`zown`) stands over LIDAR_APART off.
+      (`zown`) stands over LIDAR_APART off; one a wall line holds (`held`), where its held height does: the paved
+      ground at the foot of the cutting's wall north of Ohrada (line 37 (3389.13, -10.60)) is one area with the ground
+      behind the wall's top, its outline there at 248.44 m, and its corner on the wall's line, held at the foot's
+      244.59 m, took the top strip's 248.03 m: a spike on the ledge every 2 m of wall (#770). Of any rank: the lawn
+      beside the wing wall at the Vyšehrad tunnel's north mouth (line 17 (-724.65, -2546.51), a paved strip 0.86 m
+      across climbing to 197.88 m), held at 193.68 m, climbed the wall to its top, a cone 4 m tall by the road (#771).
     - corners `apart` (a wall area's, lifted to its top on its foot's outline: wall_face) are welded among themselves
       only, and the others at their point without them: the wall's face stands on the ground at its foot.
     `label`: what gave each corner its height (default `kind`), for the report and the lidar's rule."""
@@ -1199,6 +1221,8 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
     if zown is not None:
         with np.errstate(invalid="ignore"):
             apart = (label == "lidar") & ~is_top & rank & (np.abs(zown - target) > LIDAR_APART)
+            if held is not None:  # (whatever the rank of what it yielded to: a lawn at a paved strip's foot)
+                apart |= (label == "lidar") & ~is_top & held & (np.abs(zc - target) > LIDAR_APART)
     step |= apart
     zf = np.where(step, zc, target)
     steps = {p: {"corners": int((step & (pair == p)).sum()),
@@ -1278,6 +1302,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         g = shapely.LineString(w["p"]).intersection(box)
         if not g.is_empty:
             lines.append(g)
+    by_walls = shapely.union_all([shapely.LineString(w["p"]).buffer(SURVEY_LATTICE) for w in walls]) if walls else None
     for k, q in enumerate(pieces["survey"]):
         lines.append(q["g"].boundary)
         owners.append(("survey", k, q["g"]))
@@ -1290,7 +1315,12 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
             if g is not None and not g.is_empty:
                 lines.append(g)
             if on_lidar_:
-                g = bends(q["g"], under_at)
+                # (the lidar's ground is cut finer only by a wall: between Chotkova's terraces the fine cells carry the
+                # levels the walls hold; on an open bank they drew the raster's bumps, a paved bank creased where it was
+                # smooth, line 37 s 2348 (3397, 3), and the seams of 10 cm rose 441 -> 536 on that line, #770)
+                g = bends(q["g"], under_at) if by_walls is not None and by_walls.intersects(q["g"]) else None
+                if g is not None and not g.is_empty:
+                    g = g.intersection(by_walls)
             else:
                 kd = "road" if q["c"] in STREETS_ROAD else "sidewalk"
                 g = bends(q["g"], lambda px, py, kd=kd: streets.at(kd, px, py))
@@ -1566,7 +1596,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     cen = fc.mean(1)
     on_deck = np.zeros(len(cx), bool)
     on_deck[m] = on_span
-    zc, at_wall = hold_at_walls(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, elig, walls, on_deck)
+    is_street = np.zeros(len(cx), bool)
+    is_street[m] = np.isin(sc, list(STREETS_ROAD | STREETS_WALK))
+    zc, at_wall = hold_at_walls(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, elig, walls, on_deck, is_street)
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc]) + np.where(on_lidar | in_osm, YIELD, 0.0)
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", np.where(in_osm, "pool", "survey"))
     # (the weld's report: what gave a survey corner its height)
