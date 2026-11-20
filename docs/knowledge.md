@@ -626,6 +626,19 @@ Sections:
   m², Krejcárek's abutment 88.5 -> 70.3, Letná 149.0 -> 125.0, Chotkova 498.2 -> 482.2). The price: the ground lies
   farther from the raster where the raster bumps (4.5 m of a 24 m section along that bank more than 0.5 m off, none
   before). Streets keep their fine cells.
+- **A paved yard whose sheet misses the ground** (#638, measured 2026-11-20). A paved yard has surveyed heights on
+  its outline only, and inside it is a sheet between them unless that sheet misses IPR's raster by more than 0.5 m
+  at the 95th percentile (`zps_inside.MISS`), when it lies on the lidar. Under that limit a yard can still be far
+  off at one side: line 23 s 557 (-2564, 434), area 3398 (2,031 m², 0.43 m at p95), lay 0.5-0.9 m under the raster
+  beside the sidewalk that cuts through it and 0.29-0.37 m under that sidewalk: a step with its wall, over the
+  0.3 m `ground_mesh.meet_raised` closes. Of line 23's 707 paved areas kept as sheets, 215 (2.4 ha) are within
+  0.2 m of the raster, 308 (6.5 ha) 0.2-0.5 m off and 184 (1.2 ha) farther (held off the lidar: covered, small,
+  the user's or the rails' verdict). A paved yard's limit is 0.3 m (`MISS_PAVED`, the step that can be closed): 107-286
+  more paved areas a line lie on the lidar (line 9: 706 -> 958, 44.6 -> 50.6 ha; 17: 409 -> 673; 22: 595 -> 881;
+  23: 286 -> 464; 37: 221 -> 328), and nothing else in the survey file changes. At the place the step is 0.06 m
+  (0.29) and the walls over 0.3 m in its 80 m square fall from 99.2 to 40.3 m. The old limit's reason was the
+  page's drape (a yard on its 2 m terrain in 5 m triangles: 8 cm waves the street check read); the ground file lays
+  lidar ground in 5 m cells of the city mesh, and the lines' `streetWaviness` comes with the batch.
 - **A wall the survey has only as a strip** (#770, measured 2026-11-20). The tram's cutting north of Ohrada (line 37
   (3400, 1)) runs between two upright concrete walls of 4.7 and 5.8 m with a ledge at each foot (the user's photos
   from the footbridge, 2026-11-20). The survey has no `Zeď` line, no wall area and Geoportál no wall there: only a
