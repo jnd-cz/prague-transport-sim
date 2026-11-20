@@ -722,10 +722,11 @@ Sections:
   - it closes within 15 m of the passage. Nádraží Holešovice (line 17 (1512, 1330)) stands on a structure 55 m
     across that the raster leaves out whole: its two underpasses' covers alone stood as blocks 7 m high in it.
   Covers per line (the raster cut out under them): 9: 6 (123 m2), 17: 12 (1,039 m2), 22: 6 (494 m2), 23: 2
-  (278 m2), 37: 4 (97 m2); `python -P -E tools/covers.py LINE` lists them. Looked at on plans, all 30: 11 are
-  slots across a street (line 17's six hold 960 m2), the rest strips of 4-50 m2 where the raster smears a wall's
-  or a well's face into the street above it, and three wells of an underground entrance that the survey has no
-  stairs for (line 22 (-309, -1236), 43 m2: level with the sidewalk now, a pit 6 m deep before). Not covered: a
+  (278 m2), 37: 4 (97 m2); `python -P -E tools/covers.py LINE` lists them. Looked at on plans, all 30 (24 places,
+  six of them on two lines): 10 are slots across a street (line 17's six hold 970 m2, lines 22 and 37 two each),
+  the rest strips of 4-50 m2 where the raster smears a wall's or a well's face into the street above it, and four
+  wells of an underground entrance that the survey has no stairs for (the largest by lines 9 and 22, (-309,
+  -1236), 43 m2: level with the sidewalk now, a pit 6 m deep before). Not covered: a
   deck the survey has at level 1 (#449), and the ramps and stairs' wells beside a passage (#786, #447).
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
