@@ -11,7 +11,7 @@ import { buildLod2, buildOsmBuildings } from './buildings.js';
 import { buildCatenary } from './catenary.js';
 import { STYLE_BED_HEX, attachGround, buildDtm, flushDtm } from './groundDraw.js';
 import { buildRoads, buildZebras } from './streets.js';
-import { buildBridges, buildRoadPortals, buildRockTunnels, buildTrackSupport, buildWalls, fitDtmToMouths,
+import { buildBridges, buildRoadPortals, buildRockTunnels, buildTrackSupport, fitDtmToMouths,
   roadPortalMouths } from './structures.js';
 import { buildTrees } from './trees.js';
 import { ChunkedGeometry, GROUND_SNOW, SegmentIndex, W, addRibbon, addSide, densify, flatMat, polyLength } from './worldMesh.js';
@@ -102,7 +102,7 @@ function ownHeights(t, step) {
 export const WORLD_PARTS = [
   ['tracks + tunnel roads', 1600, 'tracks'], ['terrain mesh', 1100, 'terrain'],
   ['DTM streets', 3800, 'streets'], ['OSM roads', 300, 'roads'], ['track bed + rails', 100, 'roads'], ['track support', 1200, 'roads'],
-  ['zebras', 50, 'roads'], ['walls', 20, 'roads'], ['bridges + tunnels', 20, 'roads'], ['buildings', 3300, 'buildings'],
+  ['zebras', 50, 'roads'], ['bridges + tunnels', 20, 'roads'], ['buildings', 3300, 'buildings'],
   ['trees', 200, 'wires'], ['catenary', 200, 'wires'],
 ];
 
@@ -261,9 +261,9 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   group.userData.bedRows = beds.map((b) => b.rows); // (read by tools/test_bed_surface_page.py: the build's copy of this rule, #508)
   const pedestrianCrossings = preparePedestrianCrossings(data, route, ground, tiltOf,
     (kind, level) => level > 0 ? 0.02 : DTM_LIFT[kind] ?? 0.03);
-  // our tunnels through rock (terrain.js corridorWalls): the hill stays whole above the track; its
+  // our tunnels through rock (terrain.js rockTunnels): the hill stays whole above the track; its
   // terrain is not drawn in the tunnel's corridor, the vault, the rock over it and the portals are
-  const rock = ground.walls?.rock || [];
+  const rock = ground.rock || [];
   const TUN_W = 8.5; // half width of the vault: both tracks and the road beside them (Vyšehrad tunnel)
   const inTunnel = (x, y, pad = 0) => {
     if (!rock.length) return false;
@@ -362,9 +362,6 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
 
   buildZebras(group, data, ground, trackDist);
   await mark('zebras');
-
-  buildWalls(group, data, route, ground);
-  await mark('walls');
 
   buildBridges(group, data, route, ground);
   buildRockTunnels(group, route, ground, rock, TUN_W);

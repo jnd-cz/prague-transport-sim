@@ -4785,6 +4785,51 @@
     "source": "Google Street View at the user's link, seen 2026-11-19 (looked at, not copied)",
     "game": "main 95b3162's data, the same camera (tools/shot.py --line 37 --s 3030 --view review --at=3954.3,380.3 --yaw 138 --pitch 4 --dist 18): the deck and the embankment's slope are there; there is no abutment wall, and under the deck's end the ground is a facetted pit with a patch of the survey's tram area lying in it"
    }
+  },
+  "letna-road-wall": {
+   "line": "17",
+   "at": [
+    145.0,
+    806.0
+   ],
+   "reach": 60,
+   "issue": 765,
+   "what": "the retaining wall along nábřeží Edvarda Beneše under Letná (s 15298): Geoportál has it as one line of 720 m, 3.5 m tall; the survey has its face as a paved strip 0.44 m across (area 4166, x 26 to 317: the foot's line at 191.4-192.3 m, the top's stepping 0.6 m at a time between 193.2 and 196.3 m) and nothing west of x = 26",
+   "said": "As I thought and you suggest we can remove the old invented walls and move retaining walls into the build where we don't have them yet.",
+   "source": "the user, 2026-11-19 (session), #765",
+   "seen": {
+    "what": "From the road beside it: a wall of irregular stone masonry stands at the road's edge, between 2 and 3 m tall here, under a flat coping that steps down along the road; behind its top a bank of grass and bushes rises to the trees.",
+    "from": [
+     {
+      "at": [
+       50.0947797,
+       14.4225173
+      ],
+      "headings": [
+       350
+      ]
+     }
+    ],
+    "source": "Google Street View (a car's panorama), seen 2026-11-19 (looked at, not copied)",
+    "game": "main 2a8ddf2: the page's slab, 3.9 m tall and level along the whole line; behind it the written ground has the strip's outline as teeth 10 m wide (tools/shot.py --line 17 --s 15298 --view review --at=150,806 --yaw 20 --pitch 10 --dist 35)"
+   },
+   "sections": [
+    {
+     "name": "from the road across the wall onto its top, x = 200",
+     "from": [
+      200.0,
+      803.0
+     ],
+     "to": [
+      200.0,
+      807.5
+     ],
+     "expect": {
+      "sloping m": 0.5
+     },
+     "why": "a wall stands at the road's edge (the survey's strip: its foot 191.85 m, its top 194.3 m at x = 197-210), the bank rising behind it at about 1:1. Built on #765: one step of 2.65 m, 0.5 m sloping (the top's first half metre). The written file of 2026-11-19: a step of 0.81 m and 0.75 m of slope here, and teeth 10 m wide along the wall"
+    }
+   ]
   }
  }
 }

@@ -296,7 +296,7 @@ class Ground:
 
     # ---- the road tunnels' mouths
     def rock(self):
-        """src/terrain.js corridorWalls: our route's tunnels through rock, the terrain grid more than 8 m over the track
+        """src/terrain.js rockTunnels: our route's tunnels through rock, the terrain grid more than 8 m over the track
         on average."""
         out = []
         g = self.sv.grid

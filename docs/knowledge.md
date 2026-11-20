@@ -553,6 +553,20 @@ Sections:
   ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`). What reaches a rail without crossing
   the track lies at the bed's height within 5 cm of it (`ground_mesh.rail_band`): line 17 s 17128's stop island, classed
   sidewalk, lies along the outer rail (9.5 cm over it before), line 9's depot hall (a plot) over its tracks' ends.
+- **Geoportál's retaining walls and the walls the page drew** (#765, measured 2026-11-19). The page drew two kinds of
+  wall on top of the ground until #765. Invented ones (`corridorWalls`): where the 10 m terrain grid rose 1.5 m over
+  the track 8-15 m beside it, a face 7 m from the track; 1-4 runs a line, 15-126 m, 21.5 m tall at the Vyšehrad
+  tunnel's mouths. And Geoportál's retaining walls (`data/lineN.geo.json`: a line and one height a wall, 5-9 a line,
+  593-1,641 m) as slabs. Against the survey: 54-75 % of Geoportál's length lies within 2 m of a survey wall line or
+  wall area, and with the paved strips up to 1 m across 85-95 %: the survey has many a wall's face as a paved strip
+  (under Letná, line 17 area 4166: 0.44 m across and 290 m long, its foot's line along the road and its top's behind
+  it). What is left, 35-318 m a line, are walls of the ground from Geoportál's line and height (`wall_lines.retained`):
+  such a line lies a metre or so off the raster's rise, and under a steep bank the raster has no step to fit (a
+  side's fit read back to the line gave the top anywhere between 191.3 and 195.3 m within 30 m of wall), so the top
+  is the foot plus the height, no higher than the ground 4 m behind. A strip that is a wall's face: its outline has
+  the foot one side and the top the other without two neighbouring points climbing (`ground_mesh.two_sided`: 10-87
+  such strips a line beside the 52-155 that climb); triangulated on its outline it stood as teeth 10 m wide, hidden
+  behind the page's slab. The slab was 3.9 m all along; the survey's top steps between 1 and 4 m.
 - **Abutments: the wall the survey does not have** (#763, measured 2026-11-19). Where a deck lands, the survey's wing
   walls along the ramp are wall lines; the abutment's face under the deck is not. At the Modřany viaduct (line 17
   (-2393, -9247)) the two wing walls' lines turn by 0.5 m at the face's corners and run on along the street at its
