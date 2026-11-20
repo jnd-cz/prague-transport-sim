@@ -1364,7 +1364,7 @@ def wall_heights(segs, X, Y, on, reach):
     return z, d, q, n
 
 
-def wall_tops(q, n, own, zr):
+def wall_tops(q, n, own, zr, ground=None):
     """Which points of one kerb edge (q, normals n into the sidewalk, the sidewalk's own heights `own`, the road's
     surface zr beyond them) are a wall's top and no kerb, and those as wall edges ((m, 2, 3), the sidewalk on their
     left, wall_edges()): where the sidewalk's own height stands STEP_CUT or more over a kerb on that road, along an
@@ -1372,10 +1372,16 @@ def wall_tops(q, n, own, zr):
     its side a kerb edge: on Na Vápence, line 37 (3868, -22), the walkway held at the ramp's surface plus a kerb sank
     2.2 m into the ramp along its edge, its own edge surveyed at 260.4 m (the user's Street View viewpoint,
     2026-11-20: a level sidewalk behind a wall with a railing, #779). The wall grows from nothing at the ramp's head:
-    the edge is its top from STEP_CUT on."""
+    the edge is its top from STEP_CUT on.
+    ground: IPR SW_KERB_SMEAR in from each point, on the sidewalk. Only a point whose own height lies within STEP_CUT
+    of it counts: a sidewalk's outline along a parapet on its kerb carries the parapet's top, not the walkway's
+    (by the Modřany viaduct, line 17 (-2396, -9241), 199.24 m over a walkway at 198.1 m: held at it, the edge stood
+    1.1 m up)."""
     from kerbs import KERB
     with np.errstate(invalid="ignore"):
         up = np.asarray(own, float) - np.asarray(zr, float) - KERB
+        if ground is not None:
+            up = np.where(np.abs(np.asarray(own, float) - np.asarray(ground, float)) <= STEP_CUT, up, np.nan)
         top = (up >= STEP_CUT) if np.isfinite(up).any() and np.nanmax(up) >= KERB_WALL else np.zeros(len(q), bool)
     t = np.column_stack([n[top, 1], -n[top, 0]]) * 0.125
     z = np.asarray(own, float)[top]
@@ -1414,7 +1420,8 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
         zr = np.asarray(road_z(*(q - n * 0.5).T), float)
         # (an edge standing over the road beyond it is a wall's top, held below as a wall's edge: wall_tops, #779)
         if own:
-            top, segs = wall_tops(q, n, own[0][ok], zr)
+            g = q + n * SW_KERB_SMEAR
+            top, segs = wall_tops(q, n, own[0][ok], zr, np.asarray(ipr.sample(g[:, 0] + F.E0, g[:, 1] + F.N0), float))
             if top.any():
                 tops.append(segs)
                 q, n, zr = q[~top], n[~top], zr[~top]

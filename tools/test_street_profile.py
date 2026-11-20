@@ -214,6 +214,8 @@ class Sidewalks(unittest.TestCase):
         top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.4), ramp(u, 0 * u))
         self.assertEqual((int(top.argmax()), segs.shape, segs[0, :, 2].tolist()), (12, (68, 2, 3), [200.4, 200.4]))
         self.assertFalse(sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.4), np.full(len(u), 199.9))[0].any())
+        # (the edge's height a parapet's, 1.1 m over the ground inside the sidewalk: none)
+        self.assertFalse(sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.4), ramp(u, 0 * u), np.full(len(u), 199.3))[0].any())
         ctx["kerb_edges"] = [edge]
         z0 = sp.bilinear(sp.sidewalks(ctx, ramp, [(0, 0), (20, 4)]), np.array([15.0]), np.array([0.25]))
         self.assertLess(z0[0], 199.5)

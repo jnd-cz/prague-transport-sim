@@ -540,6 +540,9 @@ class BesideAThinWall(unittest.TestCase):
         flat = lambda px, py: np.full(len(np.atleast_1d(px)), 258.0)  # noqa: E731
         self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, flat(x, y) + 0.04, flat)[1].any())
         self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), lambda px, py: np.full(len(px), np.nan))[1].any())
+        # (the surface out there 5 m over the lidar, a deck's level: left; on the lidar: taken)
+        self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), lambda px, py: smeared(px, py) + 5.0, smeared)[1].any())
+        self.assertEqual(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), smeared, smeared)[1].sum(), 4)
 
     def test_a_sidewalks_edge_over_a_sunk_road_is_such_a_wall(self):
         # (a sidewalk north of y = 0 surveyed at 200.4 m, its kerb edge along a ramp falling east from 200.3 m: the
@@ -547,10 +550,14 @@ class BesideAThinWall(unittest.TestCase):
         # level road, none)
         D = {"areas": [{"c": "sidewalk", "l": 0, "k": [[1, 0, 0, 0]],
                         "r": [[0, 0, 200.4], [20, 0, 200.4], [20, 4, 200.4], [0, 4, 200.4]]}]}
-        e = gm.kerb_walls(D, lambda px, py: 200.3 - 0.1 * np.asarray(px, float))
+        ground = lambda px, py: np.full(len(px), 200.4)  # noqa: E731
+        e = gm.kerb_walls(D, lambda px, py: 200.3 - 0.1 * np.asarray(px, float), ground)
         self.assertEqual(e.shape, (68, 2, 2))
         self.assertAlmostEqual(float(e[:, :, 0].min()), 3.0)
-        self.assertEqual(gm.kerb_walls(D, lambda px, py: np.full(len(px), 200.3)).shape, (0, 2, 2))
+        self.assertEqual(gm.kerb_walls(D, lambda px, py: np.full(len(px), 200.3), ground).shape, (0, 2, 2))
+        # (the outline carries a parapet's top, 1.1 m over the walkway: no wall's top)
+        self.assertEqual(gm.kerb_walls(D, lambda px, py: 200.3 - 0.1 * np.asarray(px, float),
+                                       lambda px, py: np.full(len(px), 199.3)).shape, (0, 2, 2))
 
     def test_in_a_corner_of_two_walls_the_surface_is_read_clear_of_both(self):
         # (walls along y = 0 and along x = 0, a pit at 258 m in their corner whose surface is smeared within 1.5 m of
