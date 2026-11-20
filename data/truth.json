@@ -4755,6 +4755,21 @@
       "sloping m": 0.5
      },
      "why": "the sidewalk and the road along the wall's foot are level and even (the place's `seen`). The written file of 2026-11-19 has the road there at 201.1 m, 2.9 m over IPR's raster (198.2): of 580 points 1-6 m off the low side of the viaduct's walls 355 stood more than 0.5 m over the raster, the largest 3.33 m (#761); on #762's and #763's ground none does, the largest 0.19 m"
+    },
+    {
+     "name": "across the road under the viaduct's deck, x = -2430",
+     "from": [
+      -2430.0,
+      -9237.5
+     ],
+     "to": [
+      -2430.0,
+      -9245.0
+     ],
+     "expect": {
+      "off the lidar m": 0.5
+     },
+     "why": "the road passes under the deck at the street's level (IPR 197.6 m). On #762's ground the road's area (7120, one outline on two levels) took the street surface, which follows the tracks onto the deck: 205.3 m, a slab in the viaduct 1.04 m over the deck's underside (the lines' check groundUnderDecks 0 -> 2 on the batch's first build, #761)"
     }
    ]
   },

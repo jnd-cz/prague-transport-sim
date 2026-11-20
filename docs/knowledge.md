@@ -567,6 +567,14 @@ Sections:
   the foot one side and the top the other without two neighbouring points climbing (`ground_mesh.two_sided`: 10-87
   such strips a line beside the 52-155 that climb); triangulated on its outline it stood as teeth 10 m wide, hidden
   behind the page's slab. The slab was 3.9 m all along; the survey's top steps between 1 and 4 m.
+- **A street under a deck** (#761, measured 2026-11-20 on the batch's first build). The street surface follows the
+  tracks onto a deck, so under the deck it has the deck's level. A level-0 street area on a span keeps its own
+  outline for that reason, but one whose outline lies on two levels (`climbs`) cannot, and since #762 took the street
+  surface whole: the road under the Modřany viaduct (line 17 (-2428, -9241), area 7120, 1.4 ha with the ramp's
+  roadside in one outline) stood at 205.3 m where the lidar has 197.6 m, a slab in the viaduct 1.04 m over the
+  deck's underside. The lines' check `groundUnderDecks` found it (0 → 2 places), not the place's sections, which
+  lay beside the ramp. Such an area's corners under a span that the street surface puts 2 m or more over the lidar lie
+  on the lidar (`ground_mesh.off_the_deck`); the place's steep faces fell from 75.9 to 4.8 m².
 - **Abutments: the wall the survey does not have** (#763, measured 2026-11-19). Where a deck lands, the survey's wing
   walls along the ramp are wall lines; the abutment's face under the deck is not. At the Modřany viaduct (line 17
   (-2393, -9247)) the two wing walls' lines turn by 0.5 m at the face's corners and run on along the street at its

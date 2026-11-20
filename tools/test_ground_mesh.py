@@ -391,6 +391,15 @@ class Terraces(unittest.TestCase):
         self.assertEqual(gm.beside(self.D, [7, 8], set(), self.lidar), set())
 
 
+class UnderADeck(unittest.TestCase):
+    def test_a_street_corner_at_the_decks_level_under_a_span_lies_on_the_lidar(self):
+        # (#761: the road under the Modřany viaduct; the ramp's own strip, 0.3 m off the lidar, keeps the street surface)
+        z, low = gm.off_the_deck([205.3, 204.7, 198.3, np.nan], [197.6, 204.4, 198.2, 197.0])
+        self.assertEqual(low.tolist(), [True, False, False, False])
+        self.assertEqual(z[:3].tolist(), [197.6, 204.7, 198.3])
+        self.assertTrue(np.isnan(z[3]))
+
+
 class TwoSided(unittest.TestCase):
     """#765: the wall under Letná, line 17 area 4166: a paved strip 0.44 m across, its foot's line along the road and
     its top's behind it, joining gradually at the ends."""
