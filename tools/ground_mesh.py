@@ -1206,10 +1206,11 @@ def kerb_walls(D, road_at, lidar):
     the ramp lies at 257.9 m, a spike in the corner by the door (#779)."""
     import street_profile
     segs = []
-    for q, n, own in street_profile.kerb_edges(D)[0]:
-        if not np.isfinite(own).any():
-            continue
-        top, e = street_profile.wall_tops(q, n, own, road_at(*(q - n * 0.5).T), lidar(*(q + n * street_profile.SW_KERB_SMEAR).T))
+    edges, walk = street_profile.kerb_edges(D)
+    for q, n, own in edges:
+        g2 = q + n * (street_profile.SW_KERB_SMEAR + 0.5)
+        top, e = street_profile.wall_tops(q, n, own, road_at(*(q - n * 0.5).T), lidar(*(q + n * street_profile.SW_KERB_SMEAR).T),
+                                          shapely.contains_xy(walk, g2[:, 0], g2[:, 1]))
         if top.any():
             segs.append(e[:, :, :2])
     return np.concatenate(segs) if segs else np.zeros((0, 2, 2))
