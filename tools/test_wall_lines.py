@@ -147,6 +147,24 @@ class Stretches(unittest.TestCase):
         self.assertTrue(np.allclose(low["zl"], 192.53, atol=0.01))  # (no higher than the ground 4 m behind)
         self.assertEqual(wl.of_lines([line], lambda x, y: np.full(np.shape(x), 191.2), (), (), {0: 3.5}), [])  # (nothing held: no wall)
 
+    def test_a_strips_outline_is_a_wall_line_at_the_edge_the_ground_steps_at(self):
+        # (#770: the west wall of the cutting north of Ohrada, line 37 (3397, 3): a strip 0.3 m across at the top's
+        # 248.2 m, the road behind it at 248.1, the track 4.7 m under it; the raster smears the step over 2 m)
+        ring = np.array([[0.0, 0.0, 248.2], [0.0, 30.0, 248.2], [-0.3, 30.0, 248.2], [-0.3, 0.0, 248.2], [0.0, 0.0, 248.2]])
+        st = wl.of_lines([ring], lambda x, y: quay(x, y, 248.1, 243.5), (), (), None, {0: "r"})
+        self.assertEqual(len(st), 1)  # (the edge to the track alone: the road's side has no step)
+        self.assertTrue(np.allclose(st[0]["p"][:, 0], 0.0) and st[0]["out"] == "r")
+        self.assertTrue(np.allclose(st[0]["zr"], 243.5) and np.allclose(st[0]["zl"], 248.2))
+
+    def test_a_strip_on_the_lidar_is_a_wall_line_along_its_low_side(self):
+        # (#770: the east wall there, area 1818: 0.5 m across, no heights to go by)
+        ring = np.array([[0.0, 0.0, 245.2], [0.5, 0.0, 247.2], [0.5, 30.0, 247.2], [0.0, 30.0, 245.2], [0.0, 0.0, 245.2]])
+        low = wl.low_edges(ring, lambda x, y: quay(x, y, 243.5, 249.5, at=0.2))
+        self.assertEqual(len(low), 1)
+        self.assertTrue(np.allclose(low[0][:, 0], 0.0) and np.isnan(low[0][:, 2]).all())
+        self.assertEqual(sorted([low[0][0, 1], low[0][-1, 1]]), [0.0, 30.0])
+        self.assertEqual(wl.low_edges(ring, lambda x, y: np.full(np.shape(x), 245.0)), [])  # (a kerb's strip: no low side)
+
     def test_runs_close_small_gaps_and_drop_short_ones(self):
         d = np.arange(12.0)
         on = np.array([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0], bool)

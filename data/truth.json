@@ -4888,7 +4888,7 @@
      "expect": {
       "sloping m": 1.0
      },
-     "why": "the road's edge, the wall's top, one upright face of 4.7 m at the strip's edge to the track (3396.8, 3.2), the ledge and the ballast at the track's level. The written file of 2026-11-20 has 3.25 m of the 7.5 sloping (the foot in the raster's smear), the build with the strips as wall lines 0.75 m (the top's crossfall)"
+     "why": "the road's edge, the wall's top, one upright face of 4.7 m at the strip's edge to the track (3396.8, 3.2), the ledge and the ballast at the track's level. The written file of 2026-11-20 has 3.25 m of the 7.5 sloping (the foot in the raster's smear), the build with the strips as wall lines 0.5 m (the top's crossfall)"
     },
     {
      "name": "across the east wall, 6.5 m from the track to the wall's top",

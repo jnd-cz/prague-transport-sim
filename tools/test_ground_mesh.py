@@ -280,6 +280,11 @@ class Walls(unittest.TestCase):
         zf, steps, _ = gm.weld(cx, cy, zc, prio, kind, label, zown, held)
         self.assertEqual(np.round(zf, 3).tolist(), [244.59, 248.03, 248.03, 248.03])
         self.assertEqual(steps["ties"]["lidar apart"], 1)
+        # (#771: a lawn, of a lower rank than the paved strip it stands at the foot of: line 17 (-724.65, -2546.51))
+        prio = np.array([2.0 + (10 - 0) / 100 + gm.YIELD, p, 2.0 + (10 - 0) / 100 + gm.YIELD, p])
+        zf, steps, _ = gm.weld(cx, cy, np.array([193.68, 197.88, 193.68, 197.88]), prio, kind, label,
+                               np.array([197.16, np.nan, 197.16, np.nan]), held)
+        self.assertEqual(np.round(zf, 3).tolist(), [193.68, 197.88, 197.88, 197.88])
 
     def test_the_water_keeps_its_level_under_a_bank_of_its_rank(self):
         # (#664: survey water at OSM's level, 184.68 m, and its quay of one rank, 189.97 m, share a point (line 17's Vltava
@@ -555,6 +560,22 @@ class WallsMeeting(unittest.TestCase):
         ])
         self.assertEqual(z, [100.0, 100.0, 100.0, 106.0, 100.0])
         self.assertTrue(all(held))
+
+    def test_beside_a_strips_outline_every_corner_is_outside_the_strip(self):
+        # (#771: the end of the wing wall by the Vyšehrad tunnel's north mouth, line 17 (-727.35, -2547.76): the strip's
+        # north edge running west, the strip to its left, and its end's edge running south. The sidewalk's corner 1 m
+        # past the end, in a triangle whose centre lies left of the north edge's line run on, took the strip's level)
+        north = dict(self.stretch([[10, 0], [5, 0], [0, 0]], 106.0, 100.0), out="r")
+        end = dict(self.stretch([[0, 0], [0.3, -0.6], [0.6, -1.2]], 106.0, 100.0), out="r")
+        z, held = self.hold([north, end], [[-1.0, -0.1, -0.7, -2.2], [5.0, 0.5, 5.0, 0.8], [5.0, -0.8, 5.0, -1.1]])
+        self.assertEqual(z, [100.0, 100.0, 106.0])  # (the last behind the strip: at its level, as at a wall line)
+        plain = [self.stretch([[10, 0], [5, 0], [0, 0]], 106.0, 100.0)]
+        self.assertEqual(self.hold(plain, [[5.0, 0.0, 5.0, -0.2]])[0], [106.0])  # (a wall line: by the triangle's side)
+        # (a street's corner keeps its own surface beside a strip, #770; a wall line holds it)
+        c = np.array([[5.0, 0.5, 5.0, 0.8], [5.0, 0.6, 5.0, 0.9]])
+        args = (c[:, 0], c[:, 1], c[:, 2], c[:, 3], np.full(2, 103.0), np.ones(2, bool))
+        self.assertEqual(gm.hold_at_walls(*args, [north], None, np.array([True, False]))[0].tolist(), [103.0, 100.0])
+        self.assertEqual(gm.hold_at_walls(*args, plain, None, np.array([True, False]))[0].tolist(), [100.0, 100.0])
 
     def test_a_line_across_a_structure_leaves_the_decks_own_surface(self):
         face = dict(self.face, across=True)
