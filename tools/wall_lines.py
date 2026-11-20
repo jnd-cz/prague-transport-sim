@@ -179,16 +179,19 @@ def _side(S, lidar, sign, walls=None):
     return lvl, g, surveyed
 
 
-def levels(S, lidar, walls=None):
+def levels(S, lidar, walls=None, strips=False):
     """The ground to the left and to the right of sampled points S (sample()), lidar(x, y) IPR's raster, walls the
     segments ((A, B), each (m, 3)) a side's readings stop at: (zl, gl, zr, gr), each side's level at the line and its
-    slope away from it (see the module's text)."""
+    slope away from it (see the module's text). strips: and per side, where it is the strip to the next wall line (a
+    surveyed height, _side)."""
     (zl, gl, sl), (zr, gr, sr) = _side(S, lidar, 1.0, walls), _side(S, lidar, -1.0, walls)
     z = S[:, 2]
     # (the line's own height is the side's it lies nearer, within OWN; a strip's level is a surveyed height already)
     dl, dr = np.abs(z - zl), np.abs(z - zr)
     own_l = np.isfinite(z) & (dl <= OWN) & (dl <= dr) & ~sl
     own_r = np.isfinite(z) & (dr <= OWN) & (dr < dl) & ~sr
+    if strips:
+        return np.where(own_l, z, zl), gl, np.where(own_r, z, zr), gr, sl, sr
     return np.where(own_l, z, zl), gl, np.where(own_r, z, zr), gr
 
 
@@ -272,7 +275,9 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
     readings run along that wall, through the raster's smear of it, and the point next to the end stands for it.
     heights: {a line's index: its wall's height over its foot}, for the lines known by a height (retained).
     outside: {a line's index: "l" or "r"}, for a strip's outline: the side that is not the strip (`out` of its
-    stretches: ground_mesh.hold_at_walls)."""
+    stretches: ground_mesh.hold_at_walls). A stretch one of whose sides is the strip to the next wall line (a wall's
+    foot line and its top line, a wall's two faces) carries `sl` / `sr`, per point whether that side is: the strip
+    ends where the pair does, and its level holds nothing past the stretch's end (hold_at_walls)."""
     out = []
     walls = segments(list(lines) + list(others))
     for n_line, p in enumerate(lines):
@@ -280,7 +285,11 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
         if len(S) < 2:
             continue
         h = (heights or {}).get(n_line)
-        zl, gl, zr, gr = levels(S, lidar, walls) if h is None else retained(S, lidar, h, walls)
+        if h is None:
+            zl, gl, zr, gr, sl, sr = levels(S, lidar, walls, strips=True)
+        else:
+            zl, gl, zr, gr = retained(S, lidar, h, walls)
+            sl = sr = np.zeros(len(S), bool)
         if n_line in meeting and len(S) > 3:
             for q in (zl, gl, zr, gr):
                 q[0], q[-1] = q[1], q[-2]
@@ -291,6 +300,9 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
                 for q in v:
                     q[-1] = q[-2]
             out.append({"p": S[a:b + 1, :2].copy(), "zl": _median(v[0]), "gl": _median(v[1]), "zr": _median(v[2]), "gr": _median(v[3])})
+            for key, v in (("sl", sl), ("sr", sr)):
+                if v[a:b + 1].any():
+                    out[-1][key] = v[a:b + 1].copy()
             if h is not None:
                 out[-1]["h"] = h
             if n_line in meeting:  # (a line across a structure: ground_mesh.hold_at_walls leaves the deck's own surface)

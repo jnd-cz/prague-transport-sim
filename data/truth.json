@@ -4976,6 +4976,35 @@
     "source": "Google Street View of September 2025 at the two viewpoints the user linked, seen 2026-11-20 (this session, on PR 772: \"There's temporary concrete dividers for the sidewalk, we don't have to include it. Otherwise there is flat road surface and kerb for the sidewalk.\"; of the rock side: \"there is better view here\")",
     "game": "main has two slabs in the mouth; the first build of #771 a cone by the road outside it, the gate's strip stood up as a wall. With the strip at the rails' level: the flat road, the kerbs and the sidewalks. The gate, its wing wall and the dividers are not drawn."
    }
+  },
+  "wall-end-in-a-path": {
+   "line": "23",
+   "at": [
+    -2329.2,
+    571.0
+   ],
+   "reach": 20,
+   "issue": 770,
+   "what": "a footpath passing the end of a wall surveyed as two lines half a metre apart (its foot's at 271.18 m, its top's at 272.93 m): the path and the lawn past the wall's end lie on the ground, 272.6 m",
+   "source": "found tracing #770's sidewalk / sidewalk seams, 2026-11-20: line 23 s 892 (and line 22 s 5204), a step of 0.96 m inside survey sidewalk 3197",
+   "sections": [
+    {
+     "name": "across the path and past the wall's end onto the lawn, y = 571",
+     "from": [
+      -2332.0,
+      571.0
+     ],
+     "to": [
+      -2327.6,
+      571.0
+     ],
+     "expect": {
+      "off the lidar m": 1.0,
+      "largest step m": 0.4
+     },
+     "why": "IPR's raster has no step there (272.49 to 273.01 m). The written file of 2026-11-20 holds the path's last 0.75 m and the lawn past the wall at 271.18-271.4 m, the level of the strip between the wall's two lines carried on past its end: steps of 1.15 m and 1.74 m"
+    }
+   ]
   }
  }
 }

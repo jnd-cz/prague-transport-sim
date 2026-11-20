@@ -453,6 +453,30 @@ class InARockTunnel(unittest.TestCase):
         self.assertEqual(high.tolist(), [True, False, False])
 
 
+class APairsEnd(unittest.TestCase):
+    def test_the_strip_between_two_wall_lines_holds_nothing_past_their_end(self):
+        # (#770: a wall's foot line along x = 0 from y = 0 north, its right side the strip to the top line at 271.18 m,
+        # its left the ground at 272.5 m; its end joins another stretch, so it is no free end. Corners on the strip's
+        # side beside the line take the strip's level; 0.4 m and 1 m past the end they are left; on the ground's side
+        # past the end they take the ground's, as before)
+        n = 6
+        foot = {"p": np.column_stack([np.zeros(n), np.arange(n, dtype=float)]), "zl": np.full(n, 272.5), "zr": np.full(n, 271.18),
+                "gl": np.zeros(n), "gr": np.zeros(n), "sr": np.ones(n, bool)}
+        top = {"p": np.column_stack([np.linspace(-3, -0.3, 5), np.linspace(-1.5, -0.1, 5)]), "zl": np.full(5, 272.5),
+               "zr": np.full(5, 272.5), "gl": np.zeros(5), "gr": np.zeros(5)}
+        cx = np.array([0.3, 0.3, 0.3, -0.3])
+        cy = np.array([2.0, -0.4, -1.0, -0.4])
+        z, held = gm.hold_at_walls(cx, cy, cx, cy - 0.1, np.full(4, 272.6), np.ones(4, bool), [foot])
+        self.assertEqual(held.tolist()[:3], [True, False, False])  # (alone, a free end, too)
+        z, held = gm.hold_at_walls(cx, cy, cx, cy - 0.1, np.full(4, 272.6), np.ones(4, bool), [foot, top])
+        self.assertEqual(np.round(z, 2).tolist()[:1], [271.18])
+        self.assertTrue(271.18 not in np.round(z[1:], 2).tolist())
+        plain = dict(foot)
+        plain.pop("sr")
+        z0, _ = gm.hold_at_walls(cx, cy, cx, cy - 0.1, np.full(4, 272.6), np.ones(4, bool), [plain, top])
+        self.assertIn(271.18, np.round(z0[1:], 2).tolist())  # (a side read from the raster holds on, as before)
+
+
 class UnderADeck(unittest.TestCase):
     def test_a_street_corner_at_the_decks_level_under_a_span_lies_on_the_lidar(self):
         # (#761: the road under the Modřany viaduct; the ramp's own strip, 0.3 m off the lidar, keeps the street surface)

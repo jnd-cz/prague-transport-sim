@@ -661,6 +661,16 @@ Sections:
     a metre, marching squares): 2.6 km on line 9 in 679 stretches, 532 of them under 5 m, and no place needs them.
   On the place the steep faces that are no wall fall from 220.7 to 41.4 m² and its three sections, which the written
   file fails (3.25, 1.82 and 8.84 m sloping), hold (0.5, 0.78, 0.0).
+- **A wall's two lines end, and so does the strip between them** (#770, measured 2026-11-20). The survey has many a
+  wall as two `Zeď` lines half a metre apart, its foot's and its top's, and `wall_lines._side` gives the strip
+  between them the lower line's surveyed height. `ground_mesh.hold_at_walls` held every corner within 1.5 m on that
+  side at it, also past the pair's end where the end joins another stretch (no free end, #763): by line 23
+  (-2329.4, 571.3) a footpath and the lawn passing the end of a wall (foot 271.18 m, top 272.93 m, the ground
+  272.6 m on IPR) lay in a trench 1.3 m deep, a step of 0.96 m inside one sidewalk in the `surfaces` check. Such a
+  side is marked on its stretch (`sl`, `sr`) and holds nothing past the stretch's end. Whether a corner is past the
+  end is asked of its nearest segment of that stretch: 1 m beyond the end a corner is still within 1.5 m of the
+  stretch's second segment, which has no end to be past. (A free end has the same gap: a corner up to about 1 m
+  past it is held by the second segment. Left as it is: no place shows it.)
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of

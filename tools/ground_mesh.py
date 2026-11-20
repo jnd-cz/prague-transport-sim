@@ -675,6 +675,11 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     outside the strip's corner, never the strip's own (#771). Beside the stretch a corner on the strip's side is the
     ground behind the strip and stands at the strip's level, as at any wall line: behind the top of the cutting's wall
     north of Ohrada (line 37 (3396, 4), a strip 0.3 m across) the ground between the road and the strip (#770).
+    A side that is the strip between the stretch's line and the next wall line (`sl`, `sr`: a wall's foot line and its
+    top line half a metre apart) holds nothing past the stretch's end: the strip ends there. A footpath passing the
+    end of the wall by line 23 (-2329.4, 571.3), whose foot line is surveyed at 271.18 m and whose top line at
+    272.93 m, took the strip's 271.18 m in the wedge past the end, a trench 1.3 m deep and 0.5 m across in the path
+    and the lawn (the lidar has 272.6 m; the end joins the top line, so it is no free end, #770).
     It does not hold a street's corners (`street`): a street has its own surface up to the strip, and line 9 alone has
     7.4 km of such stretches (1,014 of them, 637 under 5 m: parapets, edgings, low walls) whose raster levels would
     run through its sidewalks; the lidar's ground and the terrain have none and climbed the strip (#770).
@@ -682,7 +687,7 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     held = np.zeros(len(cx), bool)
     if not walls or not eligible.any():
         return z, held
-    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP = [], [], [], [], [], [], [], [], [], []
+    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP, SL, SR, SID = [], [], [], [], [], [], [], [], [], [], [], [], []
     wl = np.array([shapely.LineString(np.asarray(w["p"], float)[:, :2]) for w in walls], object)
     wtree = shapely.STRtree(wl)
     free = np.ones((len(walls), 2), bool)
@@ -698,6 +703,11 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
             v = w.get(k)
             v = np.zeros(n + 1) if v is None else np.asarray(v, float)
             out.append(np.column_stack([v[:-1], v[1:]]))
+        for out, k in ((SL, "sl"), (SR, "sr")):
+            v = w.get(k)
+            v = np.zeros(n + 1, bool) if v is None else np.asarray(v, bool)
+            out.append(v[:-1] | v[1:])
+        SID.append(np.full(n, len(SID)))
         ACROSS.append(np.full(n, bool(w.get("across"))))
         OUT.append(np.full(n, {"l": 1, "r": -1}.get(w.get("out"), 0)))
         e = np.zeros((n, 2), bool)  # (a segment's end that is its stretch's free end)
@@ -706,7 +716,7 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
         e = np.zeros((n, 2), bool)  # (a segment's end that is its stretch's end, free or not)
         e[0, 0] = e[-1, 1] = True
         TIP.append(e)
-    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP = (np.concatenate(v) for v in (A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP))
+    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP, SL, SR, SID = (np.concatenate(v) for v in (A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP, SL, SR, SID))
     tree = shapely.STRtree(shapely.linestrings(np.stack([A, B], 1)))
     idx = np.flatnonzero(eligible)
     pi, si = tree.query(shapely.points(cx[idx], cy[idx]), predicate="dwithin", distance=WALL_HOLD)
@@ -724,6 +734,13 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     t = np.clip(raw, 0, 1)
     d = np.hypot(*(P - A[si] - t[:, None] * v).T)
     past = ((raw < -1e-9) & END[si, 0]) | ((raw > 1 + 1e-9) & END[si, 1])
+    # (whether a corner lies past a stretch's end is its nearest segment of that stretch's to say: 1 m beyond the end it
+    # is still within WALL_HOLD of the stretch's second segment, which has no end to be past)
+    o = np.lexsort((d, SID[si], pi))
+    lead = np.concatenate([[True], (pi[o][1:] != pi[o][:-1]) | (SID[si[o]][1:] != SID[si[o]][:-1])])
+    near = o[lead][np.cumsum(lead) - 1]
+    gtip = np.empty(len(pi), bool)
+    gtip[o] = ((raw[near] < -1e-9) & TIP[si[near], 0]) | ((raw[near] > 1 + 1e-9) & TIP[si[near], 1])
     order = np.lexsort((d, past, pi))  # (per corner the nearest segment it is not past first)
     first = np.concatenate([[True], pi[order][1:] != pi[order][:-1]])
     k = order[first]
@@ -739,7 +756,7 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     order2 = np.lexsort((dc, (rawc < -1e-9) | (rawc > 1 + 1e-9), d > dmin[pi] + WALL_JOIN, past, pi))
     k2 = order2[np.concatenate([[True], pi[order2][1:] != pi[order2][:-1]])]
     k = np.where(((raw[k] < 1e-9) | (raw[k] > 1 - 1e-9)) & ~past[k], k2, k)
-    c, s, t, d, raw = idx[pi[k]], si[k], t[k], d[k], raw[k]
+    c, s, t, d, raw, gtip = idx[pi[k]], si[k], t[k], d[k], raw[k], gtip[k]
     v = B[s] - A[s]
     left = v[:, 0] * (ty[c] - A[s, 1]) - v[:, 1] * (tx[c] - A[s, 0]) > 0
     rc = ((tx[c] - A[s, 0]) * v[:, 0] + (ty[c] - A[s, 1]) * v[:, 1]) / np.maximum((v * v).sum(1), 1e-12)
@@ -749,7 +766,9 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
         return Q[s, 0] + (Q[s, 1] - Q[s, 0]) * t
     level = np.where(left, along(ZL) + along(GL) * d, along(ZR) + along(GR) * d)
     past = ((raw < -1e-9) & END[s, 0]) | ((raw > 1 + 1e-9) & END[s, 1])
-    ok = np.isfinite(level) & ~past
+    # (the strip to the next wall line ends with the stretch: past its end, by the triangle's centre or the corner)
+    tip = gtip | ((np.minimum(rc, raw) < -1e-9) & TIP[s, 0]) | ((np.maximum(rc, raw) > 1 + 1e-9) & TIP[s, 1])
+    ok = np.isfinite(level) & ~past & ~(tip & np.where(left, SL[s], SR[s]))
     z = z.copy()
     z[c[ok]] = level[ok]
     held[c[ok]] = True

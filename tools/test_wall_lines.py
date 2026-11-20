@@ -80,6 +80,19 @@ class Stretches(unittest.TestCase):
         self.assertTrue(np.allclose(st[0]["zl"], 208.6) and np.allclose(st[0]["zr"], 211.4))
         self.assertTrue(np.allclose(st[1]["zl"], 211.4) and np.allclose(st[1]["zr"], 214.0))
 
+    def test_a_side_that_is_the_strip_to_the_next_line_says_so(self):
+        # (#770: a wall's foot line surveyed at 271.18 m and its top line at 272.93 m, 0.6 m apart, on ground the raster
+        # has level at 272.6 m: the strip between them takes the lower, a surveyed height, and each stretch marks
+        # that side; the sides read from the raster carry no mark)
+        def line(x, z):
+            return np.array([[x, 0.0, z], [x, 12.0, z]])
+        st = wl.of_lines([line(0.0, 271.18), line(0.6, 272.93)], lambda x, y: np.full(np.shape(x), 272.6))
+        self.assertEqual(len(st), 2)
+        self.assertTrue(np.allclose(st[0]["zr"], 271.18) and st[0]["sr"].all() and "sl" not in st[0])
+        self.assertTrue(np.allclose(st[1]["zl"], 271.18) and st[1]["sl"].all() and "sr" not in st[1])
+        plain = wl.of_lines([np.array([[0.0, 0.0, 200.0], [0.0, 12.0, 200.0]])], lambda x, y: np.where(np.asarray(x) < 0, 200.0, 203.0))
+        self.assertTrue("sl" not in plain[0] and "sr" not in plain[0])
+
     def test_a_sides_readings_stop_at_a_wall_areas_outline(self):
         """A survey wall area's outline bounds a terrace as a wall line does: the readings past it are another level's."""
         def two(x, y):  # (a step of 3 m at x = 0 and another at x = 2, each smeared over a metre)
