@@ -1050,7 +1050,10 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
     - a corner below the top keeps its own height where it differs by more than its pair's STEP (a kerb, a wall, the
       water); the pair is judged against the lowest top corner's kind;
     - a lidar corner (`label` "lidar") that yielded to its rank (YIELD) keeps its own where its area's outline there
-      (`zown`) stands over LIDAR_APART off.
+      (`zown`) stands over LIDAR_APART off; one a wall line holds (`held`), where its held height does: the paved
+      ground at the foot of the cutting's wall north of Ohrada (line 37 (3389.13, -10.60)) is one area with the ground
+      behind the wall's top, its outline there at 248.44 m, and its corner on the wall's line, held at the foot's
+      244.59 m, took the top strip's 248.03 m: a spike on the ledge every 2 m of wall (#770).
     - corners `apart` (a wall area's, lifted to its top on its foot's outline: wall_face) are welded among themselves
       only, and the others at their point without them: the wall's face stands on the ground at its foot.
     `label`: what gave each corner its height (default `kind`), for the report and the lidar's rule."""
@@ -1099,8 +1102,9 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
     label = kind if label is None else label
     apart = np.zeros(len(zc), bool)
     if zown is not None:
+        own = zown if held is None else np.where(held, zc, zown)
         with np.errstate(invalid="ignore"):
-            apart = (label == "lidar") & ~is_top & rank & (np.abs(zown - target) > LIDAR_APART)
+            apart = (label == "lidar") & ~is_top & rank & (np.abs(own - target) > LIDAR_APART)
     step |= apart
     zf = np.where(step, zc, target)
     steps = {p: {"corners": int((step & (pair == p)).sum()),

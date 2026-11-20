@@ -397,6 +397,168 @@ def geoportal_lines(ln, root=ROOT, box=None, survey=()):
     return out, hs
 
 
+def _dtm(ln, root):
+    """data/lineN.dtm.json's areas (kept while the file is the same one)."""
+    path = os.path.join(root, "data", f"line{ln}.dtm.json")
+    if not os.path.exists(path):
+        return []
+    key = (path, os.path.getmtime(path))
+    if _dtm.kept[0] != key:
+        with open(path, encoding="utf-8") as f:
+            _dtm.kept = (key, json.load(f).get("areas") or [])
+    return _dtm.kept[1]
+
+
+_dtm.kept = (None, [])
+
+
+def _reaches(p, box):
+    return box is None or not (p[:, 0].max() < box[0] or p[:, 0].min() > box[2] or p[:, 1].max() < box[1] or p[:, 1].min() > box[3])
+
+
+def low_edges(p, lidar):
+    """The runs ([(n, 3)], z NaN) of a strip's outline (closed, (n, 3)) along its low side: where IPR's raster FIT m
+    out of the strip lies STEP or more under the raster FIT m in, past the strip. A strip on the lidar's ground has no
+    heights to go by (tools/zps_inside.py: its outline's sheet misses the ground), only its place in plan: the wall's
+    face stands at its edge to the lower ground."""
+    x, y = p[:, 0], p[:, 1]
+    turn = float((x[:-1] * y[1:] - x[1:] * y[:-1]).sum())  # (over 0: anticlockwise, the inside to the left)
+    S = sample(np.column_stack([x, y, np.full(len(p), np.nan)]))
+    if len(S) < 2:
+        return []
+    sign = 1.0 if turn > 0 else -1.0
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        zin, zout = (np.nanmedian(np.stack([np.asarray(lidar(S[:, 0] + sg * S[:, 3] * o, S[:, 1] + sg * S[:, 4] * o), float)
+                                            for o in FIT]), 0) for sg in (sign, -sign))
+    d = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(S[:, 0]), np.diff(S[:, 1])))])
+    with np.errstate(invalid="ignore"):
+        low = zin - zout >= STEP
+    return [S[a:b + 1, :3].copy() for a, b in runs(low, d)]
+
+
+def strips(ln, root=ROOT, box=None):
+    """Line ln's paved strips at ground level, STRIP wide or narrower (wall_outlines), that are no wall's face in plan
+    (ground_mesh.wall_like stands those by their own outline): ([outlines (n, 3), closed], [whether on the lidar's
+    ground])."""
+    import ground_mesh
+    out, on_lidar = [], []
+    for a in _dtm(ln, root):
+        if a.get("c") != "paved" or a.get("l", 0) != 0 or len(a.get("r") or []) < 3:
+            continue
+        p = np.array([[v if v is not None else np.nan for v in q[:3]] for q in a["r"] + a["r"][:1]], float)
+        if not _reaches(p, box):
+            continue
+        x, y = p[:, 0], p[:, 1]
+        per = float(np.hypot(np.diff(x), np.diff(y)).sum())
+        if not per or abs(float((x[:-1] * y[1:] - x[1:] * y[:-1]).sum())) / per > STRIP or ground_mesh.wall_like(a):
+            continue
+        out.append(p)
+        on_lidar.append(bool(a.get("g")))
+    return out, on_lidar
+
+
+def strip_lines(ln, root=ROOT, box=None, survey=(), lidar=None):
+    """The survey's paved strips (strips) as wall lines, the runs off the survey's own walls (off_survey). A retaining
+    wall's top is often such a strip and nothing else: along the tram's cutting north of Ohrada (line 37
+    (3358..3403, -65..14), area 1847: 0.32 m across and 87 m long at 248.2-248.6 m) the track lies 4.7 m under it and
+    the paved ground beside it lay on the raster, a bank 2.5 m across where a concrete wall stands (the user's photos
+    from the footbridge, 2026-11-20, #770).
+    - A strip with the survey's heights: its outline with them. They are its level (_side: a strip under PAIR across),
+      so the stretch runs along the edge the ground steps at.
+    - A strip on the lidar's ground (the cutting's other wall, area 1818: 0.53 m across, 250 m long): its low side's
+      edge alone (low_edges), without heights."""
+    out = []
+    for p, g in zip(*strips(ln, root, box)):
+        out += low_edges(p, lidar or ipr_lidar()) if g else [p]
+    return off_survey(out, survey)
+
+
+FACE_CELL = 0.5  # m: the lattice IPR's raster is read on for its faces
+FACE_REACH = 2.0  # m round a point: the lowest and the highest reading this near are a face's foot and top
+
+
+def zero_lines(f, on):
+    """The segments ((n, 2, 2): two points (column, row) each, in lattice units) of the zero line of a lattice f through
+    the cells `on` ((rows - 1, columns - 1)): marching squares, a saddle's cell left out."""
+    s = f > 0
+    with np.errstate(all="ignore"):
+        H = np.where(s[:, :-1] != s[:, 1:], f[:, :-1] / (f[:, :-1] - f[:, 1:]), np.nan)  # (along a row, between two columns)
+        V = np.where(s[:-1, :] != s[1:, :], f[:-1, :] / (f[:-1, :] - f[1:, :]), np.nan)  # (along a column, between two rows)
+    jj, ii = np.meshgrid(np.arange(f.shape[1] - 1, dtype=float), np.arange(f.shape[0] - 1, dtype=float))
+    pts = np.stack([np.stack([jj + H[:-1, :], ii + 0 * H[:-1, :]], -1), np.stack([jj + 1 + 0 * V[:, 1:], ii + V[:, 1:]], -1),
+                    np.stack([jj + H[1:, :], ii + 1 + 0 * H[1:, :]], -1), np.stack([jj + 0 * V[:, :-1], ii + V[:, :-1]], -1)], 2)
+    ok = np.isfinite(pts[..., 0])
+    two = on & (ok.sum(-1) == 2)
+    P, K = pts[two], ok[two]
+    idx = np.argsort(~K, axis=1, kind="stable")[:, :2]
+    return P[np.arange(len(P))[:, None], idx]
+
+
+def raster_faces(polys, lidar):
+    """The lines ([(n, 3)], z NaN) along the faces IPR's raster has inside polygons: where it rises SLOPE or more in a
+    metre (a wall's smear: a 1 m raster spreads a wall of 2 m or more over 1-2 m; a bank at 1:1 rises 1 m), the line
+    midway between the lowest and the highest reading within FACE_REACH, the middle of the smear. Read on a lattice of
+    FACE_CELL fixed in the city's frame, so a box's build finds the line a whole line's build does."""
+    import shapely
+    from scipy import ndimage
+    out = []
+    k = int(round(FACE_REACH / FACE_CELL))
+    for g in polys:
+        x0, y0, x1, y1 = g.bounds
+        xs = np.arange(math.floor((x0 - FACE_REACH) / FACE_CELL), math.ceil((x1 + FACE_REACH) / FACE_CELL) + 1) * FACE_CELL
+        ys = np.arange(math.floor((y0 - FACE_REACH) / FACE_CELL), math.ceil((y1 + FACE_REACH) / FACE_CELL) + 1) * FACE_CELL
+        gx, gy = np.meshgrid(xs, ys)
+        z = np.asarray(lidar(gx.ravel(), gy.ravel()), float).reshape(gx.shape)
+        known = np.isfinite(z)
+        if not known.any():
+            continue
+        z = np.where(known, z, float(np.nanmean(z)))
+        dzy, dzx = np.gradient(z, FACE_CELL)
+        steep = (np.hypot(dzx, dzy) >= SLOPE) & known
+        if not steep.any():
+            continue
+        f = z - (ndimage.minimum_filter(z, 2 * k + 1, mode="nearest") + ndimage.maximum_filter(z, 2 * k + 1, mode="nearest")) / 2
+        on = steep[:-1, :-1] | steep[:-1, 1:] | steep[1:, :-1] | steep[1:, 1:]
+        on &= known[:-1, :-1] & known[:-1, 1:] & known[1:, :-1] & known[1:, 1:]
+        on &= shapely.contains_xy(g, gx[:-1, :-1] + FACE_CELL / 2, gy[:-1, :-1] + FACE_CELL / 2)
+        segs = zero_lines(f, on)
+        if not len(segs):
+            continue
+        segs = np.stack([xs[0] + segs[..., 0] * FACE_CELL, ys[0] + segs[..., 1] * FACE_CELL], -1)
+        merged = shapely.line_merge(shapely.multilinestrings([shapely.linestrings(segs)]))
+        for part in shapely.get_parts(merged):
+            part = shapely.simplify(part, FACE_CELL / 2)
+            if part.length >= MIN_LEN:
+                c = shapely.get_coordinates(part)
+                out.append(np.column_stack([c, np.full(len(c), np.nan)]))
+    return out
+
+
+def face_lines(ln, root=ROOT, box=None, lidar=None, survey=()):
+    """The faces IPR's raster has inside line ln's paved areas on the lidar's ground (raster_faces), as wall lines: their
+    runs off the survey's own walls and Geoportál's (off_survey). Pavement does not lie at 56 degrees: such a rise
+    inside a paved area is a wall the survey drew no line of. The cutting's other wall north of Ohrada (line 37
+    (3404..3412, -10..9), area 1817: 1.6 m across, the track's edge at 243.6 m and the road's at 249.7) has its foot
+    1 m inside the area, a ledge beside the track (the user's photos, 2026-11-20, #770)."""
+    import shapely
+    polys = []
+    for a in _dtm(ln, root):
+        if a.get("c") != "paved" or not a.get("g") or a.get("l", 0) != 0 or len(a.get("r") or []) < 3:
+            continue
+        p = np.array([q[:2] for q in a["r"]], float)
+        if not _reaches(p, box):
+            continue
+        g = shapely.Polygon(p, [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
+        if not g.is_valid:
+            g = g.buffer(0)
+        if not g.is_empty:
+            polys.append(g)
+    # (as one ground: a wall's own strip is often an area of its own, 0.5 m across, and the face runs in and out of it)
+    polys = [g for g in shapely.get_parts(shapely.union_all(polys)) if g.geom_type == "Polygon"] if polys else []
+    return off_survey(raster_faces(polys, lidar or ipr_lidar()), survey)
+
+
 def ipr_lidar():
     from geo import Frame
     from ipr_dtm import IprDtm
@@ -410,11 +572,17 @@ def stretches(ln, root=ROOT, box=None, lidar=None, extra=()):
     if box is not None:
         box = (box[0] - FIT[-1], box[1] - FIT[-1], box[2] + FIT[-1], box[3] + FIT[-1])
     # (extra: more lines taken as wall lines, ground_mesh.abutments, #763)
+    lidar = lidar or ipr_lidar()
     src, areas = source_lines(ln, root, box), wall_outlines(ln, root, box)
-    geo, hs = geoportal_lines(ln, root, box, src + wall_outlines(ln, root, box, strips=True))
-    n = len(src) + len(geo)
-    return of_lines(src + geo + list(extra), lidar or ipr_lidar(), areas, set(range(n, n + len(extra))),
-                    {len(src) + k: h for k, h in enumerate(hs)})
+    # (the survey's strips where it has no wall line, #770; Geoportal's walls where it has neither, #765; the raster's
+    # own faces inside paved ground where nobody has a line, #770)
+    walls = strip_lines(ln, root, box, src + areas, lidar)
+    known = src + wall_outlines(ln, root, box, strips=True) + [p for p, g in zip(*strips(ln, root, box)) if g]
+    geo, hs = geoportal_lines(ln, root, box, known)
+    faces = face_lines(ln, root, box, lidar, known + geo)
+    lines = src + walls + geo + faces
+    return of_lines(lines + list(extra), lidar, areas, set(range(len(lines), len(lines) + len(extra))),
+                    {len(src) + len(walls) + k: h for k, h in enumerate(hs)})
 
 
 def main(argv=None):
