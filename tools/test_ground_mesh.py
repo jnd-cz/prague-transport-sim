@@ -195,9 +195,10 @@ class Stairs(unittest.TestCase):
 class Walls(unittest.TestCase):
     def test_a_street_corner_on_a_wall_takes_its_height_there(self):
         # (#653: a wall's top rising 229.6 -> 230.0 m along x = 0..4, its foot at 228.5, top and foot at one place at
-        # x = 4. A sidewalk corner on its top 0.12 m under it takes it, between its ends; one where the wall holds its top
-        # and its foot, the nearer; one 2 m off any, or off the outline, keeps its own; a lawn corner is not moved, nor one
-        # on another level's wall)
+        # x = 4. A sidewalk corner on its top 0.10 m under it takes it; one 0.12 m under it does not: the wall stands over
+        # it, a low wall (#776: the platform climbed the cheek walls at Krejcárek's ramp); one where the wall holds its
+        # top and its foot, the nearer, down to it; one 2 m off any, or off the outline, keeps its own; a lawn corner is
+        # not moved, nor one on another level's wall)
         wall = {"c": "wall", "l": 0, "r": [[0, 0, 229.6], [4, 0, 230.0], [4, 0, 228.5], [4, 0.3, 228.5], [0, 0.3, 228.5]]}
         upper = {"c": "wall", "l": 1, "r": [[0, 1, 300.0], [4, 1, 300.0], [4, 1.3, 300.0]]}
         D = {"areas": [wall, upper]}
@@ -206,7 +207,7 @@ class Walls(unittest.TestCase):
         z = np.array([229.68, 229.50, 228.70, 227.60, 229.70, 229.75, 299.90])
         street = np.array([True, True, True, True, True, False, True])
         got = gm.snap_to_walls(D, x, y, z, street)
-        self.assertEqual(np.round(got, 3).tolist(), [229.8, 229.6, 228.5, 227.6, 229.7, 229.75, 299.9])
+        self.assertEqual(np.round(got, 3).tolist(), [229.68, 229.6, 228.5, 227.6, 229.7, 229.75, 299.9])
 
 
     def test_a_walls_face_runs_straight_across_between_its_sides(self):
@@ -464,6 +465,56 @@ class Pits(unittest.TestCase):
                        rect(0, -8, 60, 0, "road")]}
         self.assertEqual(gm.pits(D, list(range(7))), {1, 2})
         self.assertEqual(gm.pits(D, [3, 6]), set())
+
+
+class LowWalls(unittest.TestCase):
+    def test_a_walls_corner_over_the_ground_at_its_point_stands_apart(self):
+        # (#696: a low wall's top 0.5 m over the sidewalk it shares a point with; one level with it; one over nothing;
+        # the sidewalk's own corner)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 0.0]), np.zeros(6)
+        z = np.array([192.6, 192.1, 192.15, 192.1, 192.6, 192.1])
+        wall = np.array([True, False, True, False, True, False])
+        self.assertEqual(gm.standing(cx, cy, z, wall).tolist(), [True, False, False, False, False, False])
+
+
+class Platforms(unittest.TestCase):
+    """#776: a platform 40 m long on the right of a straight track that climbs 1 %, its edge 1.35 m from the axis."""
+
+    L = {"path": [[0.0, 0.0], [100.0, 0.0]], "heights": {"step": 2.0, "path": [200.0 + 0.02 * i for i in range(51)]},
+         "platforms": [{"path": "route", "s0": 30.0, "s1": 70.0, "side": -1, "vienna": None, "name": "Test"}]}
+
+    def corners(self):
+        xs, ys = np.meshgrid(np.arange(20.0, 81.0, 1.0), -np.arange(1.5, 7.1, 0.5))
+        return xs.ravel(), ys.ravel()
+
+    def test_a_platform_is_a_plane_over_the_rail_top(self):
+        x, y = self.corners()
+        rng = np.random.default_rng(1)
+        z = 200.0 + 0.01 * x + 0.20 + 0.01 * -y + rng.normal(0, 0.05, len(x))  # (0.20 m at the axis, 1 % crossfall, bumps)
+        z[(np.abs(x - 50) < 1.5) & (y < -5.6)] += 1.2  # (a wall's top behind the band)
+        got, moved = gm.platform_planes(self.L, x, y, z, np.ones(len(x), bool))
+        band = (x >= 32) & (x <= 68) & (y >= -4.0)
+        plane = 200.0 + 0.01 * x + 0.20 + 0.01 * -y
+        self.assertLess(np.abs(got[band] - plane[band]).max(), 0.02)
+        self.assertTrue(moved[band].all())
+        out = (x < 30) | (x > 70) | (y < -5.5)
+        self.assertTrue(np.allclose(got[out], z[out]) and not moved[out].any())
+
+    def test_other_platforms_and_other_corners_are_left(self):
+        x, y = self.corners()
+        z = 200.0 + 0.01 * x + 0.20 + 0.03 * np.sin(x)
+        self.assertTrue(np.allclose(gm.platform_planes(dict(self.L, platforms=[dict(self.L["platforms"][0], vienna=3.2)]), x, y, z,
+                                                       np.ones(len(x), bool))[0], z))  # (a Vienna-type stop)
+        self.assertTrue(np.allclose(gm.platform_planes(self.L, x, -y, z, np.ones(len(x), bool))[0], z))  # (the other side)
+        self.assertTrue(np.allclose(gm.platform_planes(self.L, x, y, z, np.zeros(len(x), bool))[0], z))  # (no raised corner)
+
+    def test_a_bare_hole_in_a_sidewalk_is_its_own_ground(self):
+        def ring(x0, y0, x1, y1):
+            return [[x0, y0, 190.0], [x1, y0, 190.0], [x1, y1, 190.0], [x0, y1, 190.0]]
+        walk = {"c": "sidewalk", "l": 0, "r": ring(0, 0, 60, 12), "h": [ring(5, 4, 9, 5.5), ring(20, 3, 26, 7), ring(40, 2, 55, 10)]}
+        D = {"areas": [walk, {"c": "green", "l": 0, "r": ring(20, 3, 26, 7)}]}
+        got = gm.bare_holes(D, [0, 1])  # (a shelter's footprint; a hole a bed fills; a hole of 120 m2)
+        self.assertEqual([round(g.area, 1) for g in got], [6.0])
 
 
 class UnderADeck(unittest.TestCase):

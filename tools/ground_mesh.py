@@ -192,6 +192,122 @@ def pits(D, ids):
     return out
 
 
+def bare_holes(D, ids):
+    """The small holes of the raised survey areas `ids` that no other area fills: [polygons]. The survey leaves a
+    shelter's or a kiosk's footprint out of the sidewalk it stands on (line 37, Krejcárek's platform, area 284: a hole
+    of 5.7 m2 at (3907.3, 318.2)). The ground filled it with the terrain on the lidar, 0.1-0.2 m over the platform
+    round it with step walls: a slab on the platform (the user, 2026-11-20, #776). A hole up to PIT m2 at least half
+    bare is the raised area's own ground."""
+    out = []
+    polys, own = [], []
+    for i, a in enumerate(D["areas"]):
+        if a.get("l", 0) != 0 or len(a.get("r") or []) < 3:
+            continue
+        g = shapely.Polygon([q[:2] for q in a["r"]])
+        polys.append(g if g.is_valid else g.buffer(0))
+        own.append(i)
+    if not polys:
+        return out
+    tree = shapely.STRtree(polys)
+    for i in ids:
+        a = D["areas"][i]
+        if a.get("c") not in RAISED or a.get("l", 0) != 0:
+            continue
+        for h in a.get("h", []):
+            if len(h) < 3:
+                continue
+            g = shapely.Polygon([q[:2] for q in h])
+            g = g if g.is_valid else g.buffer(0)
+            if g.is_empty or g.area > PIT:
+                continue
+            inside = [polys[k] for k in tree.query(g, predicate="intersects").tolist() if own[k] != i]
+            bare = g.difference(shapely.union_all(inside)) if inside else g
+            if bare.area >= 0.5 * g.area:
+                out.append(bare)
+    return out
+
+
+PLATFORM_BAND = 4.0  # m from the track's axis: a platform's edge 1.35 m from it (data/truth.json platform-edge-offset)
+# and its free width behind the edge (CSN 73 6425-1, 7.3.5: 2.20 m, 2.50 recommended)
+PLATFORM_FADE = 1.5  # m past the band, and from either end inward: the plane gives way to the street surface
+PLATFORM_NEAR = 0.5  # m: a corner farther from the platform's plane is something else (a ramp, a wall's top)
+PLATFORM_CROSS = 0.02  # the steepest crossfall a platform takes (the norm's 6.2.2.3: 0.5-2 %)
+PLATFORM_MIN = 20  # corners in a platform's band for it to have a plane
+
+
+def platform_planes(L, x, y, z, ok, log=None):
+    """Heights z of corners (x, y) with those `ok` (a raised area's, on its street surface) in a stop's platform laid on
+    the platform's plane: (z, the corners moved). A platform stands a steady height over the top of rail along the
+    track, with one crossfall; the sidewalk's street surface follows IPR's raster and the survey's points instead, and
+    at Krejcárek (line 37 s 2904-2974) stood +0.01 to +0.41 m over the rail top 0.6 m behind the edge, up to 0.16 m
+    apart from one metre to the next, with a mound of 0.3 m by the shelter (the user, 2026-11-20, #776: "uneven
+    surface"; his photo: level asphalt). 98 of the five lines' 149 platforms were over 5 cm off a line along.
+    - A platform is one of L["platforms"] along the route or the back path, not a Vienna-type one (boarding from the
+      sidewalk across a lane: that sidewalk follows its street).
+    - Its band: between its ends along its path, on its side, up to PLATFORM_BAND from the path's axis.
+    - Its plane: over the rail top beside each corner, the height at the axis and one crossfall, fitted to the band's
+      own corners (the survey's and the raster's reading, their middle); the crossfall held to PLATFORM_CROSS. No one
+      height holds for every stop (the user: "the heights can vary between different stops and stop styles").
+    - A corner within PLATFORM_NEAR of the plane takes it; past the band and towards the platform's ends it fades to
+      the corner's own height over PLATFORM_FADE. A platform with under PLATFORM_MIN corners, or under half of them
+      near its plane, is left."""
+    z = np.array(z, float)
+    moved = np.zeros(len(z), bool)
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    ok = np.asarray(ok, bool) & np.isfinite(z)
+    h_ = L.get("heights") or {}
+    for pf in L.get("platforms") or []:
+        key = {"route": "path", "back": "pathBack"}.get(pf.get("path"))
+        if key is None or pf.get("vienna") is not None or key not in L or key not in h_:
+            continue
+        path = np.asarray(L[key], float)[:, :2]
+        if len(path) < 2:
+            continue
+        line = shapely.LineString(path)
+        s0, s1, side = float(pf["s0"]), float(pf["s1"]), float(pf["side"])
+        if s1 - s0 < 2 * PLATFORM_FADE:
+            continue
+        part = shapely.ops.substring(line, max(s0, 0.0), min(s1, line.length))
+        bx0, by0, bx1, by1 = part.bounds
+        reach = PLATFORM_BAND + PLATFORM_FADE
+        k = np.flatnonzero(ok & (x >= bx0 - reach) & (x <= bx1 + reach) & (y >= by0 - reach) & (y <= by1 + reach))
+        if len(k) < PLATFORM_MIN:
+            continue
+        pts = shapely.points(x[k], y[k])
+        s = shapely.line_locate_point(line, pts)
+        A = shapely.get_coordinates(shapely.line_interpolate_point(line, np.maximum(s - 0.5, 0.0)))
+        B = shapely.get_coordinates(shapely.line_interpolate_point(line, np.minimum(s + 0.5, line.length)))
+        t = B - A
+        left = t[:, 0] * (y[k] - A[:, 1]) - t[:, 1] * (x[k] - A[:, 0])
+        d = shapely.distance(line, pts)
+        on = (s >= s0) & (s <= s1) & (left * side > 0) & (d <= reach)
+        k, s, d = k[on], s[on], d[on]
+        core = d <= PLATFORM_BAND
+        if core.sum() < PLATFORM_MIN:
+            continue
+        zr = np.asarray(h_[key], float)
+        rail = np.interp(s, np.arange(len(zr)) * float(h_["step"]), zr)
+        h = z[k] - rail
+        use = core.copy()
+        a = b = 0.0
+        for _ in range(3):  # (the fit of the corners near it: a ramp's foot or a wall's top in the band is none of it)
+            if use.sum() < PLATFORM_MIN:
+                break
+            b = float(np.clip(np.polyfit(d[use], h[use], 1)[0], -PLATFORM_CROSS, PLATFORM_CROSS))
+            a = float(np.median(h[use] - b * d[use]))
+            use = core & (np.abs(h - (a + b * d)) <= 0.15)
+        near = np.abs(h - (a + b * d)) <= PLATFORM_NEAR
+        if use.sum() < PLATFORM_MIN or (core & near).sum() < 0.5 * core.sum():
+            continue
+        w = np.clip((reach - d) / PLATFORM_FADE, 0, 1) * np.clip(np.minimum(s - s0, s1 - s) / PLATFORM_FADE, 0, 1)
+        z[k[near]] += (w * (rail + a + b * d - z[k]))[near]
+        moved[k[near & (w > 0)]] = True
+        if log:
+            log(f"  platform {pf.get('name')} {pf.get('code') or ''}: {a:+.2f} m over the rail top at the axis, crossfall {b * 100:+.1f} %, "
+                f"{int(near.sum())} corners")
+    return z, moved
+
+
 def terraces(D, ids, lidar):
     """Which of the lidar-ground areas `ids` are terraces: {id}. A lawn or a yard on the lidar (`g`) has surveyed heights
     on its outline only and lies on the lidar inside (#444). On a raised courtyard the lidar's ground is the ground
@@ -994,6 +1110,35 @@ def wall_face(ring_segs, x, y, tx, ty):
     return z, lifted
 
 
+LOW_WALL = 0.1  # m: a wall's corner this far over the ground at its point stands apart from it (a kerb's step is STEP)
+
+
+def standing(cx, cy, z, wall):
+    """Which wall corners (`wall`, of all corners (cx, cy) with heights z) stand LOW_WALL or more over the lowest other
+    corner at their point: the weld keeps them apart from the ground there, an upright side. A wall under WALL_FACE
+    took its heights between its two sides and was welded with whatever it shared a point with: the quay's low wall at
+    line 17 (-755.8, -1827), area 1086 (0.18 m across, its outline 0.5 m over the ground at the median), lay as a flat
+    strip. The user, 2026-11-20, on pictures of alpha-4, which drew such walls as low boxes, against main (#696):
+    upright, by the survey's own heights."""
+    out = np.zeros(len(cx), bool)
+    wall = np.asarray(wall, bool)
+    z = np.asarray(z, float)
+    if not wall.any():
+        return out
+    key = np.round(np.asarray(cx) * Q).astype(np.int64) * 10_000_000_000 + np.round(np.asarray(cy) * Q).astype(np.int64)
+    oth = np.flatnonzero(~wall & np.isfinite(z))
+    if not len(oth):
+        return out
+    ko, inv = np.unique(key[oth], return_inverse=True)
+    low = np.full(len(ko), np.inf)
+    np.minimum.at(low, inv, z[oth])
+    w = np.flatnonzero(wall & np.isfinite(z))
+    j = np.clip(np.searchsorted(ko, key[w]), 0, len(ko) - 1)
+    hit = ko[j] == key[w]
+    out[w[hit]] = z[w[hit]] - low[j[hit]] >= LOW_WALL
+    return out
+
+
 def ring_segments(a):
     """A survey area's outline edges with heights at both ends: (n, 2, 3)."""
     segs = []
@@ -1013,7 +1158,7 @@ def snap_to_walls(D, x, y, z, street):
     holds its top and its foot at one place: of the two, the one within WALL_SNAP; past it is a level the street surface
     does not meet, and its step stays."""
     z = np.array(z, float)
-    a, b = [], []
+    a, b, reach = [], [], []
     for ar in D["areas"]:
         if ar["c"] not in WALL_CLASSES or ar.get("l", 0) != 0:
             continue
@@ -1023,6 +1168,9 @@ def snap_to_walls(D, x, y, z, street):
                 if p[2] is not None and q[2] is not None:
                     a.append(p[:3])
                     b.append(q[:3])
+                    # (a wall's top LOW_WALL or more over the street is a low wall standing, not the street's edge: by
+                    # the cheek walls at Krejcárek's ramp, line 37 s 2963-2978, the platform climbed to their tops, #776)
+                    reach.append(LOW_WALL if ar["c"] == "wall" else WALL_SNAP)
     s = np.flatnonzero(street & np.isfinite(z))
     if not a or not len(s):
         return z
@@ -1034,12 +1182,14 @@ def snap_to_walls(D, x, y, z, street):
     e = b[si, :2] - a[si, :2]
     t = np.clip(((x[s][pi] - a[si, 0]) * e[:, 0] + (y[s][pi] - a[si, 1]) * e[:, 1]) / np.maximum((e ** 2).sum(1), 1e-12), 0, 1)
     zw = a[si, 2] + (b[si, 2] - a[si, 2]) * t
-    d = np.abs(zw - z[s][pi])
+    up = zw - z[s][pi]
+    d = np.abs(up)
+    lim = np.asarray(reach, float)[si]
     o = np.lexsort((d, pi))  # (per point, its nearest height first)
-    pi, zw, d = pi[o], zw[o], d[o]
+    pi, zw, up, lim = pi[o], zw[o], up[o], lim[o]
     first = np.r_[True, pi[1:] != pi[:-1]]
-    pi, zw, d = pi[first], zw[first], d[first]
-    near = d <= WALL_SNAP
+    pi, zw, up, lim = pi[first], zw[first], up[first], lim[first]
+    near = (up >= -WALL_SNAP) & (up <= lim)  # (down to a wall's foot as before; up only to what is no wall standing)
     z[s[pi[near]]] = zw[near]
     return z
 
@@ -1574,6 +1724,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         zs[on_lidar] = city_at(G, cx[m][on_lidar], cy[m][on_lidar])
     need = np.isnan(zs)
     lifted = np.zeros(len(m), bool)
+    is_wall = np.zeros(len(m), bool)
     for a in np.unique(sa[need]).tolist():
         mm = need & (sa == a)
         segs = ring_segments(D["areas"][a]) if wall_like(D["areas"][a]) else None
@@ -1582,6 +1733,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         elif segs is not None and len(segs):  # (a wall: between its sides, #653; upright where they part, #697)
             c3 = fc[m[mm] // 3].mean(1)
             zs[mm], lifted[mm] = wall_face(segs, cx[m][mm], cy[m][mm], c3[:, 0], c3[:, 1])
+            is_wall[mm] = True
         else:
             zs[mm] = surface.at(a, cx[m][mm], cy[m][mm])
     # (a paved yard meets a sidewalk on their shared edge: on its outline's plane, which ran between far points, line 23
@@ -1631,6 +1783,22 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     zs, on_hill = off_the_hill(zs, np.where(in_rock, rail_z, np.nan))
     lifted &= ~on_hill  # (no face stands there: it welds with the ground beside it)
     zc[m] = zs
+    # (a shelter's footprint in a sidewalk, a hole no area fills, is the sidewalk's own ground: bare_holes, #776)
+    c_hole = np.zeros(len(cx), bool)
+    holes = bare_holes(D, np.unique(sa).tolist())
+    if holes:
+        tt = np.flatnonzero(tcls == "terrain")
+        cen_t = fc[tt].mean(1)
+        hit, _ = shapely.STRtree(holes).query(shapely.points(cen_t[:, 0], cen_t[:, 1]), predicate="intersects")
+        idx = (np.unique(tt[hit])[:, None] * 3 + np.arange(3)).ravel()
+        zt = streets.at("sidewalk", cx[idx], cy[idx]) if len(idx) else np.zeros(0)
+        idx = idx[np.isfinite(zt)]
+        zc[idx] = zt[np.isfinite(zt)]
+        c_hole[idx] = True
+    # (a stop's platform is a plane over the rail top: platform_planes, #776)
+    c_plat = c_hole.copy()
+    c_plat[m] = np.isin(sc, list(RAISED)) & ~on_span & ~on_terrace & ~in_rock & np.isfinite(zs)
+    zc, on_plat = platform_planes(L, cx, cy, zc, c_plat)
     # (a wall the survey has as a line: the street, the lidar ground and the terrain beside it stand at its side's level
     # up to it, #697; a street under a bridge too, which keeps the survey's own outline (on_span): the sidewalk along
     # the Modřany ramp's wall, line 17 (-2385, -9250), has the wall's heights in its outline and rose 2 m against it)
@@ -1697,6 +1865,10 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     label[sv_m[keep]] = sv_label[keep]
     c_lift = np.zeros(len(cx), bool)
     c_lift[sv_m] = lifted
+    # (a low wall stands: its corner over the ground at its point is the wall's own, #696)
+    c_wall = np.zeros(len(cx), bool)
+    c_wall[sv_m] = is_wall & ~on_hill
+    c_lift |= standing(cx, cy, zc, c_wall)
     zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"))
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
