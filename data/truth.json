@@ -4921,6 +4921,17 @@
      "why": "the ledge at the wall's foot runs with the track beside it (it climbs 1.6 m in the 24 m, under the measure's slope): the written file has 8.8 m of it sloping, spikes of 1 m every 2 m where the foot's corner on the wall's line took the top's height; the build none"
     }
    ]
+  },
+  "vysehrad-tunnel-mouths": {
+   "line": "17",
+   "at": [
+    -727.0,
+    -2580.0
+   ],
+   "reach": 40,
+   "issue": 771,
+   "what": "the Vyšehrad tunnel through the rock (s 11385.8-11424.0) and its two mouths: the opening clear of ground, the survey's road and walls inside it at the rails' level (193.0-193.2 m), not on the hill's lidar (203-217 m). No section: the hill over the tunnel is in the ground file too, and a section reads the highest surface; the lines' check surveyOverTrack and the pictures hold it",
+   "source": "found on #770 (the batch's surveyOverTrack 2 -> 3 on line 17); from the cab at s 11376 a dark spike 4 m tall stood in the south mouth on main 2a8ddf2 and 3de07bd (tools/shot.py --line 17 --s 11376 --view cab), and two grey slabs in the north mouth seen from inside (--s 11408)"
   }
  }
 }
