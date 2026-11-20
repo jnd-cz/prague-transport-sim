@@ -637,7 +637,7 @@ Sections:
   on the lidar by its low side's edge alone. Such stretches hold the lidar's ground and the terrain, not a street,
   which has its own surface up to the strip. The five lines have 503-1,505 strips with heights and 3-18 on the lidar;
   they make 280-1,014 stretches a line (2.2-7.4 km, the step 1.1-1.4 m at the median, most under 5 m long: parapets,
-  edgings, low walls) and the lines' stretches go from 326-610 to about twice that. Three things came with it:
+  edgings, low walls) and the lines' stretches go from 326-610 to 628-1,622. Three things came with it:
   - the weld let a lidar corner on the wall's line, held at the foot, take the strip's top wherever the area's own
     outline there was near the top (one area runs behind the wall's top and along its foot): a spike on the ledge
     every 2 m. A lidar corner a wall holds keeps the wall's level where that is over 0.5 m off the edge it yielded
