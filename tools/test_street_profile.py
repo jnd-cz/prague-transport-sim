@@ -250,6 +250,16 @@ class Sidewalks(unittest.TestCase):
         # (its own height the foot's: under the road by its own height)
         top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 199.9), high, np.full(len(u), 199.95), np.zeros(len(u), bool))
         self.assertEqual((bool(top.all()), segs[0, :, 2].tolist()), (True, [199.9, 199.9]))
+        # (on a quay wall's top, the drop behind a walkway 1.2 m wide: the ground 1.5 m in lies on the wall's face, 1.7 m
+        # under the edge, and IPR 0.5-1 m in at the edge's own height: an ordinary kerb. At a wall's foot IPR that near
+        # is the walkway's already)
+        level = np.full(len(u), 200.0)
+        near = np.column_stack([level + 0.05, level + 0.08, level - 0.35])
+        self.assertFalse(sp.wall_tops(edge[0], edge[1], level, level - 0.05, level - 1.7, np.ones(len(u), bool), near)[0].any())
+        self.assertTrue(sp.wall_tops(edge[0], edge[1], level, level - 0.05, level - 1.7, np.ones(len(u), bool))[0].all())
+        foot = np.column_stack([np.full(len(u), 200.3), np.full(len(u), 199.95), np.full(len(u), 199.9)])
+        top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 201.4), high, np.full(len(u), 199.9), np.ones(len(u), bool), foot)
+        self.assertEqual((bool(top.all()), segs[0, :, 2].tolist()), (True, [199.9, 199.9]))
         ctx["kerb_edges"] = [edge]
         z0 = sp.bilinear(sp.sidewalks(ctx, ramp, [(0, 0), (20, 4)]), np.array([15.0]), np.array([0.25]))
         self.assertLess(z0[0], 199.5)
