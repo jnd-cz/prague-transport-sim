@@ -153,6 +153,45 @@ def over_lidar(a, lidar):
     return float(np.median(d)) if len(d) else np.nan
 
 
+PIT = 50.0  # m2: a green area up to this size inside a sidewalk is a tree pit or a small bed
+PIT_NEAR = 0.2  # m: its outline's points lie this near a raised area or inside one
+
+
+def pits(D, ids):
+    """Which of the survey areas `ids` are a tree pit or a small bed in a sidewalk: {id}. A green area at level 0, up
+    to PIT m2, whose every outline point lies in a raised area (RAISED) or within PIT_NEAR of one. On the lidar it
+    stood 5-10 cm off the sidewalk's street surface round it, a kerb's step at its outline (STEP), and bumped inside:
+    a green slab with dark sides in the sidewalk (line 22 (-772, 534.5), area 1973, 30 m2: -0.09 to +0.3 m). The user,
+    2026-11-20, on pictures of alpha-4, which drew them flush, against main (#696): flush. The five lines have 82-528
+    such areas up to 5 m2 and 127-290 more up to PIT; a larger one is a lawn (106-167 a line of 50-200 m2)."""
+    ids = [i for i in ids if D["areas"][i].get("c") == "green" and D["areas"][i].get("l", 0) == 0 and len(D["areas"][i]["r"]) >= 3]
+    if not ids:
+        return set()
+    small = []
+    for i in ids:
+        a = D["areas"][i]
+        g = shapely.Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
+        if (g if g.is_valid else g.buffer(0)).area <= PIT:
+            small.append(i)
+    if not small:
+        return set()
+    walk = []
+    for a in D["areas"]:
+        if a.get("c") in RAISED and a.get("l", 0) == 0 and len(a["r"]) >= 3:
+            g = shapely.Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
+            walk.append(g if g.is_valid else g.buffer(0))
+    if not walk:
+        return set()
+    tree = shapely.STRtree(walk)
+    out = set()
+    for i in small:
+        pts = shapely.points([q[:2] for q in D["areas"][i]["r"]])
+        pi, _ = tree.query(pts, predicate="dwithin", distance=PIT_NEAR)
+        if len(np.unique(pi)) == len(pts):
+            out.add(i)
+    return out
+
+
 def terraces(D, ids, lidar):
     """Which of the lidar-ground areas `ids` are terraces: {id}. A lawn or a yard on the lidar (`g`) has surveyed heights
     on its outline only and lies on the lidar inside (#444). On a raised courtyard the lidar's ground is the ground
@@ -1513,6 +1552,10 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         mm = np.isin(sc, list(cls)) & ~on_span & ~on_terrace
         if mm.any():
             zs[mm] = streets.at(kd, cx[m][mm], cy[m][mm])
+    # (a tree pit or a small bed in a sidewalk lies flush with it, on the sidewalk's street surface: pits, #696)
+    in_pit = np.isnan(zs) & ~on_terrace & ~on_span & np.isin(sa, sorted(pits(D, np.unique(sa).tolist())))
+    if in_pit.any():
+        zs[in_pit] = streets.at("sidewalk", cx[m][in_pit], cy[m][in_pit])
     # (such an area's part under the deck lies on the lidar, not on the deck's level the street surface has there:
     # off_the_deck, #761)
     n_under = 0
