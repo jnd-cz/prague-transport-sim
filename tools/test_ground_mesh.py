@@ -195,9 +195,10 @@ class Stairs(unittest.TestCase):
 class Walls(unittest.TestCase):
     def test_a_street_corner_on_a_wall_takes_its_height_there(self):
         # (#653: a wall's top rising 229.6 -> 230.0 m along x = 0..4, its foot at 228.5, top and foot at one place at
-        # x = 4. A sidewalk corner on its top 0.12 m under it takes it, between its ends; one where the wall holds its top
-        # and its foot, the nearer; one 2 m off any, or off the outline, keeps its own; a lawn corner is not moved, nor one
-        # on another level's wall)
+        # x = 4. A sidewalk corner on its top 0.10 m under it takes it; one 0.12 m under it does not: the wall stands over
+        # it, a low wall (#776: the platform climbed the cheek walls at Krejcárek's ramp); one where the wall holds its
+        # top and its foot, the nearer, down to it; one 2 m off any, or off the outline, keeps its own; a lawn corner is
+        # not moved, nor one on another level's wall)
         wall = {"c": "wall", "l": 0, "r": [[0, 0, 229.6], [4, 0, 230.0], [4, 0, 228.5], [4, 0.3, 228.5], [0, 0.3, 228.5]]}
         upper = {"c": "wall", "l": 1, "r": [[0, 1, 300.0], [4, 1, 300.0], [4, 1.3, 300.0]]}
         D = {"areas": [wall, upper]}
@@ -206,7 +207,7 @@ class Walls(unittest.TestCase):
         z = np.array([229.68, 229.50, 228.70, 227.60, 229.70, 229.75, 299.90])
         street = np.array([True, True, True, True, True, False, True])
         got = gm.snap_to_walls(D, x, y, z, street)
-        self.assertEqual(np.round(got, 3).tolist(), [229.8, 229.6, 228.5, 227.6, 229.7, 229.75, 299.9])
+        self.assertEqual(np.round(got, 3).tolist(), [229.68, 229.6, 228.5, 227.6, 229.7, 229.75, 299.9])
 
 
     def test_a_walls_face_runs_straight_across_between_its_sides(self):
@@ -451,6 +452,150 @@ class InARockTunnel(unittest.TestCase):
         z, high = gm.off_the_hill([197.3, 193.4, 205.0], [193.0, 193.0, np.nan])
         self.assertEqual(z.tolist(), [193.0, 193.4, 205.0])
         self.assertEqual(high.tolist(), [True, False, False])
+
+
+class Pits(unittest.TestCase):
+    def test_a_small_green_area_inside_a_sidewalk_is_a_pit(self):
+        # (#696: a tree pit of 2 m2 and a bed of 30 m2 in a sidewalk; a lawn of 100 m2 in it; a pit with one side on the
+        # road; a green area on another level)
+        def rect(x0, y0, x1, y1, c, l=0):
+            return {"c": c, "l": l, "r": [[x0, y0, 190.0], [x1, y0, 190.0], [x1, y1, 190.0], [x0, y1, 190.0]]}
+        D = {"areas": [rect(0, 0, 60, 12, "sidewalk"), rect(2, 2, 3, 4, "green"), rect(10, 2, 16, 7, "green"),
+                       rect(20, 1, 40, 6, "green"), rect(50, -1, 52, 1, "green"), rect(2, 6, 3, 8, "green", 1),
+                       rect(0, -8, 60, 0, "road")]}
+        self.assertEqual(gm.pits(D, list(range(7))), {1, 2})
+        self.assertEqual(gm.pits(D, [3, 6]), set())
+
+
+class LowWalls(unittest.TestCase):
+    def test_a_walls_corner_over_the_ground_at_its_point_stands_apart(self):
+        # (#696, #776: a low wall's top 0.5 m over the sidewalk it shares a point with; one level with it; one over
+        # nothing; the sidewalk's own corner; one 1.5 m over a lawn's corner on the lidar, which the weld joins to it)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 0.0, 3.0, 3.0]), np.zeros(8)
+        z = np.array([192.6, 192.1, 192.15, 192.1, 192.6, 192.1, 195.6, 194.1])
+        wall = np.array([True, False, True, False, True, False, True, False])
+        street = np.array([False, True, False, True, False, True, False, False])
+        self.assertEqual(gm.standing(cx, cy, z, wall, street).tolist(), [True] + [False] * 7)
+
+
+class Platforms(unittest.TestCase):
+    """#776: a platform 40 m long on the right of a straight track that climbs 1 %, its edge 1.35 m from the axis."""
+
+    L = {"path": [[0.0, 0.0], [100.0, 0.0]], "heights": {"step": 2.0, "path": [200.0 + 0.02 * i for i in range(51)]},
+         "platforms": [{"path": "route", "s0": 30.0, "s1": 70.0, "side": -1, "vienna": None, "name": "Test"}]}
+
+    def corners(self):
+        xs, ys = np.meshgrid(np.arange(20.0, 81.0, 1.0), -np.arange(1.5, 7.1, 0.5))
+        return xs.ravel(), ys.ravel()
+
+    def test_a_platform_is_a_plane_over_the_rail_top(self):
+        x, y = self.corners()
+        rng = np.random.default_rng(1)
+        z = 200.0 + 0.01 * x + 0.20 + 0.01 * -y + rng.normal(0, 0.05, len(x))  # (0.20 m at the axis, 1 % crossfall, bumps)
+        z[(np.abs(x - 50) < 1.5) & (y < -5.6)] += 1.2  # (a wall's top behind the band)
+        got, moved = gm.platform_planes(self.L, x, y, z, np.ones(len(x), bool))
+        band = (x >= 32) & (x <= 68) & (y >= -4.0)
+        plane = 200.0 + 0.01 * x + 0.20 + 0.01 * -y
+        self.assertLess(np.abs(got[band] - plane[band]).max(), 0.02)
+        self.assertTrue(moved[band].all())
+        out = (x < 30) | (x > 70) | (y < -5.5)
+        self.assertTrue(np.allclose(got[out], z[out]) and not moved[out].any())
+
+    def test_other_platforms_and_other_corners_are_left(self):
+        x, y = self.corners()
+        z = 200.0 + 0.01 * x + 0.20 + 0.03 * np.sin(x)
+        self.assertTrue(np.allclose(gm.platform_planes(dict(self.L, platforms=[dict(self.L["platforms"][0], vienna=3.2)]), x, y, z,
+                                                       np.ones(len(x), bool))[0], z))  # (a Vienna-type stop)
+        self.assertTrue(np.allclose(gm.platform_planes(self.L, x, -y, z, np.ones(len(x), bool))[0], z))  # (the other side)
+        self.assertTrue(np.allclose(gm.platform_planes(self.L, x, y, z, np.zeros(len(x), bool))[0], z))  # (no raised corner)
+
+    def test_a_bare_hole_in_a_sidewalk_is_its_own_ground(self):
+        def ring(x0, y0, x1, y1):
+            return [[x0, y0, 190.0], [x1, y0, 190.0], [x1, y1, 190.0], [x0, y1, 190.0]]
+        walk = {"c": "sidewalk", "l": 0, "r": ring(0, 0, 60, 12), "h": [ring(5, 4, 9, 5.5), ring(20, 3, 26, 7), ring(40, 2, 55, 10)]}
+        D = {"areas": [walk, {"c": "green", "l": 0, "r": ring(20, 3, 26, 7)}]}
+        got = gm.bare_holes(D, [0, 1])  # (a shelter's footprint; a hole a bed fills; a hole of 120 m2)
+        self.assertEqual([round(g.area, 1) for g in got], [6.0])
+
+
+class BesideAThinWall(unittest.TestCase):
+    def test_a_road_beside_a_thin_wall_keeps_its_surface_from_past_the_smear(self):
+        # (#779: a wall 0.3 m across along y = 0..0.3, a ramp at 258 m south of it and a road at 261 m north; the
+        # raster spreads the step over 1.5 m either side, and so does the road's own surface. Corners 0.5 m and on the
+        # wall, either side, take the surface 1.5 m out; one 2 m off is left; so are all on a surface level out there)
+        D = {"areas": [{"c": "wall", "l": 0, "r": [[0, 0, 260.4], [10, 0, 260.4], [10, 0.3, 260.4], [0, 0.3, 260.4]]},
+                       {"c": "wall", "l": 0, "r": [[0, 20, 260.4], [10, 20, 260.4], [10, 23, 260.4], [0, 23, 260.4]]},
+                       {"c": "wall", "l": 1, "r": [[0, 40, 260.4], [10, 40, 260.4], [10, 40.3, 260.4], [0, 40.3, 260.4]]}]}
+        walls = gm.thin_walls(D)
+        self.assertEqual(len(walls), 4)
+
+        def smeared(px, py):
+            return 258.0 + 3.0 * np.clip((np.asarray(py, float) + 1.5) / 3.3, 0, 1)
+        x = np.full(5, 5.0)
+        y = np.array([-0.5, 0.0, 0.3, 0.8, -2.0])
+        ty = np.array([-0.7, -0.2, 0.5, 1.0, -2.2])
+        z, held = gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), smeared)
+        self.assertEqual(held.tolist(), [True, True, True, True, False])
+        np.testing.assert_allclose(z, [258.0, 258.0, 261.0, 261.0, smeared(5.0, -2.0)], atol=1e-9)
+        flat = lambda px, py: np.full(len(np.atleast_1d(px)), 258.0)  # noqa: E731
+        self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, flat(x, y) + 0.04, flat)[1].any())
+        self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), lambda px, py: np.full(len(px), np.nan))[1].any())
+        # (the surface out there 5 m over the lidar, a deck's level: left; on the lidar: taken)
+        self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), lambda px, py: smeared(px, py) + 5.0, smeared)[1].any())
+        self.assertEqual(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), smeared, smeared)[1].sum(), 4)
+
+    def test_a_sidewalks_edge_over_a_sunk_road_is_such_a_wall(self):
+        # (a sidewalk north of y = 0 surveyed at 200.4 m, its kerb edge along a ramp falling east from 200.3 m: the
+        # edge from where it stands 0.3 m over a kerb on the ramp, 20 m of 0.25 m pieces less the first 3 m; beside a
+        # level road, none)
+        D = {"areas": [{"c": "sidewalk", "l": 0, "k": [[1, 0, 0, 0]],
+                        "r": [[0, 0, 200.4], [20, 0, 200.4], [20, 4, 200.4], [0, 4, 200.4]]}]}
+        ground = lambda px, py: np.full(len(px), 200.4)  # noqa: E731
+        e = gm.kerb_walls(D, lambda px, py: 200.3 - 0.1 * np.asarray(px, float), ground)
+        self.assertEqual(e.shape, (68, 2, 2))
+        self.assertAlmostEqual(float(e[:, :, 0].min()), 3.0)
+        self.assertEqual(gm.kerb_walls(D, lambda px, py: np.full(len(px), 200.3), ground).shape, (0, 2, 2))
+        # (the outline carries a parapet's top, 1.1 m over the walkway: no wall's top)
+        self.assertEqual(gm.kerb_walls(D, lambda px, py: 200.3 - 0.1 * np.asarray(px, float),
+                                       lambda px, py: np.full(len(px), 199.3)).shape, (0, 2, 2))
+
+    def test_in_a_corner_of_two_walls_the_surface_is_read_clear_of_both(self):
+        # (walls along y = 0 and along x = 0, a pit at 258 m in their corner whose surface is smeared within 1.5 m of
+        # either: a corner on the first wall 0.2 m from the second takes the surface 1.5 m from both)
+        D = {"areas": [{"c": "wall", "l": 0, "r": [[0, 0, 261], [10, 0, 261], [10, 0.3, 261], [0, 0.3, 261]]},
+                       {"c": "wall", "l": 0, "r": [[-0.3, -10, 261], [0, -10, 261], [0, 0.3, 261], [-0.3, 0.3, 261]]}]}
+
+        def pit(px, py):
+            px, py = np.asarray(px, float), np.asarray(py, float)
+            return np.where((px > 0) & (py < 0), 258.0 + 3.0 * np.clip(1 - np.minimum(px, -py) / 1.5, 0, 1), 261.0)
+        x, y = np.array([0.2]), np.array([0.0])
+        z, held = gm.off_the_smear(gm.thin_walls(D), x, y, np.array([0.4]), np.array([-0.3]), pit(x, y), pit)
+        self.assertTrue(held[0])
+        self.assertAlmostEqual(float(z[0]), 258.0, places=6)
+
+    def test_at_a_walls_end_the_point_out_is_not_through_the_wall(self):
+        # (a road's corner at the wall's end, its triangle north of the wall: the short edge across the wall's end
+        # points along the wall into the pit south of it; the corner takes the road's own side)
+        D = {"areas": [{"c": "wall", "l": 0, "r": [[0, 0, 261], [10, 0, 261], [10, 0.3, 261], [0, 0.3, 261]]}]}
+
+        def ground(px, py):
+            return np.where(np.asarray(py, float) < 0.15, 258.0, 261.0)
+        x, y = np.array([0.0]), np.array([0.3])
+        z, held = gm.off_the_smear(gm.thin_walls(D), x, y, np.array([0.3]), np.array([0.6]), np.array([259.5]), ground)
+        self.assertEqual((held.tolist(), z.tolist()), ([True], [261.0]))
+
+    def test_a_ramp_runs_on_to_the_wall_at_its_own_grade(self):
+        # (a ramp falling 15 % towards the wall's foot: the corner at the wall lies on the ramp's line, not level with
+        # the surface 1.5 m out; a surface 40 % steeper there is another wall's smear: level)
+        D = {"areas": [{"c": "wall", "l": 0, "r": [[0, 0, 260.4], [10, 0, 260.4], [10, 0.3, 260.4], [0, 0.3, 260.4]]}]}
+        walls = gm.thin_walls(D)
+
+        x, y, ty = np.full(2, 5.0), np.array([0.0, -1.0]), np.array([-0.2, -1.2])
+        for grade, at_wall in ((0.15, 258.0), (0.4, 258.6)):
+            ramp = lambda px, py, grade=grade: 258.0 - grade * np.asarray(py, float)  # noqa: E731
+            z, held = gm.off_the_smear(walls, x, y, x, ty, np.full(2, 259.0), ramp)
+            self.assertTrue(held.all())
+            np.testing.assert_allclose(z, [at_wall, 258.0 + grade * (1.0 if grade < 0.2 else 1.5)], atol=1e-9)
 
 
 class APairsEnd(unittest.TestCase):

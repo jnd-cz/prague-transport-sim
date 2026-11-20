@@ -4977,6 +4977,180 @@
     "game": "main has two slabs in the mouth; the first build of #771 a cone by the road outside it, the gate's strip stood up as a wall. With the strip at the rails' level: the flat road, the kerbs and the sidewalks. The gate, its wing wall and the dividers are not drawn."
    }
   },
+  "bed-in-a-sidewalk": {
+   "line": "22",
+   "at": [
+    -772.0,
+    534.5
+   ],
+   "reach": 25,
+   "issue": 696,
+   "what": "a bed of 30 m2 in a sidewalk (survey area 1973, green, on the lidar) and tree pits round it: flush with the sidewalk, no slab with dark sides",
+   "source": "the user, 2026-11-20 (session, on #696's pictures of alpha-4 against main and its two questions, tree pits and small beds flush or raised: \"696 - I will go with your recommendation there\"; the recommendation: flush, a pit's edging is level with the paving). On the written file of 2026-11-20 the bed lies -0.09 to +0.3 m off the sidewalk round it",
+   "sections": [
+    {
+     "name": "across the bed inside the sidewalk, 6.3 m along y = 534.5",
+     "from": [
+      -776.5,
+      534.5
+     ],
+     "to": [
+      -770.2,
+      534.5
+     ],
+     "expect": {
+      "largest step m": 0.03,
+      "off the chord m": 0.05
+     },
+     "why": "the sidewalk, the bed and the sidewalk again on one surface. The written file of 2026-11-20 steps 0.06 m at the bed's edge and strays 0.07 m from the line between the section's ends, 0.5 m of it sloping; the build 0.01 m, 0.02 m and none"
+    }
+   ]
+  },
+  "krejcarek-platform": {
+   "line": "37",
+   "at": [
+    3908.0,
+    318.0
+   ],
+   "reach": 35,
+   "issue": 776,
+   "what": "the Krejcárek stop's platform (s 2904-2974, the right side; the survey has it as a sidewalk, area 284): a level asphalt platform a steady height over the rails, the shelter's footprint and the grassy patch level with it, no bumps by the ramp's low walls",
+   "source": "the user, 2026-11-20 (session, on a cab picture of line 37 s 2940): \"the Krejcárek stop platform in the driven direction has uneven surface\"; and with his photo: \"there are some sloped bumps next to the wheelchair ramp too, closer to the stop sign. As well as the visible slab around the overhead wire pole. Actual pole sits in the grassy patch\"",
+   "seen": {
+    "what": "Along the platform towards the stop sign: level asphalt with a red strip at its granite edge, a drain channel along it about 2.5 m in, the shelter standing on that channel; behind the shelter a kerbed grassy patch level with the asphalt, the catenary pole in it; then the ramp rising evenly along the road's ribbed wall. Nothing bumps and no slab stands on the platform.",
+    "from": [
+     {
+      "photos": "raw/reference/photos/krejcarek/user-2026-11-20-6-platform-ramp-pole.jpg and user-2026-11-19-3, -5 (SOURCES.md)"
+     }
+    ],
+    "source": "the user's photo of 2026-11-20 from the platform's south end looking along it, and his photos of 2026-11-19 (this session; kept in raw/reference/photos/krejcarek/, not published)",
+    "game": "the written file of 2026-11-20: the ground behind the platform's edge +0.01 to +0.41 m over the rail top, a slab of terrain in the shelter's footprint 0.1-0.2 m over the platform, a mound of 0.3 m by the shelter, the sidewalk climbing the low walls by the ramp"
+   },
+   "sections": [
+    {
+     "name": "along the platform 0.7 m behind its edge, 43 m from s 2925 to s 2968",
+     "from": [
+      3882.06,
+      302.26
+     ],
+     "to": [
+      3918.04,
+      325.8
+     ],
+     "expect": {
+      "off the chord m": 0.05,
+      "largest step m": 0.02
+     },
+     "why": "the platform runs with the rails, which climb evenly here: a straight line. The written file of 2026-11-20 strays 0.17 m from it and steps 0.10 m from one sample to the next; the build 0.03 m and none"
+    },
+    {
+     "name": "across the shelter's footprint, 2.3 m from the platform's edge inward at s 2955",
+     "from": [
+      3906.89,
+      319.1
+     ],
+     "to": [
+      3908.15,
+      317.18
+     ],
+     "expect": {
+      "largest step m": 0.03
+     },
+     "why": "the hole the survey leaves for the shelter is the platform's own ground: the written file has the terrain in it over the platform, a step of 0.15 m; the build 0.01 m"
+    },
+    {
+     "name": "along the platform 3.2 m from the axis past the shelter towards the ramp, 16 m from s 2960",
+     "from": [
+      3911.68,
+      320.92
+     ],
+     "to": [
+      3925.1,
+      329.76
+     ],
+     "expect": {
+      "off the chord m": 0.2,
+      "largest step m": 0.05
+     },
+     "why": "level asphalt between the shelter and the stop sign, falling to the crossing past the platform's end: the written file has a mound there, IPR's raster's, 0.42 m off the line and steps of 0.16 m; the build 0.16 m (the platform's end) and 0.03 m"
+    }
+   ]
+  },
+  "na-vapence-garage-ramp": {
+   "line": "37",
+   "at": [
+    3871.0,
+    -24.0
+   ],
+   "reach": 20,
+   "issue": 779,
+   "what": "the garage ramp on Na Vápence by the Žižkov depot (survey road area 22): a straight ramp between upright walls down to the door, the sidewalk beside it level up to its edge",
+   "source": "the user, 2026-11-20 (session, on PR 777's picture of the place): \"the wall near the ramp at Vozovna Žižkov looks better. What still need to work is the sidewalk edge and the road ramp from underground parking\"",
+   "seen": {
+    "what": "From Na Vápence looking north-west: a straight asphalt ramp, one lane wide, falls from the street to a roller door under a slab of the office building. A wall with a railing on its top stands on either side, growing from nothing at the street to the door's height; the sidewalk along the building, left of the ramp, stays level behind its wall. Over the door a parapet with a railing, cars parked on the level behind it.",
+    "from": [
+     {
+      "at": [
+       50.0917694,
+       14.4750901
+      ],
+      "headings": [
+       320
+      ]
+     }
+    ],
+    "source": "Google Street View of August 2024 at the viewpoint the user linked, seen 2026-11-20 (this session; looked at, not copied)",
+    "game": "the written file of 2026-11-20: the sidewalk's last 1.25 m falls 2.2 m into the ramp, the ramp rises 0.76 m in its last metre before the door's wall, the road behind that wall falls 1.6 m towards it. The build: the sidewalk level to its edge over one upright face, the ramp straight to the wall's foot, the road behind level"
+   },
+   "sections": [
+    {
+     "name": "from the sidewalk across its edge onto the ramp, y = -22",
+     "from": [
+      3866.3,
+      -22.0
+     ],
+     "to": [
+      3870.5,
+      -22.0
+     ],
+     "expect": {
+      "sloping m": 0.25
+     },
+     "why": "a wall stands between the sidewalk and the ramp (the survey has the sidewalk's edge at 260.4 m and no wall area there): one step. The written file of 2026-11-20 slopes over 1.25 m of it"
+    },
+    {
+     "name": "down the ramp's middle to the foot of the door's wall",
+     "from": [
+      3871.0,
+      -30.0
+     ],
+     "to": [
+      3871.0,
+      -18.2
+     ],
+     "expect": {
+      "off the chord m": 0.2,
+      "largest step m": 0.05
+     },
+     "why": "a straight ramp (IPR's raster: 259.6 m to 257.8 m, 13.6 %; rounded at its head). The written file of 2026-11-20 rises 0.76 m in the last metre, the raster's smear of the wall: 0.67 m off the line, steps of 0.19 m; the build 0.14 m and 0.05 m"
+    },
+    {
+     "name": "from the ramp across the door's wall onto the road behind it, x = 3871",
+     "from": [
+      3871.0,
+      -20.5
+     ],
+     "to": [
+      3871.0,
+      -15.5
+     ],
+     "expect": {
+      "sloping m": 0.25
+     },
+     "why": "a wall 0.26 m across (survey area 1419), the ramp at its foot and the road behind its top: one step"
+    }
+   ]
+  },
   "wall-end-in-a-path": {
    "line": "23",
    "at": [
