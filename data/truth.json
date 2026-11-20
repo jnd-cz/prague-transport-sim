@@ -5188,12 +5188,8 @@
    ],
    "reach": 30,
    "issue": 783,
-   "what": "the pedestrian tunnel under the two roads and the track south of Čechova čtvrť (survey areas `underpass` 8598 and `sidewalk` 7410 at level -1, OSM's cycleway in a tunnel): the roads, their verges and the track run flat over it at 214.7-215.4 m, the stairs' wells beside the track open down to its floor at 211.1 m",
+   "what": "the pedestrian tunnel under the two roads and the track south of Čechova čtvrť (survey areas `underpass` 8598 and `sidewalk` 7410 at level -1, OSM's cycleway in a tunnel): the roads, their verges and the track run flat over it at 214.7-215.4 m, the stairs' wells beside the track open down to its floor at 211.1 m. The written file of 2026-11-20: the verges 3.6 m down in a slot 5 m long (IPR's raster has the tunnel's floor, 211.3 m, where the survey's level-0 outlines stand at 214.8-215.3 m), the south road 1.8 m down at its edge. The build: the roads, the verges and the track level across, the stairs' wells open; on the tag alpha-4 the roads, the verges and the track are level there",
    "source": "the user's note fb-20261120-153903-93585637 of 2026-11-20 on the test site (batch A), line 17 s 3075: \"Looks like a ditch but OSM has pedestrian tunnel here. Both tram tracks and road should lie flat on surface and tunnel be placed under than ground level.\"",
-   "seen": {
-    "what": "The game's review view of 2026-11-20 looking south along the track: a trench as wide as the tunnel across both verges and into both roads, the roads' edges ragged into it; on the tag alpha-4 the roads, the verges and the track are flat there.",
-    "game": "the written file of 2026-11-20: the verges 3.6 m down in a slot 5 m long (IPR's raster has the tunnel's floor, 211.3 m, where the survey's level-0 outlines stand at 214.8-215.3 m), the south road 1.8 m down at its edge. The build: the roads, the verges and the track level across, the stairs' wells open"
-   },
    "sections": [
     {
      "name": "along the tunnel's axis from the north road over the verges and the track to the south road",
