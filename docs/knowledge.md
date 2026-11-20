@@ -661,6 +661,30 @@ Sections:
     a metre, marching squares): 2.6 km on line 9 in 679 stretches, 532 of them under 5 m, and no place needs them.
   On the place the steep faces that are no wall fall from 220.7 to 41.4 m² and its three sections, which the written
   file fails (3.25, 1.82 and 8.84 m sloping), hold (0.5, 0.78, 0.0).
+- **A road sunk between walls** (#779, measured 2026-11-20). A garage ramp is a road area in the survey, its outline
+  surveyed at the top of its walls, and a wall area stands on some of its sides only: on Na Vápence by the Žižkov
+  depot (line 37 (3871, -24), road 22: 259.7 m at the street, 257.8 m at the door) the walls over the door and on
+  the east side are area 1419 (0.26 m across, its top alone), the side along the sidewalk has none. Two rules read
+  such a road as any other:
+  - the sidewalks' surface is tied at a kerb edge to the road 0.5 m beyond plus a kerb (`street_profile.sidewalks`):
+    here the ramp, and the walkway's last 1.25 m fell 2.2 m. A kerb edge whose own surveyed height stands 0.3 m or
+    more over a kerb on that road, along an edge that stands 0.7 m over it somewhere, is a wall's top and is held at
+    its own height as a survey wall's edge is (`wall_tops`), where that height is the walkway's: within 0.5 m of IPR
+    1.5 m in. A sidewalk's outline along a parapet on its kerb carries the parapet's top (by the Modřany viaduct,
+    line 17 (-2396, -9241): 199.24 m over a walkway at 198.1 m), and without that check 242-1,343 m of kerb a line
+    counted; with it 25-256 m (4-35 edges a line, of 47-145 km of kerb);
+  - the road's surface follows IPR, whose raster spreads a wall's face over 1-1.5 m: the ramp rose 0.76 m in its last
+    metre before the door's wall and the road behind the wall fell 1.6 m towards it. A road's corner within 1.5 m of
+    a survey wall area up to 1 m across (101-231 a line, 7.5-22 km of outline), or of a kerb edge that is a wall's
+    top, takes the road's own surface 1.5 m out, carried on at its grade there (`ground_mesh.off_the_smear`), unless
+    that surface lies 1 m or more off IPR there (under a deck the street surface has the deck's level). The
+    raster is not asked whether it steps across the wall: read 2.5 m past a wall's end beside another wall it showed
+    no step. In a corner of two walls the point out from one lies in the other's smear and is moved clear of both; at
+    a wall's end the short edge across it points through the wall, and the edge taken is the nearest whose point out
+    the corner's triangle sees.
+  The place's three sections fail on the written file (1.57 m sloping at the sidewalk's edge, the ramp 0.67 m off
+  its line, 2.75 m sloping at the door's wall) and hold on the build (0.0, 0.14, 0.0). Seen there and not fixed: the
+  generated road east of the ramp lies up to 0.56 m over IPR (#780).
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of

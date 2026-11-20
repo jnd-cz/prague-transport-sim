@@ -518,6 +518,86 @@ class Platforms(unittest.TestCase):
         self.assertEqual([round(g.area, 1) for g in got], [6.0])
 
 
+class BesideAThinWall(unittest.TestCase):
+    def test_a_road_beside_a_thin_wall_keeps_its_surface_from_past_the_smear(self):
+        # (#779: a wall 0.3 m across along y = 0..0.3, a ramp at 258 m south of it and a road at 261 m north; the
+        # raster spreads the step over 1.5 m either side, and so does the road's own surface. Corners 0.5 m and on the
+        # wall, either side, take the surface 1.5 m out; one 2 m off is left; so are all on a surface level out there)
+        D = {"areas": [{"c": "wall", "l": 0, "r": [[0, 0, 260.4], [10, 0, 260.4], [10, 0.3, 260.4], [0, 0.3, 260.4]]},
+                       {"c": "wall", "l": 0, "r": [[0, 20, 260.4], [10, 20, 260.4], [10, 23, 260.4], [0, 23, 260.4]]},
+                       {"c": "wall", "l": 1, "r": [[0, 40, 260.4], [10, 40, 260.4], [10, 40.3, 260.4], [0, 40.3, 260.4]]}]}
+        walls = gm.thin_walls(D)
+        self.assertEqual(len(walls), 4)
+
+        def smeared(px, py):
+            return 258.0 + 3.0 * np.clip((np.asarray(py, float) + 1.5) / 3.3, 0, 1)
+        x = np.full(5, 5.0)
+        y = np.array([-0.5, 0.0, 0.3, 0.8, -2.0])
+        ty = np.array([-0.7, -0.2, 0.5, 1.0, -2.2])
+        z, held = gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), smeared)
+        self.assertEqual(held.tolist(), [True, True, True, True, False])
+        np.testing.assert_allclose(z, [258.0, 258.0, 261.0, 261.0, smeared(5.0, -2.0)], atol=1e-9)
+        flat = lambda px, py: np.full(len(np.atleast_1d(px)), 258.0)  # noqa: E731
+        self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, flat(x, y) + 0.04, flat)[1].any())
+        self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), lambda px, py: np.full(len(px), np.nan))[1].any())
+        # (the surface out there 5 m over the lidar, a deck's level: left; on the lidar: taken)
+        self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), lambda px, py: smeared(px, py) + 5.0, smeared)[1].any())
+        self.assertEqual(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), smeared, smeared)[1].sum(), 4)
+
+    def test_a_sidewalks_edge_over_a_sunk_road_is_such_a_wall(self):
+        # (a sidewalk north of y = 0 surveyed at 200.4 m, its kerb edge along a ramp falling east from 200.3 m: the
+        # edge from where it stands 0.3 m over a kerb on the ramp, 20 m of 0.25 m pieces less the first 3 m; beside a
+        # level road, none)
+        D = {"areas": [{"c": "sidewalk", "l": 0, "k": [[1, 0, 0, 0]],
+                        "r": [[0, 0, 200.4], [20, 0, 200.4], [20, 4, 200.4], [0, 4, 200.4]]}]}
+        ground = lambda px, py: np.full(len(px), 200.4)  # noqa: E731
+        e = gm.kerb_walls(D, lambda px, py: 200.3 - 0.1 * np.asarray(px, float), ground)
+        self.assertEqual(e.shape, (68, 2, 2))
+        self.assertAlmostEqual(float(e[:, :, 0].min()), 3.0)
+        self.assertEqual(gm.kerb_walls(D, lambda px, py: np.full(len(px), 200.3), ground).shape, (0, 2, 2))
+        # (the outline carries a parapet's top, 1.1 m over the walkway: no wall's top)
+        self.assertEqual(gm.kerb_walls(D, lambda px, py: 200.3 - 0.1 * np.asarray(px, float),
+                                       lambda px, py: np.full(len(px), 199.3)).shape, (0, 2, 2))
+
+    def test_in_a_corner_of_two_walls_the_surface_is_read_clear_of_both(self):
+        # (walls along y = 0 and along x = 0, a pit at 258 m in their corner whose surface is smeared within 1.5 m of
+        # either: a corner on the first wall 0.2 m from the second takes the surface 1.5 m from both)
+        D = {"areas": [{"c": "wall", "l": 0, "r": [[0, 0, 261], [10, 0, 261], [10, 0.3, 261], [0, 0.3, 261]]},
+                       {"c": "wall", "l": 0, "r": [[-0.3, -10, 261], [0, -10, 261], [0, 0.3, 261], [-0.3, 0.3, 261]]}]}
+
+        def pit(px, py):
+            px, py = np.asarray(px, float), np.asarray(py, float)
+            return np.where((px > 0) & (py < 0), 258.0 + 3.0 * np.clip(1 - np.minimum(px, -py) / 1.5, 0, 1), 261.0)
+        x, y = np.array([0.2]), np.array([0.0])
+        z, held = gm.off_the_smear(gm.thin_walls(D), x, y, np.array([0.4]), np.array([-0.3]), pit(x, y), pit)
+        self.assertTrue(held[0])
+        self.assertAlmostEqual(float(z[0]), 258.0, places=6)
+
+    def test_at_a_walls_end_the_point_out_is_not_through_the_wall(self):
+        # (a road's corner at the wall's end, its triangle north of the wall: the short edge across the wall's end
+        # points along the wall into the pit south of it; the corner takes the road's own side)
+        D = {"areas": [{"c": "wall", "l": 0, "r": [[0, 0, 261], [10, 0, 261], [10, 0.3, 261], [0, 0.3, 261]]}]}
+
+        def ground(px, py):
+            return np.where(np.asarray(py, float) < 0.15, 258.0, 261.0)
+        x, y = np.array([0.0]), np.array([0.3])
+        z, held = gm.off_the_smear(gm.thin_walls(D), x, y, np.array([0.3]), np.array([0.6]), np.array([259.5]), ground)
+        self.assertEqual((held.tolist(), z.tolist()), ([True], [261.0]))
+
+    def test_a_ramp_runs_on_to_the_wall_at_its_own_grade(self):
+        # (a ramp falling 15 % towards the wall's foot: the corner at the wall lies on the ramp's line, not level with
+        # the surface 1.5 m out; a surface 40 % steeper there is another wall's smear: level)
+        D = {"areas": [{"c": "wall", "l": 0, "r": [[0, 0, 260.4], [10, 0, 260.4], [10, 0.3, 260.4], [0, 0.3, 260.4]]}]}
+        walls = gm.thin_walls(D)
+
+        x, y, ty = np.full(2, 5.0), np.array([0.0, -1.0]), np.array([-0.2, -1.2])
+        for grade, at_wall in ((0.15, 258.0), (0.4, 258.6)):
+            ramp = lambda px, py, grade=grade: 258.0 - grade * np.asarray(py, float)  # noqa: E731
+            z, held = gm.off_the_smear(walls, x, y, x, ty, np.full(2, 259.0), ramp)
+            self.assertTrue(held.all())
+            np.testing.assert_allclose(z, [at_wall, 258.0 + grade * (1.0 if grade < 0.2 else 1.5)], atol=1e-9)
+
+
 class UnderADeck(unittest.TestCase):
     def test_a_street_corner_at_the_decks_level_under_a_span_lies_on_the_lidar(self):
         # (#761: the road under the Modřany viaduct; the ramp's own strip, 0.3 m off the lidar, keeps the street surface)
