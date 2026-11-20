@@ -393,6 +393,7 @@ PARALLEL = 30.0  # degrees: a centreline this near another's heading, beside it,
 STEP_CUT = 0.3  # m between neighbouring cells of the junctions' fill: a step (a wall, a kerb), not a slope
 KERB_WALL = 0.7  # m: a sidewalk's kerb edge whose own height stands this far over a kerb on the road beyond it is a
 # wall's top (wall_lines.STEP: a kerb and a garden's edge are under it)
+KERB_OWN = 0.5  # m: a kerb edge's own height this near IPR inside the sidewalk is the walkway's (wall_lines.OWN)
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
 USUAL = 20  # samples (m) either side over which a street's usual width is its running median (a mouth is shorter)
 MOUTH = 1.0  # m: the most a street's width reaches beyond its usual width (a widening for a turn, not a side street)
@@ -1373,15 +1374,15 @@ def wall_tops(q, n, own, zr, ground=None):
     2.2 m into the ramp along its edge, its own edge surveyed at 260.4 m (the user's Street View viewpoint,
     2026-11-20: a level sidewalk behind a wall with a railing, #779). The wall grows from nothing at the ramp's head:
     the edge is its top from STEP_CUT on.
-    ground: IPR SW_KERB_SMEAR in from each point, on the sidewalk. Only a point whose own height lies within STEP_CUT
-    of it counts: a sidewalk's outline along a parapet on its kerb carries the parapet's top, not the walkway's
+    ground: IPR SW_KERB_SMEAR in from each point, on the sidewalk. Only a point whose own height lies within KERB_OWN
+    of it counts (the ramp's sidewalk rises to the building behind it: its edge 260.43 m, 260.82 m 1.5 m in): a sidewalk's outline along a parapet on its kerb carries the parapet's top, not the walkway's
     (by the Modřany viaduct, line 17 (-2396, -9241), 199.24 m over a walkway at 198.1 m: held at it, the edge stood
     1.1 m up)."""
     from kerbs import KERB
     with np.errstate(invalid="ignore"):
         up = np.asarray(own, float) - np.asarray(zr, float) - KERB
         if ground is not None:
-            up = np.where(np.abs(np.asarray(own, float) - np.asarray(ground, float)) <= STEP_CUT, up, np.nan)
+            up = np.where(np.abs(np.asarray(own, float) - np.asarray(ground, float)) <= KERB_OWN, up, np.nan)
         top = (up >= STEP_CUT) if np.isfinite(up).any() and np.nanmax(up) >= KERB_WALL else np.zeros(len(q), bool)
     t = np.column_stack([n[top, 1], -n[top, 0]]) * 0.125
     z = np.asarray(own, float)[top]
