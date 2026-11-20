@@ -1393,27 +1393,33 @@ def wall_heights(segs, X, Y, on, reach):
     return z, d, q, n
 
 
-def wall_tops(q, n, own, zr, ground=None):
+def wall_tops(q, n, own, zr, ground=None, wide=None):
     """Which points of one kerb edge (q, normals n into the sidewalk, the sidewalk's own heights `own`, the road's
-    surface zr beyond them) are a wall's top and no kerb, and those as wall edges ((m, 2, 3), the sidewalk on their
-    left, wall_edges()): where the sidewalk's own height stands STEP_CUT or more over a kerb on that road, along an
-    edge that stands KERB_WALL or more over it somewhere. A garage ramp sunk between walls is a road in the survey and
-    its side a kerb edge: on Na Vápence, line 37 (3868, -22), the walkway held at the ramp's surface plus a kerb sank
-    2.2 m into the ramp along its edge, its own edge surveyed at 260.4 m (the user's Street View viewpoint,
-    2026-11-20: a level sidewalk behind a wall with a railing, #779). The wall grows from nothing at the ramp's head:
-    the edge is its top from STEP_CUT on.
-    ground: IPR SW_KERB_SMEAR in from each point, on the sidewalk. Only a point whose own height lies within KERB_OWN
-    of it counts (the ramp's sidewalk rises to the building behind it: its edge 260.43 m, 260.82 m 1.5 m in): a sidewalk's outline along a parapet on its kerb carries the parapet's top, not the walkway's
-    (by the Modřany viaduct, line 17 (-2396, -9241), 199.24 m over a walkway at 198.1 m: held at it, the edge stood
-    1.1 m up)."""
+    surface zr beyond them) are a wall's edge and no kerb, and those as wall edges ((m, 2, 3) at the walkway's level,
+    the sidewalk on their left, wall_edges()): where the walkway stands STEP_CUT or more over or under a kerb on that
+    road, along an edge that stands KERB_WALL or more off it somewhere. A garage ramp sunk between walls is a road in
+    the survey and its side a kerb edge: on Na Vápence, line 37 (3868, -22), the walkway held at the ramp's surface
+    plus a kerb sank 2.2 m into the ramp along its edge, its own edge surveyed at 260.4 m (the user's Street View
+    viewpoint, 2026-11-20: a level sidewalk behind a wall with a railing, #779). The wall grows from nothing at the
+    ramp's head: the edge is its top from STEP_CUT on. And a sidewalk at the foot of a road's wall rose to the road
+    along its edge: line 22 (1897.5, -2211.9), 221.2 m to 223.5 m in its last 1.25 m, the road at 223.8 m (#770).
+    ground: IPR SW_KERB_SMEAR in from each point, on the sidewalk; wide: whether the sidewalk reaches that far in and
+    half a metre on. The walkway's level is the edge's own height where that lies within KERB_OWN of the ground (the
+    ramp's sidewalk rises to the building behind it: its edge 260.43 m, 260.82 m 1.5 m in); where it does not, the
+    ground on a wide sidewalk, and nothing on a narrow one. An outline along a parapet on its kerb carries the
+    parapet's top (by the Modřany viaduct, line 17 (-2396, -9241), 199.24 m over a walkway at 198.1 m: held at it, the
+    edge stood 1.1 m up), one along a road's wall the wall's top. Without `ground`: the edge's own height."""
     from kerbs import KERB
+    level = np.asarray(own, float)
     with np.errstate(invalid="ignore"):
-        up = np.asarray(own, float) - np.asarray(zr, float) - KERB
         if ground is not None:
-            up = np.where(np.abs(np.asarray(own, float) - np.asarray(ground, float)) <= KERB_OWN, up, np.nan)
-        top = (up >= STEP_CUT) if np.isfinite(up).any() and np.nanmax(up) >= KERB_WALL else np.zeros(len(q), bool)
+            ground = np.asarray(ground, float)
+            there = np.full(len(q), np.nan) if wide is None else np.where(np.asarray(wide, bool), ground, np.nan)
+            level = np.where(np.abs(level - ground) <= KERB_OWN, level, there)
+        off = np.abs(level - np.asarray(zr, float) - KERB)
+        top = (off >= STEP_CUT) if np.isfinite(off).any() and np.nanmax(off) >= KERB_WALL else np.zeros(len(q), bool)
     t = np.column_stack([n[top, 1], -n[top, 0]]) * 0.125
-    z = np.asarray(own, float)[top]
+    z = level[top]
     return top, np.stack([np.column_stack([q[top] - t, z]), np.column_stack([q[top] + t, z])], 1)
 
 
@@ -1447,10 +1453,11 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
             continue
         q, n = q[ok], n[ok]
         zr = np.asarray(road_z(*(q - n * 0.5).T), float)
-        # (an edge standing over the road beyond it is a wall's top, held below as a wall's edge: wall_tops, #779)
+        # (an edge standing over or under the road beyond it is a wall's, held below as a wall's edge: wall_tops, #779)
         if own:
-            g = q + n * SW_KERB_SMEAR
-            top, segs = wall_tops(q, n, own[0][ok], zr, np.asarray(ipr.sample(g[:, 0] + F.E0, g[:, 1] + F.N0), float))
+            g, g2 = q + n * SW_KERB_SMEAR, q + n * (SW_KERB_SMEAR + 0.5)
+            top, segs = wall_tops(q, n, own[0][ok], zr, np.asarray(ipr.sample(g[:, 0] + F.E0, g[:, 1] + F.N0), float),
+                                  shapely.contains_xy(walk, g2[:, 0], g2[:, 1]))
             if top.any():
                 tops.append(segs)
                 q, n, zr = q[~top], n[~top], zr[~top]

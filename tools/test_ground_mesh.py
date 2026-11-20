@@ -555,9 +555,11 @@ class BesideAThinWall(unittest.TestCase):
         self.assertEqual(e.shape, (68, 2, 2))
         self.assertAlmostEqual(float(e[:, :, 0].min()), 3.0)
         self.assertEqual(gm.kerb_walls(D, lambda px, py: np.full(len(px), 200.3), ground).shape, (0, 2, 2))
-        # (the outline carries a parapet's top, 1.1 m over the walkway: no wall's top)
-        self.assertEqual(gm.kerb_walls(D, lambda px, py: 200.3 - 0.1 * np.asarray(px, float),
-                                       lambda px, py: np.full(len(px), 199.3)).shape, (0, 2, 2))
+        # (the outline carries a parapet's top, 1.1 m over the walkway, the road a kerb under that: no wall; the
+        # road 1.5 m over the walkway: a wall, by the lidar's level, #770)
+        low = lambda px, py: np.full(len(px), 199.3)  # noqa: E731
+        self.assertEqual(gm.kerb_walls(D, lambda px, py: np.full(len(px), 199.2), low).shape, (0, 2, 2))
+        self.assertEqual(gm.kerb_walls(D, lambda px, py: np.full(len(px), 200.8), low).shape, (80, 2, 2))
 
     def test_in_a_corner_of_two_walls_the_surface_is_read_clear_of_both(self):
         # (walls along y = 0 and along x = 0, a pit at 258 m in their corner whose surface is smeared within 1.5 m of

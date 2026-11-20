@@ -5256,6 +5256,34 @@
      "why": "as the south road"
     }
    ]
+  },
+  "sidewalk-under-a-road-wall": {
+   "line": "22",
+   "at": [
+    1897.5,
+    -2212.0
+   ],
+   "reach": 20,
+   "issue": 770,
+   "what": "a sidewalk at the foot of a wall with a road on its top (survey sidewalk 6183, road 6010 2.3 m higher): the sidewalk level up to the wall, one upright face",
+   "source": "found tracing #770's sidewalk / sidewalk seams, 2026-11-20: line 22 s 13636, a step of 0.21 m inside the sidewalk, one of 142",
+   "sections": [
+    {
+     "name": "from the sidewalk across its edge onto the road above, y = -2211.88",
+     "from": [
+      1895.5,
+      -2211.88
+     ],
+     "to": [
+      1899.25,
+      -2211.88
+     ],
+     "expect": {
+      "sloping m": 0.5
+     },
+     "why": "IPR has the sidewalk level at 221.2 m up to 0.75 m from its edge and the road at 223.8 m: a wall. The written file of 2026-11-20 climbs through the sidewalk's last 1.25 m (221.3 to 223.5 m)"
+    }
+   ]
   }
  }
 }
