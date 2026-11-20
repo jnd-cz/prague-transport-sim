@@ -391,6 +391,47 @@ class Terraces(unittest.TestCase):
         self.assertEqual(gm.beside(self.D, [7, 8], set(), self.lidar), set())
 
 
+class InARockTunnel(unittest.TestCase):
+    """#771: the Vyšehrad tunnel's south mouth, line 17 s 11385.8: the survey's road 4.3 m over the track."""
+
+    L = {"path": [[0.0, 0.0], [300.0, 0.0]], "tunnels": [[100.0, 140.0], [200.0, 210.0]],
+         "heights": {"step": 2.0, "path": [193.0] * 151}}
+
+    @staticmethod
+    def hill(x, y):  # (20 m of rock over the first tunnel, a road's bridge 6 m over the second)
+        x = np.asarray(x, float)
+        return np.where((x > 98) & (x < 142), 213.0, np.where((x > 199) & (x < 211), 199.0, 193.0))
+
+    def test_a_tunnel_under_rock_is_one_and_a_road_over_the_track_is_not(self):
+        self.assertEqual(gm.rock_tunnels(self.L, self.hill), [(100.0, 140.0)])
+
+    def test_the_corridor_and_the_rails_level(self):
+        x = np.array([99.0, 99.8, 120.0, 120.0, 140.4, 141.0, 205.0])
+        y = np.array([0.0, 2.0, 8.0, 9.0, -3.0, 0.0, 0.0])
+        inside, rail = gm.in_the_rock(self.L, [(100.0, 140.0)], x, y)
+        self.assertEqual(inside.tolist(), [False, True, True, False, True, False, False])
+        self.assertEqual(rail[inside].tolist(), [193.0, 193.0, 193.0])
+
+    def test_a_portals_masonry_comes_down_with_the_corridor(self):
+        # (the north gate, line 17 area 1237: a wall-like strip with a corner on the hill inside the corridor and its
+        # wing wall's line running 12 m on past the tunnel's end; a road with a corner on the hill is no masonry, and a
+        # wall 40 m on is another wall)
+        x = np.array([139.0, 144.0, 152.0, 139.0, 150.0, 190.0])
+        y = np.array([3.0, 4.0, 5.0, -3.0, -5.0, 4.0])
+        z = np.array([197.2, 196.0, 193.2, 197.0, 196.0, 196.0])
+        area = np.array([7, 7, 7, 8, 8, 7])
+        inside, rail = gm.in_the_rock(self.L, [(100.0, 140.0)], x, y)
+        self.assertEqual(inside.tolist(), [True, False, False, True, False, False])
+        inside, rail = gm.portal_masonry(self.L, [(100.0, 140.0)], inside, rail, x, y, z, area, lambda a: a == 7)
+        self.assertEqual(inside.tolist(), [True, True, True, True, False, False])
+        self.assertEqual(gm.off_the_hill(z, np.where(inside, rail, np.nan))[0].tolist(), [193.0, 193.0, 193.2, 193.0, 196.0, 196.0])
+
+    def test_a_corner_on_the_hill_comes_down_to_the_rails(self):
+        z, high = gm.off_the_hill([197.3, 193.4, 205.0], [193.0, 193.0, np.nan])
+        self.assertEqual(z.tolist(), [193.0, 193.4, 205.0])
+        self.assertEqual(high.tolist(), [True, False, False])
+
+
 class UnderADeck(unittest.TestCase):
     def test_a_street_corner_at_the_decks_level_under_a_span_lies_on_the_lidar(self):
         # (#761: the road under the Modřany viaduct; the ramp's own strip, 0.3 m off the lidar, keeps the street surface)

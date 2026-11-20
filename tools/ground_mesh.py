@@ -398,6 +398,104 @@ def span_decks(L):
     return shapely.union_all(shapely.buffer(np.asarray(spans, dtype=object), BRIDGE_NEAR, cap_style="flat"))
 
 
+TUNNEL_ROCK = 8.0  # m: the lidar this far over the rails on average along a tunnel of the route: through rock (src/terrain.js rockTunnels)
+TUNNEL_OUT = 0.5  # m: the page's hole in the terrain begins this far before the tunnel (src/world.js inTunnel)
+TUNNEL_ACROSS = 8.5  # m either side of the route: the vault's half width (src/world.js TUN_W)
+TUNNEL_OVER = 0.5  # m: a survey corner in a rock tunnel's corridor this far over the rails stands on the hill, not the floor
+
+
+def rail_top(L, s):
+    """The top of rail at distances s along the route (data/lineN.json heights: every `step` m)."""
+    h = L["heights"]
+    z = np.asarray(h["path"], float)
+    return np.interp(np.asarray(s, float), np.arange(len(z)) * float(h["step"]), z)
+
+
+def rock_tunnels(L, lidar):
+    """The route's tunnels through rock, as the page judges them (src/terrain.js rockTunnels, there on the 10 m terrain
+    grid): [(a, b)] of L["tunnels"] with the lidar TUNNEL_ROCK or more over the rails on average, every 4 m along."""
+    path = np.asarray(L.get("path") or [], float)[:, :2]
+    if len(path) < 2 or "heights" not in L:
+        return []
+    route = shapely.LineString(path)
+    out = []
+    for a, b in L.get("tunnels") or []:
+        ss = np.arange(float(a), float(b) + 1e-9, 4.0)
+        pts = shapely.get_coordinates(shapely.line_interpolate_point(route, ss))
+        over = np.asarray(lidar(pts[:, 0], pts[:, 1]), float) - rail_top(L, ss)
+        if len(ss) and np.isfinite(over).any() and np.nanmean(over) > TUNNEL_ROCK:
+            out.append((float(a), float(b)))
+    return out
+
+
+def in_the_rock(L, rock, x, y):
+    """(Which points lie in a rock tunnel's corridor: within TUNNEL_ACROSS of the route between TUNNEL_OUT before its
+    start and after its end; the top of rail beside each, NaN for the others)."""
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    inside, rail = np.zeros(len(x), bool), np.full(len(x), np.nan)
+    if not rock or not len(x):
+        return inside, rail
+    route = shapely.LineString(np.asarray(L["path"], float)[:, :2])
+    for a, b in rock:
+        part = shapely.ops.substring(route, max(a - TUNNEL_OUT, 0.0), min(b + TUNNEL_OUT, route.length))
+        x0, y0, x1, y1 = part.bounds
+        k = np.flatnonzero((x >= x0 - TUNNEL_ACROSS) & (x <= x1 + TUNNEL_ACROSS) & (y >= y0 - TUNNEL_ACROSS) & (y <= y1 + TUNNEL_ACROSS))
+        if not len(k):
+            continue
+        pts = shapely.points(x[k], y[k])
+        s_ = shapely.line_locate_point(route, pts)
+        ok = (shapely.distance(route, pts) < TUNNEL_ACROSS) & (s_ > a - TUNNEL_OUT) & (s_ < b + TUNNEL_OUT)
+        inside[k[ok]] = True
+        rail[k[ok]] = rail_top(L, s_[ok])
+    return inside, rail
+
+
+PORTAL_REACH = 15.0  # m past a rock tunnel's corridor, along the route and across it: a portal's wing walls
+
+
+def portal_masonry(L, rock, inside, rail, x, y, z, area, is_wall):
+    """in_the_rock's (inside, rail) with a portal's own masonry added: every corner, within PORTAL_REACH of a rock
+    tunnel's corridor, of a wall-like survey area (is_wall(its id), `area` per corner) that stands TUNNEL_OVER or more
+    over the rails at a corner inside the corridor. The survey has the Vyšehrad tunnel's north gate as one strip
+    0.64 m across (line 17, area 1237): the arch's line across the road and track, and the wing wall along the
+    sidewalk as a sliver from the pier, 197.22 m at s 11424.8, to a point on the ground 12 m on (193.15 m). Stood up
+    as a wall its top fell with that line: seen from inside the tunnel a grey cone 4 m tall by the road. A gate is no
+    ground, and nothing draws the portal's masonry yet: the whole strip lies at the rails' level (#771)."""
+    x, y, z = np.asarray(x, float), np.asarray(y, float), np.asarray(z, float)
+    area = np.asarray(area)
+    with np.errstate(invalid="ignore"):
+        high = inside & (z - rail >= TUNNEL_OVER)
+    ids = [a for a in np.unique(area[high]).tolist() if is_wall(a)]
+    more = np.isin(area, ids) & ~inside
+    if not more.any():
+        return inside, rail
+    k = np.flatnonzero(more)
+    route = shapely.LineString(np.asarray(L["path"], float)[:, :2])
+    pts = shapely.points(x[k], y[k])
+    s_ = shapely.line_locate_point(route, pts)
+    near = shapely.distance(route, pts) < TUNNEL_ACROSS + PORTAL_REACH
+    by = np.zeros(len(k), bool)
+    for a, b in rock:
+        by |= (s_ > a - TUNNEL_OUT - PORTAL_REACH) & (s_ < b + TUNNEL_OUT + PORTAL_REACH)
+    k, s_ = k[near & by], s_[near & by]
+    inside, rail = inside.copy(), rail.copy()
+    inside[k] = True
+    rail[k] = rail_top(L, s_)
+    return inside, rail
+
+
+def off_the_hill(z, rail):
+    """(Heights z of survey corners in a rock tunnel's corridor with those TUNNEL_OVER or more over the rails beside
+    them set to the rails' level, which ones). The lidar there is the hill over the tunnel, and the street surface and a
+    wall's outline at the mouth rise with it: in the Vyšehrad tunnel's south mouth (line 17 s 11388.8, 1.9 m beside the
+    axis) the survey's road stood 4.3 m over the track, a dark spike in the portal; the page leaves out only the terrain
+    there (src/groundDraw.js attachGround), #771."""
+    z, rail = np.asarray(z, float), np.asarray(rail, float)
+    with np.errstate(invalid="ignore"):
+        high = z - rail >= TUNNEL_OVER
+    return np.where(high, rail, z), high
+
+
 def bed_ends(tracks, outline, box=None):
     """Where a drawn track's line leaves the beds' outline on the ground: (n, 4) of (x, y, the track's unit direction
     out of the outline)."""
@@ -1453,12 +1551,18 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         zs[up] = lowered_heights(cx[m][up], cy[m][up], zs[up], rz[j], low, low_w, low_ramp)
     # (a street corner shared with a survey wall or stairs takes its height within WALL_SNAP, #653)
     zs = snap_to_walls(D, cx[m], cy[m], zs, np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span)
+    # (in a rock tunnel's corridor the survey's corners lie at the rails' level, not on the hill over it: off_the_hill, #771)
+    rock = rock_tunnels(L, lidar_)
+    in_rock, rail_z = in_the_rock(L, rock, cx[m], cy[m])
+    in_rock, rail_z = portal_masonry(L, rock, in_rock, rail_z, cx[m], cy[m], zs, sa, lambda a: wall_like(D["areas"][a]))
+    zs, on_hill = off_the_hill(zs, np.where(in_rock, rail_z, np.nan))
+    lifted &= ~on_hill  # (no face stands there: it welds with the ground beside it)
     zc[m] = zs
     # (a wall the survey has as a line: the street, the lidar ground and the terrain beside it stand at its side's level
     # up to it, #697; a street under a bridge too, which keeps the survey's own outline (on_span): the sidewalk along
     # the Modřany ramp's wall, line 17 (-2385, -9250), has the wall's heights in its outline and rose 2 m against it)
     elig = corner_cls == "terrain"
-    elig[m] = np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) | on_lidar
+    elig[m] = (np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) | on_lidar) & ~in_rock
     cen = fc.mean(1)
     on_deck = np.zeros(len(cx), bool)
     on_deck[m] = on_span
@@ -1504,7 +1608,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         from geo import Frame
         from ipr_dtm import IprDtm

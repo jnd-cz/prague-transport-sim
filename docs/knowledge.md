@@ -567,6 +567,21 @@ Sections:
   the foot one side and the top the other without two neighbouring points climbing (`ground_mesh.two_sided`: 10-87
   such strips a line beside the 52-155 that climb); triangulated on its outline it stood as teeth 10 m wide, hidden
   behind the page's slab. The slab was 3.9 m all along; the survey's top steps between 1 and 4 m.
+- **A street in a rock tunnel** (#771, measured 2026-11-20). The mirror of a street under a deck: in the Vyšehrad
+  tunnel (line 17 s 11385.8-11424.0, the only tunnel through rock on the five lines; lines 9, 22 and 23 have covered
+  stretches the lidar is not 8 m over) the lidar is the hill over the vault, and the survey's level-0 areas inside
+  (the road beside the tracks, a wall area at each mouth) took the street surface or their outline, which rise with
+  it at the mouths: the road stood 4.3 m over the track 1.9 m beside the axis at s 11388.8, a dark spike in the south
+  portal, and two slabs in the north one. The page leaves out the terrain in the corridor and nothing else
+  (`src/groundDraw.js` attachGround). OSM's tunnel starts 3 m before the lidar's cliff there (s 11385.8 against
+  11388.5). In the corridor (8.5 m either side, the page's vault) a survey corner 0.5 m or more over the rails lies
+  at the rails' level, and no wall stretch holds it (`ground_mesh.off_the_hill`). The north gate's own masonry is in the survey as one
+  wall-like strip 0.64 m across (area 1237): the arch's line across the road and, as a sliver, the wing wall along the
+  sidewalk from the pier (197.22 m at s 11424.8) to a point on the ground 12 m on. Stood up as a wall its top fell
+  with that line, a grey cone 4 m tall by the road seen from inside the tunnel. A wall-like area with a corner on the
+  hill inside the corridor is the portal's masonry: within 15 m of the corridor all of it lies at the rails' level
+  (`ground_mesh.portal_masonry`). Street View of September 2025 (the user's links, 2026-11-20): a flat road, kerbs
+  and sidewalks, a stone gate and a wing wall about 6 m tall; nothing draws a portal's masonry yet.
 - **A street under a deck** (#761, measured 2026-11-20 on the batch's first build). The street surface follows the
   tracks onto a deck, so under the deck it has the deck's level. A level-0 street area on a span keeps its own
   outline for that reason, but one whose outline lies on two levels (`climbs`) cannot, and since #762 took the street
