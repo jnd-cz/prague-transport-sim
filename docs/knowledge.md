@@ -700,6 +700,28 @@ Sections:
   The place's three sections fail on the written file (1.57 m sloping at the sidewalk's edge, the ramp 0.67 m off
   its line, 2.75 m sloping at the door's wall) and hold on the build (0.0, 0.14, 0.0). Seen there and not fixed: the
   generated road east of the ramp lies up to 0.56 m over IPR (#780).
+- **A street over a pedestrian underpass** (#783, measured 2026-11-20). IPR's raster is bare earth with the bridges
+  taken out, and it takes out the cover of an underpass too: where a street crosses one at grade it shows the
+  passage's floor in a slot as long as the passage and 1-2.5 m wider. The survey has the street's areas at level 0
+  right across, their outlines at the street's level, and (not always) the passage as areas at level -1. South of
+  Čechova čtvrť (line 17 s 3084, (-1453, -9105)) the outlines stand at 214.7-215.4 m and the raster has 211.2 m:
+  the verges on the lidar fell 3.6 m, the generated roads up to 1.8 m, a trench across the street that the layered
+  ground of `alpha-4` did not have. `tools/covers.py` finds such slots and gives the level-0 areas' own outline
+  surface there; the ground build and the street surface read IPR through it (`Covers.over`, `CoveredIpr`). What
+  makes a slot a cover:
+  - it touches a passage: a survey area at level -1, or an OSM way in a tunnel of layer -1 or above from the local
+    extract (not a building's passage, not the metro). The survey's areas alone find 17 of the five lines' 41
+    covers (line 17: 8 of 15, 839 of 1,217 m2).
+    Without that key 55 more spots on line 17 qualify, mostly sidewalks whose outline carries a wall's top, and the
+    garage ramp of #779;
+  - a level-0 area's outline triangle stands 2 m or more over the raster there (a walkway's clearance and slab). A
+    triangle steeper than 15 % that rises over 1 m joins the cover with the floor (a stair well drawn as one area
+    with the sidewalk above) and is no surface; stairs and walls are not covers;
+  - it closes within 15 m of the passage. Nádraží Holešovice (line 17 (1512, 1330)) stands on a structure 55 m
+    across that the raster leaves out whole: its two underpasses' covers alone stood as blocks 7 m high in it.
+  Covers per line (the raster cut out under them): 9: 7 (478 m2), 17: 15 (1,217 m2), 22: 10 (847 m2), 23: 3
+  (346 m2), 37: 6 (355 m2); `python -P -E tools/covers.py LINE` lists them. Not covered: a deck the survey has at
+  level 1 (#449), and the stairs' wells beside a passage, which the ground draws level at their rim (#447).
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of

@@ -1554,7 +1554,13 @@ def context(ln):
     tris, _ = surface_tris(dtm["areas"], {"road", "tram"})
     sw_tris, _ = surface_tris(dtm["areas"], {"sidewalk"})
     edges, walk = kerb_edges(dtm)
-    return {"F": Frame(), "ipr": IprDtm(), "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
+    # (a street over a passage is the ground there, not the passage's floor the raster shows: covers.py, #783)
+    import covers
+    F, raw = Frame(), IprDtm()
+    xy = np.array([q[:2] for a in dtm["areas"] for q in a["r"]], float).reshape(-1, 2)
+    ways = covers.tunnel_ways((*xy.min(0), *xy.max(0))) if len(xy) else ()
+    ipr = covers.CoveredIpr(raw, covers.Covers(dtm, lambda x, y: np.asarray(raw.sample(np.asarray(x) + F.E0, np.asarray(y) + F.N0), float), ways=ways), F)
+    return {"F": F, "ipr": ipr, "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
             "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
             "rings": outlines(dtm), "wall_edges": wall_edges(dtm), "wall_levels": WallLevels(dtm)}
 
