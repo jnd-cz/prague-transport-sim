@@ -20,7 +20,7 @@ left: the garage ramp on Na Vápence, line 37 (3871, -20), has its walls' tops i
 ramp the raster shows rightly (#779).
 
 The cover. A level-0 area's own outline is the ground where it stands CUT or more over the raster in a slot that
-touches a passage (within TOUCH) and closes within LIMIT of it: its outline's triangles (the constrained Delaunay
+lies over a passage (OVER of it within TOUCH) and closes within LIMIT of it: its outline's triangles (the constrained Delaunay
 ones, as ground_mesh.SurveySurface), but for those steeper than GRADE that rise more than SPAN. Such a triangle
 joins a point on the cover with one on the floor: the sidewalk of a stair well that the survey draws as one area
 with the sidewalk above it, a verge round a portal; it is no surface, and what lies in it stays on the raster. (By
@@ -29,7 +29,11 @@ cover, and the verge a notch 3 m deep.) Stairs and walls are not covers: the
 stairs into the passage go down where the raster does. A cut that runs on past LIMIT is no slot under a street:
 Nádraží Holešovice, line 17 (1512, 1330), stands on a structure 55 m across that the raster leaves out whole, its
 rail area at 193.4 m over 186 m, and the cover of its two underpasses alone would stand as two blocks in it. The
-cover holds over the slot and NEAR round it (the raster spreads the slot's faces over 1-1.5 m, and its slot is
+A slot that only touches the passage's end is the open ramp or the stairs down to it, which the survey outlines at
+their rim: by Nádraží Braník, line 17 (-2034, -6277), the ramp between the stop and the road, its outline at
+197.3 m and its floor 3 m down at the portal, where OSM's tunnel way begins. Where such a ramp joins a slot (the
+stairs' ramp at the east end of the tunnel by line 17 (-2471, -7871), 10 m of it), the cover ends REACH from the
+passage. The cover holds over the slot and NEAR round it (the raster spreads the slot's faces over 1-1.5 m, and its slot is
 wider than the survey's passage: 90 % of its points within 1.2 m of it on line 17), and only where it is the higher
 of the two: a road tunnel deep under a hill (Letná, Strahov) has the hill's ground over it in both, and nothing
 changes there.
@@ -48,7 +52,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CUT = 2.0  # m: a level-0 outline this far over the raster above a lower area stands on a cover the raster left out
 # (a walkway's clearance and its slab: tools/zps_decks.py WALK 2.2 m, MIN_SLAB 0.3 m)
 LIMIT = 15.0  # m from the passage: a cut that reaches further is no slot over it (a road tunnel's is 20-30 m across)
-TOUCH = 1.0  # m from the passage: a slot this near is over it
+TOUCH = 1.0  # m from the passage: a slot's point this near lies over it
+REACH = 2.5  # m from the passage: the cover ends here (the raster's slot is up to this much wider than the passage)
+OVER = 0.5  # of a slot's points over the passage: less, and it lies before the passage's end (its ramp, its stairs)
 MIN_CUT = 4.0  # m2: a smaller cut is the raster's noise at a wall
 WAY = 2.5  # m either side of an OSM tunnel way: the passage (a footway's or a cycleway's underpass, 4-5 m across)
 NEAR = 3.0  # m round the raster's cut: the cover holds this far (the smear, and the lattice's step)
@@ -156,19 +162,21 @@ class Covers:
                 cut = (d >= CUT).reshape(X.shape)
             if not cut.any():
                 continue
-            # (the slots: the cut's connected parts that touch the passage and close within LIMIT of it)
+            # (the slots: the cut's connected parts that lie over the passage and close within LIMIT of it)
             lab, n = ndimage.label(cut, structure=np.ones((3, 3)))
             lc = lab[cut]
             far = shapely.distance(shapely.points(X[cut], Y[cut]), g)
-            touch, runs_on = np.zeros(n + 1, bool), np.zeros(n + 1, bool)
-            np.logical_or.at(touch, lc, far <= TOUCH)
+            size = np.bincount(lc, minlength=n + 1)
+            on_it = np.bincount(lc, weights=far <= TOUCH, minlength=n + 1) >= OVER * np.maximum(size, 1)
+            runs_on = np.zeros(n + 1, bool)
             np.logical_or.at(runs_on, lc, far > LIMIT)
-            slot = touch & ~runs_on & (np.bincount(lc, minlength=n + 1) * STEP * STEP >= MIN_CUT)
-            sel = cut & slot[lab]
+            slot = on_it & ~runs_on & (size * STEP * STEP >= MIN_CUT)
+            sel = np.zeros(cut.shape, bool)
+            sel[cut] = slot[lc] & (far <= REACH)
             if not sel.any():
                 continue
             spots = shapely.union_all(shapely.buffer(shapely.points(X[sel], Y[sel]), STEP * 0.75, quad_segs=2))
-            place["zone"] = spots.buffer(NEAR, quad_segs=4)
+            place["zone"] = spots.buffer(NEAR, quad_segs=4).intersection(g.buffer(REACH + TOUCH))
             shapely.prepare(place["zone"])
             place.update({"at": [[round(q.centroid.x, 1), round(q.centroid.y, 1)] for q in shapely.get_parts(place["zone"])],
                           "cut m2": round(float(sel.sum()) * STEP * STEP, 1), "deepest m": round(float(d.reshape(X.shape)[sel].max()), 2)})

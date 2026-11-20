@@ -709,9 +709,11 @@ Sections:
   ground of `alpha-4` did not have. `tools/covers.py` finds such slots and gives the level-0 areas' own outline
   surface there; the ground build and the street surface read IPR through it (`Covers.over`, `CoveredIpr`). What
   makes a slot a cover:
-  - it touches a passage: a survey area at level -1, or an OSM way in a tunnel of layer -1 or above from the local
-    extract (not a building's passage, not the metro). The survey's areas alone find 17 of the five lines' 41
-    covers (line 17: 8 of 15, 839 of 1,217 m2).
+  - it lies over a passage (half of it or more): a survey area at level -1, or an OSM way in a tunnel of layer -1
+    or above from the local extract (not a building's passage, not the metro). The survey's areas alone find 12
+    of the five lines' 30 covers (line 17: 7 of 12, 720 of 1,039 m2). A slot that only touches the passage's end
+    is the open ramp or the stairs down to it, which the survey outlines at their rim (Nádraží Braník, line 17
+    (-2034, -6277)); where such a ramp joins a slot, the cover ends 2.5 m from the passage.
     Without that key 55 more spots on line 17 qualify, mostly sidewalks whose outline carries a wall's top, and the
     garage ramp of #779;
   - a level-0 area's outline triangle stands 2 m or more over the raster there (a walkway's clearance and slab). A
@@ -719,9 +721,12 @@ Sections:
     with the sidewalk above) and is no surface; stairs and walls are not covers;
   - it closes within 15 m of the passage. Nádraží Holešovice (line 17 (1512, 1330)) stands on a structure 55 m
     across that the raster leaves out whole: its two underpasses' covers alone stood as blocks 7 m high in it.
-  Covers per line (the raster cut out under them): 9: 7 (478 m2), 17: 15 (1,217 m2), 22: 10 (847 m2), 23: 3
-  (346 m2), 37: 6 (355 m2); `python -P -E tools/covers.py LINE` lists them. Not covered: a deck the survey has at
-  level 1 (#449), and the stairs' wells beside a passage, which the ground draws level at their rim (#447).
+  Covers per line (the raster cut out under them): 9: 6 (123 m2), 17: 12 (1,039 m2), 22: 6 (494 m2), 23: 2
+  (278 m2), 37: 4 (97 m2); `python -P -E tools/covers.py LINE` lists them. Looked at on plans, all 30: 11 are
+  slots across a street (line 17's six hold 960 m2), the rest strips of 4-50 m2 where the raster smears a wall's
+  or a well's face into the street above it, and three wells of an underground entrance that the survey has no
+  stairs for (line 22 (-309, -1236), 43 m2: level with the sidewalk now, a pit 6 m deep before). Not covered: a
+  deck the survey has at level 1 (#449), and the ramps and stairs' wells beside a passage (#786, #447).
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of

@@ -55,6 +55,13 @@ class Street(unittest.TestCase):
         # (the raster 4 m under the road from the passage on for 30 m: a structure left out whole, not a slot)
         self.assertEqual(len(covers.Covers(self.D, slot(27, 60)).places), 0)
 
+    def test_the_open_ramp_before_the_passage_is_no_cover(self):
+        # (OSM's tunnel way begins at the portal, x = 40; before it the ramp down to it lies open, drawn by the
+        # survey as an area at its rim's level: the raster's floor there is the ground)
+        D = {"areas": [rect("paved", 20, 0, 40, 4, 200.0), rect("road", 40, -10, 50, 14, 200.0)]}
+        lidar = lambda x, y: np.where((np.asarray(x, float) > 28) & (np.asarray(x, float) < 40.5), 196.5, 200.0)  # noqa: E731
+        self.assertEqual(len(covers.Covers(D, lidar, ways=[shapely.LineString([(40, 2), (50, 2)])]).places), 0)
+
     def test_nothing_where_the_raster_has_the_street(self):
         # (a tunnel deep under the street: the raster has the street's level over it)
         self.assertEqual(len(covers.Covers(self.D, slot(27, 33, floor=199.8)).places), 0)
@@ -76,6 +83,14 @@ class Street(unittest.TestCase):
         self.assertFalse(covers.is_tunnel({"highway": "footway", "tunnel": "building_passage"}))
         self.assertFalse(covers.is_tunnel({"highway": "trunk", "tunnel": "yes", "layer": "-2"}))
         self.assertTrue(covers.is_tunnel({"highway": "cycleway", "tunnel": "yes", "layer": "-1"}))
+
+    def test_two_passages_each_with_its_cover(self):
+        D = {"areas": self.D["areas"] + [rect("underpass", 48, -1, 52, 15, 196.0, level=-1)]}
+        lidar = lambda x, y: np.where(((np.asarray(x, float) > 27) & (np.asarray(x, float) < 33))  # noqa: E731
+                                      | ((np.asarray(x, float) > 47) & (np.asarray(x, float) < 53)), 196.0, 200.0)
+        C = covers.Covers(D, lidar)
+        self.assertEqual(len(C.places), 2)
+        np.testing.assert_allclose(C.at(np.array([30.0, 50.0]), np.array([5.0, 5.0])), 200.0, atol=1e-9)
 
     def test_iprs_reader_with_the_covers(self):
         from types import SimpleNamespace
