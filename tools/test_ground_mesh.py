@@ -391,6 +391,93 @@ class Terraces(unittest.TestCase):
         self.assertEqual(gm.beside(self.D, [7, 8], set(), self.lidar), set())
 
 
+class Abutments(unittest.TestCase):
+    """#763: the Modřany viaduct's abutment, line 17 (-2393, -9247): the bed's end 1.3 m over the face, the wing
+    walls' lines turning at its corners and running on at the street's level."""
+
+    outline = shapely.box(0, -3, 50, 3)  # (the bed on the ramp, its end at x = 0; the deck runs on to -x)
+    tracks = [np.array([[60.0, 0.0], [-10.0, 0.0]])]
+
+    @staticmethod
+    def bed_at(x, y):
+        return np.full(np.shape(x), 106.5)
+
+    @staticmethod
+    def lidar(x, y):  # (the street at 100 m, the ramp's top at 106 m, the face at x = 1.3 smeared over 1 m)
+        return 100.0 + 6.0 * np.clip(np.asarray(x, float) - 0.8, 0, 1)
+
+    wings = [np.array([[20, -4, 103.0], [1.3, -4, 103.0], [1.3, -4.5, 100.2], [-10, -4.5, 100.1]]),
+             np.array([[20, 4, 103.0], [1.4, 4, 103.0]])]
+
+    def ends(self, lines):
+        self.assertEqual(len(lines), 1)
+        return sorted(np.round(lines[0][:, :2], 2).tolist())
+
+    def test_the_face_is_where_the_lidar_steps_under_the_beds_end_between_the_wing_walls_corners(self):
+        got = gm.abutments(self.tracks, self.outline, self.bed_at, self.lidar, self.wings)
+        self.assertEqual(self.ends(got), [[1.3, -4.0], [1.4, 4.0]])  # (not the low wall's points along the street)
+
+    def test_without_wing_walls_it_runs_to_the_beds_edges(self):
+        got = gm.abutments(self.tracks, self.outline, self.bed_at, self.lidar, [])
+        self.assertEqual(self.ends(got), [[1.3, -3.0], [1.3, 3.0]])
+
+    def test_over_a_slope_with_no_step_the_face_is_the_beds_end(self):
+        # (an embankment's cone under the deck's end: Krejcárek, line 37 (3954, 380))
+        got = gm.abutments(self.tracks, self.outline, self.bed_at, lambda x, y: 103.0 + 0.6 * np.clip(np.asarray(x, float), -9, 5), [])
+        self.assertEqual(self.ends(got), [[0.0, -3.0], [0.0, 3.0]])
+
+    def test_off_the_lines_bridges_a_beds_end_is_no_abutment(self):
+        # (line 17 s 3088: the beds stop over an underpass the line has no span for)
+        args = (self.tracks, self.outline, self.bed_at, self.lidar, self.wings)
+        self.assertEqual(len(gm.abutments(*args, decks=shapely.box(-20, -12, 5, 12))), 1)
+        self.assertEqual(gm.abutments(*args, decks=shapely.box(100, 100, 120, 120)), [])
+
+    def test_a_bed_that_ends_on_the_ground_is_no_abutment(self):
+        self.assertEqual(gm.abutments(self.tracks, self.outline, self.bed_at, lambda x, y: np.full(np.shape(x), 106.0), []), [])
+
+
+class WallsMeeting(unittest.TestCase):
+    """#763: two stretches meeting at a corner (a wing wall and the abutment's line): the ramp's top north-east of
+    it at 106 m, the street round it at 100 m."""
+
+    @staticmethod
+    def stretch(p, zl, zr):
+        n = len(p)
+        return {"p": np.array(p, float), "zl": np.full(n, zl), "gl": np.zeros(n), "zr": np.full(n, zr), "gr": np.zeros(n)}
+
+    def hold(self, walls, corners):
+        c = np.array(corners, float)  # (rows of the corner's x, y and its triangle's centre's x, y)
+        z, held = gm.hold_at_walls(c[:, 0], c[:, 1], c[:, 2], c[:, 3], np.full(len(c), 103.0), np.ones(len(c), bool), walls)
+        return z.tolist(), held.tolist()
+
+    def setUp(self):
+        self.wing = self.stretch([[10, 0], [5, 0], [0, 0]], 100.0, 106.0)  # (westwards: the street to its left, south)
+        self.face = self.stretch([[0, 0], [0, 5], [0, 10]], 100.0, 106.0)  # (northwards: the street to its left, west)
+
+    def test_the_corner_outside_two_meeting_walls_is_the_streets(self):
+        z, held = self.hold([self.wing, self.face], [
+            [-0.5, -0.5, -0.6, -0.3],  # (past both walls' ends)
+            [-1.0, 0.2, -0.8, 0.1],    # (past the wing's end, north of its line run on: west of the face)
+            [0.0, 0.0, -0.3, 0.5],     # (the meeting point itself, in a triangle west of the face)
+            [0.0, 0.0, 0.5, 0.5],      # (and in one on the ramp)
+            [0.0, 0.0, 0.4, -0.4],     # (and in one south of the wing)
+        ])
+        self.assertEqual(z, [100.0, 100.0, 100.0, 106.0, 100.0])
+        self.assertTrue(all(held))
+
+    def test_a_line_across_a_structure_leaves_the_decks_own_surface(self):
+        face = dict(self.face, across=True)
+        c = np.array([[-0.5, 5.0, -0.6, 5.0], [-0.5, 6.0, -0.6, 6.0]])
+        z, held = gm.hold_at_walls(c[:, 0], c[:, 1], c[:, 2], c[:, 3], np.full(2, 106.3), np.ones(2, bool), [face], np.array([True, False]))
+        self.assertEqual(z.tolist(), [106.3, 100.0])  # (the deck's own corner stays; the street's under it is held)
+        self.assertEqual(held.tolist(), [False, True])
+
+    def test_a_corner_past_a_walls_free_end_is_left(self):
+        z, held = self.hold([self.wing], [[-0.5, 0.2, -0.6, 0.3], [2.0, 0.5, 2.0, 0.3]])
+        self.assertEqual(z, [103.0, 106.0])
+        self.assertEqual(held, [False, True])
+
+
 class Lidar(unittest.TestCase):
     def test_the_city_mesh_under_the_survey_answers_on_its_triangles_planes_only(self):
         # (a lawn on the lidar ground takes the city mesh's height: its triangles under the classes above, "under")

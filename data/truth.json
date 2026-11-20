@@ -4723,7 +4723,40 @@
     ],
     "source": "Google Street View at the user's link, seen 2026-11-19 (looked at, not copied)",
     "game": "main 95b3162's data, the same camera (tools/shot.py --line 17 --s 4060 --view review --at=-2382.1,-9253.0 --yaw 143 --pitch 4 --dist 25): the wall stands, but the sidewalk along its foot rises against it in two peaks up to the deck, and the road swells towards it"
-   }
+   },
+   "sections": [
+    {
+     "name": "from the ramp's south side strip over the abutment's face down to the street under the deck, y = -9249.7",
+     "from": [
+      -2389.5,
+      -9249.7
+     ],
+     "to": [
+      -2395.5,
+      -9249.7
+     ],
+     "expect": {
+      "sloping m": 0.5
+     },
+     "why": "the span's beam starts at the abutment's square end (the place's `seen`): the ramp's top ends at an upright face. The survey's wing wall lines turn their corners at (-2392.66, -9250.81) and (-2391.92, -9241.77) and run on at the street's level; no line crosses the structure. On PR #762's ground the side strips (sidewalk 7214) fell 4.5 m in their last metre as leaning faces: 49 survey triangles steeper than 1:1 rising over 1 m in the box (-2396, -9252.5)-(-2390, -9242) (#763)"
+    },
+    {
+     "name": "from the ramp's north wall across the road beside it, x = -2379",
+     "from": [
+      -2379.0,
+      -9240.6
+     ],
+     "to": [
+      -2379.0,
+      -9234.6
+     ],
+     "expect": {
+      "off the lidar m": 0.5,
+      "sloping m": 0.5
+     },
+     "why": "the sidewalk and the road along the wall's foot are level and even (the place's `seen`). The written file of 2026-11-19 has the road there at 201.1 m, 2.9 m over IPR's raster (198.2): of 580 points 1-6 m off the low side of the viaduct's walls 355 stood more than 0.5 m over the raster, the largest 3.33 m (#761); on #762's and #763's ground none does, the largest 0.19 m"
+    }
+   ]
   },
   "krejcarek-abutment": {
    "line": "37",

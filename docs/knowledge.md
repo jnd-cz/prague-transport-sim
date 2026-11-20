@@ -553,6 +553,19 @@ Sections:
   ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`). What reaches a rail without crossing
   the track lies at the bed's height within 5 cm of it (`ground_mesh.rail_band`): line 17 s 17128's stop island, classed
   sidewalk, lies along the outer rail (9.5 cm over it before), line 9's depot hall (a plot) over its tracks' ends.
+- **Abutments: the wall the survey does not have** (#763, measured 2026-11-19). Where a deck lands, the survey's wing
+  walls along the ramp are wall lines; the abutment's face under the deck is not. At the Modřany viaduct (line 17
+  (-2393, -9247)) the two wing walls' lines turn by 0.5 m at the face's corners and run on along the street at its
+  level; without a line across, the ramp's side strips fell 4.5 m in their last metre. The bed's end is not the face:
+  the bed reaches the deck's end (#594) and overhangs the abutment, by 1.3 m there. Nor is a span's end: the route's
+  span runs s 3971-4152, the ramp included. `ground_mesh.abutments` finds the face behind the bed's end where IPR's
+  raster crosses the middle between the ground the deck leaves and the ramp's top; its ends are the wing walls' points
+  there that stand over that ground, else the first wall line across, else the bed's edges. Walls that meet: a corner
+  past a stretch's free end is left (the ground has no step there), but where two stretches meet (a wing wall and the
+  face, a wall's turn) the wedge outside the corner is past both and stood as leaning faces; an end within `WALL_JOIN`
+  of another stretch is not free, and a corner at or past such an end reads the wall its triangle's centre lies by.
+  No step in the raster, no wall: at Krejcárek (line 37 (3954, 380)) the embankment and a stone cone run under the
+  deck's end and the line makes no stretch; that abutment is the structure's (the bridge model, #742).
 - **Terraces: where the lidar's ground is not the ground** (#663, measured 2026-11-19). A lawn or a yard on the lidar
   (`g`) lies on the city mesh inside (#444). 38-108 of them a line (of 1,375-3,663) have an outline over 1 m above
   IPR's raster (its points' median); 4-70 lie over 1 m under it. Those over it are of three kinds: terraces inside

@@ -113,6 +113,17 @@ class Stretches(unittest.TestCase):
         for s in st:
             self.assertTrue(np.allclose(s["zl"], 203.0) and np.allclose(s["zr"], 200.0), (s["zl"], s["zr"]))
 
+    def test_a_line_meeting_walls_at_its_ends_reads_them_from_the_points_beside(self):
+        # (an abutment's line between its wing walls, #763: at its ends the high side's readings run along a wing wall,
+        # through the raster's smear of it)
+        def ramp(x, y):
+            x, y = np.asarray(x, float), np.asarray(y, float)
+            top = np.where((y < 0.3) | (y > 9.7), 203.0, 206.0)
+            return np.where(x > 0, top, 200.0)
+        line = np.array([[0.0, 0.0, np.nan], [0.0, 10.0, np.nan]])
+        self.assertEqual(wl.of_lines([line], ramp)[0]["zr"][[0, 5, -1]].tolist(), [203.0, 206.0, 203.0])
+        self.assertEqual(wl.of_lines([line], ramp, (), {0})[0]["zr"][[0, 5, -1]].tolist(), [206.0, 206.0, 206.0])
+
     def test_runs_close_small_gaps_and_drop_short_ones(self):
         d = np.arange(12.0)
         on = np.array([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0], bool)
