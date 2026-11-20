@@ -107,6 +107,19 @@ CHECK = """async () => {
   checks.taperedEndShoulders = shoulderWidth > .6 && shoulderWidth < 1.05;
   // Across each front quarter-light the exposed glass is shorter by the jamb.
   const frontMaterials = [shell, m.getObjectByName('Body_Window_glass')];
+  const lenses = m.getObjectByName('Tatra_T3_6892_Headlight_lens');
+  const lensBox = new THREE.Box3().setFromObject(lenses, true);
+  checks.headlightsFollowFrontPhoto = near(lensBox.max.y - lensBox.min.y, .178)
+    && near(lensBox.min.x + .089, -.55) && near(lensBox.max.x - .089, .55)
+    && near(lensBox.getCenter(new THREE.Vector3()).y, 1.17);
+  checks.bogieSkirtReturns = [-1, 1].every(side => [-3.2, 3.2].every(z => {
+    const skin = dz => hit([side * 2, .53, z + dz], [-side, 0, 0], [shell])?.distance < 1;
+    return [-1, 1].every(end => !skin(end * 1.05) && skin(end * 1.24));
+  }));
+  checks.endCurvatureAtCheeks = [-1, 1].every(end => {
+    const depth = x => Math.abs(hit([x, 1.28, end * 8], [0, 0, -end], [redShell]).point.z);
+    return depth(0) - depth(.55) < .022 && depth(.72) - depth(.94) > .10;
+  });
   checks.roundedQuarterLightOpenings = [-1, 1].every(side => {
     const at = (y, z) => hit([side * 2, y, z], [-side, 0, 0], frontMaterials)?.object;
     return at(2.20, 6.10) === frontMaterials[1] && [1.86, 2.47].every(y =>
@@ -114,7 +127,21 @@ CHECK = """async () => {
   });
   const browHit = hit([0, 2.68, 8], [0, 0, -1], [shell]);
   const glassHit = hit([0, 2.64, 8], [0, 0, -1], [m.getObjectByName('Body_Window_glass')]);
-  checks.browOverhangsGlass = browHit && glassHit && browHit.point.z > glassHit.point.z + .025;
+  checks.browLipAtCentre = browHit && glassHit && browHit.point.z > glassHit.point.z
+    && browHit.point.z - glassHit.point.z < .04;
+  checks.browsFlushAtSideJambs = [-1, 1].every(end => [-1, 1].every(side => {
+    const edge = y => hit([side * 2, y, end * 6.015], [-side, 0, 0], [shell])?.point.x;
+    return Math.abs(edge(2.715) - edge(2.2)) < .008;
+  }));
+  checks.roofRollsInAboveBothBrows = [-1, 1].every(end => {
+    const depth = y => Math.abs(hit([0, y, end * 8], [0, 0, -end], [shell]).point.z);
+    const lower = depth(2.93) - depth(2.96), upper = depth(2.99) - depth(3.02);
+    return lower > 0 && upper > lower * 2;
+  });
+  checks.frontGlassMeetsBareSill = [-.38, .38].every(x => [1.754, 1.77, 1.782].every(y => {
+    const first = hit([x, y, 8], [0, 0, -1], [...frontMaterials, m.getObjectByName('Exterior_details')]);
+    return frontMaterials.includes(first?.object);
+  }));
   const routePlate = m.getObjectByName('Route_plate'), routeBounds = new THREE.Box3().setFromObject(routePlate);
   checks.routePlateFollowsBrow = routeBounds.min.y > 2.65 && routeBounds.max.y < 3.02 && routePlate.rotation.x < -.08 && routePlate.rotation.x > -.25;
   const frontCoupler = m.getObjectByName('Coupler_front');
@@ -139,17 +166,32 @@ CHECK = """async () => {
     && parked.z < rearGlassAt(parked.x, parked.y).point.z;
   const before = pos(r.doors[0].pairs[0].inner);
   s.pose(m, { doors: [1, .5, 0], bogies: [.2, -.2], wheelAngle: 1.2, wipers: 1, couplers: [.15, -.15], pantograph: 1 });
-  const swept = tip();
-  checks.rearWiperSweep = pivot.distanceTo(pos(rearWiper)) < 1e-6
-    && Math.abs(swept.x - parked.x) > .25 && swept.y > parked.y + .09
-    && r.rearLink.localToWorld(new THREE.Vector3(.012, -.56, .01)).distanceTo(
-       r.rearCarrier.localToWorld(new THREE.Vector3(.057, 0, .01))) < .001;
+  checks.poweredSweepLeavesRearParked = tip().distanceTo(parked) < 1e-6;
   checks.doorsFoldInward = pos(r.doors[0].pairs[0].inner).x > before.x + .3;
   checks.independentDoors = near(r.doors[2].pairs[0].outer.rotation.y, 0) && near(Math.abs(r.doors[1].pairs[0].outer.rotation.y), T3_PHOTO.doorMaxAngle / 2);
   checks.doorsStopShortOf90 = near(Math.abs(r.doors[0].pairs[0].outer.rotation.y), 84 * Math.PI / 180);
   checks.bogiePose = near(r.bogies[0].rotation.y, .2) && near(r.bogies[1].rotation.y, -.2);
   checks.wheelPose = r.wheelsets.every(w => near(w.rotation.x, 1.2));
   checks.couplerPose = near(r.couplers[0].rotation.y, .15);
+  checks.frontWipersCoverCentreToDividers = [0, .5, 1].every(wipers => {
+    s.pose(m, { wipers });
+    return r.frontWiperLinks.every(({ carrier, link }, i) => {
+      const p = pos(carrier), mount = pos(r.wipers[i]), x = p.x * (i === 0 ? -1 : 1);
+      const glass = hit([p.x, p.y, 8], [0, 0, -1], [frontMaterials[1]]);
+      const onGlass = glass && p.z - glass.point.z >= 0 && p.z - glass.point.z < .04;
+      return mount.y < 1.77 && onGlass && x > .008 && x < .69
+        && (wipers !== 1 || x < .025) && (wipers !== 0 || x > .64)
+        && link.localToWorld(new THREE.Vector3(0, .515, .008)).distanceTo(
+           carrier.localToWorld(new THREE.Vector3((i === 0 ? -1 : 1) * .034, 0, .008))) < .001;
+    });
+  });
+  checks.rearWiperManualBothSides = [-1, 1].every(direction => {
+    s.pose(m, { rearWiper: direction });
+    return (parked.x - tip().x) * direction > .25 && pivot.distanceTo(pos(rearWiper)) < 1e-6
+      && r.rearLink.localToWorld(new THREE.Vector3(.012, -.56, .01)).distanceTo(
+         r.rearCarrier.localToWorld(new THREE.Vector3(.057, 0, .01))) < .001;
+  });
+  s.pose(m, {pantograph: 1});
   const headHigh = pos(r.pantograph.head).y;
   const armTip = arm => arm.upper.localToWorld(new THREE.Vector3(0, r.pantograph.armLength, 0));
   checks.collectorLinkage = r.pantograph.arms.every(a => armTip(a).distanceTo(pos(r.pantograph.head)) < .0001);
@@ -169,9 +211,9 @@ CHECK = """async () => {
   bindPhotoT3(gltf.scene);
   s.pose(gltf.scene, { doors: [1, .5, 0], pantograph: .3, wipers: 1 });
   checks.importedRigMoves = near(Math.abs(gltf.scene.rig.doors[0].pairs[0].outer.rotation.y), T3_PHOTO.doorMaxAngle)
-    && near(gltf.scene.rig.wipers[0].rotation.z, -.52) && near(gltf.scene.rig.wipers[1].rotation.z, .52)
-    && near(gltf.scene.rig.wipers[2].rotation.z, .65) && near(gltf.scene.rig.rearCarrier.rotation.z, -.65)
-    && near(gltf.scene.rig.rearLink.rotation.z, .65) && pivot.distanceTo(pos(gltf.scene.rig.wipers[2])) < .001;
+    && near(gltf.scene.rig.wipers[0].rotation.z, -.63) && near(gltf.scene.rig.wipers[1].rotation.z, .63)
+    && near(gltf.scene.rig.frontWiperLinks[0].carrier.rotation.z, .63)
+    && near(gltf.scene.rig.wipers[2].rotation.z, 0) && pivot.distanceTo(pos(gltf.scene.rig.wipers[2])) < .001;
   s.pose(gltf.scene); s.roundTrip = gltf.scene;
   const originalBounds = new THREE.Box3().setFromObject(m), importedBounds = new THREE.Box3().setFromObject(gltf.scene);
   checks.glbBounds = originalBounds.min.distanceTo(importedBounds.min) < .001 && originalBounds.max.distanceTo(importedBounds.max) < .001;

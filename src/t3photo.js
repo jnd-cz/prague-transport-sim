@@ -173,11 +173,12 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
           // A wheel recess is part of the perimeter, never a hole crossing its boundary.
           s = new THREE.Shape(); s.moveTo(start, lo);
           for (const c of [-3.2, 3.2]) {
-            const l = c - 1.38, r = c + 1.38, top = .76;
+            const l = c - 1.22, r = c + 1.22, top = .73;
             if (l < start || r > a) continue;
-            s.lineTo(l, lo); s.lineTo(l, top - .12);
-            s.quadraticCurveTo(l, top, l + .12, top); s.lineTo(r - .12, top);
-            s.quadraticCurveTo(r, top, r, top - .12); s.lineTo(r, lo);
+            s.lineTo(l, lo); s.quadraticCurveTo(l + .035, lo, l + .058, lo + .07);
+            s.lineTo(l + .105, top - .07); s.quadraticCurveTo(l + .12, top, l + .20, top);
+            s.lineTo(r - .20, top); s.quadraticCurveTo(r - .12, top, r - .105, top - .07);
+            s.lineTo(r - .058, lo + .07); s.quadraticCurveTo(r - .035, lo, r, lo);
           }
           s.lineTo(a, lo); s.lineTo(a, hi); s.lineTo(start, hi); s.closePath();
         }
@@ -209,11 +210,12 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   const rearRake = .04;
   const endPoint = (a, y, sign, inset = 0) => {
     const r = 1.25 - inset, rake = y > 1.64 ? (y - 1.64) * (sign > 0 ? .43 : rearRake) : 0;
-    // A shallow centre bow meets the much tighter quarter-light cheeks (6312 photos).
-    const c = Math.max(0, Math.cos(a));
-    const reach = 1.01 * c * (1.36 - .36 * c * c);
+    // Wide central pane, tight cheek returns. This form of sqrt(1 - sin(a)^8)
+    // keeps regular samples and a finite tangent all the way to the side jamb.
+    const s2 = Math.sin(a) ** 2, c = Math.max(0, Math.cos(a));
+    const reach = c * Math.sqrt((1 + s2) * (1 + s2 * s2)) * (1 - .012 * s2);
     const belly = y >= .85 && y <= 1.66 ? .035 * ((y - 1.24) / .42) ** 2 : 0;
-    const x = r * Math.sin(a), z = 5.99 + (reach / 1.01) * (1.01 - rake - inset - belly);
+    const x = r * Math.sin(a), z = 5.99 + reach * (1.01 - rake - inset - belly);
     return [x, y, sign * z];
   };
   const angles = Array.from({ length: 49 }, (_, i) => -Math.PI / 2 + Math.PI * i / 48);
@@ -223,11 +225,10 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     return top ? 2.65 - .17 * corner ** 2 : 1.77 + .08 * corner ** 2;
   };
   const browPoint = (a, t, sign) => {
-    const lower = endPoint(a, windowY(a, true, sign), sign, sign > 0 ? -.045 : -.025);
-    const upper = endPoint(a, 2.65, sign, sign > 0 ? -.035 : -.02);
-    upper[0] *= .985; upper[1] = 2.74 + .25 * Math.cos(a) ** .85; upper[2] -= sign * .035 * Math.cos(a) ** 2;
-    lower[1] += .025;
-    return lower.map((v, i) => THREE.MathUtils.lerp(v, upper[i], t));
+    const c = Math.cos(a), lower = endPoint(a, windowY(a, true, sign), sign);
+    lower[1] += .012; lower[2] += sign * .018 * c;
+    const rise = 2.74 + .19 * c - lower[1];
+    return [lower[0], lower[1] + t * rise, lower[2] - sign * .14 * c * rise * t];
   };
   for (const sign of [-1, 1]) {
     for (const [lo, hi, mat] of [[.34, .85, cream], [.85, 1.66, red]]) {
@@ -250,7 +251,8 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
         ...angles.filter(a => Math.abs(a) < shoulder - 1e-9).map(a => [a, 0]), ...corner];
       const upperRadius = sign > 0 ? .235 : .093, lowerRadius = sign > 0 ? .125 : .045;
       const edge = (a, k, top) => windowY(a, top, sign) + k * (top ? -upperRadius : lowerRadius);
-      const pane = (a, k, t, inset) => endPoint(a, THREE.MathUtils.lerp(edge(a, k, false), edge(a, k, true), t), sign, inset);
+      const pane = (a, k, t, inset) => endPoint(a, THREE.MathUtils.lerp(edge(a, k, false), edge(a, k, true), t), sign,
+        sign > 0 ? inset * t : inset);
       surface(body, 'Windscreen_with_quarter_lights', [0, .5, 1].map(t =>
         sections.map(([a, k]) => pane(a, k, t, .012))), glass);
       for (const side of [-1, 1]) {
@@ -261,18 +263,16 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
       }
       const across = t => sections.map(([a, k]) => V(...pane(a, k, t, 0)));
       const jambPoints = side => [.25, .5, .75].map(t => V(...pane(side * jamb, 1, t, 0)));
-      tube(detail, 'Panoramic_window_gasket', [...across(0), ...jambPoints(1),
-        ...across(1).reverse(), ...jambPoints(-1).reverse()], .017, rubber, true);
+      const sidesAndTop = [...jambPoints(1), ...across(1).reverse(), ...jambPoints(-1).reverse()];
+      if (sign > 0) {
+        tube(detail, 'Front_upper_and_side_seal', [V(...pane(jamb, 1, 0, 0)), ...sidesAndTop,
+          V(...pane(-jamb, 1, 0, 0))], .011, rubber);
+      } else tube(detail, 'Rear_window_gasket', [...across(0), ...sidesAndTop], .017, rubber, true);
     }
     for (const a of [-.75, .75]) {
       rod(detail, 'End_window_mullion', V(...endPoint(a, windowY(a, false, sign), sign)), V(...endPoint(a, windowY(a, true, sign), sign)), .018, chrome);
     }
-    surface(body, 'Overhanging_brow', [0, .12, .88, 1].map(t => angles.map(a => browPoint(a, t, sign))), cream);
     surface(detail, 'Brow_underside', [angles.map(a => endPoint(a, windowY(a, true, sign), sign)), angles.map(a => browPoint(a, 0, sign))], rubber);
-    tube(detail, 'Brow_drip_edge', angles.map(a => V(...browPoint(a, 0, sign))), .012, chrome);
-    if (sign > 0) for (const [dy, radius, mat] of [[.012, .013, chrome], [-.012, .008, red]]) {
-      tube(detail, 'Windscreen_sill_trim', angles.map(a => V(...endPoint(a, windowY(a, false, sign) + dy, sign, -.016))), radius, mat);
-    }
     // Broad aluminium bumper with two fine red inserts, as the 7000 close-up shows.
     for (const [lo, hi, mat] of [[.79, .808, rubber], [.808, .827, chrome], [.827, .839, red],
       [.839, .91, chrome], [.91, .922, red], [.922, .941, chrome], [.941, .954, rubber]]) {
@@ -281,11 +281,13 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     for (const x of [-.64, .64]) {
       const z = endPoint(Math.asin(x / 1.25), 1.13, sign, -.025)[2];
       if (sign > 0) {
-        const g = group(root, 'Headlamp', x * taper(z), 1.13, z); g.rotation.x = Math.PI / 2;
-        mesh(g, 'Red_lamp_pod', new THREE.CylinderGeometry(.143, .171, .11, 32), red, 0, .035, 0);
-        mesh(g, 'Lamp_rubber_ring', new THREE.CylinderGeometry(.142, .145, .035, 32), rubber, 0, .105, 0);
-        mesh(g, 'Lamp_bezel', new THREE.CylinderGeometry(.125, .134, .016, 32), chrome, 0, .13, 0);
-        mesh(g, 'Lamp_lens', new THREE.SphereGeometry(.120, 24, 12), lamp, 0, .143, 0).scale.y = .20;
+        const lampY = 1.17, lampX = Math.sign(x) * .55;
+        const face = endPoint(Math.asin(lampX / (1.25 * taper(7))), lampY, sign);
+        const g = group(root, 'Headlamp', lampX, lampY, face[2] - .009); g.rotation.x = Math.PI / 2;
+        mesh(g, 'Red_lamp_pod', new THREE.CylinderGeometry(.110, .124, .060, 32), red, 0, .025, 0);
+        mesh(g, 'Lamp_rubber_ring', new THREE.CylinderGeometry(.107, .110, .018, 32), rubber, 0, .061, 0);
+        mesh(g, 'Lamp_bezel', new THREE.CylinderGeometry(.092, .099, .009, 32), chrome, 0, .073, 0);
+        mesh(g, 'Lamp_lens', new THREE.SphereGeometry(.089, 24, 12), lamp, 0, .078, 0).scale.y = .14;
       } else {
         box(detail, 'Rear_lamp_surround', [.23, .105, .04], [x, 1.04, z], rubber);
         box(detail, 'Rear_red_lamp', [.195, .070, .045], [x, 1.04, z - .02], tail);
@@ -308,18 +310,20 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   // Roof cross-sections form the domed shoulders and smoothly rounded end caps.
   const roofRows = [];
   for (const [z, w, h] of [[-5.99, 1.25, 3.06], [-4.5, 1.25, 3.06], [0, 1.25, 3.06], [4.5, 1.25, 3.06], [5.99, 1.25, 3.06]]) {
-    roofRows.push(Array.from({ length: 33 }, (_, i) => { const a = Math.PI * i / 32; return [w * Math.cos(a), 2.74 + (h - 2.74) * Math.sin(a), z]; }));
+    roofRows.push(angles.map(a => [w * Math.sin(a), 2.74 + (h - 2.74) * Math.cos(a), z]));
   }
   surface(body, 'Roof_shell', roofRows, cream);
   for (const sign of [-1, 1]) {
-    const rows = Array.from({ length: 9 }, (_, j) => {
-      const t = j / 8;
-      return angles.map(a => {
-        const front = browPoint(a, 1, sign), rear = [1.25 * Math.sin(a), 2.74 + .32 * Math.cos(a), sign * 5.99];
-        const p = front.map((v, i) => THREE.MathUtils.lerp(v, rear[i], t));
-        p[1] += .012 * Math.sin(Math.PI * t) * Math.cos(a); return p;
-      });
-    });
+    // One continuous surface from the glass to the crown. The cubic leaves
+    // the brow on its tangent and arrives at the roof with zero vertical slope.
+    const rows = [0, .5, 1].map(t => angles.map(a => browPoint(a, t, sign)));
+    for (let j = 1; j <= 12; j++) rows.push(angles.map(a => {
+      const t = j / 12, u = 1 - t, c = Math.cos(a), [x, y, z] = browPoint(a, 1, sign);
+      const roofY = 2.74 + .32 * c, roofZ = sign * 5.99;
+      return [x, u ** 3 * y + 3 * u * u * t * (y + .10 * c) + t * t * (3 - 2 * t) * roofY,
+        u ** 3 * z + 3 * u * u * t * (z - sign * .014 * c * c)
+        + 3 * u * t * t * THREE.MathUtils.lerp(z, roofZ, .49) + t ** 3 * roofZ];
+    }));
     surface(body, 'Rounded_roof_cap', rows, cream);
   }
   surface(detail, 'Roof_equipment_deck', [-5.6, 5.6].map(z => Array.from({ length: 25 }, (_, i) => {
@@ -539,13 +543,22 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   rod(head, 'Head_crossmember', V(0, 0, -.19), V(0, 0, .19), .025, steel);
   rig.pantograph = { node: panto, arms, head, armLength: L };
 
-  for (const x of [-.53, .53]) {
-    const w = group(root, x < 0 ? 'Wiper_right' : 'Wiper_left', x * .80, 1.79, endPoint(Math.asin(x / 1.25), 1.79, 1, -.025)[2]);
-    w.rotation.x = -.40;
-    w.rotation.y = Math.sign(x) * .40;
+  rig.frontWiperLinks = [];
+  for (const side of [-1, 1]) {
+    const x = side * .32, y = 1.744;
+    const w = group(root, side < 0 ? 'Wiper_right' : 'Wiper_left', x, y, endPoint(Math.asin(x / (1.25 * taper(7))), y, 1, -.008)[2]);
+    w.rotation.set(-Math.atan(.43), side * .025, 0, 'YXZ');
+    box(detail, 'Wiper_mount', [.096, .022, .023],
+      [(x + side * .017) / taper(w.position.z), y, w.position.z - .003], rubber).rotation.copy(w.rotation);
     const pivot = group(w, w.name + '_pivot'); pivot.userData.axis = 'Z';
-    rod(pivot, 'Wiper_arm', V(0, 0, .01), V(Math.sign(x) * .10, .52, .01), .009, dark);
-    rod(pivot, 'Wiper_blade', V(Math.sign(x) * .10, .29, .025), V(Math.sign(x) * .10, .77, .025), .016, rubber);
+    const link = group(w, w.name + '_link', side * .034, 0, 0);
+    const carrier = group(pivot, w.name + '_carrier', 0, .515, 0);
+    for (const node of [link, carrier]) { node.userData.assembly = true; node.userData.axis = 'Z'; }
+    rod(pivot, 'Wiper_arm', V(0, 0, .012), V(0, .515, .008), .009, dark);
+    rod(link, 'Wiper_link', V(0, 0, .012), V(0, .515, .008), .005, dark);
+    rod(carrier, 'Wiper_bridge', V(side * .034, 0, .008), V(0, 0, 0), .007, dark);
+    rod(carrier, 'Wiper_blade', V(0, -.26, -.003), V(0, .28, -.003), .010, rubber);
+    rig.frontWiperLinks.push({ link, carrier });
     rig.wipers.push(pivot);
   }
   // C5R09032: the arm hangs from the brow on a small twin-spindle plate.
@@ -600,11 +613,13 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   tex.anisotropy = 8; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
   const atlasMat = material('Lettering', '#ffffff', .55, 0, { map: tex, transparent: true, alphaTest: .15 });
   const browLower = browPoint(0, 0, 1), browUpper = browPoint(0, 1, 1);
-  const routePlate = group(detail, 'Route_plate', 0, (browLower[1] + browUpper[1]) / 2, (browLower[2] + browUpper[2]) / 2 + .014);
-  routePlate.rotation.x = Math.atan2(browUpper[2] - browLower[2], browUpper[1] - browLower[1]);
+  const plateSlope = (browUpper[2] - browLower[2]) / (browUpper[1] - browLower[1]);
+  const plateY = browLower[1] + .161;
+  const routePlate = group(detail, 'Route_plate', 0, plateY, browLower[2] + .161 * plateSlope + .012);
+  routePlate.rotation.x = Math.atan(plateSlope);
   routePlate.userData.assembly = true;
-  box(routePlate, 'Route_plate_frame', [.423, .324, .012], [0, 0, 0], cream);
-  label('Route_front', line, [.404, .314], [0, 0, .008], 0, '#145488', '#fff8df', 0, routePlate);
+  box(routePlate, 'Route_plate_frame', [.423, .298, .012], [0, 0, 0], cream);
+  label('Route_front', line, [.404, .288], [0, 0, .008], 0, '#145488', '#fff8df', 0, routePlate);
   label('Fleet_front', fleet, [.68, .23], [0, 1.17, 7.009], 0, null, '#d3b665', 1);
   label('Destination', destination, [.62, .22], [0, 1.91, 6.82], 0, '#145488', '#fff8df', 2);
   label('Fleet_rear', fleet, [.68, .23], [0, 1.22, -7.009], Math.PI, null, '#d3b665', 1);
@@ -647,7 +662,7 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
 
 /** Absolute poses, so repeated calls never accumulate drift. Angles are radians. */
 export function posePhotoT3(root, { doors = [0, 0, 0], bogies = [0, 0], wheelAngle = 0,
-  pantograph = .68, wipers = 0, couplers = [0, 0] } = {}) {
+  pantograph = .68, wipers = 0, rearWiper = 0, couplers = [0, 0] } = {}) {
   const r = root.rig;
   r.doors.forEach((d, i) => d.pairs.forEach(({ outer, inner, sign }) => {
     const a = clamp(Array.isArray(doors) ? doors[i] ?? 0 : doors) * T3_PHOTO.doorMaxAngle;
@@ -656,7 +671,13 @@ export function posePhotoT3(root, { doors = [0, 0, 0], bogies = [0, 0], wheelAng
   r.bogies.forEach((b, i) => { b.rotation.y = bogies[i] ?? 0; });
   r.wheelsets.forEach(w => { w.rotation.x = wheelAngle; });
   r.couplers.forEach((c, i) => { c.rotation.y = couplers[i] ?? 0; });
-  r.wipers.forEach(w => { w.rotation.z = w.name === 'Wiper_rear_pivot' ? clamp(wipers) * .65 : (w.name === 'Wiper_right_pivot' ? 1 : -1) * (.33 - clamp(wipers) * .85); });
+  for (const [i, side] of [1, -1].entries()) {
+    const linkage = r.frontWiperLinks?.[i];
+    const angle = side * (linkage ? THREE.MathUtils.lerp(.70, -.63, clamp(wipers)) : .33 - .85 * clamp(wipers));
+    r.wipers[i].rotation.z = angle;
+    if (linkage) { linkage.link.rotation.z = angle; linkage.carrier.rotation.z = -angle; }
+  }
+  r.wipers[2].rotation.z = .65 * clamp(rearWiper, -1, 1);
   if (r.rearLink && r.rearCarrier) {
     r.rearLink.rotation.z = r.wipers[2].rotation.z;
     r.rearCarrier.rotation.z = -r.rearLink.rotation.z;
@@ -685,6 +706,10 @@ export function bindPhotoT3(root) {
     wheelsets: [1, 2].flatMap(i => [1, 2].map(j => need(`Wheelset_${i}_${j}`))),
     couplers: ['front', 'rear'].map(s => need(`Coupler_${s}`)),
     wipers: ['right', 'left', 'rear'].map(s => need(`Wiper_${s}_pivot`)),
+    frontWiperLinks: ['right', 'left'].map(side => {
+      const link = root.getObjectByName(`Wiper_${side}_link`);
+      return link && { link, carrier: need(`Wiper_${side}_carrier`) };
+    }),
     rearLink: root.getObjectByName('Wiper_rear_link'), rearCarrier: root.getObjectByName('Wiper_rear_carrier'),
     pantograph: { node: need('Pantograph'), head: need('Pantograph_contact_head'), armLength: 1.55,
       arms: [-1, 1].map(sign => { const s = sign < 0 ? 'rear' : 'front';

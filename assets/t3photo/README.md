@@ -30,6 +30,7 @@ The five user photographs supplied in the 2026-11-09 session are visual referenc
 |---|---|
 | `17823.jpg` | 6892 front: cream brow, two headlights, number, blue route board, orange collector |
 | `17824.jpg` | 6892 rear: window, cream skirt, red face, coupler recess |
+| `IMAG5950.jpg`, `FUJI3566.JPG`, `FUJI3032.JPG` | 6892 front and rear three-quarter views and 6921 door side. The skirt returns partly cover the outer wheel faces. |
 | `C5R09032.JPG`, `C5R09035.JPG` (2026-11-20) | 6892 straight-on rear and open rear doorway. These show the top-mounted wiper, narrow cream sill and rounded quarter-light beside the last door. |
 | `16806.jpg` | 6921: sloping windscreen, folding door leaves, steps, mirror and lamp housings |
 | `16447.jpg` | 8080: left side windows, skirt, wheel recesses and louvres |
@@ -77,9 +78,10 @@ repeater on each side. The end profile was also compared with
 Each of the four articulated collector frames has one diagonal; opposite frames overlap head-on.
 
 The follow-up end study separates the gently bowed nose from its tighter corner glazing. The front
-and rear have different glazing rake and upper-corner radii; the brows project over the glass and
-meet a domed roof. The front route plate is centred and tilted with the brow, in a cream holder.
-Red headlight pods, sill/drip trim and broad aluminium bumpers with red inserts follow the new photos;
+and rear have different glazing rake and upper-corner radii. The brow lip tapers to the side
+and rolls into the roof. The front glass meets the cream sill directly. The front route plate
+is centred and tilted with the brow, in a cream holder. The head-on 6892 photo gives roughly
+30 pixels of exposed lens for 185 pixels between centres. The lamp dimensions follow that ratio;
 the earlier 6892 rear photo supplies its rear lamps and upright wiper. Couplers have a bevelled, tapered
 cast fork with bored eyes, a drawbar collar, lifting handle, side pins and safety chain. Their finished
 coupling faces retain the drawing's 15.104 m overall length. All small casting dimensions are photo estimates.
@@ -102,8 +104,8 @@ assemblies; movable groups retain their pivots and stable names. `userData` beco
 | `Pantograph_upper_front/rear` | Local X at elbow; opposite relative angle, twice the lower angle |
 | `Pantograph_contact_head` | Y translation; stays level at both arm tips |
 | `Coupler_front`, `Coupler_rear` | Local Y yaw; shank pivot at z = ±6.25 m |
-| `Wiper_left/right` → `Wiper_left/right_pivot` | Parent aligns the local Z axis to the raked windscreen |
-| `Wiper_rear` → `Wiper_rear_pivot` and `Wiper_rear_link` | Two parallel arms pivot from the cream brow above the rear glass. The estimated 0.65 rad sweep moves the blade sideways. |
+| `Wiper_left/right` → `_pivot`, `_link`, `_carrier` | Two spindles below each front pane move its blade from the divider towards the centre. The carrier keeps the blade upright. |
+| `Wiper_rear` → `Wiper_rear_pivot` and `Wiper_rear_link` | Hand-operated from the rear driving position. Both arms park vertically and can be posed to either side (estimated ±0.65 rad). |
 | `Wiper_rear_carrier` | Counter-rotates under the main arm to keep the blade upright. Link lengths and sweep are estimated from the parked position. |
 | `Route_plate` | Static plate and holder aligned to the front brow |
 | `Body` / `Interior` / `Exterior_details` | Static rigid assemblies |
@@ -111,7 +113,8 @@ assemblies; movable groups retain their pivots and stable names. `userData` beco
 The source API returns a Three.js group with live references in `model.rig` (not serialized).
 `posePhotoT3(model, state)` sets an absolute pose, so repeated calls do not accumulate drift.
 State fields: `doors` (scalar or three values 0–1), `bogies` (two yaw angles), `wheelAngle`
-(radians), `pantograph` (0–1), `wipers` (0–1), `couplers` (two yaw angles). Omitted fields reset
+(radians), `pantograph` (0–1), `wipers` (front, 0–1), `rearWiper` (manual, −1 to +1, centred at 0),
+`couplers` (two yaw angles). Omitted fields reset
 to defaults. The preview exercises these transforms; no timed animation clips are baked.
 
 For an imported GLB, call `bindPhotoT3(gltf.scene)` to reconnect the same pose API, or look up nodes
