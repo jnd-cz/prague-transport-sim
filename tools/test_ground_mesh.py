@@ -426,6 +426,12 @@ class Abutments(unittest.TestCase):
         got = gm.abutments(self.tracks, self.outline, self.bed_at, lambda x, y: 103.0 + 0.6 * np.clip(np.asarray(x, float), -9, 5), [])
         self.assertEqual(self.ends(got), [[0.0, -3.0], [0.0, 3.0]])
 
+    def test_off_the_lines_bridges_a_beds_end_is_no_abutment(self):
+        # (line 17 s 3088: the beds stop over an underpass the line has no span for)
+        args = (self.tracks, self.outline, self.bed_at, self.lidar, self.wings)
+        self.assertEqual(len(gm.abutments(*args, decks=shapely.box(-20, -12, 5, 12))), 1)
+        self.assertEqual(gm.abutments(*args, decks=shapely.box(100, 100, 120, 120)), [])
+
     def test_a_bed_that_ends_on_the_ground_is_no_abutment(self):
         self.assertEqual(gm.abutments(self.tracks, self.outline, self.bed_at, lambda x, y: np.full(np.shape(x), 106.0), []), [])
 
@@ -458,6 +464,13 @@ class WallsMeeting(unittest.TestCase):
         ])
         self.assertEqual(z, [100.0, 100.0, 100.0, 106.0, 100.0])
         self.assertTrue(all(held))
+
+    def test_a_line_across_a_structure_leaves_the_decks_own_surface(self):
+        face = dict(self.face, across=True)
+        c = np.array([[-0.5, 5.0, -0.6, 5.0], [-0.5, 6.0, -0.6, 6.0]])
+        z, held = gm.hold_at_walls(c[:, 0], c[:, 1], c[:, 2], c[:, 3], np.full(2, 106.3), np.ones(2, bool), [face], np.array([True, False]))
+        self.assertEqual(z.tolist(), [106.3, 100.0])  # (the deck's own corner stays; the street's under it is held)
+        self.assertEqual(held.tolist(), [False, True])
 
     def test_a_corner_past_a_walls_free_end_is_left(self):
         z, held = self.hold([self.wing], [[-0.5, 0.2, -0.6, 0.3], [2.0, 0.5, 2.0, 0.3]])
