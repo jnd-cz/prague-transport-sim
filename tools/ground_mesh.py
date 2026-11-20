@@ -387,6 +387,17 @@ ABUT_WING = 8.0  # m: an abutment's line reaches this far either side of the tra
 ABUT_JOIN = 6.0  # m: bed ends this near each other are one abutment (a double track's two)
 
 
+def span_decks(L):
+    """The line's bridges in plan: its route's spans and the tracks marked as a bridge's, BRIDGE_NEAR either side (one
+    polygon; None where it has none)."""
+    route = shapely.LineString([p[:2] for p in L["path"]])
+    spans = [shapely.ops.substring(route, a, b) for a, b in L.get("spans") or L.get("bridges") or []]
+    spans += [shapely.LineString([p[:2] for p in t["p"]]) for t in L.get("tracks") or [] if t.get("b") and len(t.get("p") or []) > 1]
+    if not spans:
+        return None
+    return shapely.union_all(shapely.buffer(np.asarray(spans, dtype=object), BRIDGE_NEAR, cap_style="flat"))
+
+
 def bed_ends(tracks, outline, box=None):
     """Where a drawn track's line leaves the beds' outline on the ground: (n, 4) of (x, y, the track's unit direction
     out of the outline)."""
@@ -419,13 +430,16 @@ def bed_ends(tracks, outline, box=None):
     return np.array(ends, float).reshape(-1, 4)
 
 
-def abutments(tracks, outline, bed_at, lidar, wall_lines_, box=None, log=None):
+def abutments(tracks, outline, bed_at, lidar, wall_lines_, box=None, log=None, decks=None):
     """The lines across a structure where a track's bed ends high over the ground: [(2, 3) arrays, z NaN], for the wall
     lines (wall_lines.of_lines reads their two sides). The survey has an abutment's wing walls along the ramp as wall
     lines and stops where the deck lands: at the Modřany viaduct (line 17 (-2393, -9247)) the ramp's side strips fell
     4.5 m in their last metre, the lidar's smear of the abutment's face (#763).
     - A bed's end (bed_ends) is an abutment's where the bed there stands BED_OVER or more over the lidar ABUT_AHEAD
-      past it.
+      past it, on one of the line's bridges (`decks`, span_decks). Off them the lidar is no witness: where the beds
+      stop for 7.5 m over an underpass the line has no span for (line 17 s 3088, (-1456, -9105)) the survey's tram
+      area runs on at level 0, and two abutments' lines there pulled it down to the underpass's floor, a trench
+      across the track at each (the rails 3.49 m over the first surface).
     - The face: the bed reaches a deck's end (#594) and overhangs the abutment (Modřany: by 1.3 m). Back from the end
       the lidar rises from the ground the deck leaves to the ramp's top within ABUT_BACK; the face is where it crosses
       the middle of the two. Where it does not rise as a wall's smear does, by wall_lines.SLOPE over a metre (an
@@ -448,6 +462,8 @@ def abutments(tracks, outline, bed_at, lidar, wall_lines_, box=None, log=None):
     zg = np.nanmedian(np.stack([np.asarray(lidar(E[:, 0] + E[:, 2] * o, E[:, 1] + E[:, 3] * o), float) for o in ABUT_AHEAD]), 0)
     with np.errstate(invalid="ignore"):
         keep = np.isfinite(zb) & np.isfinite(zg) & (zb - zg >= BED_OVER)
+    if decks is not None:
+        keep &= shapely.contains_xy(decks, E[:, 0] + E[:, 2], E[:, 1] + E[:, 3])
     E, zg = E[keep], zg[keep]
     if not len(E):
         return []
@@ -533,7 +549,7 @@ def abutments(tracks, outline, bed_at, lidar, wall_lines_, box=None, log=None):
 WALL_JOIN = 0.5  # m: a stretch's end this near another stretch is no free end: the walls meet there (a turn, an abutment's corner)
 
 
-def hold_at_walls(cx, cy, tx, ty, z, eligible, walls):
+def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None):
     """Heights z of corners (cx, cy) with each eligible one within WALL_HOLD of a wall stretch (wall_lines.stretches)
     set to the ground of the side of the wall its triangle's centre (tx, ty) lies on: that side's level at the nearest
     point of the line plus its slope over the corner's distance from it. A corner on the line itself so takes the top
@@ -541,11 +557,15 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls):
     (#697). A corner past a stretch's free end is left; of the stretches near it a corner takes the nearest it is not
     past. An end within WALL_JOIN of another stretch is not free (walls meeting at a corner: the wedge outside it is
     past both, and stood as leaning faces between a wing wall's end and the abutment's line, #763).
+    deck: corners that are a deck's own surface (a survey area kept at its own level on a span). A stretch across a
+    structure (an abutment's line, `across`) does not hold them: on a short bridge the survey has the track's area at
+    level 0 right across the deck, and pulled down to the ground the deck leaves it was a trench across the track
+    1.5 m wide at either abutment (line 17 s 3088, (-1456, -9105): the rails 3.49 m over the first surface, #763).
     Returns (z, the corners held)."""
     held = np.zeros(len(cx), bool)
     if not walls or not eligible.any():
         return z, held
-    A, B, ZL, ZR, GL, GR, END = [], [], [], [], [], [], []
+    A, B, ZL, ZR, GL, GR, END, ACROSS = [], [], [], [], [], [], [], []
     wl = np.array([shapely.LineString(np.asarray(w["p"], float)[:, :2]) for w in walls], object)
     wtree = shapely.STRtree(wl)
     free = np.ones((len(walls), 2), bool)
@@ -561,13 +581,17 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls):
             v = w.get(k)
             v = np.zeros(n + 1) if v is None else np.asarray(v, float)
             out.append(np.column_stack([v[:-1], v[1:]]))
+        ACROSS.append(np.full(n, bool(w.get("across"))))
         e = np.zeros((n, 2), bool)  # (a segment's end that is its stretch's free end)
         e[0, 0], e[-1, 1] = free[len(END)]
         END.append(e)
-    A, B, ZL, ZR, GL, GR, END = (np.concatenate(v) for v in (A, B, ZL, ZR, GL, GR, END))
+    A, B, ZL, ZR, GL, GR, END, ACROSS = (np.concatenate(v) for v in (A, B, ZL, ZR, GL, GR, END, ACROSS))
     tree = shapely.STRtree(shapely.linestrings(np.stack([A, B], 1)))
     idx = np.flatnonzero(eligible)
     pi, si = tree.query(shapely.points(cx[idx], cy[idx]), predicate="dwithin", distance=WALL_HOLD)
+    if deck is not None and len(pi):
+        keep = ~(ACROSS[si] & np.asarray(deck, bool)[idx[pi]])
+        pi, si = pi[keep], si[keep]
     if not len(pi):
         return z, held
     P = np.column_stack([cx[idx[pi]], cy[idx[pi]]])
@@ -1138,7 +1162,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     lidar_w = wall_lines.ipr_lidar()
     abut = abutments([np.asarray(t["p"], float)[:, :2] for t in L.get("tracks") or [] if len(t.get("p") or []) > 1], outline,
                      lambda px, py: beds.surface_at(px, py, BED_REACH), lidar_w,
-                     wall_lines.source_lines(ln, box=box.bounds), box.bounds, log)
+                     wall_lines.source_lines(ln, box=box.bounds), box.bounds, log, span_decks(L) or shapely.Polygon())
     walls = wall_stretches = wall_lines.stretches(ln, box=box.bounds, lidar=lidar_w, extra=abut)
     log(f"  {len(abut)} abutment lines, {len(walls)} wall stretches")
     for w in walls:
@@ -1330,12 +1354,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # level, as the page's flushDtm left it (profile.onBridge: the route's spans, src/terrain.js Profile.bridges): the
     # street surface follows the tracks onto the deck, and a level-0 tram area running up a ramp onto a viaduct stood at
     # its deck, line 37 s 3464-3484, area 2091; that viaduct's tracks carry no `b`)
-    route = shapely.LineString([p[:2] for p in L["path"]])
-    spans = [shapely.ops.substring(route, a, b) for a, b in L.get("spans") or L.get("bridges") or []]
-    spans += [shapely.LineString([p[:2] for p in t["p"]]) for t in L.get("tracks") or [] if t.get("b") and len(t.get("p") or []) > 1]
     on_span = np.zeros(len(m), bool)
-    if spans:
-        deck = shapely.union_all(shapely.buffer(np.asarray(spans, dtype=object), BRIDGE_NEAR, cap_style="flat"))
+    deck = span_decks(L)
+    if deck is not None:
         shapely.prepare(deck)
         on_span = shapely.contains_xy(deck, cx[m], cy[m])
     # (but an area whose outline climbs a wall: on two levels, its own outline is no surface, climbs(), #761)
@@ -1420,7 +1441,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     elig = corner_cls == "terrain"
     elig[m] = np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) | on_lidar
     cen = fc.mean(1)
-    zc, at_wall = hold_at_walls(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, elig, walls)
+    on_deck = np.zeros(len(cx), bool)
+    on_deck[m] = on_span
+    zc, at_wall = hold_at_walls(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, elig, walls, on_deck)
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc]) + np.where(on_lidar | in_osm, YIELD, 0.0)
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", np.where(in_osm, "pool", "survey"))
     # (the weld's report: what gave a survey corner its height)

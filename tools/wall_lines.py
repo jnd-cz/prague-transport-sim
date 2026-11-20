@@ -289,6 +289,8 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None):
             out.append({"p": S[a:b + 1, :2].copy(), "zl": _median(v[0]), "gl": _median(v[1]), "zr": _median(v[2]), "gr": _median(v[3])})
             if h is not None:
                 out[-1]["h"] = h
+            if n_line in meeting:  # (a line across a structure: ground_mesh.hold_at_walls leaves the deck's own surface)
+                out[-1]["across"] = True
     return out
 
 
