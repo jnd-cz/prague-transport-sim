@@ -5148,6 +5148,22 @@
       "sloping m": 0.25
      },
      "why": "a wall 0.26 m across (survey area 1419), the ramp at its foot and the road behind its top: one step"
+    },
+    {
+     "name": "up Na Vápence beside the ramp to Nad Ohradou, x = 3877",
+     "from": [
+      3877.0,
+      -30.0
+     ],
+     "to": [
+      3877.0,
+      -10.0
+     ],
+     "expect": {
+      "off the lidar m": 0.5,
+      "off the chord m": 0.3
+     },
+     "why": "the street climbs evenly to the junction (IPR: 259.72 to 260.78 m). The written file of 2026-11-20 carries Nad Ohradou's crown 10 m into the mouth and stands 0.3-0.6 m over the raster for 10 m, #780"
     }
    ]
   },
@@ -5177,6 +5193,67 @@
       "largest step m": 0.4
      },
      "why": "IPR's raster has no step there (272.49 to 273.01 m). The written file of 2026-11-20 holds the path's last 0.75 m and the lawn past the wall at 271.18-271.4 m, the level of the strip between the wall's two lines carried on past its end: steps of 1.15 m and 1.74 m"
+    }
+   ]
+  },
+  "street-over-an-underpass": {
+   "line": "17",
+   "at": [
+    -1453.0,
+    -9105.0
+   ],
+   "reach": 30,
+   "issue": 783,
+   "what": "the pedestrian tunnel under the two roads and the track south of Čechova čtvrť (survey areas `underpass` 8598 and `sidewalk` 7410 at level -1, OSM's cycleway in a tunnel): the roads, their verges and the track run flat over it at 214.7-215.4 m, the stairs' wells beside the track open down to its floor at 211.1 m. The written file of 2026-11-20: the verges 3.6 m down in a slot 5 m long (IPR's raster has the tunnel's floor, 211.3 m, where the survey's level-0 outlines stand at 214.8-215.3 m), the south road 1.8 m down at its edge. The build: the roads, the verges and the track level across, the stairs' wells open; on the tag alpha-4 the roads, the verges and the track are level there",
+   "source": "the user's note fb-20261120-153903-93585637 of 2026-11-20 on the test site (batch A), line 17 s 3075: \"Looks like a ditch but OSM has pedestrian tunnel here. Both tram tracks and road should lie flat on surface and tunnel be placed under than ground level.\"",
+   "sections": [
+    {
+     "name": "along the tunnel's axis from the north road over the verges and the track to the south road",
+     "from": [
+      -1460.5,
+      -9086.0
+     ],
+     "to": [
+      -1446.0,
+      -9122.0
+     ],
+     "expect": {
+      "off the chord m": 0.5,
+      "largest step m": 0.2
+     },
+     "why": "all of it lies on the tunnel's cover: two roads, their verges and the track at 214.7-215.4 m, a kerb between them at most. The written file of 2026-11-20 follows IPR's raster into the tunnel's slot, 3.6 m down in the verges"
+    },
+    {
+     "name": "along the south road 12 m from the track's axis, over the tunnel, s 3070 to s 3100",
+     "from": [
+      -1435.2,
+      -9109.9
+     ],
+     "to": [
+      -1463.4,
+      -9120.3
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.05
+     },
+     "why": "a road at grade: the generated street surface read IPR's slot and dipped 1.8 m at its edge"
+    },
+    {
+     "name": "along the north road 12 m from the track's axis, over the tunnel, s 3070 to s 3100",
+     "from": [
+      -1443.6,
+      -9087.3
+     ],
+     "to": [
+      -1471.8,
+      -9097.7
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.05
+     },
+     "why": "as the south road"
     }
    ]
   },

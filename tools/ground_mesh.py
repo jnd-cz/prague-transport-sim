@@ -1629,7 +1629,12 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # corners lie on them, #697)
     import wall_lines
     # (and across a structure where a bed ends high over the ground: the abutment the survey's wing walls stop at, #763)
-    lidar_w = wall_lines.ipr_lidar()
+    # (a street over a passage is the ground there, not the passage's floor the raster shows: covers, #783)
+    import covers
+    lidar_raw = wall_lines.ipr_lidar()
+    cover = covers.Covers(D, lidar_raw, box.bounds, covers.tunnel_ways(box.bounds))
+    lidar_w = cover.over(lidar_raw)
+    log(f"  {len(cover.places)} covers over passages, the raster cut out under {sum(q['cut m2'] for q in cover.places):.0f} m2")
     abut = abutments([np.asarray(t["p"], float)[:, :2] for t in L.get("tracks") or [] if len(t.get("p") or []) > 1], outline,
                      lambda px, py: beds.surface_at(px, py, BED_REACH), lidar_w,
                      wall_lines.source_lines(ln, box=box.bounds), box.bounds, log, span_decks(L) or shapely.Polygon())
@@ -1791,7 +1796,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     m = corner_cls == "terrain"
     par = np.array([owners[o][1] for o in owner])[corner_face[m]]
     tri3 = np.stack([np.column_stack([x[T[par, k]], y[T[par, k]], z[T[par, k]]]) for k in range(3)], 1)
-    zc[m], prio[m], kind[m] = plane(tri3, cx[m], cy[m]), 3.0, "terrain"
+    zc[m], prio[m], kind[m] = np.fmax(plane(tri3, cx[m], cy[m]), cover.at(cx[m], cy[m])), 3.0, "terrain"
     # the water: its level at each corner, a corner on a cut seen from inside its own triangle (the level steps there)
     from geo import Frame
     from ipr_dtm import IprDtm
@@ -1818,7 +1823,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     m = corner_cls == "plot"
     zp = np.array([pieces["plot"][owners[o][1]]["z"] for o in owner[corner_face[m]]], float)
     zg = city_at(G, cx[m], cy[m])
-    zc[m] = np.where(np.isfinite(zg), zg, zp)
+    zc[m] = np.fmax(np.where(np.isfinite(zg), zg, zp), cover.at(cx[m], cy[m]))
     prio[m], kind[m] = 4.0, "plot"
     # survey
     m = np.flatnonzero(corner_cls == "survey")
@@ -1840,10 +1845,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     under_span = on_span & np.array([two_levels.get(a, False) for a in sa.tolist()], bool)
     on_span &= ~under_span
     # (a terrace keeps its own outline's surface, and so does a footpath that touches one, #663)
-    from geo import Frame as Frame_
-    from ipr_dtm import IprDtm as IprDtm_
-    f_, ipr_ = Frame_(), IprDtm_()
-    lidar_ = lambda px, py: ipr_.sample(np.asarray(px) + f_.E0, np.asarray(py) + f_.N0)  # noqa: E731
+    lidar_ = lidar_w
     raised = terraces(D, np.unique(sa).tolist(), lidar_)
     on_terrace = np.isin(sa, sorted(raised | beside(D, np.unique(sa[np.isin(sc, list(STREETS_WALK))]).tolist(), raised, lidar_)))
     for kd, cls in (("road", STREETS_ROAD), ("sidewalk", STREETS_WALK)):
@@ -1877,8 +1879,13 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     need = np.isnan(zs)
     on_lidar = need & np.array([bool(D["areas"][a].get("g")) for a in sa.tolist()], bool)
     on_lidar &= ~on_terrace
+    n_cover = 0
     if on_lidar.any():
-        zs[on_lidar] = city_at(G, cx[m][on_lidar], cy[m][on_lidar])
+        zg = city_at(G, cx[m][on_lidar], cy[m][on_lidar])
+        zo = cover.at(cx[m][on_lidar], cy[m][on_lidar])
+        with np.errstate(invalid="ignore"):
+            n_cover = int((zo > zg).sum())
+        zs[on_lidar] = np.fmax(zg, zo)
     need = np.isnan(zs)
     lifted = np.zeros(len(m), bool)
     is_wall = np.zeros(len(m), bool)
@@ -2008,12 +2015,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_smear:,} road corners beside a thin wall off its smear, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
-        from geo import Frame
-        from ipr_dtm import IprDtm
-        F_ = Frame()
-        zc[nan] = np.asarray(IprDtm().sample(cx[nan] + F_.E0, cy[nan] + F_.N0), float)
+        zc[nan] = lidar_w(cx[nan], cy[nan])
 
     # the weld
     t1 = time.time()

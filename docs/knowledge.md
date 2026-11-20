@@ -700,6 +700,34 @@ Sections:
   The place's three sections fail on the written file (1.57 m sloping at the sidewalk's edge, the ramp 0.67 m off
   its line, 2.75 m sloping at the door's wall) and hold on the build (0.0, 0.14, 0.0). Seen there and not fixed: the
   generated road east of the ramp lies up to 0.56 m over IPR (#780).
+- **A street over a pedestrian underpass** (#783, measured 2026-11-20). IPR's raster is bare earth with the bridges
+  taken out, and it takes out the cover of an underpass too: where a street crosses one at grade it shows the
+  passage's floor in a slot as long as the passage and 1-2.5 m wider. The survey has the street's areas at level 0
+  right across, their outlines at the street's level, and (not always) the passage as areas at level -1. South of
+  Čechova čtvrť (line 17 s 3084, (-1453, -9105)) the outlines stand at 214.7-215.4 m and the raster has 211.2 m:
+  the verges on the lidar fell 3.6 m, the generated roads up to 1.8 m, a trench across the street that the layered
+  ground of `alpha-4` did not have. `tools/covers.py` finds such slots and gives the level-0 areas' own outline
+  surface there; the ground build and the street surface read IPR through it (`Covers.over`, `CoveredIpr`). What
+  makes a slot a cover:
+  - it lies over a passage (half of it or more): a survey area at level -1, or an OSM way in a tunnel of layer -1
+    or above from the local extract (not a building's passage, not the metro). The survey's areas alone find 12
+    of the five lines' 30 covers (line 17: 7 of 12, 720 of 1,039 m2). A slot that only touches the passage's end
+    is the open ramp or the stairs down to it, which the survey outlines at their rim (Nádraží Braník, line 17
+    (-2034, -6277)); where such a ramp joins a slot, the cover ends 2.5 m from the passage.
+    Without that key 55 more spots on line 17 qualify, mostly sidewalks whose outline carries a wall's top, and the
+    garage ramp of #779;
+  - a level-0 area's outline triangle stands 2 m or more over the raster there (a walkway's clearance and slab). A
+    triangle steeper than 15 % that rises over 1 m joins the cover with the floor (a stair well drawn as one area
+    with the sidewalk above) and is no surface; stairs and walls are not covers;
+  - it closes within 15 m of the passage. Nádraží Holešovice (line 17 (1512, 1330)) stands on a structure 55 m
+    across that the raster leaves out whole: its two underpasses' covers alone stood as blocks 7 m high in it.
+  Covers per line (the raster cut out under them): 9: 6 (123 m2), 17: 12 (1,039 m2), 22: 6 (494 m2), 23: 2
+  (278 m2), 37: 4 (97 m2); `python -P -E tools/covers.py LINE` lists them. Looked at on plans, all 30 (24 places,
+  six of them on two lines): 10 are slots across a street (line 17's six hold 970 m2, lines 22 and 37 two each),
+  the rest strips of 4-50 m2 where the raster smears a wall's or a well's face into the street above it, and four
+  wells of an underground entrance that the survey has no stairs for (the largest by lines 9 and 22, (-309,
+  -1236), 43 m2: level with the sidewalk now, a pit 6 m deep before). Not covered: a
+  deck the survey has at level 1 (#449), and the ramps and stairs' wells beside a passage (#786, #447).
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of
@@ -808,6 +836,17 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
+- **A street's crown ends where a side street leaves it downhill** (#780, measured 2026-11-20). A street's surface
+  is its centreline's profile and a crossfall either side, the crossfall smoothed along the street. Its road area
+  runs on into a side street's mouth, and there the smooth is not the ground: on Nad Ohradou (line 37 (3877, -10))
+  the mouth of Na Vápence falls 6.5 % where the smoothed crossfall is 1.3 %, the crown lay 0.55 m over IPR 9 m
+  out, Na Vápence was pinned to it and 69 m2 of road stood 0.3-0.6 m up beside the garage ramp. A side's width
+  now ends where its crown still lies within 0.05 m of IPR before it leaves it by 0.15 m for a metre
+  (`street_profile.crossfall`), no further than its neighbours' 3 m along the street, and never under 3 m; past
+  it the road is the junctions' fill. The least width decides whether that helps: left 1.5 m, the drive lines
+  (1.75 m from the centreline) ran on the fill, which meets a street across a step, and line 23's jumps went
+  from 45 to 75; at 3 m they go to 31. Road patches of 20 m2 or more standing 0.3-1.5 m off IPR, published ->
+  with the rule: line 37 8 -> 2, 23 11 -> 6, 22 43 -> 20, 17 36 -> 19, 9 39 -> 21.
 - **The generated street surface on the five lines** (`street_profile.py --wide 300`, #512, 2026-11-15):
   - **Inside the road** (1 m in from its edge) it lies within 0.18-0.25 m of IPR at p99, the survey's surface within
     0.47-0.83 m; sidewalks 0.18-0.21 m against 1.4-2.1 m.
