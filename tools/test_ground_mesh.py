@@ -453,6 +453,19 @@ class InARockTunnel(unittest.TestCase):
         self.assertEqual(high.tolist(), [True, False, False])
 
 
+class Pits(unittest.TestCase):
+    def test_a_small_green_area_inside_a_sidewalk_is_a_pit(self):
+        # (#696: a tree pit of 2 m2 and a bed of 30 m2 in a sidewalk; a lawn of 100 m2 in it; a pit with one side on the
+        # road; a green area on another level)
+        def rect(x0, y0, x1, y1, c, l=0):
+            return {"c": c, "l": l, "r": [[x0, y0, 190.0], [x1, y0, 190.0], [x1, y1, 190.0], [x0, y1, 190.0]]}
+        D = {"areas": [rect(0, 0, 60, 12, "sidewalk"), rect(2, 2, 3, 4, "green"), rect(10, 2, 16, 7, "green"),
+                       rect(20, 1, 40, 6, "green"), rect(50, -1, 52, 1, "green"), rect(2, 6, 3, 8, "green", 1),
+                       rect(0, -8, 60, 0, "road")]}
+        self.assertEqual(gm.pits(D, list(range(7))), {1, 2})
+        self.assertEqual(gm.pits(D, [3, 6]), set())
+
+
 class UnderADeck(unittest.TestCase):
     def test_a_street_corner_at_the_decks_level_under_a_span_lies_on_the_lidar(self):
         # (#761: the road under the Modřany viaduct; the ramp's own strip, 0.3 m off the lidar, keeps the street surface)
