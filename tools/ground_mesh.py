@@ -549,6 +549,17 @@ def abutments(tracks, outline, bed_at, lidar, wall_lines_, box=None, log=None, d
 WALL_JOIN = 0.5  # m: a stretch's end this near another stretch is no free end: the walls meet there (a turn, an abutment's corner)
 
 
+def off_the_deck(z, zl):
+    """(Heights z of street corners under a span with those BED_OVER or more over the lidar zl set to it, which ones).
+    The street surface follows the tracks onto a deck, so a level-0 street under the deck read the deck's level: the
+    road under the Modřany viaduct, line 17 (-2428, -9241), area 7120: 205.3 m where the lidar has 197.6 m, a slab in
+    the viaduct 1.04 m over the deck's underside (#761)."""
+    z, zl = np.asarray(z, float), np.asarray(zl, float)
+    with np.errstate(invalid="ignore"):
+        low = z - zl >= BED_OVER
+    return np.where(low, zl, z), low
+
+
 def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None):
     """Heights z of corners (cx, cy) with each eligible one within WALL_HOLD of a wall stretch (wall_lines.stretches)
     set to the ground of the side of the wall its triangle's centre (tx, ty) lies on: that side's level at the nearest
@@ -1361,7 +1372,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         on_span = shapely.contains_xy(deck, cx[m], cy[m])
     # (but an area whose outline climbs a wall: on two levels, its own outline is no surface, climbs(), #761)
     two_levels = {a: climbs(D["areas"][a]) for a in np.unique(sa[on_span]).tolist()}
-    on_span &= ~np.array([two_levels.get(a, False) for a in sa.tolist()], bool)
+    under_span = on_span & np.array([two_levels.get(a, False) for a in sa.tolist()], bool)
+    on_span &= ~under_span
     # (a terrace keeps its own outline's surface, and so does a footpath that touches one, #663)
     from geo import Frame as Frame_
     from ipr_dtm import IprDtm as IprDtm_
@@ -1373,6 +1385,13 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         mm = np.isin(sc, list(cls)) & ~on_span & ~on_terrace
         if mm.any():
             zs[mm] = streets.at(kd, cx[m][mm], cy[m][mm])
+    # (such an area's part under the deck lies on the lidar, not on the deck's level the street surface has there:
+    # off_the_deck, #761)
+    n_under = 0
+    if under_span.any():
+        k = np.flatnonzero(under_span & np.isfinite(zs))
+        zs[k], low = off_the_deck(zs[k], lidar_(cx[m][k], cy[m][k]))
+        n_under = int(low.sum())
     # (a lawn, a yard, a railway yard on the lidar ground (`g`, tools/zps_inside.py) has surveyed heights on its outline
     # only, and the page laid it on the lidar inside (src/terrain.js DtmSurface, #444): here the city mesh's, its outline
     # too, so it meets the terrain beside it. Its outline on a slope stood up to 5.5 m under the terrain, a wall, and a
@@ -1485,7 +1504,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         from geo import Frame
         from ipr_dtm import IprDtm
