@@ -391,6 +391,8 @@ BLEND = 10.0  # m along a street from where it meets its governing street over w
 JUNCTION_WAVE = 10.0  # m: the fill's curvature penalty halves IPR's waves of this length (as whittaker's)
 PARALLEL = 30.0  # degrees: a centreline this near another's heading, beside it, runs beside it (pilot)
 STEP_CUT = 0.3  # m between neighbouring cells of the junctions' fill: a step (a wall, a kerb), not a slope
+KERB_WALL = 0.7  # m: a sidewalk's kerb edge whose own height stands this far over a kerb on the road beyond it is a
+# wall's top (wall_lines.STEP: a kerb and a garden's edge are under it)
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
 USUAL = 20  # samples (m) either side over which a street's usual width is its running median (a mouth is shorter)
 MOUTH = 1.0  # m: the most a street's width reaches beyond its usual width (a widening for a turn, not a side street)
@@ -1215,7 +1217,8 @@ def pilot_report(at, radius, ln, out_dir):
 
 def kerb_edges(dtm):
     """The survey's level-0 sidewalks' kerb edges (`k`, shared with a carriageway) 3 m or longer, as (points every
-    0.25 m, unit normals into the sidewalk), and the sidewalks as one geometry."""
+    0.25 m, unit normals into the sidewalk, the sidewalk's own surveyed height at each point, NaN where an end has
+    none), and the sidewalks as one geometry."""
     import shapely
     from shapely.geometry import Polygon
     out, polys = [], []
@@ -1239,7 +1242,9 @@ def kerb_edges(dtm):
                 if not g.contains(shapely.Point(*(mid + n * 0.5))):
                     n = -n
                 u = np.arange(0.125, L, 0.25)
-                out.append((p0[None] + t[None] * u[:, None], np.tile(n, (len(u), 1))))
+                z0, z1 = ring[i][2], ring[(i + 1) % len(ring)][2]
+                own = z0 + (z1 - z0) * u / L if z0 is not None and z1 is not None else np.full(len(u), np.nan)
+                out.append((p0[None] + t[None] * u[:, None], np.tile(n, (len(u), 1)), own))
     walk = shapely.union_all(polys) if polys else None
     if walk is not None:
         shapely.prepare(walk)
@@ -1359,6 +1364,24 @@ def wall_heights(segs, X, Y, on, reach):
     return z, d, q, n
 
 
+def wall_tops(q, n, own, zr):
+    """Which points of one kerb edge (q, normals n into the sidewalk, the sidewalk's own heights `own`, the road's
+    surface zr beyond them) are a wall's top and no kerb, and those as wall edges ((m, 2, 3), the sidewalk on their
+    left, wall_edges()): where the sidewalk's own height stands STEP_CUT or more over a kerb on that road, along an
+    edge that stands KERB_WALL or more over it somewhere. A garage ramp sunk between walls is a road in the survey and
+    its side a kerb edge: on Na Vápence, line 37 (3868, -22), the walkway held at the ramp's surface plus a kerb sank
+    2.2 m into the ramp along its edge, its own edge surveyed at 260.4 m (the user's Street View viewpoint,
+    2026-11-20: a level sidewalk behind a wall with a railing, #779). The wall grows from nothing at the ramp's head:
+    the edge is its top from STEP_CUT on."""
+    from kerbs import KERB
+    with np.errstate(invalid="ignore"):
+        up = np.asarray(own, float) - np.asarray(zr, float) - KERB
+        top = (up >= STEP_CUT) if np.isfinite(up).any() and np.nanmax(up) >= KERB_WALL else np.zeros(len(q), bool)
+    t = np.column_stack([n[top, 1], -n[top, 0]]) * 0.125
+    z = np.asarray(own, float)[top]
+    return top, np.stack([np.column_stack([q[top] - t, z]), np.column_stack([q[top] + t, z])], 1)
+
+
 def sidewalks(ctx, road_z, box, cell=SW_CELL):
     """The sidewalks around the generated road. The walkway, up to SW_WALK from the kerb, is a plane: at the kerb the
     road's surface 0.5 m beyond it plus KERB (tools/kerbs.py, the measured step), rising across at IPR's crossfall held
@@ -1381,13 +1404,22 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
     acc = np.zeros(X.shape)
     wsum = np.zeros(X.shape)
     lo, hi = SW_FALL
-    for q, n in ctx["kerb_edges"]:
+    tops = []
+    for q, n, *own in ctx["kerb_edges"]:
         ok = (q[:, 0] >= box[0][0] - SW_WALK) & (q[:, 0] <= box[1][0] + SW_WALK) \
             & (q[:, 1] >= box[0][1] - SW_WALK) & (q[:, 1] <= box[1][1] + SW_WALK)
         if not ok.any():
             continue
         q, n = q[ok], n[ok]
         zr = np.asarray(road_z(*(q - n * 0.5).T), float)
+        # (an edge standing over the road beyond it is a wall's top, held below as a wall's edge: wall_tops, #779)
+        if own:
+            top, segs = wall_tops(q, n, own[0][ok], zr)
+            if top.any():
+                tops.append(segs)
+                q, n, zr = q[~top], n[~top], zr[~top]
+                if not len(q):
+                    continue
         # (each kerb point's walkway: its width inwards and IPR's crossfall across it, past the kerb's smear)
         d = np.arange(0.25, SW_WALK + 1e-6, 0.25)
         P = q[:, None, :] + n[:, None, :] * d[None, :, None]
@@ -1425,7 +1457,10 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
     # sidewalk meets, its top or its foot, whichever is nearer IPR SW_KERB_SMEAR in on the sidewalk's side; and no pull
     # from IPR within that smear: IPR's 1 m raster spreads a wall's face over 1-2 m, and the fill sank the walkway 0.5 m
     # into the top of Krejcárek's ramp wall, line 37 (3929, 331))
-    wz, wd, wq, wn = wall_heights(ctx.get("wall_edges"), X, Y, on, SW_KERB_SMEAR)
+    edges = ctx.get("wall_edges")
+    if tops:
+        edges = np.concatenate(([] if edges is None or not len(edges) else [np.asarray(edges, float).reshape(-1, 2, 3)]) + tops)
+    wz, wd, wq, wn = wall_heights(edges, X, Y, on, SW_KERB_SMEAR)
     hold = on & (wd <= cell * 0.75)
     if hold.any() and ctx.get("wall_levels") is not None:
         q, n = wq[hold], wn[hold]
@@ -1456,7 +1491,7 @@ def sidewalk_measures(ctx, walk_z, road_z, box, raw=False):
     zi = np.asarray(ipr.sample(x[inner] + F.E0, y[inner] + F.N0), float)
     d = (zw - zi)[np.isfinite(zw) & np.isfinite(zi)]
     steps, bend, kerb, places, walls = 0, [], [], [], 0
-    for q, n in ctx["kerb_edges"]:
+    for q, n, *_ in ctx["kerb_edges"]:
         q, n = q[::4], n[::4]  # (every metre)
         ok = (q[:, 0] >= box[0][0]) & (q[:, 0] <= box[1][0]) & (q[:, 1] >= box[0][1]) & (q[:, 1] <= box[1][1])
         if ok.sum() < 3:

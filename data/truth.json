@@ -5075,6 +5075,81 @@
      "why": "level asphalt between the shelter and the stop sign, falling to the crossing past the platform's end: the written file has a mound there, IPR's raster's, 0.42 m off the line and steps of 0.16 m; the build 0.16 m (the platform's end) and 0.03 m"
     }
    ]
+  },
+  "na-vapence-garage-ramp": {
+   "line": "37",
+   "at": [
+    3871.0,
+    -24.0
+   ],
+   "reach": 20,
+   "issue": 779,
+   "what": "the garage ramp on Na Vápence by the Žižkov depot (survey road area 22): a straight ramp between upright walls down to the door, the sidewalk beside it level up to its edge",
+   "source": "the user, 2026-11-20 (session, on PR 777's picture of the place): \"the wall near the ramp at Vozovna Žižkov looks better. What still need to work is the sidewalk edge and the road ramp from underground parking\"",
+   "seen": {
+    "what": "From Na Vápence looking north-west: a straight asphalt ramp, one lane wide, falls from the street to a roller door under a slab of the office building. A wall with a railing on its top stands on either side, growing from nothing at the street to the door's height; the sidewalk along the building, left of the ramp, stays level behind its wall. Over the door a parapet with a railing, cars parked on the level behind it.",
+    "from": [
+     {
+      "at": [
+       50.0917694,
+       14.4750901
+      ],
+      "headings": [
+       320
+      ]
+     }
+    ],
+    "source": "Google Street View of August 2024 at the viewpoint the user linked, seen 2026-11-20 (this session; looked at, not copied)",
+    "game": "the written file of 2026-11-20: the sidewalk's last 1.25 m falls 2.2 m into the ramp, the ramp rises 0.76 m in its last metre before the door's wall, the road behind that wall falls 1.6 m towards it. The build: the sidewalk level to its edge over one upright face, the ramp straight to the wall's foot, the road behind level"
+   },
+   "sections": [
+    {
+     "name": "from the sidewalk across its edge onto the ramp, y = -22",
+     "from": [
+      3866.3,
+      -22.0
+     ],
+     "to": [
+      3870.5,
+      -22.0
+     ],
+     "expect": {
+      "sloping m": 0.25
+     },
+     "why": "a wall stands between the sidewalk and the ramp (the survey has the sidewalk's edge at 260.4 m and no wall area there): one step. The written file of 2026-11-20 slopes over 1.25 m of it"
+    },
+    {
+     "name": "down the ramp's middle to the foot of the door's wall",
+     "from": [
+      3871.0,
+      -30.0
+     ],
+     "to": [
+      3871.0,
+      -18.2
+     ],
+     "expect": {
+      "off the chord m": 0.2,
+      "largest step m": 0.05
+     },
+     "why": "a straight ramp (IPR's raster: 259.6 m to 257.8 m, 13.6 %; rounded at its head). The written file of 2026-11-20 rises 0.76 m in the last metre, the raster's smear of the wall: 0.67 m off the line, steps of 0.19 m; the build 0.14 m and 0.05 m"
+    },
+    {
+     "name": "from the ramp across the door's wall onto the road behind it, x = 3871",
+     "from": [
+      3871.0,
+      -20.5
+     ],
+     "to": [
+      3871.0,
+      -15.5
+     ],
+     "expect": {
+      "sloping m": 0.25
+     },
+     "why": "a wall 0.26 m across (survey area 1419), the ramp at its foot and the road behind its top: one step"
+    }
+   ]
   }
  }
 }

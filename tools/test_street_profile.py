@@ -193,6 +193,31 @@ class Sidewalks(unittest.TestCase):
                          np.array([10.0]), np.array([5.9]))
         self.assertLess(z0[0], 199.8)  # (without it: IPR's smear)
 
+    def test_a_kerb_edge_over_a_sunk_road_is_a_walls_top(self):
+        # (#779: a 4 m sidewalk surveyed level at 200.4 m beside a ramp falling from 200.3 to 198.3 m along it; IPR's
+        # raster spreads the step over the sidewalk's first 1.5 m. Its edge keeps its own height from where it stands
+        # 0.3 m over a kerb on the ramp; at the ramp's head it is a kerb. Without its own heights: the ramp plus a kerb)
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        u = np.arange(0.125, 20, 0.25)
+
+        def ramp(x, y):
+            return 200.3 - 0.1 * np.asarray(x, float)
+        ipr = SimpleNamespace(sample=lambda x, y: ramp(x, y) + (200.4 - ramp(x, y)) * np.clip(np.asarray(y, float) / 1.5, 0, 1))
+        edge = (np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 4),
+               "kerb_edges": [edge + (np.full(len(u), 200.4),)]}
+        z = sp.bilinear(sp.sidewalks(ctx, ramp, [(0, 0), (20, 4)]), np.array([15.0, 15.0, 1.0]), np.array([0.25, 3.0, 0.25]))
+        self.assertAlmostEqual(z[0], 200.4, delta=0.03)
+        self.assertAlmostEqual(z[1], 200.4, delta=0.03)
+        self.assertAlmostEqual(z[2], 200.3, delta=0.05)  # (the head: the ramp at 200.2 m and a kerb)
+        top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.4), ramp(u, 0 * u))
+        self.assertEqual((int(top.argmax()), segs.shape, segs[0, :, 2].tolist()), (12, (68, 2, 3), [200.4, 200.4]))
+        self.assertFalse(sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.4), np.full(len(u), 199.9))[0].any())
+        ctx["kerb_edges"] = [edge]
+        z0 = sp.bilinear(sp.sidewalks(ctx, ramp, [(0, 0), (20, 4)]), np.array([15.0]), np.array([0.25]))
+        self.assertLess(z0[0], 199.5)
+
     def test_wall_heights_take_the_nearest_edge(self):
         # (the sidewalk on the edge's left; a cell on its right, the wall's other level, does not take it)
         X, Y = np.meshgrid(np.arange(0, 4.1, 0.5), np.array([0.0, 1.0, 3.0, -0.5]))
