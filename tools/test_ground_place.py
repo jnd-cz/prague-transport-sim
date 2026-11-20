@@ -178,6 +178,10 @@ class Sections(unittest.TestCase):
         self.assertGreater(m["off the chord m"], 0.3)
         self.assertEqual(m["rise m"], 1.1)
         self.assertIn("off the chord m", gpl.held(m, {"off the chord m": 0.15}))
+        # (an expectation of the least: a kerb that must stand)
+        self.assertEqual(gpl.held({"rise m": 0.08}, {"rise m at least": 0.05}), {})
+        self.assertEqual(gpl.held({"rise m": 0.01}, {"rise m at least": 0.05}), {"rise m at least": (0.01, 0.05)})
+        self.assertEqual(gpl.held({}, {"rise m at least": 0.05}), {"rise m at least": (None, 0.05)})
 
     def test_samples_off_the_mesh_are_counted_not_measured(self):
         d, z = self.profile([1.0, 1.0, np.nan, np.nan, 1.0, 1.0])

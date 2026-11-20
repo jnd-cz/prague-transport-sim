@@ -23,7 +23,8 @@ line's build, of that box only. Then, per place, into reports/places/NAME/:
   the metres that slope (neither level nor a wall: a rise over run between SLOPING's two), the metres more than
   OFF_LIDAR off the raster, the largest step, the farthest the ground strays from the straight line between the
   section's ends. `expect` gives the most of each the place may have: a wall with level ground either side expects few
-  sloping metres; a ramp or a flight of stairs little off its chord. A profile picture per section.
+  sloping metres; a ramp or a flight of stairs little off its chord. A key ending " at least" gives the least: a kerb
+  that must stand, as the section's rise from its first point to its last. A profile picture per section.
 - **pictures**: built.png and written.png, the ground from above at the reach (ground_mesh.picture).
 - --written: nothing built, the written file measured alone (seconds).
 - --overlay: the line's ground file with the place's middle tiles replaced by the build's, into
@@ -243,9 +244,18 @@ def section_measures(d, z, lidar=None):
     return out
 
 
+LEAST = " at least"  # an expectation's key ending so gives the least of the measure (a kerb that must stand: "rise m at least")
+
+
 def held(m, expect):
-    """The expectations a section's measures break: {measure: (has, the most allowed)}."""
-    return {k: (m.get(k), v) for k, v in (expect or {}).items() if m.get(k) is None or m[k] > v}
+    """The expectations a section's measures break: {measure: (has, the most allowed)}; of a key ending LEAST, the least."""
+    out = {}
+    for k, v in (expect or {}).items():
+        low = k.endswith(LEAST)
+        has = m.get(k[:-len(LEAST)] if low else k)
+        if has is None or (has < v if low else has > v):
+            out[k] = (has, v)
+    return out
 
 
 def profile_picture(path, d, lines, title=""):

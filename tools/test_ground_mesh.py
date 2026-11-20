@@ -495,11 +495,25 @@ class Platforms(unittest.TestCase):
         z[(np.abs(x - 50) < 1.5) & (y < -5.6)] += 1.2  # (a wall's top behind the band)
         got, moved = gm.platform_planes(self.L, x, y, z, np.ones(len(x), bool))
         band = (x >= 32) & (x <= 68) & (y >= -4.0)
-        plane = 200.0 + 0.01 * x + 0.20 + 0.01 * -y
-        self.assertLess(np.abs(got[band] - plane[band]).max(), 0.02)
+        plane = 200.0 + 0.01 * x + 0.20 + 0.01 * -y + 1.28 * 0.05  # (at the top of the bumps: their 90th percentile)
+        self.assertLess(np.abs(got[band] - plane[band]).max(), 0.025)
         self.assertTrue(moved[band].all())
         out = (x < 30) | (x > 70) | (y < -5.5)
         self.assertTrue(np.allclose(got[out], z[out]) and not moved[out].any())
+
+    def test_a_platform_keeps_its_high_kerb(self):
+        # (an island between the bed and a road 0.12 m higher: the street surface runs straight from one kerb's top to
+        # the other's, 5 % across. The plane takes 2 % and keeps the high side within 1.5 cm; at the corners' middle it
+        # lay 3.7 cm under it. A road climbing 8 cm against the rails along the stop: the plane keeps its high end)
+        x, y = self.corners()
+        z = 200.0 + 0.01 * x + 0.05 * -y
+        got, _ = gm.platform_planes(self.L, x, y, z, np.ones(len(x), bool))
+        high = (x >= 32) & (x <= 68) & (y == -4.0)
+        self.assertGreater((got[high] - z[high]).min(), -0.015)
+        z = 200.0 + 0.01 * x + 0.20 + 0.002 * (x - 30)
+        got, _ = gm.platform_planes(self.L, x, y, z, np.ones(len(x), bool))
+        end = (x >= 60) & (x <= 68) & (y >= -4.0)
+        self.assertGreater((got[end] - z[end]).min(), -0.02)
 
     def test_other_platforms_and_other_corners_are_left(self):
         x, y = self.corners()
