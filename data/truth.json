@@ -4845,6 +4845,17 @@
      "why": "a wall stands at the road's edge (the survey's strip: its foot 191.85 m, its top 194.3 m at x = 197-210), the bank rising behind it at about 1:1. Built on #765: one step of 2.65 m, 0.5 m sloping (the top's first half metre). The written file of 2026-11-19: a step of 0.81 m and 0.75 m of slope here, and teeth 10 m wide along the wall"
     }
    ]
+  },
+  "vysehrad-tunnel-mouths": {
+   "line": "17",
+   "at": [
+    -727.0,
+    -2580.0
+   ],
+   "reach": 40,
+   "issue": 771,
+   "what": "the Vyšehrad tunnel through the rock (s 11385.8-11424.0) and its two mouths: the opening clear of ground, the survey's road and walls inside it at the rails' level (193.0-193.2 m), not on the hill's lidar (203-217 m). No section: the hill over the tunnel is in the ground file too, and a section reads the highest surface; the lines' check surveyOverTrack and the pictures hold it",
+   "source": "found on #770 (the batch's surveyOverTrack 2 -> 3 on line 17); from the cab at s 11376 a dark spike 4 m tall stood in the south mouth on main 2a8ddf2 and 3de07bd (tools/shot.py --line 17 --s 11376 --view cab), and two grey slabs in the north mouth seen from inside (--s 11408)"
   }
  }
 }

@@ -567,6 +567,16 @@ Sections:
   the foot one side and the top the other without two neighbouring points climbing (`ground_mesh.two_sided`: 10-87
   such strips a line beside the 52-155 that climb); triangulated on its outline it stood as teeth 10 m wide, hidden
   behind the page's slab. The slab was 3.9 m all along; the survey's top steps between 1 and 4 m.
+- **A street in a rock tunnel** (#771, measured 2026-11-20). The mirror of a street under a deck: in the Vyšehrad
+  tunnel (line 17 s 11385.8-11424.0, the only tunnel through rock on the five lines; lines 9, 22 and 23 have covered
+  stretches the lidar is not 8 m over) the lidar is the hill over the vault, and the survey's level-0 areas inside
+  (the road beside the tracks, a wall area at each mouth) took the street surface or their outline, which rise with
+  it at the mouths: the road stood 4.3 m over the track 1.9 m beside the axis at s 11388.8, a dark spike in the south
+  portal, and two slabs in the north one. The page leaves out the terrain in the corridor and nothing else
+  (`src/groundDraw.js` attachGround). OSM's tunnel starts 3 m before the lidar's cliff there (s 11385.8 against
+  11388.5). In the corridor (8.5 m either side, the page's vault) a survey corner 0.5 m or more over the rails lies
+  at the rails' level, and no wall stretch holds it (`ground_mesh.off_the_hill`). A cone about 1.5 m tall is left just
+  outside the north end, past the corridor.
 - **A street under a deck** (#761, measured 2026-11-20 on the batch's first build). The street surface follows the
   tracks onto a deck, so under the deck it has the deck's level. A level-0 street area on a span keeps its own
   outline for that reason, but one whose outline lies on two levels (`climbs`) cannot, and since #762 took the street
