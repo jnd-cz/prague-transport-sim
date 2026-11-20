@@ -469,12 +469,13 @@ class Pits(unittest.TestCase):
 
 class LowWalls(unittest.TestCase):
     def test_a_walls_corner_over_the_ground_at_its_point_stands_apart(self):
-        # (#696: a low wall's top 0.5 m over the sidewalk it shares a point with; one level with it; one over nothing;
-        # the sidewalk's own corner)
-        cx, cy = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 0.0]), np.zeros(6)
-        z = np.array([192.6, 192.1, 192.15, 192.1, 192.6, 192.1])
-        wall = np.array([True, False, True, False, True, False])
-        self.assertEqual(gm.standing(cx, cy, z, wall).tolist(), [True, False, False, False, False, False])
+        # (#696, #776: a low wall's top 0.5 m over the sidewalk it shares a point with; one level with it; one over
+        # nothing; the sidewalk's own corner; one 1.5 m over a lawn's corner on the lidar, which the weld joins to it)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 0.0, 3.0, 3.0]), np.zeros(8)
+        z = np.array([192.6, 192.1, 192.15, 192.1, 192.6, 192.1, 195.6, 194.1])
+        wall = np.array([True, False, True, False, True, False, True, False])
+        street = np.array([False, True, False, True, False, True, False, False])
+        self.assertEqual(gm.standing(cx, cy, z, wall, street).tolist(), [True] + [False] * 7)
 
 
 class Platforms(unittest.TestCase):

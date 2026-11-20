@@ -1113,9 +1113,12 @@ def wall_face(ring_segs, x, y, tx, ty):
 LOW_WALL = 0.1  # m: a wall's corner this far over the ground at its point stands apart from it (a kerb's step is STEP)
 
 
-def standing(cx, cy, z, wall):
-    """Which wall corners (`wall`, of all corners (cx, cy) with heights z) stand LOW_WALL or more over the lowest other
-    corner at their point: the weld keeps them apart from the ground there, an upright side. A wall under WALL_FACE
+def standing(cx, cy, z, wall, street):
+    """Which wall corners (`wall`, of all corners (cx, cy) with heights z) stand LOW_WALL or more over the lowest
+    street corner (`street`: one on a street's own surface) at their point: the weld keeps them apart from the street
+    there, an upright side. Not from the lidar's ground or the terrain: at a wall those read the raster's smear, and
+    welded to the wall's top they are right; kept apart, the bank behind the wall under Letná (line 17 (91, 805.84))
+    stood 1.4 m under the wall's top in a trench (#776). A wall under WALL_FACE
     took its heights between its two sides and was welded with whatever it shared a point with: the quay's low wall at
     line 17 (-755.8, -1827), area 1086 (0.18 m across, its outline 0.5 m over the ground at the median), lay as a flat
     strip. The user, 2026-11-20, on pictures of alpha-4, which drew such walls as low boxes, against main (#696):
@@ -1126,7 +1129,7 @@ def standing(cx, cy, z, wall):
     if not wall.any():
         return out
     key = np.round(np.asarray(cx) * Q).astype(np.int64) * 10_000_000_000 + np.round(np.asarray(cy) * Q).astype(np.int64)
-    oth = np.flatnonzero(~wall & np.isfinite(z))
+    oth = np.flatnonzero(~wall & np.asarray(street, bool) & np.isfinite(z))
     if not len(oth):
         return out
     ko, inv = np.unique(key[oth], return_inverse=True)
@@ -1868,7 +1871,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (a low wall stands: its corner over the ground at its point is the wall's own, #696)
     c_wall = np.zeros(len(cx), bool)
     c_wall[sv_m] = is_wall & ~on_hill
-    c_lift |= standing(cx, cy, zc, c_wall)
+    c_lift |= standing(cx, cy, zc, c_wall, is_street)
     zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"))
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
