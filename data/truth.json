@@ -4627,7 +4627,25 @@
    "reach": 40,
    "issue": 638,
    "what": "a paved yard meeting a sidewalk on their shared edge: no step with its wall (it stood 0.33-0.37 m under the sidewalk)",
-   "source": "found on #632 (PR #633), line 23 s 557; fixed by #750: a case that must stay"
+   "source": "found on #632 (PR #633), line 23 s 557; fixed by #750: a case that must stay; its step still read 0.29 m on the written file of 2026-11-20 (the yard's sheet 0.5-0.9 m under IPR beside the sidewalk), #638",
+   "sections": [
+    {
+     "name": "from the sidewalk east into the yard, 7 m along y = 434",
+     "from": [
+      -2566.4,
+      434.0
+     ],
+     "to": [
+      -2559.4,
+      434.0
+     ],
+     "expect": {
+      "largest step m": 0.15,
+      "off the lidar m": 1.0
+     },
+     "why": "the yard (survey area 3398) rises from the sidewalk's edge with the ground, 0.2 m a metre. On its own sheet it lay 0.29 m under the sidewalk at the edge and 0.5-0.9 m under IPR for the 5 m beyond: the written file of 2026-11-20 has a step of 0.29 m and 4.5 m off the raster"
+    }
+   ]
   },
   "lattice-cell": {
    "line": "23",

@@ -54,6 +54,16 @@ class Inside(unittest.TestCase):
         self.assertEqual([a.get("g") for a in areas], [None, None, 1])  # (the lawn drapes as on main)
         self.assertEqual(out["fit"], {"paved": 2})  # (the small one: no lattice point inside)
 
+    def test_a_paved_yard_misses_the_ground_sooner_than_a_railway_yard(self):
+        """#638: a sheet 0.4 m off the ground: over the step a yard may have to a sidewalk beside it (MISS_PAVED), under
+        MISS."""
+        areas = [rect(0, 0, 50, 50, 200, "paved"), rect(0, 0, 50, 50, 200, "rail"), rect(0, 0, 50, 50, 200, "paved")]
+        off = lambda x, y: np.full(np.shape(x), 200.4)  # noqa: E731
+        zi.inside(areas, {k: {"verdict": "fits"} for k in range(2)}, off)
+        self.assertEqual([a.get("g") for a in areas[:2]], [1, None])
+        zi.inside(areas[2:], {0: {"verdict": "fits"}}, lambda x, y: np.full(np.shape(x), 200.25))
+        self.assertIsNone(areas[2].get("g"))
+
 
 class UnderDecks(unittest.TestCase):
     """A deck 20 m wide (y 0-20) at DECK over a way running north-south (x 10) whose floor IPR shows at FLOOR."""
