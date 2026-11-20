@@ -808,6 +808,17 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
+- **A street's crown ends where a side street leaves it downhill** (#780, measured 2026-11-20). A street's surface
+  is its centreline's profile and a crossfall either side, the crossfall smoothed along the street. Its road area
+  runs on into a side street's mouth, and there the smooth is not the ground: on Nad Ohradou (line 37 (3877, -10))
+  the mouth of Na Vápence falls 6.5 % where the smoothed crossfall is 1.3 %, the crown lay 0.55 m over IPR 9 m
+  out, Na Vápence was pinned to it and 69 m2 of road stood 0.3-0.6 m up beside the garage ramp. A side's width
+  now ends where its crown still lies within 0.05 m of IPR before it leaves it by 0.15 m for a metre
+  (`street_profile.crossfall`), no further than its neighbours' 3 m along the street, and never under 3 m; past
+  it the road is the junctions' fill. The least width decides whether that helps: left 1.5 m, the drive lines
+  (1.75 m from the centreline) ran on the fill, which meets a street across a step, and line 23's jumps went
+  from 45 to 75; at 3 m they go to 31. Road patches of 20 m2 or more standing 0.3-1.5 m off IPR, published ->
+  with the rule: line 37 8 -> 2, 23 11 -> 6, 22 43 -> 20, 17 36 -> 19, 9 39 -> 21.
 - **The generated street surface on the five lines** (`street_profile.py --wide 300`, #512, 2026-11-15):
   - **Inside the road** (1 m in from its edge) it lies within 0.18-0.25 m of IPR at p99, the survey's surface within
     0.47-0.83 m; sidewalks 0.18-0.21 m against 1.4-2.1 m.
