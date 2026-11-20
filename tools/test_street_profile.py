@@ -111,6 +111,27 @@ class Junctions(unittest.TestCase):
         self.assertTrue(np.isfinite(z[0]))
 
 
+class CrownReach(unittest.TestCase):
+    def test_a_streets_width_ends_where_its_crown_leaves_the_ground(self):
+        # (#780: a street along y = 0 on ground level across but for a mouth 8 m long at x = 46..54, where the ground
+        # falls 6.5 % to the south: there the south half width ends where the level crown is 0.15 m off the ground,
+        # 2.5 m out; elsewhere it is the road area's, and so is the north side's)
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        s = np.arange(0.0, 101.0, 1.0)
+        p = np.column_stack([s, np.zeros(len(s))])
+        t = np.tile([1.0, 0.0], (len(s), 1))
+
+        def ground(x, y):
+            x, y = np.asarray(x, float), np.asarray(y, float)
+            return 200.0 + np.where((x > 46) & (x < 54) & (y < 0), 0.065 * y, 0.0)
+        fall, width = sp.crossfall(SimpleNamespace(E0=0.0, N0=0.0), SimpleNamespace(sample=ground), p, t, box(-5, -8, 105, 8), s)
+        south = 1 if width[50, 1] < width[50, 0] else 0
+        self.assertAlmostEqual(float(width[50, south]), 2.5, delta=0.6)
+        self.assertGreater(float(width[50, 1 - south]), 7.0)
+        self.assertGreater(float(width[20].min()), 7.0)
+
+
 class Sidewalks(unittest.TestCase):
     def test_held_at_the_kerb_and_rising_with_the_ground(self):
         # a 20 m by 4 m sidewalk beside a flat road at 200 m, the ground rising 2 % away from the kerb: within the

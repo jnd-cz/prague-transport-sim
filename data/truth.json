@@ -5148,6 +5148,22 @@
       "sloping m": 0.25
      },
      "why": "a wall 0.26 m across (survey area 1419), the ramp at its foot and the road behind its top: one step"
+    },
+    {
+     "name": "up Na Vápence beside the ramp to Nad Ohradou, x = 3877",
+     "from": [
+      3877.0,
+      -30.0
+     ],
+     "to": [
+      3877.0,
+      -10.0
+     ],
+     "expect": {
+      "off the lidar m": 0.5,
+      "off the chord m": 0.3
+     },
+     "why": "the street climbs evenly to the junction (IPR: 259.72 to 260.78 m). The written file of 2026-11-20 carries Nad Ohradou's crown 10 m into the mouth and stands 0.3-0.6 m over the raster for 10 m, #780"
     }
    ]
   },
