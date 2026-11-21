@@ -327,6 +327,108 @@ class Sidewalks(unittest.TestCase):
         self.assertEqual(sp.wall_edges({"areas": [sw, wall]}).tolist(), [[[20, 6, 200.3], [0, 6, 200.2]]])
 
 
+class Strips(unittest.TestCase):
+    """(#786) a paved strip is a wall for the sidewalk beside it: a wall's face in plan, or one the ground steps across"""
+
+    def test_a_paved_strip_that_is_a_walls_face_is_a_wall_for_the_sidewalk(self):
+        # (a sidewalk whose far edge is the top's side of a paved strip 0.2 m across, the strip's other side 2.3 m lower:
+        # its edge is a wall edge, as on a wall area. A paved yard 6 m across, and a strip on the lidar's ground: none)
+        sw = {"c": "sidewalk", "l": 0, "r": [[0, 0, 200.1], [20, 0, 200.1], [20, 6, 200.3], [0, 6, 200.2]]}
+        face = {"c": "paved", "l": 0, "r": [[0, 6, 200.2], [20, 6, 200.3], [20, 6.2, 198.0], [0, 6.2, 198.0]]}
+        yard = {"c": "paved", "l": 0, "r": [[0, 6, 200.2], [20, 6, 200.3], [20, 12, 198.0], [0, 12, 198.0]]}
+        self.assertEqual(sp.wall_edges({"areas": [sw, face]}).tolist(), [[[20, 6, 200.3], [0, 6, 200.2]]])
+        self.assertEqual(len(sp.wall_areas({"areas": [sw, face, yard, dict(face, g=1), dict(face, l=1)]})), 1)
+        self.assertEqual(len(sp.wall_edges({"areas": [sw, yard]})), 0)
+
+    def test_a_strip_the_ground_steps_across_holds_the_walkway_on_its_side(self):
+        # a 6 m sidewalk whose far edge lies on a strip with the ground 2 m lower beyond it; IPR's raster spreads the
+        # step from 4 to 7 m. The cells along the strip are held at the ground's level on the sidewalk's side, with no
+        # pull from IPR within 1.5 m of it
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        u = np.arange(0.125, 20, 0.25)
+        ipr = SimpleNamespace(sample=lambda x, y: 200.2 - 2.0 * np.clip((np.asarray(y, float) - 4.0) / 3.0, 0, 1))
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 6),
+               "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))],
+               "strip_edges": lambda b: (np.array([[[20, 6, 200.2], [0, 6, 200.2]]]), np.array([3.0]))}
+        road = lambda x, y: np.full(len(np.atleast_1d(x)), 200.1)  # noqa: E731
+        z = sp.bilinear(sp.sidewalks(ctx, road, [(0, 0), (20, 6)]), np.array([10.0, 10.0]), np.array([5.0, 5.9]))
+        self.assertAlmostEqual(z[1], 200.2, delta=0.03)
+        self.assertGreater(z[0], 200.1)
+        ctx.pop("strip_edges")
+        self.assertLess(sp.bilinear(sp.sidewalks(ctx, road, [(0, 0), (20, 6)]), np.array([10.0]), np.array([5.9]))[0], 199.8)
+        # (a walkway 0.6 m wide between the strip and a road: IPR has no reading of it, and it stands a kerb over the
+        # road past it, not at the smear its strip's edge was given)
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 0.6), "kerb_edges": [],
+               "strip_edges": lambda b: (np.array([[[0, 0, 201.0], [20, 0, 201.0]]]), np.array([0.6]))}
+        z = sp.bilinear(sp.sidewalks(ctx, road, [(0, 0), (20, 1)]), np.array([10.0]), np.array([0.25]))
+        self.assertAlmostEqual(z[0], 200.1 + 0.1, delta=0.02)
+
+    def test_strip_edges_are_a_strips_sides_the_ground_steps_across(self):
+        # (a strip 0.2 m across along y = 6..6.2, a sidewalk south of it at 200.2 m and the ground north of it at
+        # 196.4 m: its south side's edges, the sidewalk on their left, at IPR 1.5 m in. The ground level across it: none)
+        from shapely.geometry import box
+        strip = np.array([[0, 6, 198.5], [20, 6, 198.5], [20, 6.2, 198.5], [0, 6.2, 198.5], [0, 6, 198.5]], float)
+        e, w = sp.strip_edges("0", box(0, 0, 20, 6), [(0, 0), (20, 6)],
+                              lambda x, y: np.where(np.asarray(y, float) > 6.1, 196.4, 200.2), [strip])
+        self.assertEqual((e.shape, w.tolist()), ((20, 2, 3), [3.0] * 20))
+        np.testing.assert_allclose(e[0], [[1.0, 6.0, 200.2], [0.0, 6.0, 200.2]], atol=1e-9)
+        self.assertEqual(len(sp.strip_edges("0", box(0, 0, 20, 6), [(0, 0), (20, 6)], lambda x, y: 200.2 + 0 * np.asarray(y, float), [strip])[0]), 0)
+        # (a ramp 2 m wide between that strip and another, rising 5 % along them, the ground 1.5 m higher behind one
+        # and 1.5 m lower behind the other, IPR smearing both across the ramp: both strips' edges on the ramp, at IPR
+        # halfway across it)
+        other = strip + [0, -2.2, 0]
+
+        def ramp(x, y):
+            x, y = np.asarray(x, float), np.asarray(y, float)
+            return 198.0 + 0.05 * x + 1.5 * np.clip((y - 5.0) / 1.0, -1, 1)
+        e, w = sp.strip_edges("0", box(0, 4, 20, 6), [(0, 0), (20, 6)], ramp, [strip, other])
+        self.assertEqual(e.shape, (40, 2, 3))
+        np.testing.assert_allclose(w, 2.0, atol=0.03)
+        np.testing.assert_allclose(e[:, 0, 2], 198.0 + 0.05 * e[:, :, 0].mean(1), atol=0.07)  # (an end's mean is over fewer)
+
+    def test_a_strips_sides_keep_their_own_levels_round_its_corners(self):
+        # (a strip 1 m across with a sidewalk all round it, at 200.2 m south of its middle and 196.4 m north: each long
+        # side's edges at its own walkway's level right up to the corners, its two ends no edges; a block 2 m long none)
+        from shapely.geometry import box
+
+        def lidar(x, y):
+            return np.where(np.asarray(y, float) > 6.5, 196.4, 200.2) + 0 * np.asarray(x, float)
+        strip = np.array([[0, 6, 198.5], [20, 6, 198.5], [20, 7, 198.5], [0, 7, 198.5], [0, 6, 198.5]], float)
+        e, w = sp.strip_edges("0", box(-10, -4, 30, 17), [(-10, -4), (30, 17)], lidar, [strip])
+        self.assertEqual(len(e), 40)
+        self.assertEqual(sorted(set(np.round(e[:, :, 1].mean(1), 3).tolist())), [6.0, 7.0])
+        np.testing.assert_allclose(e[:, 0, 2], np.where(e[:, 0, 1] < 6.5, 200.2, 196.4), atol=1e-9)
+        block = np.array([[9, 6, 198.5], [11, 6, 198.5], [11, 7, 198.5], [9, 7, 198.5], [9, 6, 198.5]], float)
+        self.assertEqual(len(sp.strip_edges("0", box(-10, -4, 30, 17), [(-10, -4), (30, 17)], lidar, [block])[0]), 0)
+
+    def test_a_sidewalk_runs_in_unbroken(self):
+        # (a sidewalk 0.6 m wide and another behind a strip 0.2 m across: 2 m in from the first one's kerb is a
+        # sidewalk, but not the same one)
+        from shapely.geometry import box
+        q, n = np.array([[5.0, 0.0], [15.0, 0.0]]), np.tile([0.0, 1.0], (2, 1))
+        self.assertEqual(sp.runs_in(box(0, 0, 20, 0.6).union(box(0, 0.8, 20, 4)), q, n, 2.0).tolist(), [False, False])
+        self.assertEqual(sp.runs_in(box(0, 0, 20, 4), q, n, 2.0).tolist(), [True, True])
+        self.assertEqual(sp.runs_in(None, q, n, 2.0).tolist(), [False, False])
+        self.assertEqual(sp.runs_in(box(0, 0, 20, 4), q, n, np.array([2.0, 5.0])).tolist(), [True, False])
+
+    def test_a_kerbs_walkway_ends_at_a_strip_between_two_sidewalks(self):
+        # (a sidewalk 0.9 m wide at a road's kerb, a parapet 0.2 m across behind it, between the plane's samples at
+        # 0.75 and 1.0 m... and a ramp 1.5 m over the road behind the parapet: the kerb's plane stays before the
+        # parapet, and the ramp's cells follow the ground)
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        u = np.arange(0.125, 20, 0.25)
+        ipr = SimpleNamespace(sample=lambda x, y: np.where(np.asarray(y, float) > 1.3, 201.6, 200.1))
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 0.9).union(box(0, 1.1, 20, 4)),
+               "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))]}
+        f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 200.0), [(0, 0), (20, 4)])
+        z = sp.bilinear(f, np.array([10.0, 10.0, 10.0]), np.array([0.5, 1.5, 3.0]))
+        self.assertAlmostEqual(z[0], 200.11, delta=0.02)
+        self.assertGreater(z[1], 201.4)
+        self.assertGreater(z[2], 201.5)
+
+
 class Measures(unittest.TestCase):
     def street(self, n=40):
         s = np.arange(0, float(n))
