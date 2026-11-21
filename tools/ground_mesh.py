@@ -1563,8 +1563,54 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
     return faces
 
 
+BELT_SIDE = 0.75  # m from their shared edge the tram belt's and the road's street surface are read, each on its own
+# side: past the cells the step runs through (the surface's cells are 0.5 m, read between their centres)
+
+
+def belt_kerbs(x, y, tx, ty, z, road, tram, surface, step):
+    """Heights z of corners (x, y), each in a triangle with centre (tx, ty), with the road's corners (`road`) at a
+    raised tram belt's edge on the road's own level: (z, the road corners that keep it: a kerb). The street build
+    leaves a kerb in its surface where the tram's belt stands over the road beside it (street_profile.raised_bed,
+    bed_kerb), but at the edge the two areas share a point, the tram's area ranks first there and the road's corner
+    took its height: the road ramped up to the belt over its last face, up to 5 m, or stepped by chance where a
+    lattice line fell near (Vinohradská from Olšanské hřbitovy to Flora, line 9 (3333, -1478): 269.36 to 269.53 m over
+    2 m; the user, 2026-11-21: "mostly placed on corridor with kerb", #606).
+    - At a point the road's and the tram's (`tram`) corners share, each side's surface is read BELT_SIDE from the
+      point towards its triangle's centre, no farther than the centre: the lowest of the road's readings and the
+      highest of the tram's (a reading short of BELT_SIDE lies in the step's cells, between the two).
+    - Where the tram's side stands more than `step` over the road's (data/truth.json raised-belt: over it the belt's
+      edge is a kerb), the road's corners there take the road's reading and keep it in the weld; the tram's corners
+      take the tram's.
+    `surface(x, y)`: the street surface's road level."""
+    z = np.array(z, float)
+    kerb = np.zeros(len(z), bool)
+    road, tram = np.asarray(road, bool), np.asarray(tram, bool)
+    if not road.any() or not tram.any():
+        return z, kerb
+    key = np.round(np.asarray(x, float) * Q).astype(np.int64) * 10_000_000_000 + np.round(np.asarray(y, float) * Q).astype(np.int64)
+    both = np.intersect1d(key[road], key[tram])
+    k = np.flatnonzero((road | tram) & np.isin(key, both))
+    if not len(k):
+        return z, kerb
+    vx, vy = np.asarray(tx, float)[k] - x[k], np.asarray(ty, float)[k] - y[k]
+    n = np.maximum(np.hypot(vx, vy), 1e-9)
+    r = np.minimum(BELT_SIDE, n) / n
+    own = np.asarray(surface(x[k] + vx * r, y[k] + vy * r), float)
+    uk, inv = np.unique(key[k], return_inverse=True)
+    lo, hi = np.full(len(uk), np.inf), np.full(len(uk), -np.inf)
+    rd = road[k] & np.isfinite(own)
+    tm = tram[k] & np.isfinite(own)
+    np.minimum.at(lo, inv[rd], own[rd])
+    np.maximum.at(hi, inv[tm], own[tm])
+    up = (np.isfinite(lo) & np.isfinite(hi) & (hi - lo > step))[inv]
+    z[k[up & road[k]]] = lo[inv][up & road[k]]
+    z[k[up & tram[k]]] = hi[inv][up & tram[k]]
+    kerb[k[up & road[k]]] = True
+    return z, kerb
+
+
 # ---------------------------------------------------------------- the build
-def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
+def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, kerbs=None):
     """The corners' heights welded at each point: (each corner's height, the steps kept by pair, the points). A point takes
     its top-priority corners' height, whatever their order (#664: it took the first top corner's, the order of the
     partition's pieces; drawing the survey's walls reordered them and moved line 22's corner at (-1114, -537), shared by
@@ -1584,6 +1630,7 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
       across climbing to 197.88 m), held at 193.68 m, climbed the wall to its top, a cone 4 m tall by the road (#771).
     - corners `apart` (a wall area's, lifted to its top on its foot's outline: wall_face) are welded among themselves
       only, and the others at their point without them: the wall's face stands on the ground at its foot.
+    - a road's corner at a raised tram belt's edge (`kerbs`, belt_kerbs) keeps its own as at any kerb.
     `label`: what gave each corner its height (default `kind`), for the report and the lidar's rule."""
     key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
     if apart is not None:
@@ -1620,6 +1667,8 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
     pair = np.where(pk & pt, "weir", np.where(pk, "water", np.where(pt, "bank", np.where(kind == "plot", "plot",
                     np.where((kind == "raised") != (top_kind[inv] == "raised"), "kerb",
                              np.where((kind == "terrain") != (top_kind[inv] == "terrain"), "wall", ""))))))
+    if kerbs is not None:
+        pair = np.where(kerbs & (pair == ""), "kerb", pair)
     lim = np.array([STEP.get(p, np.inf) for p in pair]) if len(pair) else np.zeros(0)
     # (a weir's two sides share the water's priority: both are top, each keeps its own level more than STEP off the
     # middle; welded to the first's, the second's triangles sloped 1.5 m up to the weir at Šítkovský)
@@ -2050,6 +2099,13 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     is_street = np.zeros(len(cx), bool)
     is_street[m] = np.isin(sc, list(STREETS_ROAD | STREETS_WALK))
     zc, at_wall = hold_at_walls(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, elig, walls, on_deck, is_street)
+    # (a road's corner at a raised tram belt's edge keeps the road's level: belt_kerbs, #606)
+    import street_profile
+    c_road, c_tram = np.zeros(len(cx), bool), np.zeros(len(cx), bool)
+    on_street = ~on_span & ~in_rock & ~at_wall[m]
+    c_road[m], c_tram[m] = (sc == "road") & on_street, (sc == "tram") & on_street
+    zc, belt = belt_kerbs(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, c_road, c_tram,
+                          lambda px, py: streets.at("road", px, py), street_profile.RAISED_BED)
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc]) + np.where(on_lidar | in_osm, YIELD, 0.0)
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", np.where(in_osm, "pool", "survey"))
     # (the weld's report: what gave a survey corner its height)
@@ -2091,7 +2147,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         zc[nan] = lidar_w(cx[nan], cy[nan])
 
@@ -2106,7 +2162,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     c_wall = np.zeros(len(cx), bool)
     c_wall[sv_m] = is_wall & ~on_hill
     c_lift |= standing(cx, cy, zc, c_wall, is_street)
-    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"))
+    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"),
+                               belt & (kind != "bed"))
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
     vkey = np.stack([np.round(cx * Q).astype(np.int64), np.round(cy * Q).astype(np.int64), zq], 1)

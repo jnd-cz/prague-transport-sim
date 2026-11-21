@@ -5358,6 +5358,144 @@
      "why": "IPR has the road and the sidewalk at 191.86-191.99 m up to 1 m inside the kerb and the wall's face from 1.25 m in (190.17 m at 1.5 m). The kerb-wall rule read the walkway's level on the face and held the edge at it: the written file of ground batch B has the sidewalk at 190.31 m at its kerb"
     }
    ]
+  },
+  "vinohradska-raised-corridor": {
+   "line": "9",
+   "at": [
+    3242.04,
+    -1470.13
+   ],
+   "reach": 60,
+   "issue": 606,
+   "what": "Vinohradská between Olšanské hřbitovy and Flora: the tram's corridor stands about 0.3 m over the carriageways either side behind a kerb; a road or a footpath across it comes up to the rail top",
+   "source": "the user, 2026-11-18 (#606): \"yes it's raised\"; 2026-11-21 (session): \"Vinohradská between Želivského and Flora is mostly placed on corridor with kerb. Where roads or footpaths cross it's level crossing like usual, so the surface comes up to the rail top.\"",
+   "sections": [
+    {
+     "name": "from the south carriageway across the kerb onto the corridor, s 15359, 1.6 m",
+     "from": [
+      3242.28,
+      -1466.04
+     ],
+     "to": [
+      3242.19,
+      -1467.63
+     ],
+     "expect": {
+      "rise m at least": 0.2,
+      "largest step m at least": 0.15
+     },
+     "why": "IPR's raster is older than the corridor and has the street level across, 0.3-0.45 m under the rails; the road's corner on the corridor's edge took the tram area's height and the road ramped up over its last face"
+    },
+    {
+     "name": "from the north carriageway across the kerb onto the corridor, s 15359, 1.6 m",
+     "from": [
+      3241.78,
+      -1474.72
+     ],
+     "to": [
+      3241.87,
+      -1473.12
+     ],
+     "expect": {
+      "rise m at least": 0.2,
+      "largest step m at least": 0.15
+     },
+     "why": "as the south kerb"
+    },
+    {
+     "name": "from the south carriageway across the kerb onto the corridor, s 15339, 1.6 m",
+     "from": [
+      3262.25,
+      -1467.2
+     ],
+     "to": [
+      3262.16,
+      -1468.8
+     ],
+     "expect": {
+      "rise m at least": 0.2,
+      "largest step m at least": 0.15
+     },
+     "why": "as at s 15359, 20 m on: the kerb runs on, not only where a lattice line falls near the edge"
+    },
+    {
+     "name": "along the south carriageway 1 m from the kerb, s 15330 to s 15390",
+     "from": [
+      3271.25,
+      -1467.53
+     ],
+     "to": [
+      3211.35,
+      -1464.02
+     ],
+     "expect": {
+      "off the chord m": 0.08,
+      "largest step m": 0.03
+     },
+     "why": "the carriageway beside the corridor keeps its own level right up to the kerb: in ground batch B it rose towards the kerb where a lattice line of the road lay farther from it"
+    },
+    {
+     "name": "along the north carriageway 1 m from the kerb, s 15330 to s 15390",
+     "from": [
+      3270.72,
+      -1476.61
+     ],
+     "to": [
+      3210.82,
+      -1473.11
+     ],
+     "expect": {
+      "off the chord m": 0.08,
+      "largest step m": 0.03
+     },
+     "why": "as the south carriageway"
+    }
+   ]
+  },
+  "vinohradska-crossing": {
+   "line": "9",
+   "at": [
+    2942.54,
+    -1453.17
+   ],
+   "reach": 45,
+   "issue": 606,
+   "what": "a road across Vinohradská's raised corridor (the survey has the crossing as road right across, s 15650-15670): its surface comes up to the rail top without a kerb",
+   "source": "the user, 2026-11-21 (session): \"Where roads or footpaths cross it's level crossing like usual, so the surface comes up to the rail top.\"",
+   "sections": [
+    {
+     "name": "along the crossing road from the south carriageway to the rail, s 15659, 8 m",
+     "from": [
+      2943.02,
+      -1443.19
+     ],
+     "to": [
+      2942.62,
+      -1451.38
+     ],
+     "expect": {
+      "largest step m": 0.1,
+      "rise m at least": 0.25
+     },
+     "why": "the road climbs 0.3-0.45 m to the rails over its approach; a confirmed corridor read raised right through the crossing would leave a kerb across the road"
+    },
+    {
+     "name": "along the crossing road from the north carriageway to the rail, s 15659, 8 m",
+     "from": [
+      2941.97,
+      -1464.66
+     ],
+     "to": [
+      2942.37,
+      -1456.47
+     ],
+     "expect": {
+      "largest step m": 0.1,
+      "rise m at least": 0.2
+     },
+     "why": "as from the south"
+    }
+   ]
   }
  }
 }

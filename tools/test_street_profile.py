@@ -106,6 +106,15 @@ class Junctions(unittest.TestCase):
         self.assertTrue(got[on].all())
         self.assertFalse(got[~on].any())
         self.assertFalse(sp.raised_bed(dict(c, z=np.full(len(s), 200.05)), F, level, road, on).any())
+        # (a road 8 m wide across the confirmed corridor, s 10-18: the survey's own tram area has a gap there, a level
+        # crossing. No sample of it is raised; the corridor either side stays so. IPR's own reading keeps a crossing
+        # the old way, by its ramp)
+        own = box(-5, -3, 10, 3).union(box(18, -3, 45, 3))
+        got = sp.raised_bed(dict(c, z=np.full(len(s), 200.25)), F, level, road, on, own)
+        cross = (s > 10) & (s < 18)
+        self.assertFalse(got[cross].any())
+        self.assertTrue(got[on & ((s < 10) | (s > 18))].all())
+        self.assertTrue(sp.raised_bed(dict(c, z=np.full(len(s), 200.07)), F, raised, road, on, own).all())
 
     @unittest.skipUnless(__import__("geo").have_grid(), __import__("geo").NO_GRID)
     def test_a_confirmed_corridor_lies_between_its_ends(self):

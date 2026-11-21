@@ -664,7 +664,7 @@ def _track_centre(L):
     return s, c, t, zc, g, half
 
 
-def raised_bed(c, F, ipr, road, confirmed=None):
+def raised_bed(c, F, ipr, road, confirmed=None, own=None):
     """Per sample of a tracks string and side (0: -n, 1: +n), whether its bed stands over RAISED_BED above the road
     beside it in IPR: IPR on the tracks (between them and at each) against IPR 1-2 m beyond the bed's edge, where that
     is road; held over 5 m runs (a crossing's ramp, where IPR beside the bed is at its level, is a gap in the run).
@@ -672,7 +672,11 @@ def raised_bed(c, F, ipr, road, confirmed=None):
     the user confirmed raised, and read it unraised (2 % of its samples).) Where the user confirmed a corridor that IPR
     reads level (`confirmed`, per sample: confirmed_corridor), the tracks' own surface (`z`) against IPR beside it
     decides too: on Vinohradská from Olšanské hřbitovy towards Flora the tracks stand 0.26-0.29 m over IPR and the
-    survey, both level across, and the user: "yes it's raised" (#606)."""
+    survey, both level across, and the user: "yes it's raised" (#606). There a crossing has no gap in IPR to show it
+    (IPR is older than the corridor), so the survey shows it: where the string's centre lies outside the survey's own
+    tram area (`own`), a road or a footpath runs across the corridor, and its surface comes up to the rails (the
+    user, 2026-11-21: "Where roads or footpaths cross it's level crossing like usual, so the surface comes up to the
+    rail top"): no confirmed sample there."""
     import shapely
     n = np.column_stack([-c["t"][:, 1], c["t"][:, 0]])
     out = np.zeros((len(c["p"]), 2), bool)
@@ -695,7 +699,8 @@ def raised_bed(c, F, ipr, road, confirmed=None):
             beside = np.nanmedian(np.array(zs), axis=0)
         up = np.isfinite(beside) & (bed - beside > RAISED_BED)
         if confirmed is not None and "z" in c:
-            up |= np.isfinite(beside) & confirmed & (c["z"] - beside > RAISED_BED)
+            belt = confirmed if own is None else confirmed & shapely.contains_xy(own, c["p"][:, 0], c["p"][:, 1])
+            up |= np.isfinite(beside) & belt & (c["z"] - beside > RAISED_BED)
         for a, b in runs(up):
             if c["s"][b - 1] - c["s"][a] >= 5.0:
                 out[a:b, side] = True
@@ -764,7 +769,7 @@ def pilot(at, radius, ln, out_dir, ctx=None):
             # (only the bed is the tracks': carried across a 15 m junction, their tilt (cant included) set the fill up
             # to 0.4 m off IPR and met the side streets in a seam; the road beside it is junctions()' fill)
             c["width"] = np.minimum(c["width"], (c["half"] + BED)[:, None])
-            c["raised"] = raised_bed(c, F, ipr, road, confirmed_corridor(ln, c["p"]))
+            c["raised"] = raised_bed(c, F, ipr, road, confirmed_corridor(ln, c["p"]), ctx.get("tram"))
     # a street's width at a junction's mouth is held to its width along the street: Bělohorská's mouth reached 22 m up
     # Liborova (line 23) with its own crossfall, 1 m under IPR where Liborova starts its 15 % climb, which then lagged
     # 3 m behind it; the mouth is the junctions' fill's
