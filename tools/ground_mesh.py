@@ -2039,7 +2039,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         zc[nan] = lidar_w(cx[nan], cy[nan])
 
