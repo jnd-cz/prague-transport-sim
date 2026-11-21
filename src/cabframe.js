@@ -7,6 +7,7 @@
 // (index.html #cab .roof) and is the top of every opening. A 2D canvas under the panel: a few polygons, each clipped at
 // the eye's near plane.
 import * as THREE from 'three';
+import { rectOf } from './boxes.js';
 import { CAB } from './t3simple.js';
 
 const NEAR = 0.05;
@@ -146,12 +147,12 @@ export class CabFrame {
       g.fill();
       if (edge) { g.strokeStyle = edge; g.lineWidth = 1.5 * dpr; g.stroke(); }
     }
-    const yb = this.roof ? this.roof.getBoundingClientRect().bottom * dpr : 0;
+    const yb = this.roof ? rectOf(this.roof).bottom * dpr : 0; // (the boxes kept between the changes that move them, #706)
     if (yb > 0) for (const c of CORNERS) this.corner(...c, yb, dpr);
     // the mirror's picture stays on top of the frame (the user, 2026-11-17: "mirror view should stay on top of
     // everything, not be hidden by other surface ... only menu can draw over it"; index.html #mirror is over the rest)
     if (hole) {
-      const b = hole.getBoundingClientRect();
+      const b = rectOf(hole);
       if (b.width > 12 && b.height > 12) g.clearRect((b.left + 6) * dpr, (b.top + 6) * dpr, (b.width - 12) * dpr, (b.height - 12) * dpr);
     }
   }

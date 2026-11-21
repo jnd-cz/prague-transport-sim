@@ -3,21 +3,23 @@
 // keeps drawing (the tile container's decision: docs/decisions/2026-11-06-tile-container.md). A tile is decoded on its
 // own; its neighbours' blobs come with it when its meshes are asked, for the normals of the vertices on its border.
 //
-// In: first { init: { styles, names, cell, unit, tile } } — `styles[class][draw name]` = [group, r, g, b] (src/groundDraw.js
-// groundStyles), `names[class]` the file's draw names ('' first, src/groundFile.js); then per tile { id, bytes, layout,
-// box: [x0, y0], ring: [{ bytes, layout }], lookup, meshes, coarse } (bytes: the tile's blob, layout: its own; coarse:
-// the far ground's step in m, with `lookup`).
+// In: first { init: { styles, names, cell, unit, tile } } — `styles[class][draw name]` = [group, r, g, b] or, where the
+// land class matters, [group, r, g, b, land class] (src/groundDraw.js groundStyles), `names[class]` the file's draw
+// names ('' first, src/groundFile.js); then per tile { id, bytes, layout, box: [x0, y0], ring: [{ bytes, layout }],
+// lookup, meshes, coarse } (bytes: the tile's blob, layout: its own; coarse: the far ground's step in m, with `lookup`).
 // Out: { id, lookup, meshes, coarse, times }:
 // - lookup: { x0, y0, cell, nx, ny, start, tris, vx, vy, vz, tv, tk, kinds, ta, areas, cover }, the tile's height lookup:
 //   its flat triangles (the steps' walls left out) in a grid of `cell` m from its corner, each with its class (tk: an
 //   index into `kinds`, the file's classes) and the survey's class under it (ta: an index into `areas`, 0 for none),
 //   and the survey's 10 m cells (cover, as src/terrain.js TriIndex keys them);
-// - meshes: [{ group, pos, nor, col, idx }], one indexed geometry per material group, positions from the tile's corner
-//   as three.js takes them (x, z, -y), each draw class with its own vertices so colours do not blend across a class's
-//   edge, the normals averaged over its triangles, the neighbours' too on the tile's border;
-// - coarse: { pos, nor, col, idx }, the far ground (#30): the lookup's heights and colours on a `coarse` m grid from the
-//   tile's corner, a cell drawn where all four corners lie on the ground, and a skirt COARSE_SKIRT m down its border
-//   (a detailed tile beside it meets it at its own vertices, not at the grid's: the skirt covers what is between).
+// - meshes: [{ group, pos, nor, col, cls, idx }], one indexed geometry per material group, positions from the tile's
+//   corner as three.js takes them (x, z, -y), each draw class with its own vertices so colours do not blend across a
+//   class's edge, the normals averaged over its triangles, the neighbours' too on the tile's border (cls: each
+//   vertex's land class, null where the mesh's styles carry none);
+// - coarse: { pos, nor, col, cls, idx }, the far ground (#30): the lookup's heights, colours and land classes on a
+//   `coarse` m grid from the tile's corner, a cell drawn where all four corners lie on the ground, and a skirt
+//   COARSE_SKIRT m down its border (a detailed tile beside it meets it at its own vertices, not at the grid's: the
+//   skirt covers what is between).
 
 function varints(bytes, n, off, out) {
   for (let i = 0; i < n; i++) {
@@ -147,7 +149,7 @@ function meshes(g, cfg, box, ring) {
     let j = i;
     while (j < n && groupOf(order[j]) === mesh) j++;
     // one mesh: its vertices, each draw class's own (the tile's border ones remembered: the neighbours' normals)
-    const pos = [], col = [], idx = new Uint32Array(3 * (j - i)), edge = [];
+    const pos = [], col = [], cls = [], idx = new Uint32Array(3 * (j - i)), edge = [];
     let nv = 0, last = -1;
     for (let k = i; k < j; k++) {
       const t = order[k] % 16777216, s = style[Math.floor(order[k] / 16777216) % 256];
@@ -158,6 +160,7 @@ function meshes(g, cfg, box, ring) {
           stamp[v] = gen; local[v] = nv++;
           pos.push(vx[v] - x0, vz[v], y0 - vy[v]);
           col.push(s[1], s[2], s[3]);
+          cls.push(s[4] || 0);
           if (border[v]) edge.push(local[v], v, cfg.sid.get(s));
         }
         idx[3 * (k - i) + e] = local[v];
@@ -181,7 +184,9 @@ function meshes(g, cfg, box, ring) {
       const l = Math.hypot(N[v], N[v + 1], N[v + 2]) || 1;
       N[v] /= l; N[v + 1] /= l; N[v + 2] /= l;
     }
-    out.push({ group: style[Math.floor(order[i] / 16777216) % 256][0], pos: P, nor: N, col: new Float32Array(col), idx });
+    // (cls: the terrain's land class per vertex, where the mesh's styles carry one: src/weather.js landCls, #707)
+    const first = style[Math.floor(order[i] / 16777216) % 256];
+    out.push({ group: first[0], pos: P, nor: N, col: new Float32Array(col), cls: first.length > 4 ? new Uint8Array(cls) : null, idx });
     i = j;
   }
   return out;
@@ -210,7 +215,7 @@ function lookup(g, cell, box, side) {
       }
       ta[m / 3] = id; tk[m / 3] = kind;
       const st = cfg.styles[name]?.[names[draw[i / 3]]] ?? cfg.styles[name]?.[''];
-      col.push(st ? st[1] : 0.5, st ? st[2] : 0.5, st ? st[3] : 0.5);
+      col.push(st ? st[1] : 0.5, st ? st[2] : 0.5, st ? st[3] : 0.5, (st && st[4]) || 0); // (r, g, b, the land class)
       tv[m++] = a; tv[m++] = b; tv[m++] = c;
     }
   }
@@ -256,15 +261,16 @@ function find(lk, px, py) {
 
 const COARSE_SKIRT = 5; // m: the far ground's skirt down its border
 function coarse(lk, col, side, step) {
-  const n = Math.round(side / step) + 1, z = new Float64Array(n * n).fill(NaN), C = new Float32Array(3 * n * n);
+  const n = Math.round(side / step) + 1, z = new Float64Array(n * n).fill(NaN), C = new Float32Array(3 * n * n), L = new Uint8Array(n * n);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const [t, h] = find(lk, i * step, j * step);
     if (t < 0) continue;
     z[j * n + i] = h;
-    C[3 * (j * n + i)] = col[3 * t]; C[3 * (j * n + i) + 1] = col[3 * t + 1]; C[3 * (j * n + i) + 2] = col[3 * t + 2];
+    C[3 * (j * n + i)] = col[4 * t]; C[3 * (j * n + i) + 1] = col[4 * t + 1]; C[3 * (j * n + i) + 2] = col[4 * t + 2];
+    L[j * n + i] = col[4 * t + 3];
   }
   const ok = (i, j) => i >= 0 && j >= 0 && i < n && j < n && !Number.isNaN(z[j * n + i]);
-  const pos = [], nor = [], cols = [], idx = [], at = new Int32Array(n * n).fill(-1);
+  const pos = [], nor = [], cols = [], cls = [], idx = [], at = new Int32Array(n * n).fill(-1);
   const add = (i, j, dz) => {
     const k = j * n + i;
     // (the normal from the grid's differences, as three.js takes it: x, up, -y)
@@ -274,6 +280,7 @@ function coarse(lk, col, side, step) {
     pos.push(i * step, z[k] - dz, -j * step);
     nor.push(-dx / len, 1 / len, dy / len);
     cols.push(C[3 * k], C[3 * k + 1], C[3 * k + 2]);
+    cls.push(L[k]);
     return pos.length / 3 - 1;
   };
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (ok(i, j)) at[j * n + i] = add(i, j, 0);
@@ -289,7 +296,7 @@ function coarse(lk, col, side, step) {
     idx.push(a, a2, b2, a, b2, b);
   };
   for (let k = 0; k + 1 < n; k++) { edge(k, 0, k + 1, 0); edge(k + 1, n - 1, k, n - 1); edge(0, k + 1, 0, k); edge(n - 1, k, n - 1, k + 1); }
-  return { pos: new Float32Array(pos), nor: new Float32Array(nor), col: new Float32Array(cols), idx: new Uint32Array(idx) };
+  return { pos: new Float32Array(pos), nor: new Float32Array(nor), col: new Float32Array(cols), cls: new Uint8Array(cls), idx: new Uint32Array(idx) };
 }
 
 let cfg = null;
@@ -309,7 +316,7 @@ onmessage = ({ data }) => {
     const lk = (out.lookup = lookup(g, cfg.cell, data.box, cfg.tile));
     if (data.coarse) {
       const c = (out.coarse = coarse(lk, lk.col, cfg.tile, data.coarse));
-      transfer.push(c.pos.buffer, c.nor.buffer, c.col.buffer, c.idx.buffer);
+      transfer.push(c.pos.buffer, c.nor.buffer, c.col.buffer, c.cls.buffer, c.idx.buffer);
     }
     delete lk.col;
     transfer.push(lk.start.buffer, lk.tris.buffer, lk.tv.buffer, lk.ta.buffer, lk.tk.buffer, lk.cover.buffer, lk.vx.buffer, lk.vy.buffer, lk.vz.buffer);
@@ -317,7 +324,7 @@ onmessage = ({ data }) => {
   const t2 = performance.now();
   if (data.meshes) {
     out.meshes = meshes(g, cfg, data.box, data.ring?.length ? ringNormals(data.ring, data.box, cfg) : null);
-    for (const m of out.meshes) transfer.push(m.pos.buffer, m.nor.buffer, m.col.buffer, m.idx.buffer);
+    for (const m of out.meshes) { transfer.push(m.pos.buffer, m.nor.buffer, m.col.buffer, m.idx.buffer); if (m.cls) transfer.push(m.cls.buffer); }
   }
   out.times = { decode: t1 - t0, lookup: t2 - t1, meshes: performance.now() - t2 };
   postMessage(out, transfer);

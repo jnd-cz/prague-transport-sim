@@ -7,6 +7,8 @@
 import { t } from './i18n.js';
 import { localUrl } from './localFiles.js';
 
+// (a file's name is written as text: an installed package's files are named by their author)
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DL_SHARE_MIN = 0.05;
 const $ = (id) => document.getElementById(id);
 const mb = (b) => (b / 1048576).toFixed(1);
@@ -256,7 +258,7 @@ export class Loader {
       const pct = d.state === 'done' ? '✓' : d.state === 'missing' ? t('load.missing') : d.state === 'error' ? t('load.error')
         : d.total ? `${Math.floor((d.loaded / d.total) * 100)} %` : d.loaded ? `${mb(d.loaded)} MB` : '…';
       const size = d.total ? `${mb(d.total)} MB` : '';
-      return `<tr class="${d.state}"><td>${d.label}</td><td>${size}</td><td>${pct}</td></tr>`;
+      return `<tr class="${d.state}"><td>${esc(d.label)}</td><td>${size}</td><td>${pct}</td></tr>`;
     }).join('');
     if (this.failed) return; // (the message stays; the files go on arriving)
     const f = this.fraction();
