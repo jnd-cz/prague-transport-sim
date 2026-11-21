@@ -50,6 +50,16 @@ RAIL_STEP = 2.0  # m between rail stations
 # lidar; outside, greenery 4 of 7 survey, paved 3 of 3 lidar (14 of 19; "outside to the survey" alone matches 11).
 COURT_RAYS, COURT_REACH, COURT_SHARE = 16, 60.0, 0.75
 FLOOR = 170.0  # m: no ground under it (tools/sources.py TERRAIN_FLOOR; DI writes 0 for a missing height)
+# A single outline point the survey has wrong (stray_points): on the five lines' smooth level-0 areas off the lidar,
+# 291 / 377 / 282 / 141 / 166 points (lines 9, 17, 22, 23, 37; 0.1-0.2 % of their 103-214 thousand) stand STRAY_OFF or
+# more off IPR between two ring neighbours within STRAY_NEAR of it. Most are the other level of a step IPR has too (a
+# wall's top or foot, an underpass's cut: IPR spans 2-7 m within STRAY_ROUND of them); where IPR spans under half the
+# point's own distance off it there is no step to stand on: 58 / 87 / 37 points on lines 17, 22, 37 (measured
+# 2026-11-21, #548).
+STRAY_OFF = 0.5  # m off IPR (OFFSET: over twice IPR's own p95 at the rails)
+STRAY_NEAR = 0.2  # m: its two ring neighbours lie on IPR within this
+STRAY_ROUND = 2.0  # m round the point IPR is read (at the point and on rings 1 and 2 m round it)
+STRAY_STEP = 0.5  # of the point's distance off IPR: IPR spanning this share or more round it has a step there
 
 
 def inner_points(xy):
@@ -171,6 +181,37 @@ def rail_points(paths):
     if not xs:
         return np.zeros(0), np.zeros(0), np.zeros(0)
     return np.concatenate(xs), np.concatenate(ys), np.concatenate(zs)
+
+
+def stray_points(xy, zs, ground):
+    """Indexes of a smooth surface's outline points (xy, heights zs, None for none; a closed ring without its closing
+    point) that the survey has wrong: STRAY_OFF or more off the lidar's ground (`ground(x, y)`: arrays, NaN outside)
+    while both ring neighbours lie within STRAY_NEAR of it and the ground round the point has no step for it to be the
+    other side of (it spans under STRAY_STEP of the point's distance off it within STRAY_ROUND). The median between
+    Bělohorská's tracks (lines 22 and 23 (-3101.3, 152.5) and (-3101.2, 149.8), shared with the tram's and the road's
+    areas) has two points at 297.91 m, the height of its end 38 m down the street, where the street stands at
+    300.15 and 299.76 m: the strip between its neighbours 10 and 38 m off lay up to 1.27 m under the street, a pit
+    beside the bed (#548). dtm.despike's median of six neighbours does not see it: the outline falls there anyway,
+    and its points lie far apart."""
+    n = len(zs)
+    if n < 4:
+        return []
+    x, y = np.array([p[0] for p in xy], float), np.array([p[1] for p in xy], float)
+    z = np.array([np.nan if v is None else v for v in zs], float)
+    with np.errstate(invalid="ignore"):
+        d = z - np.asarray(ground(x, y), float)
+        cand = np.flatnonzero((np.abs(d) >= STRAY_OFF) & (np.abs(np.roll(d, 1)) <= STRAY_NEAR) & (np.abs(np.roll(d, -1)) <= STRAY_NEAR))
+    if not len(cand):
+        return []
+    ang = np.linspace(0, 2 * np.pi, 16, endpoint=False)
+    rr = np.concatenate([[0.0], np.full(16, STRAY_ROUND / 2), np.full(16, STRAY_ROUND)])
+    aa = np.concatenate([[0.0], ang, ang])
+    out = []
+    for k in cand.tolist():
+        g = np.asarray(ground(x[k] + rr * np.cos(aa), y[k] + rr * np.sin(aa)), float)
+        if np.isfinite(g).sum() >= len(g) // 2 and np.nanmax(g) - np.nanmin(g) < STRAY_STEP * abs(d[k]):
+            out.append(k)
+    return out
 
 
 def surface_at(r, x, y):
