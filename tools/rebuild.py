@@ -254,7 +254,7 @@ def main():
         sys.exit(0 if sys.argv[1:] in (["-h"], ["--help"]) else 2)
     lines, par, force = got
     FORCE.update(force)
-    CACHE = stepcache.Cache(ROOT)
+    CACHE = stepcache.Cache(ROOT, stepcache.machine_dir())
     t0 = time.time()
     if par:
         # (lines side by side, as many as free memory holds: a line's build with its parallel steps

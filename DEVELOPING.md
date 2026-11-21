@@ -41,7 +41,8 @@ python -P -E tools/rebuild.py --force        # every step runs
 
 A step runs only when something it read changed (`tools/stepcache.py`, #511): each run is traced (the files it
 opened, probed or listed under the checkout, the modules it imported from it, the packages' versions) and
-recorded in `reports/rebuild/cache/`; a step whose record still holds is skipped and its outputs put back as that
+recorded in `TRAMDATA_CACHE/stepcache/` (without a machine cache: `reports/rebuild/cache/` of the checkout; the
+records name files by their path under the checkout, so they hold in a fresh worktree, #797); a step whose record still holds is skipped and its outputs put back as that
 run left them, so the next step reads what it read before (`data/lineN.json` is rewritten by several steps in
 turn). A change to one rule reruns the steps that read what it changed, down to the first whose output stays the
 same. `lineN.log` says per step whether it ran and why (`tools/track_profile.py changed`, `data/line9.json
