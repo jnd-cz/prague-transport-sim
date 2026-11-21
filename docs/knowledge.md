@@ -693,9 +693,9 @@ Sections:
     sidewalk reaches that far. A walkway on a quay wall's top has the drop within those 1.5 m (Rašínovo nábřeží,
     line 17 (-761.2, -1704.8): edge 191.90 m, road 191.87 m, IPR 191.99 m 1 m in and 190.17 m 1.5 m in): read at
     1.5 m alone, its edge was held 1.6 m under the road, 57 such kerb sites in the surfaces check of ground batch B
-    against 18 at a wall's foot. The edge's own height is the walkway's also where IPR 0.5, 0.75 or 1 m in comes
-    within 0.3 m of it (`KERB_NEAR`): wall edges 1,215 to 885 m (line 9), 1,519 to 1,104 (17), 624 to 547 (22), 352
-    to 294 (23), 386 to 308 (37), the ones lost with their own height -0.16 to +0.23 m off the road (10th-90th
+    against 18 at a wall's foot. The edge's own height is the walkway's also where it is a plain kerb's (within 0.3 m of the
+    road plus a kerb) and IPR 0.5, 0.75 or 1 m in comes within 0.3 m of it (`KERB_NEAR`): wall edges 1,215 to 875 m (line 9), 1,519 to 1,040 (17), 624 to 515 (22), 352
+    to 280 (23), 386 to 309 (37), the ones lost with their own height -0.16 to +0.23 m off the road (10th-90th
     percentile), plain kerbs;
   - the road's surface follows IPR, whose raster spreads a wall's face over 1-1.5 m: the ramp rose 0.76 m in its last
     metre before the door's wall and the road behind the wall fell 1.6 m towards it. A road's corner within 1.5 m of

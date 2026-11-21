@@ -260,6 +260,11 @@ class Sidewalks(unittest.TestCase):
         foot = np.column_stack([np.full(len(u), 200.3), np.full(len(u), 199.95), np.full(len(u), 199.9)])
         top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 201.4), high, np.full(len(u), 199.9), np.ones(len(u), bool), foot)
         self.assertEqual((bool(top.all()), segs[0, :, 2].tolist()), (True, [199.9, 199.9]))
+        # (at a wall's foot with the edge's height between the two levels, 0.6 m over the walkway, and the raster's smear
+        # of the wall at that height 0.5 m in: no plain kerb, the walkway is the ground's)
+        smear = np.column_stack([np.full(len(u), 200.6), np.full(len(u), 200.1), np.full(len(u), 199.9)])
+        top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.5), high, np.full(len(u), 199.9), np.ones(len(u), bool), smear)
+        self.assertEqual((bool(top.all()), segs[0, :, 2].tolist()), (True, [199.9, 199.9]))
         ctx["kerb_edges"] = [edge]
         z0 = sp.bilinear(sp.sidewalks(ctx, ramp, [(0, 0), (20, 4)]), np.array([15.0]), np.array([0.25]))
         self.assertLess(z0[0], 199.5)

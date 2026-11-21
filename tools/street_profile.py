@@ -1415,7 +1415,8 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
     (-761.2, -1704.8), the sidewalk's edge at 191.90 m beside the road at 191.87 m, IPR 191.99 m 1 m in and 190.17 m
     1.5 m in, on the wall's face; read as the walkway's level, that sank the edge 1.6 m under the road (the batch's
     surfaces check: 57 such kerb sites on the five lines, 18 at a wall's foot). Where IPR that near the edge comes
-    within STEP_CUT of the edge's own height, a walkway lies at it: its own height. Without `ground`: the edge's own
+    within STEP_CUT of the edge's own height and that height is a plain kerb's on the road (within STEP_CUT of the
+    road plus a kerb), a walkway lies at it: its own height. Without `ground`: the edge's own
     height."""
     from kerbs import KERB
     level = np.asarray(own, float)
@@ -1425,7 +1426,9 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
             there = np.full(len(q), np.nan) if wide is None else np.where(np.asarray(wide, bool), ground, np.nan)
             ours = np.abs(level - ground) <= KERB_OWN
             if near is not None:
-                ours |= np.fmin.reduce(np.abs(level[:, None] - np.asarray(near, float).reshape(len(level), -1)), axis=1) <= STEP_CUT
+                # (only an edge that is a plain kerb by its own height: at a wall's foot the raster's smear of the
+                # wall passes through any height between the two levels)
+                ours |= (np.fmin.reduce(np.abs(level[:, None] - np.asarray(near, float).reshape(len(level), -1)), axis=1) <= STEP_CUT)                     & (np.abs(level - np.asarray(zr, float) - KERB) < STEP_CUT)
             level = np.where(ours, level, there)
         off = np.abs(level - np.asarray(zr, float) - KERB)
         top = (off >= STEP_CUT) if np.isfinite(off).any() and np.nanmax(off) >= KERB_WALL else np.zeros(len(q), bool)
