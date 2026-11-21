@@ -1221,7 +1221,8 @@ def kerb_walls(D, road_at, lidar):
     for q, n, own in edges:
         g2 = q + n * (street_profile.SW_KERB_SMEAR + 0.5)
         top, e = street_profile.wall_tops(q, n, own, road_at(*(q - n * 0.5).T), lidar(*(q + n * street_profile.SW_KERB_SMEAR).T),
-                                          shapely.contains_xy(walk, g2[:, 0], g2[:, 1]))
+                                          shapely.contains_xy(walk, g2[:, 0], g2[:, 1]),
+                                          np.column_stack([lidar(*(q + n * v).T) for v in street_profile.KERB_NEAR]))
         if top.any():
             segs.append(e[:, :, :2])
     return np.concatenate(segs) if segs else np.zeros((0, 2, 2))

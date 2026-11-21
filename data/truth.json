@@ -5329,6 +5329,35 @@
      "why": "the platform runs with the rails, which fall evenly here: a straight line (as at Krejcárek, krejcarek-platform)"
     }
    ]
+  },
+  "sidewalk-on-a-quay-wall": {
+   "line": "17",
+   "at": [
+    -761.2,
+    -1704.8
+   ],
+   "reach": 25,
+   "issue": 770,
+   "what": "a sidewalk about 1.2 m wide on the top of the quay wall, beside the road at its level (survey edge 191.90 m, road 191.87 m), the lower quay 3.8 m under it: the sidewalk level with the road up to the wall",
+   "source": "found in ground batch B's surfaces check, 2026-11-20: line 17 s 12284, the sidewalk's edge 1.54 m under the road, one of 57 such kerb sites on the five lines",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk on the wall's top, y = -1704.8",
+     "from": [
+      -758.8,
+      -1704.8
+     ],
+     "to": [
+      -762.0,
+      -1704.8
+     ],
+     "expect": {
+      "largest step m": 0.2,
+      "off the lidar m": 0.5
+     },
+     "why": "IPR has the road and the sidewalk at 191.86-191.99 m up to 1 m inside the kerb and the wall's face from 1.25 m in (190.17 m at 1.5 m). The kerb-wall rule read the walkway's level on the face and held the edge at it: the written file of ground batch B has the sidewalk at 190.31 m at its kerb"
+    }
+   ]
   }
  }
 }
