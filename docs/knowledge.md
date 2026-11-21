@@ -687,7 +687,16 @@ Sections:
     its own height as a survey wall's edge is (`wall_tops`), where that height is the walkway's: within 0.5 m of IPR
     1.5 m in. A sidewalk's outline along a parapet on its kerb carries the parapet's top (by the Modřany viaduct,
     line 17 (-2396, -9241): 199.24 m over a walkway at 198.1 m), and without that check 242-1,343 m of kerb a line
-    counted; with it 25-256 m (4-35 edges a line, of 47-145 km of kerb);
+    counted; with it 25-256 m (4-35 edges a line, of 47-145 km of kerb). The mirror case (#770): a sidewalk at the
+    foot of a road's wall has its kerb edge surveyed at the wall's top (line 22 (1897.5, -2212): the walkway at
+    221.2 m, the road at 223.8 m), so the edge is a wall's either way, held at IPR's level 1.5 m in where the
+    sidewalk reaches that far. A walkway on a quay wall's top has the drop within those 1.5 m (Rašínovo nábřeží,
+    line 17 (-761.2, -1704.8): edge 191.90 m, road 191.87 m, IPR 191.99 m 1 m in and 190.17 m 1.5 m in): read at
+    1.5 m alone, its edge was held 1.6 m under the road, 57 such kerb sites in the surfaces check of ground batch B
+    against 18 at a wall's foot. The edge's own height is the walkway's also where it is a plain kerb's (within 0.3 m of the
+    road plus a kerb) and IPR 0.5, 0.75 or 1 m in comes within 0.3 m of it (`KERB_NEAR`): wall edges 1,215 to 875 m (line 9), 1,519 to 1,040 (17), 624 to 515 (22), 352
+    to 280 (23), 386 to 309 (37), the ones lost with their own height -0.16 to +0.23 m off the road (10th-90th
+    percentile), plain kerbs;
   - the road's surface follows IPR, whose raster spreads a wall's face over 1-1.5 m: the ramp rose 0.76 m in its last
     metre before the door's wall and the road behind the wall fell 1.6 m towards it. A road's corner within 1.5 m of
     a survey wall area up to 1 m across (101-231 a line, 7.5-22 km of outline), or of a kerb edge that is a wall's
