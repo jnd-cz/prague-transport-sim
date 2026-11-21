@@ -236,9 +236,12 @@ PLATFORM_MIN = 20  # corners in a platform's band for it to have a plane
 PLATFORM_TOP = 90  # the percentile of the fitted corners' heights over the rail top the plane lies at: their top, not
 # their middle (a platform is built up over the road and the bed beside it: under the middle of its corners it lost
 # its kerb where the road climbs against the rails along the stop)
+PLATFORM_WIDE = 8.0  # m from the axis: how far the plane holds in an area the survey has as a platform (their back edges:
+# a median 4.1-5.1 m from the axis a line, the farthest 6.3 m, Pražský hrad A; past it, a square classed platform)
+PLATFORM_SPREAD = 1.0  # m: fitted corners closer together than this across the platform tell no crossfall
 
 
-def platform_planes(L, x, y, z, ok, log=None):
+def platform_planes(L, x, y, z, ok, log=None, wide=None):
     """Heights z of corners (x, y) with those `ok` (a raised area's, on its street surface) in a stop's platform laid on
     the platform's plane: (z, the corners moved). A platform stands a steady height over the top of rail along the
     track, with one crossfall; the sidewalk's street surface follows IPR's raster and the survey's points instead, and
@@ -259,11 +262,21 @@ def platform_planes(L, x, y, z, ok, log=None):
       edges stand a median 0.11 m over the rail top either way.
     - A corner within PLATFORM_NEAR of the plane takes it; past the band and towards the platform's ends it fades to
       the corner's own height over PLATFORM_FADE. A platform with under PLATFORM_MIN corners, or under half of them
-      near its plane, is left."""
+      near its plane, is left.
+    - In an area the survey has as a platform (`wide`: its corners) the plane holds right across, up to PLATFORM_WIDE:
+      the whole area is the platform, and its corners are its outline's alone, their own heights the survey's few
+      points. Hlušičkova's platforms (line 9 s 1334-1402 and s 27076-27144: 68 m, 12 and 14 outline points, the back
+      edge 5.5 m from the axis, where the band had faded out) kept the plane at the track and their back edge at
+      +0.02 to +0.23 m over the rail top, 0.16 m to 0.05 m under the road's kerb from one point to the next (the user,
+      2026-11-21, on ground batch B: "looks clean from track side, a bit bumpy from road side"); IPR has them level
+      across, +0.21 and +0.22 m at 0.7 m and 2 m behind the edge.
+    - Fitted corners all at one distance from the axis (such a platform's edge alone, PLATFORM_SPREAD) tell no
+      crossfall: none is taken."""
     z = np.array(z, float)
     moved = np.zeros(len(z), bool)
     x, y = np.asarray(x, float), np.asarray(y, float)
     ok = np.asarray(ok, bool) & np.isfinite(z)
+    wide = np.zeros(len(z), bool) if wide is None else np.asarray(wide, bool)
     h_ = L.get("heights") or {}
     for pf in L.get("platforms") or []:
         key = {"route": "path", "back": "pathBack"}.get(pf.get("path"))
@@ -278,7 +291,7 @@ def platform_planes(L, x, y, z, ok, log=None):
             continue
         part = shapely.ops.substring(line, max(s0, 0.0), min(s1, line.length))
         bx0, by0, bx1, by1 = part.bounds
-        reach = PLATFORM_BAND + PLATFORM_FADE
+        reach = PLATFORM_WIDE + PLATFORM_FADE
         k = np.flatnonzero(ok & (x >= bx0 - reach) & (x <= bx1 + reach) & (y >= by0 - reach) & (y <= by1 + reach))
         if len(k) < PLATFORM_MIN:
             continue
@@ -289,8 +302,9 @@ def platform_planes(L, x, y, z, ok, log=None):
         t = B - A
         left = t[:, 0] * (y[k] - A[:, 1]) - t[:, 1] * (x[k] - A[:, 0])
         d = shapely.distance(line, pts)
+        reach = np.where(wide[k], PLATFORM_WIDE, PLATFORM_BAND) + PLATFORM_FADE
         on = (s >= s0) & (s <= s1) & (left * side > 0) & (d <= reach)
-        k, s, d = k[on], s[on], d[on]
+        k, s, d, reach = k[on], s[on], d[on], reach[on]
         core = d <= PLATFORM_BAND
         if core.sum() < PLATFORM_MIN:
             continue
@@ -302,7 +316,7 @@ def platform_planes(L, x, y, z, ok, log=None):
         for _ in range(3):  # (the fit of the corners near it: a ramp's foot or a wall's top in the band is none of it)
             if use.sum() < PLATFORM_MIN:
                 break
-            b = float(np.clip(np.polyfit(d[use], h[use], 1)[0], -PLATFORM_CROSS, PLATFORM_CROSS))
+            b = float(np.clip(np.polyfit(d[use], h[use], 1)[0], -PLATFORM_CROSS, PLATFORM_CROSS)) if np.ptp(d[use]) >= PLATFORM_SPREAD else 0.0
             a = float(np.median(h[use] - b * d[use]))
             use = core & (np.abs(h - (a + b * d)) <= 0.15)
         if use.sum() >= PLATFORM_MIN:
@@ -2078,7 +2092,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (and a bed laid flush with the platform's sidewalk, in_pit: the grassy patch behind Krejcárek's shelter stayed 5 cm
     # under the platform when its plane rose to the top of its corners)
     c_plat[m] = (np.isin(sc, list(RAISED)) | in_pit) & ~on_span & ~on_terrace & ~in_rock & np.isfinite(zs)
-    zc, on_plat = platform_planes(L, cx, cy, zc, c_plat)
+    c_wide = np.zeros(len(cx), bool)
+    c_wide[m] = sc == "platform"
+    zc, on_plat = platform_planes(L, cx, cy, zc, c_plat, wide=c_wide)
     # (a wall the survey has as a line: the street, the lidar ground and the terrain beside it stand at its side's level
     # up to it, #697; a street under a bridge too, which keeps the survey's own outline (on_span): the sidewalk along
     # the Modřany ramp's wall, line 17 (-2385, -9250), has the wall's heights in its outline and rose 2 m against it)
