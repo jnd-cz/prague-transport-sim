@@ -358,6 +358,21 @@ class Strips(unittest.TestCase):
         np.testing.assert_allclose(w, 2.0, atol=0.03)
         np.testing.assert_allclose(e[:, 0, 2], 198.0 + 0.05 * e[:, :, 0].mean(1), atol=0.07)  # (an end's mean is over fewer)
 
+    def test_a_strips_sides_keep_their_own_levels_round_its_corners(self):
+        # (a strip 1 m across with a sidewalk all round it, at 200.2 m south of its middle and 196.4 m north: each long
+        # side's edges at its own walkway's level right up to the corners, its two ends no edges; a block 2 m long none)
+        from shapely.geometry import box
+
+        def lidar(x, y):
+            return np.where(np.asarray(y, float) > 6.5, 196.4, 200.2) + 0 * np.asarray(x, float)
+        strip = np.array([[0, 6, 198.5], [20, 6, 198.5], [20, 7, 198.5], [0, 7, 198.5], [0, 6, 198.5]], float)
+        e, w = sp.strip_edges("0", box(-10, -4, 30, 17), [(-10, -4), (30, 17)], lidar, [strip])
+        self.assertEqual(len(e), 40)
+        self.assertEqual(sorted(set(np.round(e[:, :, 1].mean(1), 3).tolist())), [6.0, 7.0])
+        np.testing.assert_allclose(e[:, 0, 2], np.where(e[:, 0, 1] < 6.5, 200.2, 196.4), atol=1e-9)
+        block = np.array([[9, 6, 198.5], [11, 6, 198.5], [11, 7, 198.5], [9, 7, 198.5], [9, 6, 198.5]], float)
+        self.assertEqual(len(sp.strip_edges("0", box(-10, -4, 30, 17), [(-10, -4), (30, 17)], lidar, [block])[0]), 0)
+
     def test_a_sidewalk_runs_in_unbroken(self):
         # (a sidewalk 0.6 m wide and another behind a strip 0.2 m across: 2 m in from the first one's kerb is a
         # sidewalk, but not the same one)

@@ -1400,7 +1400,17 @@ def strip_edges(ln, walk, box, lidar, strips=None):
         zs, ws = np.full(len(mid), np.nan), np.full(len(mid), np.nan)
         zs[k], ws[k] = z, width
         along = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(mid, axis=0).T))])
+        # (a run is cut where the strip's outline turns a corner: round it lies another walkway, and a side shorter
+        # than a stretch is the strip's end, no wall's side. A block 2.0 x 1.1 m at the foot of Rašínovo quay's wall,
+        # line 17 (-746.4, -1445.8), `paved` 1231, the lower quay at 188.3 m west of it and the upper sidewalk at
+        # 197.2 m east: one run round it, its mean along the outline 190.0-194.6 m at its two ends, held the lower quay
+        # up to 2 m over the raster for 1.5 m round it)
+        corner = np.flatnonzero((n[:-1] * n[1:]).sum(1) < math.cos(math.radians(wall_lines.TURN))) + 1
+        pieces = []
         for i0, i1 in wall_lines.runs(step, along):
+            cut = [i0] + [c for c in corner.tolist() if i0 < c <= i1] + [i1 + 1]
+            pieces += [(c0, c1 - 1) for c0, c1 in zip(cut, cut[1:]) if along[c1 - 1] - along[c0] >= wall_lines.MIN_LEN]
+        for i0, i1 in pieces:
             zz = np.where(ok[i0:i1 + 1], zs[i0:i1 + 1], np.nan)
             pad = np.pad(zz, STRIP_ALONG // 2, constant_values=np.nan)
             with warnings.catch_warnings():
