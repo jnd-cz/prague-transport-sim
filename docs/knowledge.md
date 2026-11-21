@@ -759,6 +759,18 @@ Sections:
   median 0.11 m over the rail top (0.10 m at the middle; Krejcárek's 0.34 for 0.30). A bed laid flush with the
   platform's sidewalk (`pits`) follows the plane: the grassy patch behind Krejcárek's shelter stayed 5 cm under it.
   No fact gives a platform's height over the rail top yet.
+
+  Where the survey has the platform as an area of its own (class `platform`: 14 / 14 / 28 / 12 / 4 of the lines'
+  platforms, their back edge a median 4.1-5.1 m from the axis, up to 6.3 m) it is drawn by its outline alone, and
+  the band of 4 m left its back edge at the survey's few points. In ground batch B, 0.5 m inside the back edge, 10 /
+  3 / 15 / 10 / 2 of them strayed over 5 cm from a straight line along the track and 7 / 1 / 5 / 2 / 2 over 10 cm
+  (at their edge 0.7 m behind the rails: 2 / 0 / 3 / 1 / 2 over 5 cm); Hlušičkova's two (line 9, 68 m, 12 and 14
+  outline points) by 0.30 and 0.43 m, the kerb to Plzeňská from 0.16 m over the road to 0.05 m under it. In such an area
+  the plane holds right across (`PLATFORM_WIDE`), and corners fitted at one distance from the axis tell no
+  crossfall (`PLATFORM_SPREAD`): IPR has Hlušičkova's level across, +0.21 and +0.22 m over the rail top 0.7 and 2 m
+  behind the edge. The sidewalk islands (43-49 platforms on lines 9, 17, 22 whose sidewalk ends within 6.5 m of
+  the axis) stray at the back at 13 / 21 / 12 / 4 / 4 over 5 cm; on line 17 most of those stand on the Modřany
+  line's walls (#786). They keep the band.
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of
