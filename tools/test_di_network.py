@@ -231,6 +231,33 @@ class Network(unittest.TestCase):
                 self.assertAlmostEqual(f[0]['off'], dy, delta=0.02)
 
 
+    def test_a_smooth_answer_states_whether_dis_line_still_steps(self):
+        # #672: DI's line with a 5-degree corner in a 500 m curve at s 100 (lint's rule flags it): the answer holds; one
+        # curve there: it matches; no DI line within its reach: changed. The line is two records, the corner 20 m past
+        # their joint: the rule reads DI's line followed on through the joint
+        def kinked(corner):
+            pts, x, y, h = [(0.0, 0.0)], 0.0, 0.0, 0.0
+            for k in range(1, 201):
+                h += 1 / 500 + (math.radians(corner) if k == 100 else 0.0)
+                x, y = x + math.cos(h), y + math.sin(h)
+                pts.append((x, y))
+            return pts
+        for corner, state in ((5.0, 'holds'), (0.0, 'matches')):
+            p = kinked(corner)
+            steps = [{'id': 'the curve', 'xy': p[100], 'reach': 10.0, 'step': None}]
+            f = net_of(p[:81], p[80:], steps=steps).facts['steppedAnswers']
+            self.assertEqual([(e['id'], e['state']) for e in f], [('the curve', state)], corner)
+            self.assertEqual(f[0]['step'] is None, state == 'matches')
+        p = kinked(5.0)
+        f = net_of(p, steps=[{'id': 'gone', 'xy': (p[100][0], p[100][1] + 30), 'reach': 10.0, 'step': None}]).facts
+        self.assertEqual(f['steppedAnswers'][0]['state'], 'changed')
+        # (the step's radii recorded with the answer: DI's step as it was holds, a step drawn otherwise is changed)
+        got = net_of(p, steps=[{'id': 'x', 'xy': p[100], 'reach': 10.0, 'step': None}]).facts['steppedAnswers'][0]['step']
+        for rec, state in (((got['r5'], got['r25']), 'holds'), ((got['r5'] * 3, got['r25']), 'changed')):
+            f = net_of(p, steps=[{'id': 'x', 'xy': p[100], 'reach': 10.0, 'step': rec}]).facts['steppedAnswers']
+            self.assertEqual(f[0]['state'], state, rec)
+
+
 class Matching(unittest.TestCase):
     def test_each_track_of_a_double_track_keeps_its_own(self):
         # OSM draws the pair 2.5 m apart (Kobylisy), DI 3.5 m

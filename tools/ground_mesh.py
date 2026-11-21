@@ -67,6 +67,7 @@ STREETS_ROAD, STREETS_WALK = {"road", "tram"}, {"sidewalk"}  # (the classes the 
 STEP = {"kerb": 0.03, "plot": 0.01, "wall": 0.5, "weir": 0.01, "water": 0.01, "bank": math.inf}
 BORDER_NEAR = 0.002  # m: vertices this near a square's border are put onto it in both squares (tile_faces)
 CROSS_EXT = 0.3  # m: a row's line across the bed reaches this far past its edges, to the beds' outline
+EDGE_APART = 0.05  # m: a bed's edge nearer the beds' outline or another bed's edge is not a line of its own (bed_edges)
 BED_REACH = 0.5  # m: a corner in the beds' outline this far past a row's edge takes the edge's height (bed_surface)
 PLACE_NEAR = 10.0  # m: the rail points around a named place (heads_check)
 BORDER_TOL = 0.002  # m: an edge this near the border of the line's ground lies on it (edge_check; the grid's 0.71 mm)
@@ -1522,21 +1523,82 @@ def rail_lines(beds, outline):
     """The rails of every drawn track and its rows' lines across the bed (edge to edge, CROSS_EXT m past each edge), inside
     the beds' outline on the ground: the rails and the rows close cells as the page's bed quads do. (A rail alone would
     end inside the outline at a track's join or end, and polygonize drops what closes no face: on line 37, 6,307 rail
-    points had no vertex within 1.25 m.)"""
+    points had no vertex within 1.25 m.) And where the bed's style may change inside the outline (#676): a line across
+    the bed where a track's style changes (bed_surface.Beds.style_runs), and every bed's edges inside the outline (at a
+    fork, a switch, between paired tracks), so each face lies in one style (Beds.style_at)."""
     out = []
-    for rows in beds.rows:
+    runs = beds.style_runs()
+    for k, rows in enumerate(beds.rows):
         if len(rows) < 2:
             continue
         for j in (1, 2):
             out.append(shapely.LineString([(x + nx * off[j], y + ny * off[j]) for x, y, nx, ny, off, _ in rows]))
         for x, y, nx, ny, off, _ in rows:
-            a, b = off[0] - CROSS_EXT, off[3] + CROSS_EXT
-            out.append(shapely.LineString([(x + nx * a, y + ny * a), (x + nx * off[1], y + ny * off[1]),
-                                           (x + nx * off[2], y + ny * off[2]), (x + nx * b, y + ny * b)]))
+            out.append(across(x, y, nx, ny, off))
+        acc = beds.acc(k)
+        for a in runs[k][0][1:].tolist():
+            r = min(max(int(np.searchsorted(acc, a, "right")) - 1, 0), len(rows) - 2)
+            v = (a - acc[r]) / ((acc[r + 1] - acc[r]) or 1)
+            A, B = rows[r], rows[r + 1]
+            out.append(across(*[A[q] * (1 - v) + B[q] * v for q in range(4)], [p * (1 - v) + q * v for p, q in zip(A[4], B[4])]))
+    out += bed_edges(beds, outline)
     if not out:
         return []
     clipped = shapely.intersection(np.array(out, dtype=object), outline)
     return [g for g in shapely.get_parts(clipped) if g.geom_type == "LineString" and g.length > 1e-3]
+
+
+def across(x, y, nx, ny, off):
+    """A bed's line across at a row: edge to edge through its rails, CROSS_EXT m past each edge."""
+    a, b = off[0] - CROSS_EXT, off[3] + CROSS_EXT
+    return shapely.LineString([(x + nx * a, y + ny * a), (x + nx * off[1], y + ny * off[1]),
+                               (x + nx * off[2], y + ny * off[2]), (x + nx * b, y + ny * b)])
+
+
+def bed_edges(beds, outline):
+    """Every ground bed's two edges where they lie inside the beds' outline, more than EDGE_APART m from the outline's
+    boundary and from an earlier track's edge (one line where two lie on each other, as paired tracks' edges at the
+    middle of the strip between them: two lines mm apart would leave slivers), each piece's ends joined to the nearest
+    point of what it was cut back from (the outline, the other edge), so it closes faces."""
+    if outline.is_empty:
+        return []
+    edges, owner = [], []
+    for k, rows in enumerate(beds.rows):
+        if len(rows) < 2 or beds.tracks[k].get("b"):
+            continue
+        for j in (0, 3):
+            edges.append(shapely.LineString([(x + nx * off[j], y + ny * off[j]) for x, y, nx, ny, off, _ in rows]))
+            owner.append(k)
+    if not edges:
+        return []
+    bound = list(chunks([outline.boundary]))
+    ref = np.array(bound + edges, dtype=object)
+    ref_owner = np.array([-1] * len(bound) + owner)
+    tree = shapely.STRtree(ref)
+    out = []
+    for e, k in zip(edges, owner):
+        inside = e.intersection(outline)
+        if inside.is_empty:
+            continue
+        near = tree.query(inside, predicate="dwithin", distance=EDGE_APART)
+        near = near[ref_owner[near] < k]  # (the outline, and the edges of earlier tracks; a track's own other edge is apart)
+        if len(near):
+            others = shapely.union_all(ref[near])
+            inside = inside.difference(others.buffer(EDGE_APART, quad_segs=2))
+        else:
+            others = None
+        for g in shapely.get_parts(inside):
+            if g.geom_type != "LineString" or g.length < EDGE_APART:
+                continue
+            c = shapely.get_coordinates(g)
+            if others is not None:  # (each end that was cut back joined to what cut it)
+                ends = []
+                for p in (c[0], c[-1]):
+                    q = shapely.ops.nearest_points(shapely.Point(p), others)[1]
+                    ends.append((q.x, q.y) if q.distance(shapely.Point(p)) < 2 * EDGE_APART else None)
+                c = np.vstack(([ends[0]] if ends[0] else []) + [c] + ([ends[1]] if ends[1] else [])) if any(ends) else c
+            out.append(shapely.LineString(c))
+    return out
 
 
 def chunks(lines, most=64):
@@ -1599,8 +1661,54 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
     return faces
 
 
+BELT_SIDE = 0.75  # m from their shared edge the tram belt's and the road's street surface are read, each on its own
+# side: past the cells the step runs through (the surface's cells are 0.5 m, read between their centres)
+
+
+def belt_kerbs(x, y, tx, ty, z, road, tram, surface, step):
+    """Heights z of corners (x, y), each in a triangle with centre (tx, ty), with the road's corners (`road`) at a
+    raised tram belt's edge on the road's own level: (z, the road corners that keep it: a kerb). The street build
+    leaves a kerb in its surface where the tram's belt stands over the road beside it (street_profile.raised_bed,
+    bed_kerb), but at the edge the two areas share a point, the tram's area ranks first there and the road's corner
+    took its height: the road ramped up to the belt over its last face, up to 5 m, or stepped by chance where a
+    lattice line fell near (Vinohradská from Olšanské hřbitovy to Flora, line 9 (3333, -1478): 269.36 to 269.53 m over
+    2 m; the user, 2026-11-21: "mostly placed on corridor with kerb", #606).
+    - At a point the road's and the tram's (`tram`) corners share, each side's surface is read BELT_SIDE from the
+      point towards its triangle's centre, no farther than the centre: the lowest of the road's readings and the
+      highest of the tram's (a reading short of BELT_SIDE lies in the step's cells, between the two).
+    - Where the tram's side stands more than `step` over the road's (data/truth.json raised-belt: over it the belt's
+      edge is a kerb), the road's corners there take the road's reading and keep it in the weld; the tram's corners
+      take the tram's.
+    `surface(x, y)`: the street surface's road level."""
+    z = np.array(z, float)
+    kerb = np.zeros(len(z), bool)
+    road, tram = np.asarray(road, bool), np.asarray(tram, bool)
+    if not road.any() or not tram.any():
+        return z, kerb
+    key = np.round(np.asarray(x, float) * Q).astype(np.int64) * 10_000_000_000 + np.round(np.asarray(y, float) * Q).astype(np.int64)
+    both = np.intersect1d(key[road], key[tram])
+    k = np.flatnonzero((road | tram) & np.isin(key, both))
+    if not len(k):
+        return z, kerb
+    vx, vy = np.asarray(tx, float)[k] - x[k], np.asarray(ty, float)[k] - y[k]
+    n = np.maximum(np.hypot(vx, vy), 1e-9)
+    r = np.minimum(BELT_SIDE, n) / n
+    own = np.asarray(surface(x[k] + vx * r, y[k] + vy * r), float)
+    uk, inv = np.unique(key[k], return_inverse=True)
+    lo, hi = np.full(len(uk), np.inf), np.full(len(uk), -np.inf)
+    rd = road[k] & np.isfinite(own)
+    tm = tram[k] & np.isfinite(own)
+    np.minimum.at(lo, inv[rd], own[rd])
+    np.maximum.at(hi, inv[tm], own[tm])
+    up = (np.isfinite(lo) & np.isfinite(hi) & (hi - lo > step))[inv]
+    z[k[up & road[k]]] = lo[inv][up & road[k]]
+    z[k[up & tram[k]]] = hi[inv][up & tram[k]]
+    kerb[k[up & road[k]]] = True
+    return z, kerb
+
+
 # ---------------------------------------------------------------- the build
-def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
+def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, kerbs=None):
     """The corners' heights welded at each point: (each corner's height, the steps kept by pair, the points). A point takes
     its top-priority corners' height, whatever their order (#664: it took the first top corner's, the order of the
     partition's pieces; drawing the survey's walls reordered them and moved line 22's corner at (-1114, -537), shared by
@@ -1620,6 +1728,7 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
       across climbing to 197.88 m), held at 193.68 m, climbed the wall to its top, a cone 4 m tall by the road (#771).
     - corners `apart` (a wall area's, lifted to its top on its foot's outline: wall_face) are welded among themselves
       only, and the others at their point without them: the wall's face stands on the ground at its foot.
+    - a road's corner at a raised tram belt's edge (`kerbs`, belt_kerbs) keeps its own as at any kerb.
     `label`: what gave each corner its height (default `kind`), for the report and the lidar's rule."""
     key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
     if apart is not None:
@@ -1656,6 +1765,8 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None):
     pair = np.where(pk & pt, "weir", np.where(pk, "water", np.where(pt, "bank", np.where(kind == "plot", "plot",
                     np.where((kind == "raised") != (top_kind[inv] == "raised"), "kerb",
                              np.where((kind == "terrain") != (top_kind[inv] == "terrain"), "wall", ""))))))
+    if kerbs is not None:
+        pair = np.where(kerbs & (pair == ""), "kerb", pair)
     lim = np.array([STEP.get(p, np.inf) for p in pair]) if len(pair) else np.zeros(0)
     # (a weir's two sides share the water's priority: both are top, each keeps its own level more than STEP off the
     # middle; welded to the first's, the second's triangles sloped 1.5 m up to the weir at Šítkovský)
@@ -2116,6 +2227,13 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     is_street = np.zeros(len(cx), bool)
     is_street[m] = np.isin(sc, list(STREETS_ROAD | STREETS_WALK))
     zc, at_wall = hold_at_walls(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, elig, walls, on_deck, is_street)
+    # (a road's corner at a raised tram belt's edge keeps the road's level: belt_kerbs, #606)
+    import street_profile
+    c_road, c_tram = np.zeros(len(cx), bool), np.zeros(len(cx), bool)
+    on_street = ~on_span & ~in_rock & ~at_wall[m]
+    c_road[m], c_tram[m] = (sc == "road") & on_street, (sc == "tram") & on_street
+    zc, belt = belt_kerbs(cx, cy, np.repeat(cen[:, 0], 3), np.repeat(cen[:, 1], 3), zc, c_road, c_tram,
+                          lambda px, py: streets.at("road", px, py), street_profile.RAISED_BED)
     prio[m] = 2.0 + np.array([(10 - RANK.get(c, 1)) / 100 for c in sc]) + np.where(on_lidar | in_osm, YIELD, 0.0)
     kind[m] = np.where(np.isin(sc, list(RAISED)), "raised", np.where(in_osm, "pool", "survey"))
     # (the weld's report: what gave a survey corner its height)
@@ -2157,7 +2275,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         zc[nan] = lidar_w(cx[nan], cy[nan])
 
@@ -2172,7 +2290,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     c_wall = np.zeros(len(cx), bool)
     c_wall[sv_m] = is_wall & ~on_hill
     c_lift |= standing(cx, cy, zc, c_wall, is_street)
-    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"))
+    zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"),
+                               belt & (kind != "bed"))
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
     vkey = np.stack([np.round(cx * Q).astype(np.int64), np.round(cy * Q).astype(np.int64), zq], 1)

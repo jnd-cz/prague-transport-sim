@@ -210,6 +210,8 @@ OVERRIDES = {
                   else f"{f['stop']}, from {f.get('from')}", "tools/build_line.py"),
     "switchTips": (("trackSources", "switchTips"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
     "photoTracks": (("trackSources", "photoTracks"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
+    "steppedAnswers": (("trackSources", "steppedAnswers"), lambda f: f["decision"], "tools/di_network.py, through tools/build_line.py",
+                       lambda f: f.get("answer") == "smooth"),
     "structures": (("trackHeights", "structures"), lambda f: f["id"], "tools/import_track_heights.py, through tools/line_heights.py"),
     "surveyGround": (("surveyGround", "places"), lambda f: f"{f['lat']},{f['lon']}", "tools/dtm.py (zps_ground.judge)"),
     "grassReview": (("grassReview", "answers"), lambda f: f["id"], "tools/track_styles.py",

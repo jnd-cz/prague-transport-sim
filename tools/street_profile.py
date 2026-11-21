@@ -385,6 +385,7 @@ R_CLASS, R_STREET, RAISED_BED, FALL_MAX, SW_FALL = street_geometry()
 # (the places the user confirmed as a raised tram corridor: the line-wide report measures raised_bed() on them)
 with open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8") as _fh:
     RAISED_PLACES = next(x["value"] for x in json.load(_fh)["streetGeometry"]["facts"] if x["id"] == "raised-corridors")
+CONFIRMED_NEAR = 10.0  # m: a tracks string's point this near the line between a confirmed corridor's ends lies on it
 SMOOTH_M = 15.0  # m: IPR along a centreline smoothed over this before the fit (its noise: 1 cm p90 against it)
 SEAM = 1.0  # m: the samples within this of a point's nearest one's distance weigh in its height (governing_height)
 BLEND = 10.0  # m along a street from where it meets its governing street over which it takes on its own crown
@@ -663,13 +664,19 @@ def _track_centre(L):
     return s, c, t, zc, g, half
 
 
-def raised_bed(c, F, ipr, road):
+def raised_bed(c, F, ipr, road, confirmed=None, own=None):
     """Per sample of a tracks string and side (0: -n, 1: +n), whether its bed stands over RAISED_BED above the road
     beside it in IPR: IPR on the tracks (between them and at each) against IPR 1-2 m beyond the bed's edge, where that
     is road; held over 5 m runs (a crossing's ramp, where IPR beside the bed is at its level, is a gap in the run).
     (IPR against itself, not against the tracks' heights: those stood 0.13 m under IPR's corridor at Hartigova, which
-    the user confirmed raised, and read it unraised (2 % of its samples); 0.25 m over IPR's level corridor at
-    Olšanské hřbitovy (#606) read it raised behind a 0.25 m kerb)"""
+    the user confirmed raised, and read it unraised (2 % of its samples).) Where the user confirmed a corridor that IPR
+    reads level (`confirmed`, per sample: confirmed_corridor), the tracks' own surface (`z`) against IPR beside it
+    decides too: on Vinohradská from Olšanské hřbitovy towards Flora the tracks stand 0.26-0.29 m over IPR and the
+    survey, both level across, and the user: "yes it's raised" (#606). There a crossing has no gap in IPR to show it
+    (IPR is older than the corridor), so the survey shows it: where the string's centre lies outside the survey's own
+    tram area (`own`), a road or a footpath runs across the corridor, and its surface comes up to the rails (the
+    user, 2026-11-21: "Where roads or footpaths cross it's level crossing like usual, so the surface comes up to the
+    rail top"): no confirmed sample there."""
     import shapely
     n = np.column_stack([-c["t"][:, 1], c["t"][:, 0]])
     out = np.zeros((len(c["p"]), 2), bool)
@@ -691,9 +698,30 @@ def raised_bed(c, F, ipr, road):
             warnings.simplefilter("ignore", RuntimeWarning)
             beside = np.nanmedian(np.array(zs), axis=0)
         up = np.isfinite(beside) & (bed - beside > RAISED_BED)
+        if confirmed is not None and "z" in c:
+            belt = confirmed if own is None else confirmed & shapely.contains_xy(own, c["p"][:, 0], c["p"][:, 1])
+            up |= np.isfinite(beside) & belt & (c["z"] - beside > RAISED_BED)
         for a, b in runs(up):
             if c["s"][b - 1] - c["s"][a] >= 5.0:
                 out[a:b, side] = True
+    return out
+
+
+def confirmed_corridor(ln, p, places=None):
+    """Per point of a tracks string, whether it lies on a corridor the user confirmed raised between two ends
+    (data/truth.json raised-corridors with `from` and `to`: within CONFIRMED_NEAR m of the line between them, between
+    its ends), on line `ln`."""
+    out = np.zeros(len(p), bool)
+    for r in RAISED_PLACES if places is None else places:
+        if r.get("line") != int(ln) or not (r.get("from") and r.get("to")):
+            continue
+        F = Frame()
+        a = np.array([float(np.ravel(v)[0]) for v in F.xy([r["from"][0]], [r["from"][1]])])
+        b = np.array([float(np.ravel(v)[0]) for v in F.xy([r["to"][0]], [r["to"][1]])])
+        ab = b - a
+        u = ((p - a) @ ab) / (ab @ ab)
+        d = np.hypot(*(p - (a + np.clip(u, 0, 1)[:, None] * ab)).T)
+        out |= (u >= 0) & (u <= 1) & (d <= CONFIRMED_NEAR)
     return out
 
 
@@ -741,7 +769,7 @@ def pilot(at, radius, ln, out_dir, ctx=None):
             # (only the bed is the tracks': carried across a 15 m junction, their tilt (cant included) set the fill up
             # to 0.4 m off IPR and met the side streets in a seam; the road beside it is junctions()' fill)
             c["width"] = np.minimum(c["width"], (c["half"] + BED)[:, None])
-            c["raised"] = raised_bed(c, F, ipr, road)
+            c["raised"] = raised_bed(c, F, ipr, road, confirmed_corridor(ln, c["p"]), ctx.get("tram"))
     # a street's width at a junction's mouth is held to its width along the street: Bělohorská's mouth reached 22 m up
     # Liborova (line 23) with its own crossfall, 1 m under IPR where Liborova starts its 15 % climb, which then lagged
     # 3 m behind it; the mouth is the junctions' fill's
@@ -1859,8 +1887,9 @@ def _wide_init(ln):
 def wide_square(ln, cell, ij, raised_xy, ctx=None):
     """One square of line_wide: the line's streets built in it and measured, as sums and samples to merge in square
     order (survey and generated: the road 1 m inside its edge against IPR, the drive lines, the sidewalks), the
-    generated jumps' places, and per confirmed raised corridor (raised_xy) its tracks' samples within 50 m and how many
-    read raised. None where the square holds no street."""
+    generated jumps' places, and per confirmed raised corridor (raised_xy: a point, or a place with `from` and `to`) its
+    tracks' samples within 50 m of the point or on the stretch in this square (confirmed_corridor), and how many read
+    raised. None where the square holds no street."""
     import shapely
     ctx = ctx or (_WIDE["ctx"] if _WIDE.get("ln") == ln else context(ln))
     i, j = ij
@@ -1874,7 +1903,10 @@ def wide_square(ln, cell, ij, raised_xy, ctx=None):
         n = r = 0
         for c in cs:
             if "raised" in c:
-                near = np.hypot(*(c["p"] - xy).T) <= 50.0
+                if isinstance(xy, dict):
+                    near = confirmed_corridor(ln, c["p"], [xy]) & (np.abs(c["p"] - at) <= radius).all(1)
+                else:
+                    near = np.hypot(*(c["p"] - xy).T) <= 50.0
                 n += int(near.sum())
                 r += int(c["raised"][near].any(1).sum())
         out["raised"].append((n, r))
@@ -1986,7 +2018,9 @@ def line_wide(lines, cell, out_path, jobs=None):
                 x, y = F.xy([r["lat"]], [r["lon"]])
                 raised_at.append({"place": r["place"], "xy": np.array([float(np.ravel(x)[0]), float(np.ravel(y)[0])]),
                                   "n": 0, "raised": 0})
-        xy = [r["xy"] for r in raised_at]
+        # (a stretch the user confirmed between two ends: its tracks' samples on it, #606)
+        xy = [r["xy"] if not (q.get("from") and q.get("to")) else q
+              for r, q in zip(raised_at, [q for q in RAISED_PLACES if q["line"] == ln])]
         if jobs > 1:
             ex = sysinfo.pool(min(jobs, len(sq)), _wide_init, ln)
             results = ex.map(wide_square, *zip(*[(ln, cell, ij, xy) for ij in sq]))
@@ -2049,7 +2083,7 @@ def line_wide(lines, cell, out_path, jobs=None):
             for c, v in sorted(scat.items()) if v["survey"]}
         res["triangles over the streets (road, tram, sidewalks)"] = tri
         res["squares"] = len(sq)
-        res["confirmed raised corridors, share of the tracks within 50 m read raised"] = {
+        res["confirmed raised corridors, share of the tracks within 50 m (a stretch: on it) read raised"] = {
             r["place"]: round(r["raised"] / r["n"], 2) if r["n"] else None for r in raised_at}
         res["generated jumps, places"] = places
         out[ln] = res

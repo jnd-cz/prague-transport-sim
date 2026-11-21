@@ -86,14 +86,14 @@ class Network:
     """nodes: {id: {'xy', 'kind'}}; edges: {id: {'a', 'b', 'line', 'src', 'records'}}, `line` from a to b;
     at[node]: [(edge, end)] the edge ends at the node (end 0: the edge starts there)."""
 
-    def __init__(self, source, tips=(), photo=None, archive=None):
+    def __init__(self, source, tips=(), photo=None, archive=None, steps=()):
         self.source = source
         self.archive = archive
         self.nodes, self.edges = {}, {}
         self.at = defaultdict(list)
         self.report = defaultdict(int)
         # the state of each truth.json fact applied over DI (sources.fact_state, #670): {section: [entry with `at`]}
-        self.facts = {'switchTips': [], 'photoTracks': []}
+        self.facts = {'switchTips': [], 'photoTracks': [], 'steppedAnswers': []}
         self._reach = {}
         self._zones = {}
         self._build(source)
@@ -104,6 +104,7 @@ class Network:
         self.unique_pairs()
         self._walk_back()
         self.index()
+        self.state_steps(steps)
 
     # ------------------------------------------------------------------ construction
     def _node(self, xy, kind):
@@ -824,6 +825,60 @@ class Network:
             self.nodes[F]['kind'] = 'joint'
             self.report['switch tips placed'] += 1
 
+    def state_steps(self, steps):
+        """The 'smooth' answers of the stepped-curve review (data/truth.json trackSources.steppedAnswers, #368) against
+        DI's own line (#672): tools/lint.js steppedCurves' rule (stepped_review.stepped_places) on DI's lines through the
+        place, each followed STEP_FOLLOW m on along the passes either way. A step within the answer's reach: holds (the
+        answer still smooths it); none: matches (DI's line has no step there now); no DI line within reach: changed. With
+        the step's radii recorded with the answer (`step`, from its card), a step DI now draws otherwise is changed too.
+        `steps`: [{'id', 'xy', 'reach', 'step': (r5, r25) or None}]."""
+        import stepped_review
+        for f in steps:
+            pt = Point(f['xy'])
+            near = [e for e in (self.eids[i] for i in self.tree.query(pt.buffer(f['reach'])))
+                    if self.edges[e]['line'].distance(pt) <= f['reach']]
+            found = []
+            for e in near:
+                for q in stepped_review.stepped_places(self.line_through(e)):
+                    if math.dist(q['xy'], f['xy']) <= f['reach']:
+                        found.append(q)
+            worst = max(found, key=lambda q: q['r25'] / q['r5'], default=None)
+            now = None if not near else ('step', worst['r5'], worst['r25']) if worst else ('none',)
+            rec = ('step', *f['step']) if f.get('step') else None
+            same_step = lambda a, b: a[0] == b[0] == 'step' and all(abs(x - y) <= STEP_SAME * y for x, y in zip(a[1:], b[1:]))
+            state = 'changed' if now is None else sources.fact_state(('none',), rec, now, unchanged=same_step)
+            self.facts['steppedAnswers'].append({
+                'id': f['id'], 'state': state, 'at': [round(v, 1) for v in f['xy']], 'lines': len(near),
+                'step': None if worst is None else {'r5': round(worst['r5']), 'r25': round(worst['r25'])}})
+
+    def line_through(self, e):
+        """Edge e's line followed STEP_FOLLOW m on either way along the passes, the straightest pass at each node."""
+        c = list(self.edges[e]['line'].coords)
+        fwd = self._follow(e, 1, c)
+        back = self._follow(e, 0, c[::-1])
+        return back[::-1] + c + fwd
+
+    def _follow(self, e, end, path):
+        out, seen, need = [], {e}, STEP_FOLLOW
+        last = list(path[-2:])
+        while need > 0:
+            nxt = [x for x in self.passes.get((e, end), ()) if x[0] not in seen]
+            if not nxt or len(last) < 2:
+                break
+            hx, hy = last[1][0] - last[0][0], last[1][1] - last[0][1]
+
+            ways = [list(self.edges[f]['line'].coords)[::1 if fend == 0 else -1] for f, fend in nxt]
+            cos = [(hx * (c[1][0] - c[0][0]) + hy * (c[1][1] - c[0][1])) /
+                   ((math.hypot(hx, hy) * math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1])) or 1) for c in ways]
+            k = max(range(len(nxt)), key=cos.__getitem__)
+            (f, fend), c = nxt[k], ways[k]
+            out += c[1:]
+            last = (c[-2], c[-1])
+            need -= self.edges[f]['line'].length
+            seen.add(f)
+            e, end = f, 1 - fend
+        return out
+
     def take_photo(self, photo):
         """Tracks measured on the orthophoto the user took over DI's (data/truth.json photoTracks): an edge the photo
         track covers along PHOTO_SHARE of its length within di_tracks.PHOTO_COVER takes the photo's line between its
@@ -1392,7 +1447,7 @@ def load_network():
 
     def build():
         di, archive = di_tracks.load_sources()
-        return Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), archive)
+        return Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), archive, di_tracks.stepped_facts())
     return kept('network', key, build, code=('di_network.py', 'di_tracks.py'))
 
 
@@ -1454,6 +1509,9 @@ def _radius_over(coords, cum, lo, hi, tip=3.0):
     return (hi - lo - tip) / d if d > 1e-9 else math.inf
 
 
+STEP_FOLLOW = 40.0  # m of DI's line followed on either way from an edge near a 'smooth' answer (state_steps: lint's rule
+# reads 12.5 m either side of each point, within the answer's 10 m)
+STEP_SAME = 0.25  # of each radius: a step DI draws within this of the one recorded with the answer is the same step
 SMOOTHED = None  # the 'smooth' answers of the stepped-curve review, [(xy, reach)], read once (di_tracks.stepped_answers)
 
 
@@ -1914,7 +1972,7 @@ def main():
     t = time.time()
     di, _ = di_tracks.load_sources()
     t1 = time.time()
-    net = Network(di, di_tracks.switch_tips(), di_tracks.photo_source())
+    net = Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), steps=di_tracks.stepped_facts())
     print(f"sources {t1 - t:.1f} s, network {time.time() - t1:.1f} s: {net.summary()}")
     root = Path(__file__).resolve().parent.parent
     d = json.loads((root / 'data' / f'line{line}.json').read_text(encoding='utf-8'))
