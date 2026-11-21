@@ -37,6 +37,18 @@ class File(unittest.TestCase):
         self.assertEqual(got, want)
         self.assertEqual({c: len(t) for c, t in by.items()}, {"terrain": 1, "survey": 2, "bed": 0, "plot": 1, "wall": 0})
 
+    def test_the_raster_error_is_measured_on_request(self):
+        # (#704: a plain build's report says it was not measured; --error measures it)
+        asked = []
+        keep, gm.raster_error = gm.raster_error, lambda built, ln: asked.append(ln) or {"all": {}}
+        try:
+            self.assertEqual(gm.error_report({}, "9", False), gm.NOT_MEASURED)
+            self.assertEqual(asked, [])
+            self.assertEqual(gm.error_report({}, "9", True), {"all": {}})
+            self.assertEqual(asked, ["9"])
+        finally:
+            gm.raster_error = keep
+
     def test_a_step_brought_down_to_one_height_is_one_vertex(self):
         """fit_mouths can bring both vertices of a step to one height: weld_coincident makes them one and drops the wall
         between them, so the file decodes to what was built."""
