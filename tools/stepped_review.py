@@ -71,6 +71,33 @@ def step_offset(at, t):
     return float(np.abs(v[mid] - np.polyval(fit, u[mid])).max())
 
 
+STEP_RATIO, STEP_CURVE = 3, 1500  # tools/lint.js steppedCurves: R25 under STEP_CURVE m and R5 * STEP_RATIO under R25
+
+
+def turn(a, b, c):
+    """lint.js turn: the sign of the turn a -> b -> c."""
+    v = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+    return (v > 0) - (v < 0)
+
+
+def stepped_places(p):
+    """tools/lint.js steppedCurves on one polyline (#672): every 2 m from LONG to its length less LONG, where the radius
+    over 25 m is under STEP_CURVE and over STEP_RATIO times the radius over 5 m, but a reverse curve's middle (the two
+    halves turning opposite ways, the 5 m radius no tighter than either half's): [{'s', 'xy', 'r5', 'r25'}]."""
+    L, at = along(p)
+    out = []
+    s = LONG
+    while s < L - LONG:
+        r5, r25 = circle_radius(at(s - SHORT), at(s), at(s + SHORT)), circle_radius(at(s - LONG), at(s), at(s + LONG))
+        if r25 < STEP_CURVE and r5 * STEP_RATIO < r25:
+            h = LONG / 2
+            a0, a1, m, b1, b0 = at(s - LONG), at(s - h), at(s), at(s + h), at(s + LONG)
+            if not (turn(a0, a1, m) * turn(m, b1, b0) < 0 and r5 >= min(circle_radius(a0, a1, m), circle_radius(m, b1, b0))):
+                out.append({'s': s, 'xy': m, 'r5': r5, 'r25': r25})
+        s += 2
+    return out
+
+
 def measure(path, s, info=None, scan=SCAN):
     """How large the step at route s is: the radii over 5 and 25 m as the check read them (its `info`, else read here), the
     corner they imply (degrees: the turn over 5 m beyond the curve's own) and the step's offset (m) from the smooth curve of

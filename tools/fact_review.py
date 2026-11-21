@@ -37,7 +37,8 @@ KEEP, UNSURE = "keep my fact", "unsure"
 # the marks' labels: the user's fact, the source's point
 WHAT = {"stopSigns": ("your placed stop sign", "the DTM's sign (state 2024)"),
         "switchTips": ("your switch tip", "DI's fork"),
-        "photoTracks": ("your orthophoto track", "DI's track")}
+        "photoTracks": ("your orthophoto track", "DI's track"),
+        "steppedAnswers": ("your 'smooth' answer", "DI's line")}
 
 
 def card_id(section, fid):
@@ -61,13 +62,18 @@ def cards(facts, frame=None):
             marks.append({"x": d["src"][0], "y": d["src"][1], "label": theirs, "color": SOURCE})
         off = d.get("off")
         retire = RETIRE_SIGN if f["section"] == "stopSigns" else RETIRE
+        info = (f"{f['id']}: {theirs} lies {off} m from {yours} (data/truth.json {f['section']}); without it the build "
+                f"takes {theirs}. Is the source right? \"{retire}\" or keep yours.")
+        if f["section"] == "steppedAnswers":  # (#672: no point of the source's, the step is gone from DI's line)
+            info = (f"{f['id']}: {theirs} has no stepped curve within reach of {yours} now (tools/lint.js steppedCurves' "
+                    f"rule on DI's own line); without it the build fits DI's points there. Is the source right? "
+                    f"\"{retire}\" or keep yours.")
         out.setdefault(line, []).append({
             "kind": "fact match", "id": card_id(f["section"], f["id"]), "section": f["section"], "fact": f["id"],
             "line": line, "lines": [ln for ln, _ in f["lines"]], "x": x, "y": y,
             "place": [round(float(lat), 7), round(float(lon), 7)], "mag": round((off or 0) * 100), "status": "review",
             "marks": marks, "options": [retire, KEEP, UNSURE],
-            "info": f"{f['id']}: {theirs} lies {off} m from {yours} (data/truth.json {f['section']}); without it the "
-                    f"build takes {theirs}. Is the source right? \"{retire}\" or keep yours."})
+            "info": info})
     for cs in out.values():
         cs.sort(key=lambda c: -c["mag"])
     return out

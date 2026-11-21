@@ -523,6 +523,24 @@ def stepped_answers(truth=None):
     return out
 
 
+def stepped_facts(truth=None):
+    """The 'smooth' answers of the stepped-curve review as facts to state (di_network.Network.state_steps, #672):
+    [{'id': its decision, 'xy', 'reach', 'step': (r5, r25) recorded from its card, or None}]."""
+    import json
+    from geo import Frame
+    path = truth or Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
+    facts = json.loads(Path(path).read_text(encoding='utf-8'))['trackSources'].get('steppedAnswers', [])
+    frame, out = Frame(), []
+    for f in facts:
+        if f.get('answer') != 'smooth' or not f.get('decision'):
+            continue
+        x, y = frame.xy(*f['place'])
+        st = f.get('step')
+        out.append({'id': f['decision'], 'xy': (float(x), float(y)), 'reach': float(f.get('reach', STEPPED_REACH)),
+                    'step': (float(st['r5_m']), float(st['r25_m'])) if st else None})
+    return out
+
+
 STEPPED_REACH = 10.0  # m: a 'smooth' answer frees DI's vertices this near its place (the cards' steps lie within 5 m of it)
 
 
