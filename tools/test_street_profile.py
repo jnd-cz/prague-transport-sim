@@ -99,6 +99,35 @@ class Junctions(unittest.TestCase):
         level = SimpleNamespace(sample=lambda x, y: np.full(len(np.atleast_1d(x)), 200.0))
         self.assertTrue(sp.raised_bed(dict(c, z=np.full(len(s), 200.07)), F, raised, road).all())
         self.assertFalse(sp.raised_bed(dict(c, z=np.full(len(s), 200.25)), F, level, road).any())
+        # (#606: on a corridor the user confirmed, IPR level across it, the tracks' own surface decides: raised there,
+        # not where the tracks stand within RAISED_BED of IPR beside)
+        on = s < 25
+        got = sp.raised_bed(dict(c, z=np.full(len(s), 200.25)), F, level, road, on)
+        self.assertTrue(got[on].all())
+        self.assertFalse(got[~on].any())
+        self.assertFalse(sp.raised_bed(dict(c, z=np.full(len(s), 200.05)), F, level, road, on).any())
+        # (a road 8 m wide across the confirmed corridor, s 10-18: the survey's own tram area has a gap there, a level
+        # crossing. No sample of it is raised; the corridor either side stays so. IPR's own reading keeps a crossing
+        # the old way, by its ramp)
+        own = box(-5, -3, 10, 3).union(box(18, -3, 45, 3))
+        got = sp.raised_bed(dict(c, z=np.full(len(s), 200.25)), F, level, road, on, own)
+        cross = (s > 10) & (s < 18)
+        self.assertFalse(got[cross].any())
+        self.assertTrue(got[on & ((s < 10) | (s > 18))].all())
+        self.assertTrue(sp.raised_bed(dict(c, z=np.full(len(s), 200.07)), F, raised, road, on, own).all())
+
+    @unittest.skipUnless(__import__("geo").have_grid(), __import__("geo").NO_GRID)
+    def test_a_confirmed_corridor_lies_between_its_ends(self):
+        from geo import Frame
+        F = Frame()
+        a, b = (50.078425, 14.47248), (50.077978, 14.463804)
+        ax, ay = (float(np.ravel(v)[0]) for v in F.xy([a[0]], [a[1]]))
+        bx, by = (float(np.ravel(v)[0]) for v in F.xy([b[0]], [b[1]]))
+        places = [{"line": 9, "from": list(a), "to": list(b)}, {"line": 37, "lat": a[0], "lon": a[1]}]
+        mid = ((ax + bx) / 2, (ay + by) / 2)
+        p = np.array([mid, (mid[0], mid[1] + 5), (mid[0], mid[1] + 20), (ax + (ax - bx) * 0.05, ay + (ay - by) * 0.05)])
+        self.assertEqual(sp.confirmed_corridor(9, p, places).tolist(), [True, True, False, False])
+        self.assertFalse(sp.confirmed_corridor(37, p, places).any())
 
     def test_street_geometry_from_truth(self):
         r, other, belt, fall, walk = sp.street_geometry()

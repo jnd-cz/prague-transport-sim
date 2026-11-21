@@ -478,6 +478,48 @@ class LowWalls(unittest.TestCase):
         self.assertEqual(gm.standing(cx, cy, z, wall, street).tolist(), [True] + [False] * 7)
 
 
+class BeltKerbs(unittest.TestCase):
+    """#606: a tram belt along y >= 0, a road along y < 0, sharing the points on y = 0."""
+
+    def corners(self):
+        # (per point x = 0, 5, 10: a road corner of a triangle centred 2 m south and one centred 0.4 m south, a tram
+        # corner of a triangle centred 2 m north)
+        x = np.repeat([0.0, 5.0, 10.0], 3)
+        ty = np.tile([-2.0, -0.4, 2.0], 3)
+        road = np.tile([True, True, False], 3)
+        return x, np.zeros(9), x, ty, road, ~road
+
+    def test_a_raised_belts_edge_is_a_kerb(self):
+        # (the street surface steps 0.25 m through its cells at the edge: 200.0 m on the road 0.5 m out, 200.25 m on
+        # the belt. Read at the point every corner had 200.125 m, and the weld gave the road's the tram's)
+        x, y, tx, ty, road, tram = self.corners()
+
+        def surface(px, py):
+            return 200.0 + 0.25 * np.clip(np.asarray(py, float) / 1.0 + 0.5, 0, 1) + 0 * np.asarray(px, float)
+        z, kerb = gm.belt_kerbs(x, y, tx, ty, np.full(9, 200.125), road, tram, surface, 0.07)
+        np.testing.assert_allclose(z[road], 200.0, atol=1e-9)  # (the lowest of the road's readings, the short one too)
+        np.testing.assert_allclose(z[tram], 200.25, atol=1e-9)
+        self.assertEqual(kerb.tolist(), road.tolist())
+        # (the weld: the tram's corner is the point's top; the road's keeps its own as a kerb, and without the mark
+        # takes the top's)
+        prio, kind = np.where(tram, 2.01, 2.02), np.full(9, "survey", dtype=object)
+        zf, steps, _ = gm.weld(x, y, z, prio, kind, kerbs=kerb)
+        np.testing.assert_allclose(zf, z, atol=1e-9)
+        zf, _, _ = gm.weld(x, y, z, prio, kind)
+        np.testing.assert_allclose(zf, 200.25, atol=1e-9)
+
+    def test_a_level_belts_edge_is_none(self):
+        # (the belt 0.05 m over the road, under the raised belt's 0.07 m, and the road's crossfall beside it: nothing
+        # moves; nor where the road's corners share no point with the tram's)
+        x, y, tx, ty, road, tram = self.corners()
+        z0 = np.full(9, 200.02)
+        z, kerb = gm.belt_kerbs(x, y, tx, ty, z0, road, tram, lambda px, py: 200.0 + 0.05 * (np.asarray(py, float) > 0), 0.07)
+        self.assertTrue(np.allclose(z, z0) and not kerb.any())
+        z, kerb = gm.belt_kerbs(x + np.where(tram, 1.0, 0.0), y, tx, ty, z0, road, tram,
+                                lambda px, py: 200.0 + 0.3 * (np.asarray(py, float) > 0), 0.07)
+        self.assertTrue(np.allclose(z, z0) and not kerb.any())
+
+
 class Platforms(unittest.TestCase):
     """#776: a platform 40 m long on the right of a straight track that climbs 1 %, its edge 1.35 m from the axis."""
 
