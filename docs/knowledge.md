@@ -760,7 +760,10 @@ Sections:
     metre either side. Across such a walkway nothing pulls the surface to IPR. A walkway under 1.5 m across has no
     reading at all and stands a kerb over the road past it (the sidewalk 0.6 m wide between the parapet and the
     road). `wall_lines.stretches` is not used for it: it reads a side 2.5-4 m off, past the ramp, or between two
-    wall lines takes one line's own height, the wall's top for the ramp.
+    wall lines takes one line's own height, the wall's top for the ramp. A run of such edges is cut where the
+    strip's outline turns a corner, and a side under 2 m is none: a paved block 2.0 x 1.1 m at the foot of Rašínovo
+    quay's wall (line 17 (-746.4, -1445.8), `paved` 1231), one run round it, held the lower quay at the mean of both
+    its sides' levels, up to 2 m over the raster.
   - *The surface is read between cells* (`ground_mesh.Streets.at`, cells of 0.5 m), and across a strip thinner than
     a cell the sidewalk on the other side is among them: the platform's corners on Braník's wall read 195.8-196.5 m
     for 197.4 m, teeth. A sidewalk's corner within 0.75 m of a wall's outline reads the surface 0.75 m out on its
@@ -771,7 +774,8 @@ Sections:
     runs unbroken that far (`street_profile.runs_in`), and a plane cut at a break fills only cells before it.
   - *A strip's own surface, triangulated* (0.2 m across, 194 m long, 15 points a side), gave corners on one side the
     other side's height by turns: a paved area up to 1 m across takes its heights between its two sides
-    (`across_outline`).
+    (`across_outline`). Where its sides' outlines have few points it stands tilted across instead: the coping of
+    Ohrada's cutting wall (line 37, `paved` 1847: 0.32 m across, 92 m long, 8 points) by up to 0.3 m for 25 m.
   Three places (`branik-platform-ramps`, `modranska-skola-ramp`, `cerny-kun-platform-wall`): 9 sections fail on the
   written file of 2026-11-20 and hold on the build; steep faces 105.7 to 50.5 m2, 137.1 to 62.1 m2, 153.8 to
   109.4 m2. Not done: Černý kůň's ramps are level-1 areas (the footbridge's), not the ground (#449); a ramp of two
