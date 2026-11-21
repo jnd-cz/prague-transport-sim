@@ -7,10 +7,10 @@ argument-hint: "[lines, e.g. 9,23] (default: chosen from the diff)"
 # Regression check
 
 Compares this branch with main's baseline instead of rerunning the published data. Which one, by what
-each run has (`tools/headless.py`, #282): main's at the merge base (published at night, or this machine's own); else a
-seedless run is measured at the merge base once, in a pinned worktree in the heavy-job queue, and kept on
-this machine for the next branch on that base (a few minutes a line); a seeded run takes the latest world
-checkpoint's. `--against W1` names a checkpoint.
+each run has (`tools/headless.py`, #282, #709): main's at the merge base (published at night, or this machine's own);
+else the run is measured at the merge base once, in a pinned worktree in the heavy-job queue, and kept on
+this machine for the next branch on that base (seedless: a few minutes a line; seeded: as long as the branch's own
+run). `--against W1` names a checkpoint instead.
 
 1. **What changed:** `git diff --name-only origin/main...HEAD` plus uncommitted changes, and
    `git diff origin/main -- data/MANIFEST.json` if data was rebuilt.
@@ -18,7 +18,7 @@ checkpoint's. `--against W1` names a checkpoint.
    lines (unless given: $ARGUMENTS):
    - **the simulation** (`src/traffic.js`, `src/autopilot.js`, `src/tram.js`, `src/tr37.js`, the game's rules
      in `src/game.js`, `tools/traffic_lint.js`, `tools/bench/`, `tools/autopilot.js`): all lines,
-     9,17,22,23,37, `--checks u3,redruns,traffic,lint`, seeds 1-5.
+     9,17,22,23,37, `--checks u3,redruns,stops,traffic,lint`, seeds 1-5 (`stops` rides on the `u3` drive, #708).
    - **a build tool with rebuilt data** (world): the lines whose files changed in the manifest (or in
      `data/` against it); a build tool whose data is not rebuilt yet is rebuilt first
      (`python -P -E tools/rebuild.py <lines> --parallel`). `--checks lint,surfaces,canted,crossing,spacing,heights`,
@@ -36,13 +36,13 @@ checkpoint's. `--against W1` names a checkpoint.
    waits for, so start it and let it wait rather than starting a second one beside it. Every check on
    every line takes 27 minutes with 4 pages at once (#205), the geometry checks a few minutes a line.
    `python -P -E tools/headless.py --lines <lines> --checks <the tier's checks> --compare`
-   (`--port 0` when another headless run uses 8745). Seeded counts are judged against main's spread over
+   Seeded counts are judged against main's spread over
    its seeds (#156); fewer seeds (`--seeds 1-2`) still compare against the full spread, only less surely.
 4. **Read the result:**
    - A stale-baseline warning: main moved since its baseline. Say so, and read the differences as main's
      changes plus the branch's.
-   - A note when a seeded run took a checkpoint (its merge base has no baseline): the differences are the world's
-     changes since it plus the branch's. Say so in the PR.
+   - A note that seeded runs compare with a checkpoint, "not with main" (measuring at the merge base was left out
+     or gave nothing): read no move from them; run it again so that it measures there, and say so in the PR.
    - Known failures in AGENTS.md (its table) are not regressions.
    - The table lists, per line and check: counts whose mean left main's seed spread (**worse** /
      better), counts that moved inside it (noise: no reason needed), and per-seed hard failures

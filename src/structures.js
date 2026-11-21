@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The structures: our tunnels through rock, the road tunnels' portals and the ground fitted to their mouths, the
-// track's support, the bridges and the retaining walls.
+// track's support and the bridges. (Retaining walls are the ground file's: tools/wall_lines.py, #765.)
 import * as THREE from 'three';
 import { weatherize, wetFactor } from './weather.js';
-import { ChunkedGeometry, GROUND_SNOW, STREET_SNOW, W, densify } from './worldMesh.js';
+import { ChunkedGeometry, GROUND_SNOW, STREET_SNOW, W } from './worldMesh.js';
 
 // Our tunnels through rock: a vault over both tracks and the road (walls to 4.8 m, an arch to 7.2 m
 // over the rails), the rock above it at the lidar ground (wider than the hole cut in the terrain, a
@@ -294,61 +294,6 @@ export function buildBridges(group, data, route, ground) {
       pier.position.set(o.x, (z - 1.6 + zg) / 2, -o.y);
       pier.rotation.y = Math.atan2(h.hx, -h.hy);
       group.add(pier);
-    }
-  }
-  cg.build(group);
-}
-
-// Retaining walls where the track is cut into a hillside (e.g. Chotkova), with a flat cap
-// covering the terrain lowered behind them.
-export function buildWalls(group, data, route, ground) {
-  const cg = new ChunkedGeometry(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { color: true });
-  const stone = new THREE.Color('#8a8172').toArray(), coping = new THREE.Color('#9c968a').toArray(), cap = new THREE.Color('#6f7d55').toArray();
-  // real retaining walls (IPR Praha): line + height
-  const realPts = new Map();
-  const key = (x, y) => `${Math.floor(x / 8)},${Math.floor(y / 8)}`;
-  for (const w of data.geo?.walls || []) {
-    const line = densify(w.p, 2);
-    const c = cg._chunk(line[0][0], line[0][1]);
-    const half = 0.25;
-    const edge = line.map((p, i) => {
-      const a = line[Math.max(0, i - 1)], b = line[Math.min(line.length - 1, i + 1)];
-      const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
-      const nx = -dy / l, ny = dx / l;
-      const g1 = ground.at(p[0] + nx * 1.5, p[1] + ny * 1.5), g2 = ground.at(p[0] - nx * 1.5, p[1] - ny * 1.5);
-      const bottom = Math.min(g1, g2) - 0.4, top = Math.max(Math.max(g1, g2) + 0.3, bottom + 0.4 + w.h);
-      realPts.set(key(p[0], p[1]), true);
-      return { L: [p[0] + nx * half, p[1] + ny * half], R: [p[0] - nx * half, p[1] - ny * half], bottom, top };
-    });
-    for (let i = 0; i < edge.length - 1; i++) {
-      const a = edge[i], b = edge[i + 1];
-      for (const side of ['L', 'R']) {
-        cg.quad(c, W(...a[side], a.bottom), W(...b[side], b.bottom), W(...b[side], b.top), W(...a[side], a.top), stone);
-      }
-      cg.quad(c, W(...a.L, a.top), W(...b.L, b.top), W(...b.R, b.top), W(...a.R, a.top), coping);
-    }
-  }
-  const nearReal = (x, y) => {
-    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) if (realPts.has(`${Math.floor(x / 8) + i},${Math.floor(y / 8) + j}`)) return true;
-    return false;
-  };
-  const runs = ground.walls?.runs || [];
-  const B = ground.walls.bench, Rch = ground.walls.reach + 3;
-  for (const run of runs) {
-    if (run.pts.length < 2) continue;
-    const c = cg._chunk(...(() => { const o = route.at(run.pts[0].s); return [o.x, o.y]; })());
-    for (let i = 0; i < run.pts.length - 1; i++) {
-      const a = run.pts[i], b = run.pts[i + 1];
-      const za = ground.profile.height(a.s), zb = ground.profile.height(b.s);
-      const fa = route.offset(a.s, run.side * B), fb = route.offset(b.s, run.side * B);
-      const ka = route.offset(a.s, run.side * (B + 0.5)), kb = route.offset(b.s, run.side * (B + 0.5));
-      const ca = route.offset(a.s, run.side * Rch), cb = route.offset(b.s, run.side * Rch);
-      // wall face (unless a real surveyed wall stands here)
-      if (!nearReal(fa.x, fa.y)) cg.quad(c, W(fa.x, fa.y, za - 0.3), W(fb.x, fb.y, zb - 0.3), W(fb.x, fb.y, b.top), W(fa.x, fa.y, a.top), stone);
-      // coping stones and the cap of hillside behind the wall
-      cg.quad(c, W(fa.x, fa.y, a.top + 0.15), W(fb.x, fb.y, b.top + 0.15), W(kb.x, kb.y, b.top + 0.15), W(ka.x, ka.y, a.top + 0.15), coping);
-      cg.quad(c, W(fa.x, fa.y, a.top), W(fb.x, fb.y, b.top), W(fb.x, fb.y, b.top + 0.15), W(fa.x, fa.y, a.top + 0.15), coping);
-      cg.quad(c, W(ka.x, ka.y, a.top + 0.05), W(kb.x, kb.y, b.top + 0.05), W(cb.x, cb.y, b.top + 0.05), W(ca.x, ca.y, a.top + 0.05), cap);
     }
   }
   cg.build(group);

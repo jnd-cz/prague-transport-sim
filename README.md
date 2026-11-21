@@ -199,8 +199,8 @@ tmavé sklo je hra.
 
 ### Město
 
-- Terén: koridor trati je zaříznutý do lidarového terénu; opěrné zdi tam, kde trať vede v zářezu ve svahu
-  (Chotkova), Most Legií na mostovce s pilíři.
+- Terén: povrch podle zaměření města a lidaru; opěrné zdi ze zaměření a z dat města jsou jeho součástí
+  (Chotkova, nábřeží pod Letnou), Most Legií na mostovce s pilíři.
 - Značky: klasické červené pražské označníky; rychlostní návěsti podle předpisu D 1/2 (omezení rychlosti černým
   číslem na žluté, rychlostník bílým na černé, předzvěstní trojúhelník, „r“ oblouku o malém poloměru, nebezpečné
   stoupání a klesání), dvakrát větší než skutečné, aby se daly přečíst na obrazovce. Tabulky
@@ -258,9 +258,10 @@ Na malé obrazovce je panel řidiče úzký pruh (rychloměr, ampérmetr, kontro
 sloupec u pravého palce (▲ nahoře, STOP dole), ostatní tlačítka ve dvou sloupcích vlevo a panel řidiče mezi nimi.
 
 **Celá obrazovka:** telefon se jednou zeptá v menu; s „Celá obrazovka“ se každá směna spustí na celé obrazovce,
-otočená na šířku, kde to prohlížeč dovolí (Chrome na Androidu), jinde hra ukáže, ať telefon otočíte. ⛶ v menu ji
-kdykoli zapne nebo vypne; gesto zpět ji opustí do příštího startu. Safari na iPhonu celou obrazovku stránce nedovolí: hra jednou poradí
-Sdílet ⬆ → Přidat na plochu a spuštěná z ikony na ploše běží na celé obrazovce.
+otočená na šířku, kde to prohlížeč dovolí (Chrome na Androidu), jinde hra ukáže, ať telefon otočíte. ⛶ v menu
+a ve směně na panelu pauzy (II) ji kdykoli zapne nebo vypne; gesto zpět ji opustí do příštího startu nebo ⛶. Safari na
+iPhonu celou obrazovku stránce nedovolí: hra jednou poradí Sdílet ⬆ → Přidat na plochu a spuštěná z ikony na ploše běží
+na celé obrazovce.
 
 ### S herním ovladačem
 

@@ -33,6 +33,10 @@ export const T3 = {
   sandSecs: 1500,
   lineVoltage: 600,
 };
+// its running gear in src/articulated.js's terms (#579): one section, the body, on two free bogies 6.4 m apart, each
+// with a 1.9 m wheelbase (AXLES below)
+T3.sections = [{ from: 0.6, to: T3.length - 0.6, bogies: [-1, 1].map((d) => ({ at: T3.length / 2 + d * T3.bogies / 2, turn: 'free', wheelbase: 1.9 })) }];
+T3.joints = [];
 export const VEHICLE_TYPES = { T3 };
 
 // Wheel/rail adhesion (peak, at a standstill) by weather: the game's values, which the checks were set on. The research

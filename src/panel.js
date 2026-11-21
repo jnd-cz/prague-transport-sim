@@ -137,15 +137,21 @@ function ctl(id, x, y, kind, o = {}) {
 }
 // 6921's edgewise meters, flat as from straight above (the user's photo, 2026-11-17: "draw them as rectangles rather
 // than curved surface from perspective ... the needle comes from the right side"): a black frame, the scale plate under
-// the strip with the calibration stamp, the figures left of the ticks, the pointer's blade coming in from the right.
+// the strip with the calibration stamp, the figures left of the ticks (on a narrow plate in their place), the pointer's
+// blade coming in from the right.
 // The scales are the photo's: a tick every 20 A, a long one every 100 A, figures every 200 A; a tick every 2 V, figures
 // every 10 V. Compact strips leave out the short ticks and the strip.
 const SCALE = { amp: [600, 20, 100, 200, 'A', '- - -11- 2002'], volt: [40, 2, 10, 10, 'V', '- - -12- 2002'] };
 function meter(id, x, y, w, h, fig = 9, dense = true) {
   const [max, minor, long, step, unit, stamp] = SCALE[id], f = (n) => +n.toFixed(2);
   const b = Math.max(3, Math.round(w * 0.07)), wx = b + 2.5, wy = b + 2.5, ww = w - 2 * wx, wh = h - 2 * wy;
-  const sh = dense ? wh * 0.1 : 0, y0 = wy + wh - fig * 0.6 - 1.5, y1 = wy + sh + fig * 0.5 + 1.5, at = (v) => y0 - (v / max) * (y0 - y1);
   const xr = wx + ww * (dense ? 0.66 : 0.74), xl = xr - ww * 0.27;
+  // a figure stands left of its mark where the plate has room for the widest, else over its mark, in its place (the phone's
+  // strips: their ammeter's 600 ran onto the frame, the user, 2026-11-18, "perhaps put it on top of the mark when running
+  // short on space", #691; above its mark it touched the next one). Its width at 0.6 em a digit: --f-label's Barlow
+  // Condensed is not loaded, so a phone draws Roboto, 0.56 em.
+  const fw = String(max).length * fig * 0.6, over = fw > xl - wx - 0.5, fx = over ? Math.min(xr - ww * 0.105, wx + ww - fw / 2 - 0.5) : xl;
+  const sh = dense ? wh * 0.1 : 0, y0 = wy + wh - fig * 0.6 - 1.5, y1 = wy + sh + fig * 0.5 + 1.5, at = (v) => y0 - (v / max) * (y0 - y1);
   let s = `<svg viewBox="0 0 ${w} ${h}"><rect class="fr" width="${w}" height="${h}" rx="3"/>` +
     `<rect class="rim" x="${b}" y="${b}" width="${f(w - 2 * b)}" height="${f(h - 2 * b)}" rx="1.5"/>` +
     `<rect class="pl" x="${wx}" y="${wy}" width="${f(ww)}" height="${f(wh)}"/><rect class="gap" x="${f(wx + ww * 0.93)}" y="${wy}" width="${f(ww * 0.07)}" height="${f(wh)}"/>`;
@@ -153,10 +159,12 @@ function meter(id, x, y, w, h, fig = 9, dense = true) {
     `<text class="stamp" x="${f(wx + ww * 0.45)}" y="${f(wy + sh * 0.68)}" font-size="${f(sh * 0.5)}">${stamp}</text>`;
   for (let v = 0; v <= max + 1e-6; v += dense ? minor : long) {
     const big = Math.abs(v / long - Math.round(v / long)) < 1e-6, ty = f(at(v));
+    // (the compact ones leave out the 0: their unit letter stands there)
+    const num = Math.abs(v / step - Math.round(v / step)) < 1e-6 && (dense || v);
+    if (num && over) { s += `<text class="fig over" x="${f(fx)}" y="${ty}" font-size="${fig}">${v}</text>`; continue; }
     s += big ? `<rect class="tk" x="${f(xr - ww * 0.24)}" y="${f(ty - 0.6)}" width="${f(ww * 0.27)}" height="1.2"/>`
       : `<rect class="tk" x="${f(xr - ww * 0.1)}" y="${f(ty - 0.35)}" width="${f(ww * 0.1)}" height=".7"/>`;
-    // (the compact ones leave out the 0: their unit letter stands there)
-    if (Math.abs(v / step - Math.round(v / step)) < 1e-6 && (dense || v)) s += `<text class="fig" x="${f(xl)}" y="${ty}" font-size="${fig}">${v}</text>`;
+    if (num) s += `<text class="fig" x="${f(xl)}" y="${ty}" font-size="${fig}">${v}</text>`;
   }
   s += `<text class="unit" x="${f(wx + ww * 0.06)}" y="${f(y0)}" font-size="${f(fig * 1.45)}">${unit}</text>`;
   // the pointer at 0, moved up by update() (data-r: the scale's length)
@@ -360,6 +368,8 @@ function requested(game, st, s) {
 export class Panel {
   constructor() {
     this.dash = $('dash');
+    this.resized = true; // (the dashboard's size changed since place(): update() then places its parts again)
+    new ResizeObserver(() => { this.resized = true; }).observe(this.dash);
     this.look = 0;
     this.fold = store(FOLD_KEY) === '1';
     this.held = {}; // keys held (the momentary controls drawn pressed)
@@ -532,7 +542,7 @@ export class Panel {
 
   place() {
     const dw = this.dash.offsetWidth, dh = this.dash.offsetHeight;
-    this.placed = `${dw}x${dh}`;
+    this.resized = false;
     if (!dw || !dh) return;
     if (!document.body.classList.contains('pcompact')) {
       const s = dh / H, pz = this.el.pz;
@@ -582,11 +592,11 @@ export class Panel {
   update(game, opts) {
     const b = document.body;
     if (this.layoutKey !== this.modeKey()) this.layout();
-    else if (this.placed !== `${this.dash.offsetWidth}x${this.dash.offsetHeight}`) this.place();
+    else if (this.resized) this.place(); // (the dashboard's size changed: a ResizeObserver says so, no layout read here, #706)
     if (!this.fitted) this.fit();
     const tram = game.tram, eq = tram.eq, lamps = game.lamps || {}, e = this.el, now = performance.now();
     const set = (k, v, f) => { if (this.state[k] !== v) { this.state[k] = v; f(v); } };
-    b.dataset.doors = game.doorState;
+    set('doors', game.doorState, (v) => { b.dataset.doors = v; });
     b.classList.toggle('passist', !!opts.assist);
     b.classList.toggle('pdeadman', !!opts.deadman);
     // the dial, the meters

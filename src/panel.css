@@ -95,6 +95,8 @@ body.passist:not(.touch) .ctl .kb { display: block; }
 .meter .tk { fill: #161616; }
 .meter .fig, .meter .unit { font-family: var(--f-label); font-weight: 700; fill: #161616; dominant-baseline: central; font-variant-numeric: tabular-nums; }
 .meter .fig { text-anchor: end; }
+/* (over its mark where the plate is narrow: src/panel.js meter()) */
+.meter .fig.over { text-anchor: middle; }
 .meter .ptr { fill: #2c2d2c; transition: transform .25s linear; }
 
 /* the speedometer on its pedestal (6921: a black face, white figures 0-80, an odometer) */
