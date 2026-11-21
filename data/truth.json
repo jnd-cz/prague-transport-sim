@@ -5358,6 +5358,202 @@
      "why": "IPR has the road and the sidewalk at 191.86-191.99 m up to 1 m inside the kerb and the wall's face from 1.25 m in (190.17 m at 1.5 m). The kerb-wall rule read the walkway's level on the face and held the edge at it: the written file of ground batch B has the sidewalk at 190.31 m at its kerb"
     }
    ]
+  },
+  "branik-platform-ramps": {
+   "line": "17",
+   "at": [
+    -2034.0,
+    -6269.0
+   ],
+   "reach": 35,
+   "issue": 786,
+   "what": "the platform of Nádraží Braník on the top of a wall 2.6 m over a ramp of two flights that goes down beside it to the lower road: the platform level up to the wall's top, the ramp's flights straight along the walls' feet, the walls upright",
+   "source": "the user's note on the test site, 2026-11-20 (fb-20261120-154358-23100c03: \"one more test case for ramps and pedestrian underpass tunnel which should be on the left\"), on ground batch A",
+   "sections": [
+    {
+     "name": "along the platform 0.4 m inside the wall's top, 16 m",
+     "from": [
+      -2034.21,
+      -6257.27
+     ],
+     "to": [
+      -2045.21,
+      -6269.07
+     ],
+     "expect": {
+      "off the chord m": 0.1,
+      "largest step m": 0.05
+     },
+     "why": "the survey has the wall as `paved` 2605, 0.18 m across, its top's side at 197.43-197.51 m and its foot's at 194.84 m; the platform's own outline along it is the top's. The written file of 2026-11-20 has the platform's edge at 196.35 m there, on IPR's smear of the wall"
+    },
+    {
+     "name": "along the upper ramp 0.4 m from the wall's foot, 16 m",
+     "from": [
+      -2034.94,
+      -6256.59
+     ],
+     "to": [
+      -2045.94,
+      -6268.39
+     ],
+     "expect": {
+      "off the chord m": 0.2,
+      "largest step m": 0.1
+     },
+     "why": "the ramp falls evenly along the wall's foot (1.0 m in 16 m); the written file has it toothed, its corners on the wall's line read between the platform's cells and its own"
+    },
+    {
+     "name": "from the platform across the wall onto the ramp, 3 m",
+     "from": [
+      -2036.23,
+      -6261.07
+     ],
+     "to": [
+      -2038.18,
+      -6258.79
+     ],
+     "expect": {
+      "sloping m": 0.25,
+      "largest step m at least": 2.0
+     },
+     "why": "a wall: 197.43 m to 194.84 m within 0.18 m"
+    }
+   ]
+  },
+  "modranska-skola-ramp": {
+   "line": "17",
+   "at": [
+    -2482.0,
+    -8420.0
+   ],
+   "reach": 40,
+   "issue": 786,
+   "what": "the platform of Modřanská škola on the track's embankment and the ramp that climbs to it from the bus stop on Modřanská: the ramp 2.15 m wide between the wall under the track and a low parapet on the road's side (the survey's `paved` 7894 and 7924, each 0.2 m across), 196.9 to 199.8 m in 40 m; south of its top the platform level up to the parapet's line, a sidewalk 0.6 m wide between the parapet and the road at the road's kerb; the walls upright and plain",
+   "source": "the user's note on the test site, 2026-11-20 (fb-20261120-154139-ecb65c1f: \"tram stop and ramp isn't even\"), on ground batch A; the user, 2026-11-21 (session), with a Street View frame from the bus stop: \"Modřanská škola has ramp from the bus stop like this\"; the user, 2026-11-21 (session), asked whether the ramp's top 23 m are steps as OSM has them (way 186894319, `highway=steps`): \"Modřanská škola should be accessibility ramp with no steps, osm can be wrong there which I can fix later.\"",
+   "seen": {
+    "what": "From the bus stop, looking south: a ramp of paving about 2 m wide rising along a plain wall of concrete panels some 4 m high (the track above it, its masts on the wall), a low concrete parapet on the ramp's road side that rises with it, the stop's shelter and sign at the ramp's top; beside the parapet the roadside sidewalk and the bus bay. From Modřanská 26, looking west-south-west at the platform's part: the same plain upright wall, one joint along it at about two thirds of its height, a parapet over the platform.",
+    "from": [
+     {
+      "note": "the user's Street View frame, sent in the session of 2026-11-21 (not stored)"
+     },
+     {
+      "note": "Street View at Modřanská 26, image of August 2025, looked at 2026-11-21 (not stored)"
+     }
+    ],
+    "source": "Street View, looked at; the user's frame"
+   },
+   "sections": [
+    {
+     "name": "up the ramp 1.2 m from the parapet, 34 m from (-2481.6, -8396) south to the platform",
+     "from": [
+      -2481.6,
+      -8396.0
+     ],
+     "to": [
+      -2481.3,
+      -8430.0
+     ],
+     "expect": {
+      "off the chord m": 0.4,
+      "largest step m": 0.1,
+      "rise m at least": 2.2
+     },
+     "why": "IPR has the ramp at its middle rising evenly, 197.46 m to 199.9 m (6.8 %); a metre either side it reads the track's 200 m and the road's 196.1 m. The written file of 2026-11-20 has it wavy and 0.3-0.8 m low"
+    },
+    {
+     "name": "across the ramp at y = -8410, from the wall under the track to the parapet, 1.7 m",
+     "from": [
+      -2482.3,
+      -8410.0
+     ],
+     "to": [
+      -2480.6,
+      -8410.0
+     ],
+     "expect": {
+      "sloping m": 0.25,
+      "largest step m": 0.1
+     },
+     "why": "a ramp is level across; the written file falls 0.8 m across it towards the parapet, the road's level smeared in"
+    },
+    {
+     "name": "along the platform 0.4 m inside the parapet's line, 19 m",
+     "from": [
+      -2480.33,
+      -8433.0
+     ],
+     "to": [
+      -2480.02,
+      -8452.0
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.1
+     },
+     "why": "the survey has the parapet as `paved` 7924, 0.2 m across and 194 m long, its sides at 198.7 and 198.3 m: neither the platform's 199.6 m nor the road's 196.4 m. The ground steps across it, and the platform's cells along it read IPR's smear of the step"
+    },
+    {
+     "name": "along the sidewalk at the wall's foot, midway between the parapet and the kerb, 18 m",
+     "from": [
+      -2479.44,
+      -8434.0
+     ],
+     "to": [
+      -2479.12,
+      -8452.0
+     ],
+     "expect": {
+      "off the chord m": 0.1,
+      "largest step m": 0.05
+     },
+     "why": "a sidewalk 0.6 m wide between the wall and the road, at the road's kerb (196.5 m). The written file has it between 197.3 and 199.6 m by turns: its corners read the platform's cells across the parapet, and the kerb-wall rule took IPR 1.5 m in from its kerb, the platform's, for its walkway"
+    },
+    {
+     "name": "from the platform across the wall to the road, y = -8440",
+     "from": [
+      -2481.0,
+      -8440.0
+     ],
+     "to": [
+      -2478.5,
+      -8440.0
+     ],
+     "expect": {
+      "sloping m": 0.5,
+      "largest step m at least": 1.5
+     },
+     "why": "a wall: the platform at 199.6 m, the road at 196.4 m, 1 m apart"
+    }
+   ]
+  },
+  "cerny-kun-platform-wall": {
+   "line": "17",
+   "at": [
+    -2230.0,
+    -6928.0
+   ],
+   "reach": 35,
+   "issue": 786,
+   "what": "the platform of Černý kůň on the top of a wall over the ramps of the footbridge and the underpass beside it: the platform level up to the wall's top, the walls upright (the ramps themselves are level-1 areas, not the ground)",
+   "source": "the user's note on the test site, 2026-11-20 (fb-20261120-154306-c100b0e1: \"another wavy ramps\"), on ground batch A",
+   "sections": [
+    {
+     "name": "along the platform 0.4 m inside the wall's top, 41 m",
+     "from": [
+      -2243.26,
+      -6950.09
+     ],
+     "to": [
+      -2234.07,
+      -6910.09
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.05
+     },
+     "why": "the survey has the wall as `paved` 2592, 0.25 m across, its top's side at 198.33-199.05 m along the platform; the written file has the platform's edge 0.25 m off its straight line, on IPR's smear of the wall"
+    }
+   ]
   }
  }
 }
