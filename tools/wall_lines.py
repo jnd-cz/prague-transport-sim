@@ -327,25 +327,27 @@ def source_lines(ln, root=ROOT, box=None):
     path = os.path.join(root, "data", f"line{ln}.zps.json")
     if not os.path.exists(path):
         return []
-    with open(path, encoding="utf-8") as f:
-        d = json.load(f)
-    if KIND not in d["kinds"]:
-        return []
-    k = d["kinds"].index(KIND)
-    out = []
-    for r in d["lines"]:
-        # (level 0 and above: a walled ramp's sides are surveyed at level 1, the Modřany viaduct's, line 17 (-2385, -9250),
-        # with the ground stepping 5 m across them; a bridge's parapet at level 1 has no step in the raster and makes no
-        # stretch. Underground levels are left out)
-        if r[0] != k or r[1] < 0:
-            continue
-        p = np.array([[v if v is not None else np.nan for v in r[i:i + 3]] for i in range(3, len(r), 3)], float)
-        if len(p) < 2:
-            continue
-        if box is not None and (p[:, 0].max() < box[0] or p[:, 0].min() > box[2] or p[:, 1].max() < box[1] or p[:, 1].min() > box[3]):
-            continue
-        out.append(p)
-    return out
+    # (kept while the file is the same one: a line's street squares each ask for their own box, #786)
+    key = (path, os.path.getmtime(path))
+    if source_lines.kept[0] != key:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        lines = []
+        k = d["kinds"].index(KIND) if KIND in d["kinds"] else None
+        for r in d["lines"] if k is not None else ():
+            # (level 0 and above: a walled ramp's sides are surveyed at level 1, the Modřany viaduct's, line 17 (-2385, -9250),
+            # with the ground stepping 5 m across them; a bridge's parapet at level 1 has no step in the raster and makes no
+            # stretch. Underground levels are left out)
+            if r[0] != k or r[1] < 0:
+                continue
+            p = np.array([[v if v is not None else np.nan for v in r[i:i + 3]] for i in range(3, len(r), 3)], float)
+            if len(p) >= 2:
+                lines.append(p)
+        source_lines.kept = (key, lines)
+    return [p for p in source_lines.kept[1] if _reaches(p, box)]
+
+
+source_lines.kept = (None, [])
 
 
 STRIP = 1.0  # m: a paved survey area this wide or narrower is a strip: a parapet, an edging, a wall's top
@@ -356,13 +358,8 @@ def wall_outlines(ln, root=ROOT, box=None, strips=False):
     strips: and of its paved strips up to STRIP wide (twice the area over the perimeter): the survey has many a wall's
     top as one (under Letná, line 17 (26..317, 800), area 4166: 0.44 m wide and 290 m long at 191.4-196.3 m, the
     wall Geoportál has as a line)."""
-    path = os.path.join(root, "data", f"line{ln}.dtm.json")
-    if not os.path.exists(path):
-        return []
-    with open(path, encoding="utf-8") as f:
-        d = json.load(f)
     out = []
-    for a in d.get("areas") or []:
+    for a in _dtm(ln, root):
         if a.get("c") not in (("wall", "paved") if strips else ("wall",)) or len(a.get("r") or []) < 3:
             continue
         p = np.array([[v if v is not None else np.nan for v in q[:3]] for q in a["r"] + a["r"][:1]], float)
