@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-18",
- "built_at_commit": "cce9a13",
- "published": "2026-11-20 13:23",
- "note": "Ground batch A of 2026-11-20 (#757): the tunnel mouths (#772), strips as wall lines and plain lidar ground (#773), paved yards on the lidar over 0.3 m (#774); dtm, ground and network of the five lines",
+ "built_at_commit": "a9f9f06",
+ "published": "2026-11-21 12:06",
+ "note": "Ground batch B (#757): the lines' street surfaces and ground rebuilt with #775, #777, #781, #782, #784, #785, #787, #789, #790",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -25,12 +25,12 @@
    "sha256": "251801868332448f753545d87832bf64e96a833087e648ff552d4faa8ebc84c8"
   },
   "line17.ground.bin": {
-   "size": 31313033,
-   "sha256": "a3be84cb242a1818916ce77ed157535ac28115d7f708a79788a694e020dc4a14"
+   "size": 31226890,
+   "sha256": "947d044f37c9fa0caaa851353cad604ca790a7a5f01a0656d8b685d3fc0fa580"
   },
   "line17.ground.json": {
-   "size": 129447,
-   "sha256": "2a91a2ada1a1d33e9ef65fb8ce1236f63eee0919318c6eb3a845c40f33fe267b"
+   "size": 129419,
+   "sha256": "31b1a84e9ea75e1bd90fd8ceb7cb6eedab6c7ba5c6bbce60fc7e8101ec5c7bd2"
   },
   "line17.json": {
    "size": 7046694,
@@ -38,19 +38,19 @@
   },
   "line17.network.json": {
    "size": 9289335,
-   "sha256": "fc86da3a10e6179aae06651e96dfd9132b1d04b3f1591fcec40e45144311ed52"
+   "sha256": "d67d7e94e821405b5a9cf92199618fa305d0a226e5ec07629c7646836c6fa904"
   },
   "line17.signals.json": {
    "size": 36582,
    "sha256": "8698ef0e19017bcdd84848c74c82e24cd7635419e107f36365ec6858bf64dc59"
   },
   "line17.streets.bin": {
-   "size": 5454211,
-   "sha256": "90e8cf5d6c988473a8f3b3a90236b12449131da201927156ec44f00294dfda38"
+   "size": 5541161,
+   "sha256": "8493158320c5d2f1bf4b4789e42970a1b205653f1536b34c3b204495e040b68b"
   },
   "line17.streets.json": {
-   "size": 18685,
-   "sha256": "616572807f58e694d8a9d77fb9cfa139ff255e877b5aaf8a840ab5151c60c830"
+   "size": 18687,
+   "sha256": "bca7a16d4c9a3089975a8f003d68e03bead426cbe660a9eb7262cc8dec14db62"
   },
   "line17.validate.json": {
    "size": 4663,
@@ -81,12 +81,12 @@
    "sha256": "5a3066480fa2189f954a82260479e55389f76f131d19b6323a4311484fd50545"
   },
   "line22.ground.bin": {
-   "size": 30465313,
-   "sha256": "5a5fae18629aa5ecbc5aefa55d62aa37b0ec96e2f6063cca0f43523a165aed30"
+   "size": 30374202,
+   "sha256": "dc76ec81c36743c33a89c445781aea1cff299b4cca4b7d8729eeca9ff261f3b5"
   },
   "line22.ground.json": {
-   "size": 103813,
-   "sha256": "86302ce61a96ce24c327e62b8e528be31dce70432398d693b74cc3a82f86408c"
+   "size": 103675,
+   "sha256": "3dd07f11f7a6f7cea387a0daa0d0ae991ff8616bdf34ea8d3dbabc0252ac3363"
   },
   "line22.json": {
    "size": 7034977,
@@ -94,15 +94,15 @@
   },
   "line22.network.json": {
    "size": 10038928,
-   "sha256": "4a280a8d844a4d80f055bbf46f7646986b36d168d038aacd26c88b8e4fe910af"
+   "sha256": "7cb56d700aeb1a0dd35d54abc01ba10f6a839a622e12ba9f1886197e1c20fad8"
   },
   "line22.streets.bin": {
-   "size": 5451982,
-   "sha256": "7f00b4932308d36f09afea80cf742fc09af3218b7ff0c8adff606eba95326443"
+   "size": 5532838,
+   "sha256": "006700645433605efad30eeb23fdd3f5c04476546540bbefbae50c204ceb059f"
   },
   "line22.streets.json": {
-   "size": 17648,
-   "sha256": "d085a8b4d7b37006eadd1894a59202401017abda0fc162f971d81934259a1cde"
+   "size": 17649,
+   "sha256": "18a3aaabb0eed22284f2b456d8d7d29ff8428d86c7de526de20f1c3b456b9426"
   },
   "line22.validate.json": {
    "size": 4761,
@@ -133,12 +133,12 @@
    "sha256": "44dd791918ed36b34951d68245846e676f9edf47df20270afcee1e1457695f77"
   },
   "line23.ground.bin": {
-   "size": 14392659,
-   "sha256": "6fac6c0b2ee10b06e5f181c932e3e3f9f5aaf72165649de5f8e4bd6239ba1978"
+   "size": 14351417,
+   "sha256": "e73803a9c8dc85f2785480c1db8ba20aa7778d3e2a522edb737e08d2a473c947"
   },
   "line23.ground.json": {
-   "size": 44110,
-   "sha256": "8d719e25d2207dffdaf693b452313955f07d4a2e189cc161a8ff4e5096858e27"
+   "size": 44082,
+   "sha256": "a58e595a63c62f24d393145dd84d5faf8405cda1d6c5cf75827fa1d7586870e0"
   },
   "line23.json": {
    "size": 2713617,
@@ -146,15 +146,15 @@
   },
   "line23.network.json": {
    "size": 3963252,
-   "sha256": "ad7fea0815c20798d8033b6baedb65032d6ce52dc76c5d3077d549ac986817c9"
+   "sha256": "46d0eccea1ffcd147e64720fe54e553a2c3970d7a1ace11f15f6631fec576625"
   },
   "line23.streets.bin": {
-   "size": 2472771,
-   "sha256": "b4b9f7684cfd9fe5195b9d8a818505e91347d9f80f2c1191b5b955fdc6004dda"
+   "size": 2503384,
+   "sha256": "93072ba5ec205f96fce9dd941d802eefc203717009484825700b7a5eee977c5c"
   },
   "line23.streets.json": {
    "size": 8989,
-   "sha256": "a169ab8d7e6d99fef06ab90a4e3a5a3ddb5c6fe29273253de5f8b43a310998d0"
+   "sha256": "458346f3e58d4e49b68e53b805340efbd1481e5ff9c3b1ed0a30c1385c2e2d7f"
   },
   "line23.validate.json": {
    "size": 2170,
@@ -185,12 +185,12 @@
    "sha256": "5c13ef12ff1188dedd2a05f2c33578907cb66822ab55bac5321f6e790fabca8b"
   },
   "line37.ground.bin": {
-   "size": 12553219,
-   "sha256": "afe8e07e06e2b2e14b652c0def0af312cdb39932efe008d1fbe7945b0072d5bc"
+   "size": 12532303,
+   "sha256": "ba634ff36c8080dc364c97c6b8ba01403c759337af3dc3e1b04f54351e2be68b"
   },
   "line37.ground.json": {
-   "size": 51601,
-   "sha256": "074dbdcd3f159baed363d605bbbf13d82968903c8fc1974d06128789af4d79b3"
+   "size": 51570,
+   "sha256": "c61ebe644ab4b96bd2f33f4728f77c1398834daf9e957e6f55d1bab4df5cc87a"
   },
   "line37.json": {
    "size": 2540615,
@@ -198,15 +198,15 @@
   },
   "line37.network.json": {
    "size": 4084944,
-   "sha256": "e978485b6ead658a807f9245216c7e59cb9590a68974e391f722c5c85f5e0742"
+   "sha256": "3d44f98abd9fe12428db9c215669bdaa3f255064adbcad912cc880c28bf53960"
   },
   "line37.streets.bin": {
-   "size": 2581731,
-   "sha256": "c38fef511ce8b90168ec103b7e6805a7152604e98b8de111938bf55e5000e866"
+   "size": 2620623,
+   "sha256": "1e4b01ed102cb38c4cbff84ca7d5bea9ac0adac10d1485b231e4805a5575264b"
   },
   "line37.streets.json": {
-   "size": 9998,
-   "sha256": "62903bd6c7c0d3b13e9dab5b7fe0d52e0de4a12999f6e52d8354ff4d31dae82e"
+   "size": 10000,
+   "sha256": "6ec278a5a4c454fdae193f08da32407f02847e8e31f8806c81e4a6a16f6e5cd2"
   },
   "line37.validate.json": {
    "size": 2514,
@@ -237,12 +237,12 @@
    "sha256": "c489d57b5075cac8196ec50aa042c43464fe88e8ad6b811d02276c7fb8f494c4"
   },
   "line9.ground.bin": {
-   "size": 27064875,
-   "sha256": "5613c6973bfcb65311eb65c44279553db37ca322336995f41c4250d6822b2efa"
+   "size": 26960787,
+   "sha256": "1e0194516d7cad4fc4669ece848087f5c3ae5ef9e0b556f8fbcff899d34851b9"
   },
   "line9.ground.json": {
-   "size": 88417,
-   "sha256": "14d2c6b13408e8aa0d1512f7cda109dec1d59c2995716b4f3637e40d766acaed"
+   "size": 88333,
+   "sha256": "9edb0d9ed34403f1b81dca727c15d7a3cde6135928d5e37abca2876a8a8e3965"
   },
   "line9.json": {
    "size": 6276517,
@@ -250,15 +250,15 @@
   },
   "line9.network.json": {
    "size": 10465869,
-   "sha256": "b4a973162531c7f4dd500fedf5df10ff830246a317222df979ba916e1e708afe"
+   "sha256": "12a8e04560dca8cf507d05567cd027a6dd3979be1a8d832b3db5f6d5600a7c79"
   },
   "line9.streets.bin": {
-   "size": 6076977,
-   "sha256": "67d67434c480b8fc6308a9f749ac0f0b7c75480f2295a06c65d8994a6b2f0779"
+   "size": 6195952,
+   "sha256": "fc0ff16269dbbbfec3ef452d5a87fe5e9856a1b3941ef8f16467d489c2309722"
   },
   "line9.streets.json": {
-   "size": 18528,
-   "sha256": "850ba825a3a84f95824cad57987ab87c90a005fcbd3bc30045ba8133fc546290"
+   "size": 18530,
+   "sha256": "c559a9bf1235c0cc4ab8991fc09390f9a6a84e0d24c2043117c7de55d464b522"
   },
   "line9.validate.json": {
    "size": 6596,
