@@ -181,10 +181,19 @@ class Hashes:
 
 
 def versions(names):
-    """Versions of the packages named (outside the checkout): __version__, else the installed distribution's."""
+    """Versions of the packages named (outside the checkout): __version__, else the installed distribution's. A
+    package only a step's child process imported (street_profile's workers read the raster with PIL) is imported here
+    for its version: its distribution has another name (Pillow), so the record held "" and Cache.versions, which
+    imports it, read 13.0.0: the step ran at every rebuild (#797)."""
     out = {}
     for n in names:
         m = sys.modules.get(n)
+        if m is None:
+            try:
+                import importlib
+                m = importlib.import_module(n)
+            except Exception:
+                m = None
         v = getattr(m, "__version__", None) if m else None
         if v is None:
             try:
