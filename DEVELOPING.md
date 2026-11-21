@@ -501,7 +501,11 @@ and class (#444; `--dtm DIR`, `--page main` for main's drawing); the build marks
 what it took under the decks in `checks.underDecks`. `python -P -E tools/bench/paved_ipr.py` measures paved track
 against IPR along each route: the stretches whose surface lies more than 10 cm under IPR for 6 m or more, each with
 its cause (the source holding it there, split by which of source and IPR the survey sides with; a curve that did not
-follow; no source) and its place (#539; `--json OUT` for every run).
+follow; no source) and its place (#539; `--json OUT` for every run). `python -X utf8 -P -E tools/bench/kerb_causes.py
+DIR` sorts the flat kerbs of a checks folder (`headless.py --checks surfaces --out DIR`, run on the checkout's data) by
+what IPR, the written ground and the street surface have across each kerb: no kerb in the raster either, an area drawn
+from its outline, a kerb spread wider than the check's row, flat in the street surface, the rest (#800; `--list` for
+every sample, `--json OUT`).
 
 **Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
 pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a
