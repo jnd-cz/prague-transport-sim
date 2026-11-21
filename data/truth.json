@@ -5285,6 +5285,51 @@
     }
    ]
   },
+  "motol-platform": {
+   "line": "9",
+   "at": [
+    -6338.4,
+    -1328.4
+   ],
+   "reach": 30,
+   "issue": 776,
+   "what": "the Motol stop's platform between the track and Plzeňská (platform B, the survey has it as a sidewalk 2.9 m wide): level along the track, a kerb to the road behind it",
+   "source": "found in ground batch B's surfaces check, 2026-11-20: line 9 s 2892-2928, the platform flush with Plzeňská at every sample (a kerb of 0.08 m in the file published before), one of line 9's 23 platforms with new flat kerbs",
+   "sections": [
+    {
+     "name": "from Plzeňská across the kerb onto the platform, x = -6338.4",
+     "from": [
+      -6338.46,
+      -1326.4
+     ],
+     "to": [
+      -6338.36,
+      -1327.5
+     ],
+     "expect": {
+      "rise m at least": 0.05,
+      "largest step m": 0.2
+     },
+     "why": "the street surface has the platform 0.09 m over the road at this kerb (277.05 over 276.96 m); the platform's plane at the middle of its corners brought it to 276.97 m in the written file of ground batch B"
+    },
+    {
+     "name": "along the platform 0.7 m behind its edge at the track, 28 m",
+     "from": [
+      -6350.0,
+      -1328.14
+     ],
+     "to": [
+      -6322.0,
+      -1330.42
+     ],
+     "expect": {
+      "off the chord m": 0.05,
+      "largest step m": 0.02
+     },
+     "why": "the platform runs with the rails, which fall evenly here: a straight line (as at Krejcárek, krejcarek-platform)"
+    }
+   ]
+  },
   "sidewalk-on-a-quay-wall": {
    "line": "17",
    "at": [

@@ -737,6 +737,28 @@ Sections:
   wells of an underground entrance that the survey has no stairs for (the largest by lines 9 and 22, (-309,
   -1236), 43 m2: level with the sidewalk now, a pit 6 m deep before). Not covered: a
   deck the survey has at level 1 (#449), and the ramps and stairs' wells beside a passage (#786, #447).
+- **A stop's platform is a plane at the top of its corners** (#776, measured 2026-11-20). The survey has a platform
+  as a sidewalk, and its street surface runs from one kerb's top to the other's and follows the raster between: at
+  Krejcárek (line 37 s 2904-2974) +0.01 to +0.41 m over the rail top 0.6 m behind the edge. `platform_planes` lays
+  the corners in a platform's band on one plane over the rail top (one height, one crossfall up to 2 %). Fitted to
+  the corners' middle, the plane lay under the kerb tops wherever the road climbs against the rails along the stop
+  or the platform tilts more than 2 %: Motol's platform B (line 9 s 25524-25592, an island 2.9 m across between the track and Plzeňská)
+  came down 0.08 m at the road, flush with it, and ground batch B's surfaces check counted new flat kerbs at 23 /
+  21 / 13 / 5 / 12 platforms (lines 9, 17, 22, 23, 37; on line 9, 176 of its 180 more flat kerb sites). On the street surface's 0.5 m cells, the kerb cells under
+  5 cm in the platforms' bands:
+
+  | line | before any plane | plane at the middle | at the 75th percentile | at the 90th | anchored at the high side |
+  |---|---|---|---|---|---|
+  | 9 | 287 | 1,151 | 501 | 226 | 589 |
+  | 17 | 177 | 1,218 | 432 | 171 | 1,071 |
+  | 22 | 201 | 680 | 226 | 31 | 529 |
+  | 23 | 64 | 157 | 43 | 14 | 40 |
+  | 37 | 73 | 599 | 212 | 63 | 324 |
+
+  The plane lies at the 90th percentile of the corners it fits (`PLATFORM_TOP`); the platforms' edges stand a
+  median 0.11 m over the rail top (0.10 m at the middle; Krejcárek's 0.34 for 0.30). A bed laid flush with the
+  platform's sidewalk (`pits`) follows the plane: the grassy patch behind Krejcárek's shelter stayed 5 cm under it.
+  No fact gives a platform's height over the rail top yet.
 - **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
   is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
   (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of

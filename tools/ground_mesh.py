@@ -233,6 +233,9 @@ PLATFORM_FADE = 1.5  # m past the band, and from either end inward: the plane gi
 PLATFORM_NEAR = 0.5  # m: a corner farther from the platform's plane is something else (a ramp, a wall's top)
 PLATFORM_CROSS = 0.02  # the steepest crossfall a platform takes (the norm's 6.2.2.3: 0.5-2 %)
 PLATFORM_MIN = 20  # corners in a platform's band for it to have a plane
+PLATFORM_TOP = 90  # the percentile of the fitted corners' heights over the rail top the plane lies at: their top, not
+# their middle (a platform is built up over the road and the bed beside it: under the middle of its corners it lost
+# its kerb where the road climbs against the rails along the stop)
 
 
 def platform_planes(L, x, y, z, ok, log=None):
@@ -246,8 +249,14 @@ def platform_planes(L, x, y, z, ok, log=None):
       sidewalk across a lane: that sidewalk follows its street).
     - Its band: between its ends along its path, on its side, up to PLATFORM_BAND from the path's axis.
     - Its plane: over the rail top beside each corner, the height at the axis and one crossfall, fitted to the band's
-      own corners (the survey's and the raster's reading, their middle); the crossfall held to PLATFORM_CROSS. No one
-      height holds for every stop (the user: "the heights can vary between different stops and stop styles").
+      own corners (the survey's and the raster's reading); the crossfall held to PLATFORM_CROSS. No one height holds
+      for every stop (the user: "the heights can vary between different stops and stop styles"). The plane lies at the
+      top of the corners it fits (PLATFORM_TOP), not at their middle: at their middle Motol's platform B (line 9
+      s 25524-25592, an island between the track and Plzeňská) came 0.08 m down at the road's kerb, flush with the
+      road, and ground batch B's surfaces check counted new flat kerbs at 23 / 21 / 13 / 5 / 12 platforms. On the
+      street surface's cells: 287 / 177 / 201 / 64 / 73 kerb cells under 5 cm before any plane (lines 9, 17, 22, 23,
+      37), 1,151 / 1,218 / 680 / 157 / 599 with the middle, 226 / 171 / 31 / 14 / 63 with the top; the platforms'
+      edges stand a median 0.11 m over the rail top either way.
     - A corner within PLATFORM_NEAR of the plane takes it; past the band and towards the platform's ends it fades to
       the corner's own height over PLATFORM_FADE. A platform with under PLATFORM_MIN corners, or under half of them
       near its plane, is left."""
@@ -296,6 +305,8 @@ def platform_planes(L, x, y, z, ok, log=None):
             b = float(np.clip(np.polyfit(d[use], h[use], 1)[0], -PLATFORM_CROSS, PLATFORM_CROSS))
             a = float(np.median(h[use] - b * d[use]))
             use = core & (np.abs(h - (a + b * d)) <= 0.15)
+        if use.sum() >= PLATFORM_MIN:
+            a = float(np.percentile(h[use] - b * d[use], PLATFORM_TOP))
         near = np.abs(h - (a + b * d)) <= PLATFORM_NEAR
         if use.sum() < PLATFORM_MIN or (core & near).sum() < 0.5 * core.sum():
             continue
@@ -1962,7 +1973,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         c_hole[idx] = True
     # (a stop's platform is a plane over the rail top: platform_planes, #776)
     c_plat = c_hole.copy()
-    c_plat[m] = np.isin(sc, list(RAISED)) & ~on_span & ~on_terrace & ~in_rock & np.isfinite(zs)
+    # (and a bed laid flush with the platform's sidewalk, in_pit: the grassy patch behind Krejcárek's shelter stayed 5 cm
+    # under the platform when its plane rose to the top of its corners)
+    c_plat[m] = (np.isin(sc, list(RAISED)) | in_pit) & ~on_span & ~on_terrace & ~in_rock & np.isfinite(zs)
     zc, on_plat = platform_planes(L, cx, cy, zc, c_plat)
     # (a wall the survey has as a line: the street, the lidar ground and the terrain beside it stand at its side's level
     # up to it, #697; a street under a bridge too, which keeps the survey's own outline (on_span): the sidewalk along
