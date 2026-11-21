@@ -34,7 +34,7 @@ From the partition (tools/ground_partition.py partition(): survey, bed, plot and
    again after it, every time.
 
 The report (reports/ground-mesh/lineN.json): triangles per class against what the page draws today, the error against
-IPR's 1 m raster by distance band, the fallback levels, the steps by pair, the file's size raw, gzip and brotli, the
+IPR's 1 m raster by distance band (with --error only: minutes a line, #704), the fallback levels, the steps by pair, the file's size raw, gzip and brotli, the
 rails' check (the mesh under each rail within RAIL_TOL of the bed's row), the edge check, the build time.
 """
 import collections
@@ -3150,6 +3150,16 @@ def picture(ln, window, path, px=5, mesh=None):
     im.save(path)
 
 
+NOT_MEASURED = "not measured (tools/ground_mesh.py --error)"
+
+
+def error_report(built, ln, measure):
+    """The report's `error`: raster_error where it was asked for, else NOT_MEASURED. It reads the whole box's raster
+    and looks every LATTICE-th cell up in the mesh twice: in ground batch B's build 105 / 495 / 375 / 38 / 58 s (lines
+    9, 17, 22, 23, 37), 18 of the 95 minutes, for a figure no check and no file reads (#704)."""
+    return raster_error(built, ln) if measure else NOT_MEASURED
+
+
 def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -3158,6 +3168,9 @@ def main(argv=None):
     ap.add_argument("--mesh")
     ap.add_argument("--threads", type=int, default=8)
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--error", action="store_true",
+                    help="also measure the mesh against IPR's raster for the report (raster_error: 0.6-8 minutes a line; a "
+                         "checkpoint's run, or a change of the terrain's thinning)")
     ap.add_argument("--min-free", type=float, default=4.0, help="GB: the run stops itself when free memory falls under it")
     a = ap.parse_args(argv)
     lines = a.lines.split(",") if a.lines else [a.line]
@@ -3183,8 +3196,9 @@ def main(argv=None):
             rep["tunnel mouths"] = fit_mouths(ln, built)
             rep["seconds"]["mouths"] = round(time.time() - t1, 1)
             t1 = time.time()
-            rep["error"] = raster_error(built, ln)
-            rep["seconds"]["error"] = round(time.time() - t1, 1)
+            rep["error"] = error_report(built, ln, a.error)
+            if a.error:
+                rep["seconds"]["error"] = round(time.time() - t1, 1)
             if not a.no_write:
                 write(ln, built, rep)
                 # (the network reads the survey from this file: built after it, every time, #658)

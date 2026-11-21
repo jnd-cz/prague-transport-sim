@@ -641,7 +641,9 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   tiles on the S-JTSK grid, each decoded on its own in a pool of workers (`src/groundFile.js`, #30): every tile's height
   lookup at load, then only those within the fog's end of the camera and of 1 km of route ahead, drawn in detail (9-17
   MB of lookups held, 48-120 MB before #658). `?keepgeo` and `?bot` keep every tile's lookup and meshes. `tools/bench/ground_tiles.py` drives the window along a line:
-  what is held, each tile's time, any tile missing in view.
+  what is held, each tile's time, any tile missing in view. The build's report (`reports/ground-mesh/`) holds the
+  mesh's error against IPR's raster only where `tools/ground_mesh.py --error` asked for it (0.6-8 minutes a line,
+  #704): a checkpoint's run, or a change of the terrain's thinning.
 - **The network** (the traffic's roads, lanes, footways and doors, the signals bound to the lanes, what the platforms and
   stops read of the survey) is built once, after `tools/ground_mesh.py`, by `tools/network.py` into
   `data/lineN.network.json` ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658). Start
