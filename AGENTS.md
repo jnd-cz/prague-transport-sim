@@ -69,7 +69,9 @@ things are done, and why a rule exists, is in the files it points to:
   to its `(#issue)` and the text to its keyword (`tools/pr_text.py`).
 - **`Closes #N` only when the PR meets every point of the issue's "Done when".** Anything open (the user's
   answers, an import, a rebuild, a publish, another line) makes it `Part of #N`, and the PR and a comment on the
-  issue list what remains. A reviewer who finds an open point changes the keyword before the merge.
+  issue list what remains. A reviewer who finds an open point changes the keyword before the merge. A ground
+  rule's PR closes its issue once the rule's places hold: the lines' rebuild is the batch's (#757), whose PR
+  lists the rules it rebuilt (the user, 2026-11-21).
 - **Merge windows:** the user merges in batches, once or twice a day. A PR is marked ready and merged on the user's word only, as a squash titled
   `<PR title> (#PR)` (the title ends with `(#issue)`), the branch deleted: `session.py merge N`, not gh's
   `--delete-branch`, which removes the worktree with its untracked files. A session whose checks are done says
@@ -136,8 +138,8 @@ things are done, and why a rule exists, is in the files it points to:
   `heavy.py`). Count runs and builds (`headless.py`, `rebuild.py`, `ground_mesh.py`, `city_terrain.py`,
   `heavy.py --shared GB,CORES` for pictures and the like) run beside each other while their memory and cores
   fit (the user, 2026-11-19, #728). A wait that ends with "does nothing" names a stuck job: look at that one.
-- **The heaviest work runs at night** or on the user's word (the user, 2026-11-21): a rebuild of every line, a
-  seeded compare of every line, a checkpoint's run. By day a session runs the place loop, the tools' tests and
+- **The heaviest work runs at night** (22:00 to 07:00) or on the user's word (the user, 2026-11-21): a rebuild of
+  every line, a seeded compare of every line, a checkpoint's run. By day a session runs the place loop, the tools' tests and
   one-line runs, and leaves the night's jobs queued with what they are to prove.
 - **A long job pins its checkout:** work on another issue meanwhile in its own worktree.
 - **Which checks a change needs** (`/regress` picks them from the diff and has the commands; a change of two
