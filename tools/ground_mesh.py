@@ -2051,6 +2051,15 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     in_rock, rail_z = portal_masonry(L, rock, in_rock, rail_z, cx[m], cy[m], zs, sa, lambda a: wall_like(D["areas"][a]))
     zs, on_hill = off_the_hill(zs, np.where(in_rock, rail_z, np.nan))
     lifted &= ~on_hill  # (no face stands there: it welds with the ground beside it)
+    # (and in any tunnel of the route the tram's own area lies at the rails' level: under a cover the raster has the
+    # cover, and the street surface the tram's area takes read it. By Hlavní nádraží, line 9 s 11840-11860, the upper
+    # street crosses the track on a cover: the tram's area stood at 201-204.4 m over rails at 197.4 m, the ground
+    # closed over the track. The base ground is the tunnel's floor; its cover is a slab to come (the user, 2026-11-20:
+    # "build the base groundlevel, that is stream bed or underpass floor but then we have to place invented bridge
+    # decks on top of the ground", #449). The lines' other tunnels off the rock have the raster at the rails, #788)
+    in_tun, rail_t = in_the_rock(L, [tuple(v) for v in L.get("tunnels") or []], cx[m], cy[m])
+    in_tun &= (sc == "tram") & ~in_rock
+    zs, on_floor = off_the_hill(zs, np.where(in_tun, rail_t, np.nan))
     zc[m] = zs
     # (a shelter's footprint in a sidewalk, a hole no area fills, is the sidewalk's own ground: bare_holes, #776)
     c_hole = np.zeros(len(cx), bool)
@@ -2074,7 +2083,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # up to it, #697; a street under a bridge too, which keeps the survey's own outline (on_span): the sidewalk along
     # the Modřany ramp's wall, line 17 (-2385, -9250), has the wall's heights in its outline and rose 2 m against it)
     elig = corner_cls == "terrain"
-    elig[m] = (np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) | on_lidar) & ~in_rock
+    elig[m] = (np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) | on_lidar) & ~in_rock & ~on_floor
     cen = fc.mean(1)
     on_deck = np.zeros(len(cx), bool)
     on_deck[m] = on_span
@@ -2122,7 +2131,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         zc[nan] = lidar_w(cx[nan], cy[nan])
 

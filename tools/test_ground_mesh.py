@@ -683,6 +683,15 @@ class UnderADeck(unittest.TestCase):
         self.assertEqual(z[:3].tolist(), [197.6, 204.7, 198.3])
         self.assertTrue(np.isnan(z[3]))
 
+    def test_the_trams_area_under_a_cover_lies_at_the_rails(self):
+        # (#788: in a tunnel of the route, off the rock: a corner of the tram's area 4 m over the rails beside it at
+        # the rails' level; one at the rails, and one outside the tunnel, left)
+        L = {"path": [[0.0, 0.0], [100.0, 0.0]], "heights": {"step": 1.0, "path": [197.4] * 101}, "tunnels": [[40.0, 60.0]]}
+        inside, rail = gm.in_the_rock(L, [tuple(v) for v in L["tunnels"]], np.array([50.0, 50.0, 20.0]), np.array([2.0, -3.0, 2.0]))
+        self.assertEqual(inside.tolist(), [True, True, False])
+        z, floor = gm.off_the_hill([201.4, 197.5, 204.0], np.where(inside, rail, np.nan))
+        self.assertEqual((z.tolist(), floor.tolist()), ([197.4, 197.5, 204.0], [True, False, False]))
+
 
 class TwoSided(unittest.TestCase):
     """#765: the wall under Letná, line 17 area 4166: a paved strip 0.44 m across, its foot's line along the road and

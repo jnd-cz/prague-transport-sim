@@ -5554,6 +5554,47 @@
      "why": "the survey has the wall as `paved` 2592, 0.25 m across, its top's side at 198.33-199.05 m along the platform; the written file has the platform's edge 0.25 m off its straight line, on IPR's smear of the wall"
     }
    ]
+  },
+  "hlavni-nadrazi-under-the-magistrala": {
+   "line": "9",
+   "at": [
+    1075.0,
+    -338.0
+   ],
+   "reach": 45,
+   "issue": 788,
+   "what": "the track east of the Hlavní nádraží stop under the Magistrála's bridges and then under the upper street on a cover (the line's tunnel s 11801-11867): over the rails nothing but the cover to come; south of the track under the bridges a wall with a car park on its top (its height is open, #788)",
+   "source": "the user, 2026-11-20 (session): \"the road bridges over our tram track right after hlavní nádraží stop on line 9. It looks like ground isdue combined with broken bridge decks (those can be solved later). What does the survey says there?\"",
+   "seen": {
+    "what": "From the cab towards the stop (west), under the Magistrála's bridges just out of the cover: left of the track (south) a concrete wall runs beside it to the bridges' far end, tall for the first metres at the cover, then with a railing on its top about 1 m over the cab's eye line, a lorry and cars parked behind the railing at the wall's top, the bridges' piers standing up there; right of the track (north) a lower wall with a railing follows the track's curve. From the cab east of the cover, looking at its portal: the track in a cutting between concrete walls, the left one (south) about twice the right one's height with a grass bank on its top, the cover a slab with a parapet and a street's railing over it. From Bolzanova 7 looking east: the Magistrála's deck on piers over the street; under it, left of the tram track, cars parked at the street's level.",
+    "from": [
+     {
+      "note": "two frames of a cab ride video towards the stop, sent by the user 2026-11-21 (session; not stored)"
+     },
+     {
+      "note": "Street View at Bolzanova 7, looking east, looked at 2026-11-21 (not stored)"
+     }
+    ],
+    "source": "the user, 2026-11-21 (session): \"From cab ride video I attach two screenshots showing track under magistrála (direction towards hlavní nádraží stop), basically there's a wall next to tram track on the south side.\"; Street View, looked at"
+   },
+   "sections": [
+    {
+     "name": "along the axis under the cover, s 11838 to s 11862",
+     "from": [
+      1077.4,
+      -339.2
+     ],
+     "to": [
+      1100.1,
+      -331.6
+     ],
+     "expect": {
+      "off the chord m": 0.4,
+      "largest step m": 0.2
+     },
+     "why": "the rails run at 197.4 m under the upper street's cover; the tram's own area `tram` 253 took the street surface, which read the cover in IPR: the written file has the ground at 201-204.4 m on the axis, closed over the track"
+    }
+   ]
   }
  }
 }
