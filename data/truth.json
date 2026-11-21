@@ -740,6 +740,14 @@
    "style": "grass",
    "extent": "our track along Drinopol's platform B (U103Z2P) and 3 m past its ends (line 22 s 3679-3717 in the 2026-11-14 build); the other direction's track beside the platform stays paved",
    "source": "user 2026-11-14, #584, with a Street View picture of platform B: \"Other platform is similar. It's the only place like this that I saw so far and now it's clear why: it's also bus stop, usually for replacement bus, so the asphalt has to run from the road and back.\""
+  },
+  {
+   "line": "9",
+   "between": [[50.071977, 14.390368], [50.072261, 14.393352]],
+   "style": "embedded",
+   "extent": "between the two points: both tracks past Bertramka towards Anděl (line 9 s 6844-7060 in the 2026-11-21 build), the open-track cards open-50.07214-14.39185 and open-50.07217-14.39187",
+   "note": "level with the road beside it; the rails' heights there come from the track archive (DI's axes carry none) and stood up to 0.82 m over IPR's 2023 lidar in ground batch C (#539)",
+   "source": "user 2026-11-21 (session), on the two cards answered paved on 2026-11-14 (#591): \"bertramka is embedded asphalt, same level as the road next to it\""
   }
  ],
  "grassTrack": {
