@@ -515,6 +515,23 @@ class Platforms(unittest.TestCase):
         end = (x >= 60) & (x <= 68) & (y >= -4.0)
         self.assertGreater((got[end] - z[end]).min(), -0.02)
 
+    def test_a_surveyed_platform_takes_its_plane_right_across(self):
+        # (an area the survey has as a platform, its corners on its two edges alone, 1.5 and 5.5 m from the axis: the
+        # edge at the track level along at 0.25 m over the rail top, the back edge at the survey's few points, wandering
+        # 0.2 m. All of it lies on the plane, level across: corners at one distance tell no crossfall. Not marked as
+        # the survey's platform, the back edge lies past the band's fade and keeps its own heights)
+        x = np.concatenate([np.arange(20.0, 81.0, 1.0)] * 2)
+        y = np.concatenate([np.full(61, -1.5), np.full(61, -5.5)])
+        z = 200.0 + 0.01 * x + np.where(y > -2, 0.25, 0.12 + 0.1 * np.sin(x / 3.0))
+        got, moved = gm.platform_planes(self.L, x, y, z, np.ones(len(x), bool), wide=np.ones(len(x), bool))
+        mid = (x >= 32) & (x <= 68)
+        self.assertLess(np.abs(got[mid] - (200.0 + 0.01 * x[mid] + 0.25)).max(), 1e-6)
+        self.assertTrue(moved[mid].all())
+        got, moved = gm.platform_planes(self.L, x, y, z, np.ones(len(x), bool))
+        back = mid & (y < -2)
+        self.assertTrue(np.allclose(got[back], z[back]) and not moved[back].any())
+        self.assertLess(np.abs(got[mid & (y > -2)] - (200.0 + 0.01 * x[mid & (y > -2)] + 0.25)).max(), 1e-6)
+
     def test_other_platforms_and_other_corners_are_left(self):
         x, y = self.corners()
         z = 200.0 + 0.01 * x + 0.20 + 0.03 * np.sin(x)

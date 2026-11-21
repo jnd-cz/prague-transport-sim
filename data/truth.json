@@ -5358,6 +5358,83 @@
      "why": "IPR has the road and the sidewalk at 191.86-191.99 m up to 1 m inside the kerb and the wall's face from 1.25 m in (190.17 m at 1.5 m). The kerb-wall rule read the walkway's level on the face and held the edge at it: the written file of ground batch B has the sidewalk at 190.31 m at its kerb"
     }
    ]
+  },
+  "hlusickova-platforms": {
+   "line": "9",
+   "at": [
+    -7826.7,
+    -1559.0
+   ],
+   "reach": 40,
+   "issue": 776,
+   "what": "the Hlušičkova stop's two platforms, each between its track and a lane of Plzeňská (the survey has them as platform areas 4.2 m wide, 68 m long, with 12 and 14 outline points): level along the track at the rails' edge and at the road's",
+   "source": "the user's report fb-20261121-093105-606267ae (line 9 s 1402, 2026-11-21, on the published ground): \"Wavy platforms that should be flat and smooth\"; and on ground batch B, 2026-11-21 (session): \"Hlušičkova looks clean from track side, a bit bumpy from road side.\"",
+   "sections": [
+    {
+     "name": "along platform B 0.5 m inside its back edge at the road, 56 m",
+     "from": [
+      -7805.7,
+      -1539.0
+     ],
+     "to": [
+      -7853.89,
+      -1567.51
+     ],
+     "expect": {
+      "off the chord m": 0.05,
+      "largest step m": 0.03
+     },
+     "why": "IPR has the platform level across, +0.21 and +0.22 m over the rail top 0.7 m and 2 m behind the edge; the plane's band ended 4 m from the axis and the back edge, 5.5 m from it, kept the survey's points: +0.02 to +0.23 m over the rail top in ground batch B"
+    },
+    {
+     "name": "along platform A 0.5 m inside its back edge at the road, 56 m",
+     "from": [
+      -7847.8,
+      -1579.05
+     ],
+     "to": [
+      -7799.6,
+      -1550.55
+     ],
+     "expect": {
+      "off the chord m": 0.05,
+      "largest step m": 0.03
+     },
+     "why": "as platform B: 0.21 m off a straight line in ground batch B"
+    },
+    {
+     "name": "along platform B 0.7 m behind its edge at the track, 56 m",
+     "from": [
+      -7804.19,
+      -1541.54
+     ],
+     "to": [
+      -7852.39,
+      -1570.05
+     ],
+     "expect": {
+      "off the chord m": 0.07,
+      "largest step m": 0.03
+     },
+     "why": "the platform runs with the rails (0.29 m off a straight line in the ground published before batch B, 0.06 m in batch B)"
+    },
+    {
+     "name": "from Plzeňská across the kerb onto platform B, s 27110",
+     "from": [
+      -7830.36,
+      -1552.3
+     ],
+     "to": [
+      -7829.85,
+      -1553.17
+     ],
+     "expect": {
+      "rise m at least": 0.08,
+      "largest step m": 0.3
+     },
+     "why": "a platform stands a kerb over the road behind it; in ground batch B its back edge lay 0.05 m under the road's kerb here and 0.16 m over it 6 m on"
+    }
+   ]
   }
  }
 }
