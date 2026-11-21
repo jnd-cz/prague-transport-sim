@@ -737,6 +737,46 @@ Sections:
   wells of an underground entrance that the survey has no stairs for (the largest by lines 9 and 22, (-309,
   -1236), 43 m2: level with the sidewalk now, a pit 6 m deep before). Not covered: a
   deck the survey has at level 1 (#449), and the ramps and stairs' wells beside a passage (#786, #447).
+- **A paved strip is a wall for the sidewalk beside it** (#786, measured 2026-11-21). The survey has many a
+  retaining wall and parapet as a paved area 0.2-0.5 m across and nothing else: no wall area, no `Zeď` line. What
+  kept a sidewalk off IPR's smear at a wall (#653: the cells along a wall held at its level, a street corner on its
+  outline snapped to it) knew the wall and stairs areas alone. Sidewalk edges on walls and stairs / on strips that
+  are a wall's face in plan (`ground_mesh.wall_like`) / on strips the ground steps across by 0.7 m or more: line 9:
+  6,086 / 1,750 / 720 m; 17: 10,885 / 5,838 / 1,124 m; 22: 6,822 / 1,191 / 543 m; 23: 4,856 / 705 / 294 m; 37:
+  3,271 / 650 / 93 m. Platforms with 5 m or more of such an edge on their side: 1 of 97 (line 9), 12 of 88 (17:
+  Belárie, Přístaviště, Nádraží Braník, Pobřežní cesta, Sídliště Modřany, Modřanská rokle, Modřanská škola, Černý
+  kůň), 1 of 88 (22), 1 of 47 (23), 2 of 42 (37): the Modřany line runs on walls. Five things went wrong at them,
+  each with its rule:
+  - *The strip is a wall's face* (its foot's line one side, its top's the other: Nádraží Braník, line 17 (-2040,
+    -6262), `paved` 2605, 0.18 m across, 197.43 and 194.84 m). The platform on its top lay on the raster's smear,
+    196.35 m at its edge. Such a strip is a wall area for the sidewalks' surface and for the snap
+    (`ground_mesh.wall_areas`).
+  - *The strip's heights are neither side's ground* (Modřanská škola, line 17 (-2479.7, -8440), `paved` 7924:
+    198.7 and 198.3 m between a platform at 199.6 m and a road at 196.4 m; the parapet of the ramp from the bus
+    stop). `street_profile.strip_edges` takes a strip's side as a wall edge where the ground steps across the strip:
+    the walkway's level against IPR 1.5 m past the strip's other side. The walkway's level is IPR 1.5 m in, or
+    halfway across a walkway narrower than 3 m: the ramp north of that stop is 2.15 m wide between two strips, and
+    the raster has it at its middle alone (197.5 to 199.9 m in 36 m), the track's 200 m and the road's 196.1 m a
+    metre either side. Across such a walkway nothing pulls the surface to IPR. A walkway under 1.5 m across has no
+    reading at all and stands a kerb over the road past it (the sidewalk 0.6 m wide between the parapet and the
+    road). `wall_lines.stretches` is not used for it: it reads a side 2.5-4 m off, past the ramp, or between two
+    wall lines takes one line's own height, the wall's top for the ramp.
+  - *The surface is read between cells* (`ground_mesh.Streets.at`, cells of 0.5 m), and across a strip thinner than
+    a cell the sidewalk on the other side is among them: the platform's corners on Braník's wall read 195.8-196.5 m
+    for 197.4 m, teeth. A sidewalk's corner within 0.75 m of a wall's outline reads the surface 0.75 m out on its
+    triangle's side (`ground_mesh.own_side`).
+  - *Samples every 0.25 m step over a strip 0.2 m across.* The kerb's walkway plane ran from the roadside sidewalk
+    over the parapet onto the ramp, and the kerb-wall rule (#779) took IPR 1.5 m in from that sidewalk's kerb, the
+    platform's 199.7 m, for its walkway and held the kerb 3.2 m over the road. Both now ask whether the sidewalk
+    runs unbroken that far (`street_profile.runs_in`), and a plane cut at a break fills only cells before it.
+  - *A strip's own surface, triangulated* (0.2 m across, 194 m long, 15 points a side), gave corners on one side the
+    other side's height by turns: a paved area up to 1 m across takes its heights between its two sides
+    (`across_outline`).
+  Three places (`branik-platform-ramps`, `modranska-skola-ramp`, `cerny-kun-platform-wall`): 9 sections fail on the
+  written file of 2026-11-20 and hold on the build; steep faces 105.7 to 50.5 m2, 137.1 to 62.1 m2, 153.8 to
+  109.4 m2. Not done: Černý kůň's ramps are level-1 areas (the footbridge's), not the ground (#449); a ramp of two
+  flights side by side in one area (Braník's lower flights) is one surface between its walls; the platforms stand
+  where the kerb rule puts them (#776).
 - **A stop's platform is a plane at the top of its corners** (#776, measured 2026-11-20). The survey has a platform
   as a sidewalk, and its street surface runs from one kerb's top to the other's and follows the raster between: at
   Krejcárek (line 37 s 2904-2974) +0.01 to +0.41 m over the rail top 0.6 m behind the edge. `platform_planes` lays

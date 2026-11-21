@@ -1286,15 +1286,23 @@ WALL_CLASSES = ("wall", "stairs")
 WALL_ON = 0.05  # m: a sidewalk's outline edge on a wall's or stairs' outline (the survey shares their vertices)
 
 
-def wall_edges(dtm):
-    """The level-0 sidewalks' outline edges along a survey wall or stairs (#653), with the sidewalk's own heights at
+def wall_areas(dtm):
+    """The level-0 survey areas a sidewalk meets as a wall: the walls and stairs, and the paved strips that are a
+    wall's face in plan (ground_mesh.wall_areas, #786)."""
+    import ground_mesh
+    return [dtm["areas"][i] for i in ground_mesh.wall_areas(dtm)]
+
+
+def wall_edges(dtm, walls=None):
+    """The level-0 sidewalks' outline edges along a survey wall or stairs (#653; wall_areas, or those given), with the
+    sidewalk's own heights at
     their ends: (n, 2, 3), each running with its sidewalk on its left. A wall's outline holds its top and its foot at
     one place; the sidewalk's own edge says which it meets, and its side which cells it holds (a sidewalk wrapping round
     a wall has its foot and its top within a cell of each other: Krejcárek's ramp, line 37 (3926, 327))."""
     import shapely
     from shapely.geometry import Polygon
-    walls = [shapely.LineString([q[:2] for q in r] + [r[0][:2]]) for a in dtm["areas"]
-             if a["c"] in WALL_CLASSES and a["l"] == 0 for r in [a["r"]] + a.get("h", []) if len(r) >= 2]
+    walls = [shapely.LineString([q[:2] for q in r] + [r[0][:2]]) for a in (wall_areas(dtm) if walls is None else walls)
+             for r in [a["r"]] + a.get("h", []) if len(r) >= 2]
     if not walls:
         return np.zeros((0, 2, 3))
     tree = shapely.STRtree(walls)
@@ -1322,6 +1330,89 @@ def wall_edges(dtm):
     return np.asarray(segs, float).reshape(-1, 2, 3)
 
 
+STRIP_ALONG = 5  # segments (m) along a strip over which the walkway's level beside it is its running mean
+STRIP_SEEN = 1.5  # m: a walkway narrower than this beside a strip the ground steps across has no reading in IPR's raster
+
+
+def strip_edges(ln, walk, box, lidar, strips=None):
+    """The edges of the level-0 sidewalks (`walk`) along a paved strip the ground steps across, within a box ((x0, y0),
+    (x1, y1)) and SW_KERB_SMEAR round it, with the walkway's level there: (n, 2, 3), each with its sidewalk on its
+    left (wall_edges), and how far across the walkway runs from each (up to twice SW_KERB_SMEAR). The strips: the
+    survey's paved areas up to wall_lines.STRIP across that are no wall's face in plan (wall_lines.strips; or the
+    outlines given, closed (n, 3)): a parapet, a wall's top. Such a strip is a wall for the sidewalk where the ground
+    steps across it, but its outline's heights are neither side's ground: between the platform of Modřanská škola and
+    the road, line 17 (-2479.7, -8440), `paved` 7924 is 0.2 m across at 198.7 and 197.9 m, the platform inside it at
+    199.6 m and a sidewalk 0.6 m wide outside it at 196.5 m by the road (#786).
+    - The walkway's level is IPR (lidar(x, y)) SW_KERB_SMEAR in from the strip, or halfway across a walkway narrower
+      than twice that, its mean over STRIP_ALONG along the strip. North of that stop a ramp 2.15 m wide climbs to the
+      platform between the strip and the wall under the track (line 17 (-2481, -8410); the user's photo from the bus
+      stop, 2026-11-21): IPR has it at its middle, 197.5 to 199.9 m in 36 m, and the track's 200 m and the road's
+      196.1 m a metre either side.
+    - The ground steps across the strip where that level and IPR SW_KERB_SMEAR past the strip's other side part by
+      wall_lines.STEP or more, along runs as wall_lines' (runs()). (wall_lines.stretches reads a side 2.5-4 m off or,
+      between two wall lines, takes one of the two lines' heights: for the ramp, the wall's top, and no step at all
+      where the parapet's own height was the nearer.)"""
+    import shapely
+    import wall_lines
+    none = np.zeros((0, 2, 3)), np.zeros(0)
+    if walk is None or walk.is_empty:
+        return none
+    m = SW_KERB_SMEAR
+    lim = (box[0][0] - m, box[0][1] - m, box[1][0] + m, box[1][1] + m)
+    if strips is None:
+        strips = wall_lines.strips(ln, ROOT, lim)[0]
+    d = np.arange(0.05, 2 * m + 1e-6, 0.05)  # (a strip is 0.2 m across: no coarser)
+    dt = np.arange(0.05, wall_lines.STRIP + 0.5, 0.05)
+    segs, across = [], []
+    for ring in strips:
+        ring = np.asarray(ring, float)
+        S = wall_lines.sample(np.column_stack([ring[:, :2], np.zeros(len(ring))]))
+        if len(S) < 3:
+            continue
+        g = shapely.Polygon(ring[:, :2])
+        g = g if g.is_valid else g.buffer(0)
+        if g.is_empty:
+            continue
+        shapely.prepare(g)
+        a, b = S[:-1, :2], S[1:, :2]
+        mid = (a + b) / 2
+        x, y = ring[:, 0], ring[:, 1]
+        out = -1.0 if float((x[:-1] * y[1:] - x[1:] * y[:-1]).sum()) > 0 else 1.0  # (anticlockwise: the strip to the left)
+        n = S[:-1, 3:5] * out
+        ok = shapely.contains_xy(walk, *(mid + 0.1 * n).T) & (mid[:, 0] >= lim[0]) & (mid[:, 0] <= lim[2]) \
+            & (mid[:, 1] >= lim[1]) & (mid[:, 1] <= lim[3])
+        if not ok.any():
+            continue
+        k = np.flatnonzero(ok)
+        # (how far in the walkway runs from each segment, up to twice the smear; its level at its middle)
+        P = mid[k, None, :] + n[k, None, :] * d[None, :, None]
+        inside = shapely.contains_xy(walk, P[..., 0], P[..., 1])
+        width = np.where(inside.all(1), 2 * m, d[np.argmin(inside, axis=1)] - 0.025)
+        r = mid[k] + n[k] * np.minimum(m, width / 2)[:, None]
+        # (the ground past the strip's other side)
+        T = mid[k, None, :] - n[k, None, :] * dt[None, :, None]
+        thick = shapely.contains_xy(g, T[..., 0], T[..., 1])
+        far = mid[k] - n[k] * (np.where(thick.all(1), dt[-1], dt[np.argmin(thick, axis=1)]) + m)[:, None]
+        z, zf = np.asarray(lidar(r[:, 0], r[:, 1]), float), np.asarray(lidar(far[:, 0], far[:, 1]), float)
+        step = np.zeros(len(mid), bool)
+        with np.errstate(invalid="ignore"):
+            step[k] = np.abs(z - zf) >= wall_lines.STEP
+        zs, ws = np.full(len(mid), np.nan), np.full(len(mid), np.nan)
+        zs[k], ws[k] = z, width
+        along = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(mid, axis=0).T))])
+        for i0, i1 in wall_lines.runs(step, along):
+            zz = np.where(ok[i0:i1 + 1], zs[i0:i1 + 1], np.nan)
+            pad = np.pad(zz, STRIP_ALONG // 2, constant_values=np.nan)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                zz = np.nanmean(np.lib.stride_tricks.sliding_window_view(pad, STRIP_ALONG), axis=1)
+            for q in np.flatnonzero(ok[i0:i1 + 1] & np.isfinite(zz)).tolist():
+                A, B = [a[i0 + q, 0], a[i0 + q, 1], zz[q]], [b[i0 + q, 0], b[i0 + q, 1], zz[q]]
+                segs.append([A, B] if out > 0 else [B, A])
+                across.append(ws[i0 + q])
+    return np.asarray(segs, float).reshape(-1, 2, 3), np.asarray(across, float)
+
+
 WALL_LOCAL = 1.0  # m: a wall's or stairs' outline heights within this of a place are its top and its foot there
 
 
@@ -1331,9 +1422,9 @@ class WallLevels:
     along a wall zigzag between its top and its foot: Krejcárek's ramp, line 37 (3927, 322), 228.56 and 230.65 m a metre
     apart along one wall."""
 
-    def __init__(self, dtm):
+    def __init__(self, dtm, walls=None):
         from scipy.spatial import cKDTree
-        p = [q[:3] for a in dtm["areas"] if a["c"] in WALL_CLASSES and a.get("l", 0) == 0
+        p = [q[:3] for a in (wall_areas(dtm) if walls is None else walls)
              for r in [a["r"]] + a.get("h", []) for q in r if q[2] is not None]
         self.p = np.asarray(p, float).reshape(-1, 3)
         self.tree = cKDTree(self.p[:, :2]) if len(self.p) else None
@@ -1395,6 +1486,20 @@ def wall_heights(segs, X, Y, on, reach):
     return z, d, q, n
 
 
+def runs_in(walk, q, n, depth):
+    """Whether the sidewalks (`walk`) run unbroken from each kerb point q along its normal n to `depth` m in (one
+    depth, or one per point). A point
+    that far in can be another sidewalk's, across a wall: at Modřanská škola, line 17 (-2479, -8445), a sidewalk 0.6 m
+    wide along the road lies under a wall with the platform on its top, and IPR 1.5 m in from its kerb is the
+    platform's 199.7 m; taken for the walkway's level, it made the kerb a wall's top 3.2 m over the road (#786)."""
+    import shapely
+    q, n = np.asarray(q, float), np.asarray(n, float)
+    if walk is None or not len(q):
+        return np.zeros(len(q), bool)
+    depth = np.broadcast_to(np.asarray(depth, float), (len(q),))
+    return shapely.contains(walk, shapely.linestrings(np.stack([q + n * 0.05, q + n * depth[:, None]], 1)))
+
+
 def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
     """Which points of one kerb edge (q, normals n into the sidewalk, the sidewalk's own heights `own`, the road's
     surface zr beyond them) are a wall's edge and no kerb, and those as wall edges ((m, 2, 3) at the walkway's level,
@@ -1406,7 +1511,7 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
     ramp's head: the edge is its top from STEP_CUT on. And a sidewalk at the foot of a road's wall rose to the road
     along its edge: line 22 (1897.5, -2211.9), 221.2 m to 223.5 m in its last 1.25 m, the road at 223.8 m (#770).
     ground: IPR SW_KERB_SMEAR in from each point, on the sidewalk; wide: whether the sidewalk reaches that far in and
-    half a metre on. The walkway's level is the edge's own height where that lies within KERB_OWN of the ground (the
+    half a metre on, unbroken (runs_in). The walkway's level is the edge's own height where that lies within KERB_OWN of the ground (the
     ramp's sidewalk rises to the building behind it: its edge 260.43 m, 260.82 m 1.5 m in); where it does not, the
     ground on a wide sidewalk, and nothing on a narrow one. An outline along a parapet on its kerb carries the
     parapet's top (by the Modřany viaduct, line 17 (-2396, -9241), 199.24 m over a walkway at 198.1 m: held at it, the
@@ -1469,10 +1574,10 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
         zr = np.asarray(road_z(*(q - n * 0.5).T), float)
         # (an edge standing over or under the road beyond it is a wall's, held below as a wall's edge: wall_tops, #779)
         if own:
-            g, g2 = q + n * SW_KERB_SMEAR, q + n * (SW_KERB_SMEAR + 0.5)
+            g = q + n * SW_KERB_SMEAR
             g1 = [q + n * v for v in KERB_NEAR]
             top, segs = wall_tops(q, n, own[0][ok], zr, np.asarray(ipr.sample(g[:, 0] + F.E0, g[:, 1] + F.N0), float),
-                                  shapely.contains_xy(walk, g2[:, 0], g2[:, 1]),
+                                  runs_in(walk, q, n, SW_KERB_SMEAR + 0.5),
                                   np.column_stack([np.asarray(ipr.sample(v[:, 0] + F.E0, v[:, 1] + F.N0), float) for v in g1]))
             if top.any():
                 tops.append(segs)
@@ -1484,6 +1589,19 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
         P = q[:, None, :] + n[:, None, :] * d[None, :, None]
         inside = shapely.contains_xy(walk, P[..., 0], P[..., 1])
         w = np.where(inside.all(1), SW_WALK, d[np.argmin(inside, axis=1)] - 0.25)
+        # (and no further than the sidewalk runs unbroken: a strip 0.2 m across lies between two samples, and the
+        # plane of the kerb on Modřanská ran over the ramp's parapet onto the ramp behind it, line 17 (-2480.7,
+        # -8400), the ramp's cells along the parapet at the road's 196.4 m for the ramp's 197.5 m, #786)
+        cut = np.flatnonzero(w >= 0.5)
+        cut = cut[~runs_in(walk, q[cut], n[cut], w[cut])]
+        broken = np.zeros(len(q), bool)
+        broken[cut] = True
+        for dk in d[1:]:
+            if not len(cut):
+                break
+            far = (w[cut] >= dk) & ~runs_in(walk, q[cut], n[cut], dk)
+            w[cut[far]] = dk - 0.25
+            cut = cut[~far & (w[cut] > dk)]
         Z = np.asarray(ipr.sample(P[..., 0].ravel() + F.E0, P[..., 1].ravel() + F.N0), float).reshape(P.shape[:2])
         # (a least-squares line per kerb point over its walkway, all at once)
         m = (d[None] >= SW_KERB_SMEAR) & (d[None] <= np.minimum(w - 1.0, SW_WALK)[:, None]) & np.isfinite(Z)
@@ -1507,6 +1625,10 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
             j = np.round((p[:, 0] - xs[0]) / cell).astype(int)
             good = np.isfinite(zr) & (dk <= w) & (i >= 0) & (j >= 0) & (i < X.shape[0]) & (j < X.shape[1])
             good[good] &= on[i[good], j[good]]
+            # (before a break the plane's cell lies before it too: the nearest cell to a point 4 cm before the parapet
+            # was the ramp's behind it)
+            g = np.flatnonzero(good & broken)
+            good[g] = (X[i[g], j[g]] - q[g, 0]) * n[g, 0] + (Y[i[g], j[g]] - q[g, 1]) * n[g, 1] <= w[g] + 0.05
             np.add.at(acc, (i[good], j[good]), (zr[good] + KERB + c[good] * dk) / dk)
             np.add.at(wsum, (i[good], j[good]), 1.0 / dk)
     with np.errstate(invalid="ignore", divide="ignore"):
@@ -1528,6 +1650,29 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
         wz[hold] = ctx["wall_levels"].pick(q[:, 0], q[:, 1], wz[hold], ref)
     known = np.where(hold, wz, known)
     data = np.where(on & (wd <= SW_KERB_SMEAR), np.nan, data)
+    # (and its edge on a paved strip the ground steps across (strip_edges, #786): the cells along it held on their own
+    # side, at a kerb's plane where one reaches them, else at the walkway's level there; no pull from IPR there, nor
+    # anywhere across a walkway narrower than twice the smear: IPR has such a one at its middle alone)
+    se, across = ctx["strip_edges"](box) if ctx.get("strip_edges") is not None else (None, None)
+    if se is not None and len(se):
+        # (a walkway under STRIP_SEEN across has no reading of its own in IPR's 1 m raster: where a road lies past it,
+        # it stands a kerb over that road, as at any kerb. The sidewalk 0.6 m wide between the parapet and Modřanská,
+        # line 17 (-2479.3, -8440): IPR halfway across it reads the wall's smear, 197.3 m for 196.5 m)
+        thin = np.flatnonzero(across < STRIP_SEEN)
+        if len(thin):
+            e = se[thin, 1, :2] - se[thin, 0, :2]
+            nrm = np.column_stack([-e[:, 1], e[:, 0]]) / np.maximum(np.hypot(e[:, 0], e[:, 1]), 1e-9)[:, None]
+            k = se[thin, :, :2].mean(1) + nrm * (across[thin] + 0.5)[:, None]
+            zk = np.asarray(road_z(k[:, 0], k[:, 1]), float) + KERB
+            se = se.copy()
+            se[thin[np.isfinite(zk)], :, 2] = zk[np.isfinite(zk)][:, None]
+        sz, sd, _, _ = wall_heights(se, X, Y, on, SW_KERB_SMEAR)
+        known = np.where(on & (sd <= cell * 0.75) & ~hold & np.isnan(known), sz, known)
+        data = np.where(on & (sd <= SW_KERB_SMEAR), np.nan, data)
+        narrow = across < 2 * SW_KERB_SMEAR
+        if narrow.any():
+            _, nd, _, _ = wall_heights(se[narrow], X, Y, on, 2 * SW_KERB_SMEAR)
+            data = np.where(on & (nd <= 2 * SW_KERB_SMEAR), np.nan, data)
     free = on & np.isnan(known)
     lam = (SW_WAVE / (2 * math.pi)) ** 4 / cell ** 4
     grid = fill_2d(known, free, data, lam)
@@ -1611,9 +1756,15 @@ def context(ln):
     xy = np.array([q[:2] for a in dtm["areas"] for q in a["r"]], float).reshape(-1, 2)
     ways = covers.tunnel_ways((*xy.min(0), *xy.max(0))) if len(xy) else ()
     ipr = covers.CoveredIpr(raw, covers.Covers(dtm, lambda x, y: np.asarray(raw.sample(np.asarray(x) + F.E0, np.asarray(y) + F.N0), float), ways=ways), F)
-    return {"F": F, "ipr": ipr, "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
-            "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
-            "rings": outlines(dtm), "wall_edges": wall_edges(dtm), "wall_levels": WallLevels(dtm)}
+    walls = wall_areas(dtm)
+
+    def lidar(x, y):
+        return np.asarray(ipr.sample(np.asarray(x) + F.E0, np.asarray(y) + F.N0), float)
+    ctx = {"F": F, "ipr": ipr, "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
+           "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
+           "rings": outlines(dtm), "wall_edges": wall_edges(dtm, walls), "wall_levels": WallLevels(dtm, walls),
+           "strip_edges": lambda box: strip_edges(ln, near_box(ctx, "walk", box), box, lidar) if walk is not None else None}
+    return ctx
 
 
 def class_area(dtm, classes):
