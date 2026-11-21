@@ -5358,6 +5358,44 @@
      "why": "IPR has the road and the sidewalk at 191.86-191.99 m up to 1 m inside the kerb and the wall's face from 1.25 m in (190.17 m at 1.5 m). The kerb-wall rule read the walkway's level on the face and held the edge at it: the written file of ground batch B has the sidewalk at 190.31 m at its kerb"
     }
    ]
+  },
+  "hlavni-nadrazi-under-the-magistrala": {
+   "line": "9",
+   "at": [
+    1075.0,
+    -338.0
+   ],
+   "reach": 45,
+   "issue": 788,
+   "what": "the track east of the Hlavní nádraží stop under the Magistrála's bridges and then under the upper street on a cover (the line's tunnel s 11801-11867): over the rails nothing but the cover to come (what stands south of the track under the bridges is an open question, #788)",
+   "source": "the user, 2026-11-20 (session): \"the road bridges over our tram track right after hlavní nádraží stop on line 9. It looks like ground isdue combined with broken bridge decks (those can be solved later). What does the survey says there?\"",
+   "seen": {
+    "what": "Looking east from Bolzanova: the Magistrála's deck on piers over the street; under it, left of the tram track, cars parked at the street's level, and more vehicles behind a fence right of the track; the track in setts runs on under the deck at the same level.",
+    "from": [
+     {
+      "note": "Street View at Bolzanova 7, looking east, looked at 2026-11-21 (not stored)"
+     }
+    ],
+    "source": "Street View, looked at"
+   },
+   "sections": [
+    {
+     "name": "along the axis under the cover, s 11838 to s 11862",
+     "from": [
+      1077.4,
+      -339.2
+     ],
+     "to": [
+      1100.1,
+      -331.6
+     ],
+     "expect": {
+      "off the chord m": 0.4,
+      "largest step m": 0.2
+     },
+     "why": "the rails run at 197.4 m under the upper street's cover; the tram's own area `tram` 253 took the street surface, which read the cover in IPR: the written file has the ground at 201-204.4 m on the axis, closed over the track"
+    }
+   ]
   }
  }
 }
