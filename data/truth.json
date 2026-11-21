@@ -26,7 +26,8 @@
   "trackSurfaceReview": "tools/surface_review.py (an answered place gets no card); tools/track_styles.py's setts (#574) once it reads them",
   "bedTroughReview": "tools/bed_troughs.py (an answered place gets no card); reference for the walls step (`wall`) until an issue reads it",
   "groundRules": "reference: the rules tools/ground_mesh.py holds (crossing_pieces, rail_band, on_rails) and checks (heads_check)",
-  "groundPlaces": "tools/ground_place.py: the places a ground change is built and measured at (#757)"
+  "groundPlaces": "tools/ground_place.py: the places a ground change is built and measured at (#757)",
+  "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)"
  },
  "contactorSound": [
  {
@@ -5840,5 +5841,150 @@
     }
    ]
   }
+ },
+ "openTrackReview": {
+  "note": "The user's answers to the open track review (reports/review/open-track-N.json, tools/open_track.py, #591): what the track is between the card's two points: `ballast`, `grass`, or `paved` (the rules decide).",
+  "answers": [
+   {
+    "id": "open-50.06536-14.32433",
+    "line": "9",
+    "place": [
+     50.065357,
+     14.324327
+    ],
+    "between": [
+     [
+      50.065212,
+      14.323564
+     ],
+     [
+      50.065579,
+      14.325043
+     ]
+    ],
+    "answer": "ballast",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07214-14.39185",
+    "line": "9",
+    "place": [
+     50.072144,
+     14.391854
+    ],
+    "between": [
+     [
+      50.071977,
+      14.390368
+     ],
+     [
+      50.072261,
+      14.393352
+     ]
+    ],
+    "answer": "paved",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07217-14.39187",
+    "line": "9",
+    "place": [
+     50.072173,
+     14.391869
+    ],
+    "between": [
+     [
+      50.072308,
+      14.393617
+     ],
+     [
+      50.071975,
+      14.390136
+     ]
+    ],
+    "answer": "paved",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07803-14.46474",
+    "line": "9",
+    "place": [
+     50.07803,
+     14.464736
+    ],
+    "between": [
+     [
+      50.078077,
+      14.465585
+     ],
+     [
+      50.077982,
+      14.463887
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07825-14.46897",
+    "line": "9",
+    "place": [
+     50.078248,
+     14.46897
+    ],
+    "between": [
+     [
+      50.078292,
+      14.469848
+     ],
+     [
+      50.078204,
+      14.468093
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07837-14.47134",
+    "line": "9",
+    "place": [
+     50.078367,
+     14.471338
+    ],
+    "between": [
+     [
+      50.078426,
+      14.472494
+     ],
+     [
+      50.078309,
+      14.470182
+     ]
+    ],
+    "answer": "paved",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.09339-14.39906",
+    "line": "22",
+    "place": [
+     50.093388,
+     14.399058
+    ],
+    "between": [
+     [
+      50.093307,
+      14.398485
+     ],
+     [
+      50.093476,
+      14.399629
+     ]
+    ],
+    "answer": "paved",
+    "source": "user, open track review (reports/review/open-track-22.json), 2026-11-14 (#591)"
+   }
+  ]
  }
 }
