@@ -525,6 +525,23 @@ class Platforms(unittest.TestCase):
         end = (x >= 60) & (x <= 68) & (y >= -4.0)
         self.assertGreater((got[end] - z[end]).min(), -0.02)
 
+    def test_a_surveyed_platform_takes_its_plane_right_across(self):
+        # (an area the survey has as a platform, its corners on its two edges alone, 1.5 and 5.5 m from the axis: the
+        # edge at the track level along at 0.25 m over the rail top, the back edge at the survey's few points, wandering
+        # 0.2 m. All of it lies on the plane, level across: corners at one distance tell no crossfall. Not marked as
+        # the survey's platform, the back edge lies past the band's fade and keeps its own heights)
+        x = np.concatenate([np.arange(20.0, 81.0, 1.0)] * 2)
+        y = np.concatenate([np.full(61, -1.5), np.full(61, -5.5)])
+        z = 200.0 + 0.01 * x + np.where(y > -2, 0.25, 0.12 + 0.1 * np.sin(x / 3.0))
+        got, moved = gm.platform_planes(self.L, x, y, z, np.ones(len(x), bool), wide=np.ones(len(x), bool))
+        mid = (x >= 32) & (x <= 68)
+        self.assertLess(np.abs(got[mid] - (200.0 + 0.01 * x[mid] + 0.25)).max(), 1e-6)
+        self.assertTrue(moved[mid].all())
+        got, moved = gm.platform_planes(self.L, x, y, z, np.ones(len(x), bool))
+        back = mid & (y < -2)
+        self.assertTrue(np.allclose(got[back], z[back]) and not moved[back].any())
+        self.assertLess(np.abs(got[mid & (y > -2)] - (200.0 + 0.01 * x[mid & (y > -2)] + 0.25)).max(), 1e-6)
+
     def test_other_platforms_and_other_corners_are_left(self):
         x, y = self.corners()
         z = 200.0 + 0.01 * x + 0.20 + 0.03 * np.sin(x)
@@ -624,6 +641,43 @@ class BesideAThinWall(unittest.TestCase):
             np.testing.assert_allclose(z, [at_wall, 258.0 + grade * (1.0 if grade < 0.2 else 1.5)], atol=1e-9)
 
 
+class BesideAStrip(unittest.TestCase):
+    """(#786) a sidewalk beside a paved strip that is a wall's face: read on its own side, snapped to the strip's line"""
+    D = {"areas": [{"c": "paved", "l": 0, "r": [[0, 0, 194.8], [10, 0, 194.8], [10, 0.2, 197.4], [0, 0.2, 197.4]]},
+                   {"c": "paved", "l": 0, "r": [[0, 20, 194.8], [10, 20, 194.8], [10, 26, 197.4], [0, 26, 197.4]]},
+                   {"c": "wall", "l": 1, "r": [[0, 40, 194.8], [10, 40, 194.8], [10, 40.2, 197.4], [0, 40.2, 197.4]]}]}
+
+    def test_a_walls_face_in_plan_is_a_wall_area(self):
+        # (the strip 0.2 m across with its foot's line and its top's; not the yard 6 m across, nor a wall on a deck)
+        self.assertEqual(gm.wall_areas(self.D), [0])
+        self.assertEqual(gm.outline_edges(self.D, [0]).shape, (4, 2, 2))
+
+    def test_a_sidewalks_corner_by_a_wall_reads_its_own_side(self):
+        # a ramp at 194.8 m south of the strip and a platform at 197.4 m north of it; the surface's cells are 0.5 m, and
+        # read between cells within half a metre of the strip it mixes the two. Corners on the strip's two lines and
+        # 0.4 m off them take the surface 0.75 m out on their triangle's side; one 1 m off is left
+        walls = gm.outline_edges(self.D, [0])
+
+        def read(px, py):
+            return 194.8 + 2.6 * np.clip((np.asarray(py, float) + 0.4) / 1.0, 0, 1)
+        x = np.full(5, 5.0)
+        y = np.array([0.2, 0.6, 0.0, -0.4, 1.2])
+        ty = np.array([0.5, 0.9, -0.3, -0.6, 1.5])
+        z, held = gm.own_side(walls, x, y, x, ty, read(x, y), read)
+        np.testing.assert_allclose(z, [197.4, 197.4, 194.8, 194.8, 197.4], atol=1e-9)
+        self.assertEqual(held.tolist(), [True, False, True, False, False])
+        # (no surface out there: left)
+        self.assertFalse(gm.own_side(walls, x, y, x, ty, read(x, y), lambda px, py: np.full(len(px), np.nan))[1].any())
+
+    def test_a_street_corner_on_the_strips_line_takes_its_height(self):
+        # (as on a wall area: on the top's line 0.05 m under it, and on the foot's line 0.2 m over it, the line's height;
+        # 0.25 m under the top's line the top stands as a low wall)
+        x = np.full(3, 5.0)
+        y = np.array([0.2, 0.0, 0.2])
+        z = gm.snap_to_walls(self.D, x, y, np.array([197.35, 195.0, 197.15]), np.ones(3, bool))
+        np.testing.assert_allclose(z, [197.4, 194.8, 197.15], atol=1e-9)
+
+
 class APairsEnd(unittest.TestCase):
     def test_the_strip_between_two_wall_lines_holds_nothing_past_their_end(self):
         # (#770: a wall's foot line along x = 0 from y = 0 north, its right side the strip to the top line at 271.18 m,
@@ -655,6 +709,15 @@ class UnderADeck(unittest.TestCase):
         self.assertEqual(low.tolist(), [True, False, False, False])
         self.assertEqual(z[:3].tolist(), [197.6, 204.7, 198.3])
         self.assertTrue(np.isnan(z[3]))
+
+    def test_the_trams_area_under_a_cover_lies_at_the_rails(self):
+        # (#788: in a tunnel of the route, off the rock: a corner of the tram's area 4 m over the rails beside it at
+        # the rails' level; one at the rails, and one outside the tunnel, left)
+        L = {"path": [[0.0, 0.0], [100.0, 0.0]], "heights": {"step": 1.0, "path": [197.4] * 101}, "tunnels": [[40.0, 60.0]]}
+        inside, rail = gm.in_the_rock(L, [tuple(v) for v in L["tunnels"]], np.array([50.0, 50.0, 20.0]), np.array([2.0, -3.0, 2.0]))
+        self.assertEqual(inside.tolist(), [True, True, False])
+        z, floor = gm.off_the_hill([201.4, 197.5, 204.0], np.where(inside, rail, np.nan))
+        self.assertEqual((z.tolist(), floor.tolist()), ([197.4, 197.5, 204.0], [True, False, False]))
 
 
 class TwoSided(unittest.TestCase):
