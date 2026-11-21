@@ -33,17 +33,9 @@ SOURCES = [a for a in sys.argv[1:] if a not in ("--line", LINE)]
 import heavy  # noqa: E402
 heavy.turn(f"dtm {LINE}")  # (a heavy job run alone, ~60 s; under rebuild.py in its turn, #536)
 
-# area classes by the DTM object type code at the end of the layer name
-CLASSES = {
-    "010000000503": "road", "010000001703": "road", "010000001103": "parking", "010000000903": "cycle",
-    "010000000703": "sidewalk", "010000001303": "island", "010000002403": "tram", "010000005303": "platform",
-    "010000005803": "deck", "010000006203": "tunnel", "010000006603": "underpass", "010000031203": "rail",
-    "010000021503": "green", "010000020903": "green", "010000015203": "green", "010000018703": "paved",
-    "010000018903": "paved", "010000005503": "paved", "010000016603": "stairs", "010000031503": "roof",
-    "010000016803": "wall", "010000020303": "water",
-    # (#555: the median strip between carriageways, tools/zps_medians.py; the road's associated area, paved)
-    "010000001503": "median", "010000032003": "paved",
-}
+# area classes by the DTM object type code at the start of the layer name; a layer neither a class nor left out on
+# purpose stops the build (tools/zps_layers.py, #703)
+import zps_layers  # noqa: E402
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
 from geo import Frame  # noqa: E402
@@ -328,7 +320,10 @@ corridor = gpkg.near(cells, 40, (F.E0, F.N0))
 for package in packages:
     opl = package.opl
     for t in gpkg.layers(opl):
-        cls = CLASSES.get(t.split("#")[-1].split("_")[0])
+        try:
+            cls = zps_layers.classify(t)
+        except ValueError as e:
+            sys.exit(f"{package.district}: {e}")
         if not cls:
             continue
         for f in gpkg.features(opl, t, keep=corridor):
@@ -521,6 +516,8 @@ counts = defaultdict(int)
 for a in areas:
     counts[(a["c"], a["l"])] += 1
 print("areas:", dict(sorted(counts.items())))
+classes = zps_layers.summary(areas)  # (per class, its count and m2: in the report, #703)
+print("classes:", classes)
 print(f"dropped {dropped} areas with >30 % unknown heights, {n_copies} copies of an area")
 print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing, "
       f"{n_deck} ground-level corners on a deck's line given the ground")
@@ -534,7 +531,7 @@ vertex = {"exact": n_z, "near": n_near, "missing": n_none, "deckToGround": n_dec
 nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
-                           checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
+                           checks={"classes": classes, "vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
                                    "decks": deck_report, "underDecks": under_report, "inside": inside_report,
                                    "outlines": outline_report,
                                    "shelters": {k: v for k, v in shelter_report.items() if k != "shelters"}}),
