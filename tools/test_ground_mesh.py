@@ -979,6 +979,22 @@ class Rails(unittest.TestCase):
         self.assertTrue(np.allclose(got[:3], 200.0 - bed_surface.BED_BELOW))
         self.assertTrue(np.allclose(low[:3], 200.0 - bed_surface.BED_BELOW))
 
+    def test_lines_where_a_style_changes_and_along_beds_inside_the_outline(self):
+        # (#676: the route's style changes at y 40, a line across the bed there; two paired tracks 4 m apart, their beds
+        # meeting at x 2 inside the outline: one line along the middle, not two mm apart)
+        import bed_surface
+        L = level_line([([[0, 0], [0, 100]], {}), ([[4, 0], [4, 100]], {})])
+        L["styles"] = [{"s0": 0, "s1": 50, "style": "panels"}, {"s0": 50, "s1": 200, "style": "embedded"}]
+        beds = bed_surface.Beds(L)
+        outline = shapely.box(-2, 0, 6, 100)
+        got = gm.rail_lines(beds, outline)
+        across = [g for g in got if abs(g.centroid.y - 40) < 0.05 and g.length > 3]
+        self.assertTrue(across)
+        middle = [g for g in got if abs(g.bounds[0] - 2) < 1e-6 and abs(g.bounds[2] - 2) < 1e-6 and g.length > 50]
+        self.assertEqual(len(middle), 1)
+        # (the outer edges lie on the outline: no line of their own)
+        self.assertFalse([g for g in gm.bed_edges(beds, outline) if g.bounds[0] < -1.9 or g.bounds[2] > 5.9])
+
     def test_a_point_off_the_rail_is_judged_at_the_rail(self):
         # (the outline's edge on the right rail: a point 0.5 mm past it lies outside, its foot on the rail on the edge;
         # it counts, at the rail's height)
