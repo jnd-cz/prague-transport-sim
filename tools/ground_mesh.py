@@ -420,7 +420,9 @@ class SurveySurface:
                     self.area.append(i)
         self.tris = np.asarray(self.tris, float).reshape(-1, 3, 3)
         self.area = np.asarray(self.area, int)
-        self.tree = shapely.STRtree(shapely.polygons(self.tris[:, [0, 1, 2, 0], :2])) if len(self.tris) else None
+        self.polys = shapely.polygons(self.tris[:, [0, 1, 2, 0], :2]) if len(self.tris) else None
+        self.tree = shapely.STRtree(self.polys) if len(self.tris) else None
+        self.missed = 0  # (points given the nearest triangle's surface: at()'s count, for the build's log)
 
     def at(self, area, x, y):
         """Heights of points of one area (NaN where none of its triangles holds them)."""
@@ -435,12 +437,20 @@ class SurveySurface:
         pi, ti = pi[ok], ti[ok]
         z = plane(self.tris[ti], x[pi], y[pi])
         out[pi] = z
-        miss = np.isnan(out)
-        if miss.any():  # (on the outline, a hair outside every triangle: the nearest vertex's height)
-            mine = self.tris[self.area == area].reshape(-1, 3)
-            if len(mine):
-                d = (mine[None, :, 0] - x[miss, None]) ** 2 + (mine[None, :, 1] - y[miss, None]) ** 2
-                out[miss] = mine[d.argmin(1), 2]
+        miss = np.flatnonzero(np.isnan(out))
+        if len(miss):
+            # (on the outline, a hair outside every triangle: the area's nearest triangle's surface at its nearest point
+            # to it. The nearest vertex's height, as it was, is another place's on a long edge: the median between
+            # Bělohorská's tracks (line 22, area 3968: 2.7 m across, its north edge 44 m between two points at 300.35
+            # and 298.20 m) had the edge's lattice points at 300.35, 299.50, 299.25, 297.95 and 297.95 m, the first
+            # 1.2 m over the street and the last two 0.6-0.8 m under it, #548)
+            k = np.flatnonzero(self.area == area)
+            if len(k):
+                pts = shapely.points(x[miss], y[miss])
+                qi, j = shapely.STRtree(self.polys[k]).query_nearest(pts, all_matches=False)
+                near = shapely.get_coordinates(shapely.shortest_line(pts[qi], self.polys[k[j]]))[1::2]
+                out[miss[qi]] = plane(self.tris[k[j]], near[:, 0], near[:, 1])
+                self.missed += len(qi)
         return out
 
 
@@ -2265,7 +2275,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         zc[nan] = lidar_w(cx[nan], cy[nan])
 

@@ -210,6 +210,7 @@ def fill_along(r, zs):
 # few cm, a ramp a slope; stairs and walls are their own classes)
 SMOOTH = {"road", "tram", "parking", "cycle", "sidewalk", "island", "median", "platform", "paved"}
 n_spikes = defaultdict(int)
+n_stray = defaultdict(int)
 import numpy as np  # noqa: E402
 from ipr_dtm import IprDtm  # noqa: E402
 import zps_ground  # noqa: E402
@@ -247,9 +248,16 @@ def despike(r, zs, cls):
             g = terrain(*xy[i])
             if g is not None and abs(m - g) < abs(z - g):
                 bad.append(i)
-    if not bad or len(bad) > 0.4 * n:
+    if len(bad) > 0.4 * n:
         return zs  # (most of the ring disagrees: no trend to trust)
-    n_spikes[cls] += len(bad)
+    # (a single point the survey has wrong, its neighbours on the lidar's ground and no step in it there:
+    # zps_ground.stray_points, #548)
+    stray = [i for i in zps_ground.stray_points(xy, zs, lambda x, y: _ipr.sample(np.asarray(x, float), np.asarray(y, float))) if i not in bad]
+    n_stray[cls] += len(stray)
+    bad += stray
+    if not bad:
+        return zs
+    n_spikes[cls] += len(bad) - len(stray)
     out = list(zs)
     for i in bad:
         out[i] = None
@@ -517,11 +525,12 @@ print(f"dropped {dropped} areas with >30 % unknown heights, {n_copies} copies of
 print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing, "
       f"{n_deck} ground-level corners on a deck's line given the ground")
 print(f"spikes along smooth outlines, taken along the ring: {sum(n_spikes.values())} {dict(sorted(n_spikes.items()))}")
+print(f"single points off the lidar's ground where it has no step, taken along the ring: {sum(n_stray.values())} {dict(sorted(n_stray.items()))}")
 out = {"areas": areas, "shelters": shelter_report["shelters"]}
 # the vertex heights within the survey: a 3D line's vertex at the same place, else a boundary point
 # within 2.5 m, else interpolated along the ring; areas with > 30 % unknown are dropped
 vertex = {"exact": n_z, "near": n_near, "missing": n_none, "deckToGround": n_deck, "droppedAreas": dropped,
-          "spikes": dict(sorted(n_spikes.items()))}
+          "spikes": dict(sorted(n_spikes.items())), "stray": dict(sorted(n_stray.items()))}
 nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
