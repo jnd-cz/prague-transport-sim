@@ -148,7 +148,7 @@ and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any
 extract's index beside the machine cache (`TRAMDATA_CACHE/osm-index/<extract>-<code>/`, DEVELOPING.md), DI's and the
 archive's parsed tracks and DI's network (`TRAMDATA_CACHE/kept/`, keyed by the sources' provenance hashes and the code
 that reads them; `tools/dtmp_tracks.py` `kept`) and the rebuild's step records with the outputs they name
-(`reports/rebuild/cache/`).
+(`TRAMDATA_CACHE/stepcache/`; `reports/rebuild/cache/` of the checkout without a machine cache).
 
 ## Regional DTM monthly downloads and JVF transition (#63)
 

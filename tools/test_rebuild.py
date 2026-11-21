@@ -117,6 +117,39 @@ class StepCacheTest(unittest.TestCase):
         self.assertEqual(self.build(), ["skip", "skip"])
         self.assertEqual(self.data(), first)  # (b's output put back as it was, not b run twice)
 
+    def test_a_shared_cache_holds_in_another_checkout(self):
+        # (#797: the cache beside the machine's data cache. A second checkout of the same files, with no data yet,
+        # skips every step and gets the outputs; a change there runs there and leaves the first checkout's records)
+        shared = tempfile.mkdtemp(prefix="test_rebuild_cache_")
+        self.addCleanup(shutil.rmtree, shared, True)
+        self.addCleanup(os.environ.pop, stepcache.DIR_ENV, None)
+        one = self.root
+        rebuild.CACHE = stepcache.Cache(one, shared)
+        self.assertEqual(self.build(), [0, 0])
+        first = self.data()
+        self.assertFalse(os.path.exists(os.path.join(one, "reports", "rebuild", "cache")))
+        two = tempfile.mkdtemp(prefix="test_rebuild_two_")
+        self.addCleanup(shutil.rmtree, two, True)
+        for d in ("tools", "raw"):
+            shutil.copytree(os.path.join(one, d), os.path.join(two, d), ignore=shutil.ignore_patterns("__pycache__"))
+        for d in ("data", "reports/rebuild"):
+            os.makedirs(os.path.join(two, d))
+        self.root = rebuild.ROOT = two
+        rebuild.CACHE = stepcache.Cache(two, shared)
+        self.assertEqual(self.build(), ["skip", "skip"])
+        self.assertEqual(self.data(), first)
+        self.write("raw/in.txt", "two")
+        self.assertEqual(self.build(), [0, 0])
+        self.assertEqual(self.data()["src"], "two")
+        self.root = rebuild.ROOT = one
+        rebuild.CACHE = stepcache.Cache(one, shared)
+        self.assertEqual(self.build(), ["skip", "skip"])
+        self.assertEqual(self.data(), first)
+        # (without a folder given the cache is the checkout's own again, and knows nothing of these runs)
+        rebuild.CACHE = stepcache.Cache(one)
+        self.assertNotIn(stepcache.DIR_ENV, os.environ)
+        self.assertEqual(self.build(), [0, 0])
+
     def test_changed_import_reruns(self):
         self.build()
         self.write("tools/helper.py", "K = 22\n")  # (another size: Python's bytecode cache goes by size and second)
@@ -243,11 +276,12 @@ class StepCacheTest(unittest.TestCase):
         self.assertEqual(rebuild.CACHE.records(rebuild.CACHE.name("line9", "b.py", ["--line", "9"])), [])
 
     def test_prune(self):
-        self.build()
-        self.write("raw/in.txt", "two")
-        self.build()
-        self.write("raw/in.txt", "three")
-        self.build()  # (KEEP records per step: the first run's outputs are named by none)
+        with mock.patch.object(stepcache, "KEEP", 2):
+            self.build()
+            self.write("raw/in.txt", "two")
+            self.build()
+            self.write("raw/in.txt", "three")
+            self.build()  # (KEEP records per step: the first run's outputs are named by none)
         n, _ = rebuild.CACHE.prune()
         self.assertGreater(n, 0)
         self.assertEqual(self.build(), ["skip", "skip"])
