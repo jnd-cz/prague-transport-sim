@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// A set of cars on the track (src/models.js placeConsist): each car on its two bogie pivots, hung on the
-// coupling, and its running gear posed from the track. A car with moving gear carries it as
-// car.userData.gear (src/rigged.js, src/t3simple.js):
-//   axle      half the wheelbase: a bogie turns to the chord between its axles' points on the track
+// A set of cars on the track (src/models.js placeConsist): each car placed by its type's running gear
+// (src/articulated.js: the T3 one section on two bogie pivots), hung on the coupling, and its running gear
+// posed from the track. A car with moving gear carries it as car.userData.gear (src/rigged.js, src/t3simple.js):
+//   axle      half the wheelbase
 //   pinY      the coupler pins' height in the car
 //   live()    whether the gear is drawn now (the hybrid's lighter level has it merged)
 //   turn(i, yaw)   bogie i (0 the front, 1 the rear) turned against the body about its pivot (+ to the left)
@@ -12,24 +12,17 @@
 //   done()         after a car's calls (optional)
 import * as THREE from 'three';
 import { T3, CAR_PITCH } from './tram.js';
+import { placeUnit } from './articulated.js';
 
 const v3 = () => new THREE.Vector3();
 const A = v3(), B = v3(), F = v3(), Q = v3(), qi = new THREE.Quaternion();
 
-// A car's pose from the track: on its two bogie pivots, its centre c (at(s) -> [x, y, height, roll])
-function placeCar(car, c, at, bogie) {
-  const [ax, ay, za, ra = 0] = at(c + bogie), [bx, by, zb, rb = 0] = at(c - bogie);
-  car.position.set((ax + bx) / 2, (za + zb) / 2, -(ay + by) / 2);
-  car.rotation.y = Math.atan2(ax - bx, -(ay - by));
-  car.rotation.x = -Math.atan2(za - zb, 2 * bogie);
-  car.rotation.z = -(ra + rb) / 2;
-}
-
-// a bogie's yaw against its car: the chord between its axles' points on the track, its pivot at s
-function bogieYaw(car, s, at, axle) {
-  const [px, py] = at(s + axle), [qx, qy] = at(s - axle);
-  const d = Math.atan2(px - qx, -(py - qy)) - car.rotation.y;
-  return Math.atan2(Math.sin(d), Math.cos(d));
+// A section's node at its pose from placeUnit (route x, y and height; lift: its origin over the track bed)
+export function poseSection(node, p, lift = 0) {
+  node.position.set(p.p[0], p.p[2] + lift, -p.p[1]);
+  node.rotation.y = p.yaw;
+  node.rotation.x = -p.pitch;
+  node.rotation.z = -p.roll;
 }
 
 // a point of a car in world coordinates from its local (x left, y up, z forward)
@@ -43,33 +36,34 @@ const intoCar = (car, d, out) => out.copy(d).applyQuaternion(qi.copy(car.quatern
 // pin, a few cm closer along the track in a curve than on the straight. Then each car's gear: the bogies
 // turned to the track, the wheels rolled by sFront, the coupled bars along the link, the free ones straight.
 export function hangConsist(model, sFront, at, pitch = CAR_PITCH) {
-  const { cars, bogie } = model.userData, pin = T3.couplerPivot, link = pitch - 2 * pin;
+  const { cars } = model.userData, type = T3, pin = T3.couplerPivot, link = pitch - 2 * pin;
   const y = cars[0].userData.gear?.pinY ?? 0; // (the link runs between the pins)
-  const centres = [];
-  let c = sFront - T3.length / 2;
+  const poses = [];
+  let f = sFront;
+  const place = (car, front) => { const p = placeUnit(type, front, at); poseSection(car, p.sections[0]); return p; };
   cars.forEach((car, k) => {
     if (k > 0) {
       const prev = cars[k - 1];
       carPoint(prev, 0, y, -pin, A);
-      // the next car's centre along the track: two secant steps from the straight-track pitch
-      let c2 = c - pitch;
+      // the next car's front along the track: two secant steps from the straight-track pitch
+      let f2 = f - pitch;
       for (let i = 0; i < 3; i++) {
-        placeCar(car, c2, at, bogie);
+        place(car, f2);
         carPoint(car, 0, y, pin, B);
         const err = A.distanceTo(B) - link;
         if (Math.abs(err) < 1e-4) break;
-        c2 += err;
+        f2 += err;
       }
-      c = c2;
+      f = f2;
     }
-    placeCar(car, c, at, bogie);
-    centres.push(c);
+    poses.push(place(car, f));
   });
+  // (each car's pose with its bogies' and joints' angles and what a limit held, for the debug overlay and window.game)
+  model.userData.placed = poses;
   cars.forEach((car, k) => {
     const g = car.userData.gear;
     if (!g || !g.live()) return;
-    g.turn(0, bogieYaw(car, centres[k] + bogie, at, g.axle));
-    g.turn(1, bogieYaw(car, centres[k] - bogie, at, g.axle));
+    poses[k].bogies.forEach((b, i) => g.turn(i, b.yaw));
     g.roll(sFront);
     // from this car's rear pin to the next one's front pin; the bar ahead from the previous car's rear pin
     const next = cars[k + 1], prev = cars[k - 1];

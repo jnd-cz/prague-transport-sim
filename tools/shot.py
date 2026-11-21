@@ -8,6 +8,9 @@
     python -P -E tools/shot.py --line 22 --s 6330 --view cab --weather snow   # bare crowns, snow on the ground
     python -P -E tools/shot.py --line 37 --s 3420 --view cab --plain --ref .   # as a player sees it (the ground's
                                                                    # tiles, #30) against every tile in detail
+    python -P -E tools/shot.py --line 17 --s 12568 --view review --at=-755,-1450 --ref . --overlay reports/places/rasinovo-quay/overlay
+                                                                   # a place's ground (tools/ground_place.py --overlay,
+                                                                   # #757) against the checkout's own
 
 Writes individual PNGs, a labelled side-by-side PNG, and camera/data hashes to reports/shots/.
 Git references are exported temporarily and use verified published files from TRAMDATA_CACHE.
@@ -37,6 +40,19 @@ from data_reference import ROOT, checkout, digest, git
 
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
+    overlay = None  # a folder whose files stand in for the checkout's at the same paths (--overlay)
+
+    def translate_path(self, path):
+        p = super().translate_path(path)
+        if self.overlay:
+            try:
+                q = Path(self.overlay) / Path(p).resolve().relative_to(Path(self.directory).resolve())
+            except ValueError:
+                return p
+            if q.is_file():
+                return str(q)
+        return p
+
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store')
         super().end_headers()
@@ -46,9 +62,10 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 
 
 @contextmanager
-def site(root):
+def site(root, overlay=None):
     # The kernel reserves this ephemeral socket before any browser is started.
-    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Quiet, directory=str(root)))
+    handler = type('Overlaid', (Quiet,), {'overlay': str(overlay)}) if overlay else Quiet
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(handler, directory=str(root)))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -84,7 +101,8 @@ def font(size=20):
     return ImageFont.load_default(size)
 
 
-def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45, picks=(), plain=False, weather='dry'):
+def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45, picks=(), plain=False, weather='dry',
+            overlay=None):
     context = browser.new_context(viewport={'width': 1280, 'height': 720}, device_scale_factor=1)
     context.add_init_script('''window.headless = true;
       let state = 158; Math.random = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296);''')
@@ -97,8 +115,8 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
         return max(1, (deadline - time.monotonic()) * 1000)
 
     try:
-        with site(root) as url:
-            print(f'Loading line {line}, {view}: {root}', flush=True)
+        with site(root, overlay) as url:
+            print(f'Loading line {line}, {view}: {root}' + (f' under {overlay}' if overlay else ''), flush=True)
             keep = '' if plain else '&keepgeo'  # (plain: the ground's tiles round the camera only, as a player loads, #30)
             page.goto(f'{url}/?line={line}&seed=158{keep}', timeout=remaining())
             page.wait_for_function("document.getElementById('loading')?.classList.contains('hidden') && "
@@ -236,7 +254,11 @@ def main(argv=None, root=ROOT):
     ap.add_argument('--weather', choices=('dry', 'rain', 'leaves', 'snow'), default='dry',
                     help="the menu's weather in both pictures (snow: winter, bare crowns; leaves: autumn)")
     ap.add_argument('--livery', help='the livery picked in the menu (#529; default the vehicle\'s own)')
+    ap.add_argument('--overlay', type=Path, help='a folder whose files stand in for the current checkout\'s at the same paths '
+                    '(a place\'s ground: tools/ground_place.py --overlay); the reference is drawn without it')
     a = ap.parse_args(argv)
+    if a.overlay and not a.overlay.is_dir():
+        ap.error(f'--overlay: no folder {a.overlay}')
     at = None
     if a.at:
         try:
@@ -259,7 +281,7 @@ def main(argv=None, root=ROOT):
             browser, renderer = gpu.launch(pw)
             try:
                 now = capture(browser, root, a.line, a.s, a.view, current, a.timeout, target=at, dist=a.dist, pitch=a.pitch, picks=picks,
-                              plain=a.plain, weather=a.weather)
+                              plain=a.plain, weather=a.weather, overlay=a.overlay and a.overlay.resolve())
                 report = {'line': a.line, 's': a.s, 'view': a.view, 'renderer': renderer, 'current': now,
                           'current_commit': git(root, 'rev-parse', 'HEAD'),
                           'working_changes': git(root, 'status', '--porcelain', '--', 'src', 'index.html', 'data/truth.json', 'data/MANIFEST.json')}

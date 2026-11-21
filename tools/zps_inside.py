@@ -14,7 +14,8 @@ survey's heights; #276's ground built offline will cut the terrain mesh by it in
   drape's points inside also let the page lay a lawn by a grass track to its bed: left a sheet, lawns covered the rails
   on line 22 and let the terrain through on line 17);
 - a railway yard or a paved yard where it lies open on IPR's ground (DRAPE: zps_ground's verdict within its OFFSET of
-  IPR, moved there, or off it unevenly along walls and slopes) and its sheet misses the ground (MISS). A sheet that fits
+  IPR, moved there, or off it unevenly along walls and slopes) and its sheet misses the ground (MISS; a paved yard's,
+  MISS_PAVED). A sheet that fits
   stays, smooth: a paved yard draped on the lidar's 2 m terrain in 5 m triangles counts as waves on a street. The
   uneven ones measured, their inside beyond 1 m of IPR as a sheet and draped: paved 46 % and 17 % (220,000 m²), rail
   30 % and 1.7 % (green 54 % and 8.7 %). One too small for the lidar to see (a planter, a raised bed: #446) or under a
@@ -39,6 +40,12 @@ HELD = {"survey", "review", "changing"}  # its verdicts holding an area off IPR 
 # a sheet that fits stays (a paved yard draped on the lidar's 2 m terrain in 5 m triangles counted 8 cm waves the
 # street check reads: line 9's streetWaviness 2348 -> 2617 with every open area draped)
 MISS = 0.5
+# m: a paved yard's sheet misses the ground over this: the step ground_mesh closes to a raised area beside it (MEET_STEP).
+# A yard cut by a sidewalk meets it along a line through its own inside, where its sheet is the plane between far
+# outline points: line 23 s 557 (-2564, 434), area 3398 (2,031 m2, 0.43 m at the 95th percentile) lay 0.5-0.9 m
+# under IPR beside the sidewalk and 0.29-0.37 m under the sidewalk, a step with its wall. The waves MISS was set
+# against were the page's drape on its 2 m terrain; the ground file lays lidar ground in 5 m cells (#638)
+MISS_PAVED = 0.3
 STEP, INSET = 2.0, 0.5  # m: the lattice inside an area where its sheet is compared with IPR, and its distance off the outline
 REACH = 0.5  # m round an opening's streets: their vertices at its edge (the portals)
 # m under the deck's underside (its top less its slab `t`, else SLAB as the page draws it): a ground-level vertex this
@@ -140,7 +147,7 @@ def inside(areas, verdicts, ground):
             continue
         if a["c"] != "green":
             miss = misses(a, ground)
-            if miss is None or miss <= MISS:
+            if miss is None or miss <= (MISS_PAVED if a["c"] == "paved" else MISS):
                 out["fit"][a["c"]] = out["fit"].get(a["c"], 0) + 1
                 continue
         a["g"] = 1

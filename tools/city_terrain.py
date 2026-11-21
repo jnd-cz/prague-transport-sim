@@ -996,6 +996,22 @@ def show(rep):
         print(f"  zero area {a['n']}: {a['km2']} km², {a['district']} {a['cadastral']}, holds {a['holds']}, filled {a['filled']}")
 
 
+BOOKKEEPING = b"\n# ---------------------------------------------------------------- the key and the cache\n"
+
+
+def code_hash(here=None):
+    """The hash of the code that makes the mesh: CODE's files, this one up to its section on the key and the cache (the
+    key, the cache's folders, the command line and the turn among the heavy jobs follow it; what main() passes on is in
+    the key by value). #748 changed the turn's line, and with the whole file hashed every checkout lost its cached mesh:
+    13 min and 15 GB to build the same one again, #757."""
+    here = here or os.path.dirname(os.path.abspath(__file__))
+    h = hashlib.sha256()
+    for f in CODE:
+        with open(os.path.join(here, f), "rb") as fh:
+            h.update(fh.read().replace(b"\r\n", b"\n").split(BOOKKEEPING)[0])
+    return h.hexdigest()
+
+
 def inputs(box=None):
     """What the cache key hashes, as main reads it: (key()'s arguments, DI's network, the 10 m grids' paths, a function
     hashing the DMR 5G tiles: --fetch adds tiles and keys again)."""
@@ -1007,8 +1023,7 @@ def inputs(box=None):
     segs = segments(net)
     print(f"DI's network: {len(net.edges)} edges, {sum(e['line'].length for e in net.edges.values()) / 1000:.0f} km of track", flush=True)
     grid_paths = sorted(p for p in __import__("glob").glob(os.path.join(ROOT, "raw", "**", "terrain5514.tif"), recursive=True))
-    here = os.path.dirname(os.path.abspath(__file__))
-    code = hashlib.sha256(b"".join(open(os.path.join(here, f), "rb").read() for f in CODE)).hexdigest()
+    code = code_hash()
 
     def tile_hashes():
         return {f: sha256(os.path.join(dmr5g.DIR, f)) for f in sorted(os.listdir(dmr5g.DIR)) if f.endswith(".tif")}
@@ -1065,7 +1080,8 @@ def main(argv):
     import contextlib
     import sysinfo
     heavy = shape[0] * shape[1] > SMALL
-    with HeavyJob("city_terrain") if heavy else contextlib.nullcontext():
+    # (a build: beside counts and other builds while the whole city's 15 GB and its threads fit, #728)
+    with HeavyJob("city_terrain", share={"gb": 15, "cores": threads}) if heavy else contextlib.nullcontext():
         def guard():  # (the machine is shared: this run ends itself rather than push other jobs into swapping)
             while True:
                 if (sysinfo.available_gb() or 99) < min_free:
