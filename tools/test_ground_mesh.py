@@ -191,6 +191,16 @@ class Stairs(unittest.TestCase):
         self.assertEqual(s.flights, {})
         self.assertAlmostEqual(float(s.at(0, np.array([1.0]), np.array([0.0]))[0]), 200.0)
 
+    def test_a_point_a_hair_off_a_long_edge_takes_the_edges_height_there(self):
+        # (#548: a strip 44 m long and 2.7 m across that falls 2.2 m along; a lattice point on its long edge, 1 mm
+        # outside it, lies in none of its triangles. It took the nearest vertex's height, 0.75 m off at 15 m along)
+        strip = {"c": "median", "l": 0, "r": [[0, 0, 300.4], [44, 0, 298.2], [44, 2.7, 298.2], [0, 2.7, 300.4]]}
+        s = gm.SurveySurface({"areas": [strip]}, [0])
+        x = np.array([5.0, 15.0, 22.0, 30.0, 39.0])
+        for y in (-0.001, 2.701):
+            np.testing.assert_allclose(s.at(0, x, np.full(5, y)), 300.4 - 0.05 * x, atol=1e-6)
+        self.assertEqual(s.missed, 10)
+
 
 class Walls(unittest.TestCase):
     def test_a_street_corner_on_a_wall_takes_its_height_there(self):

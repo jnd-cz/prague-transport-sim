@@ -5358,6 +5358,35 @@
      "why": "IPR has the road and the sidewalk at 191.86-191.99 m up to 1 m inside the kerb and the wall's face from 1.25 m in (190.17 m at 1.5 m). The kerb-wall rule read the walkway's level on the face and held the edge at it: the written file of ground batch B has the sidewalk at 190.31 m at its kerb"
     }
    ]
+  },
+  "belohorska-median": {
+   "line": "22",
+   "at": [
+    -3090.0,
+    152.0
+   ],
+   "reach": 40,
+   "issue": 548,
+   "what": "the median between Bělohorská's tracks (the survey's `median` 3968, 2.7 m across, 167 m long): level with the street, which climbs evenly here",
+   "source": "found in ground batch B's canted check, 2026-11-21: line 22's deepest sunken places beside a bed, (-3087, 153) 0.92 m and (-3105, 151) 0.76 m; the user, 2026-11-09 (report-20261109-202327, line 37): \"sunken ground around tram tracks\"",
+   "sections": [
+    {
+     "name": "along the median's middle, 40 m from (-3108, 150.4) east",
+     "from": [
+      -3108.0,
+      150.4
+     ],
+     "to": [
+      -3068.0,
+      154.6
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.05
+     },
+     "why": "two of the median's outline points, (-3101.3, 152.5) and (-3101.2, 149.8), stand at 297.91 m, the height of its end 38 m down the street, where IPR has the street at 300.15 and 299.76 m: the strip between its neighbours lay up to 1.27 m under the street"
+    }
+   ]
   }
  }
 }
