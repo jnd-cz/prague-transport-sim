@@ -58,7 +58,7 @@ class Measure(unittest.TestCase):
     def test_the_kinds_are_answers_with_keys(self):
         keys = [k for _, k in R.KINDS]
         self.assertEqual(len(set(keys)), len(keys))
-        self.assertNotIn(R.UNSURE, R.ANSWER)
+        self.assertEqual(R.ANSWER[R.UNSURE], R.UNSURE)   # (recorded: no card again where the imagery shows nothing)
 
     @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_an_answer_goes_into_truth_and_the_place_off_the_review(self):

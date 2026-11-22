@@ -15,7 +15,8 @@
   outline's lowest and highest points.
 - **--import** takes the answers (python -P -E tools/deploy.py --pull, in the deploy checkout) into data/truth.json
   `stairsReview`, keyed by place: a point inside the area, as lat/lon (survey area numbers change with a rebuild).
-  Unsure is held. An area holding an answered place gets no card again.
+  An area holding an answered place gets no card again, unsure included: the user answers unsure where the imagery
+  does not show the stairs (a private garden, 2026-11-22), and another look would not either.
 """
 import argparse
 import json
@@ -48,7 +49,7 @@ KINDS = [  # (the answer on the card, its key in data/truth.json)
     ("no stairs here", "not stairs"),
 ]
 UNSURE = "unsure"
-ANSWER = dict(KINDS)
+ANSWER = {**dict(KINDS), UNSURE: UNSURE}   # (unsure: no card again, no rule reads it)
 # Places the issue's thread asked about (x, y in the city frame, metres): a card wherever they are.
 ASKED = [
     (4001.4, 1411.9, "a flight's 14 step noses lead 4 m down along a building's wall, the sidewalk's level on the other "
@@ -212,7 +213,7 @@ def write_sets(lines, counts, rows):
 TRUTH_NOTE = ("The user's answers to the stairs review (reports/review/stairs-N.json, tools/stairs_review.py, #447): what "
               "kind of stairs stand at a place, for the rules that draw the ground under the survey's stairs. `place` is a "
               "point inside the survey's stairs area (lat, lon); `kind` is one of flight, turning, sunk, two levels, more "
-              "than stairs, structure, not stairs.")
+              "than stairs, structure, not stairs, or unsure (the imagery does not show them; no rule reads it).")
 
 
 def do_import(lines, reviews):
