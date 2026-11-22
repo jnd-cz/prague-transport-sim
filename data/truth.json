@@ -5970,6 +5970,66 @@
      "why": "the track follows the street the lidar measured: the archive's heights lay 0.5-0.83 m over it along these 70 m"
     }
    ]
+  },
+  "marjanka-track-level": {
+   "line": "22",
+   "at": [
+    -3272.0,
+    137.0
+   ],
+   "reach": 30,
+   "issue": 539,
+   "what": "Bělohorská at Marjánka (line 22 s 3955-4020): both tracks between the stop's two island platforms, in a belt 0.2 m over the carriageways either side",
+   "source": "measured 2026-11-22 on ground batch C: the archive's record (survey year 2014) has the tracks 0.20-0.26 m under IPR's 2023 lidar for 65 m, no DI heights; the lidar has the track belt 0.2 m over the carriageways and the platforms 0.2 m over the track; built, the track lay 0.48 m under the platforms. The user, 2026-11-14 (#539), on Bělohorská: the track \"doesn't sit lower\"",
+   "sections": [
+    {
+     "name": "from the south platform's edge across both tracks to the north one's, at the stop's middle (s 3990), 7 m",
+     "from": [
+      -3271.6,
+      133.5
+     ],
+     "to": [
+      -3272.4,
+      140.5
+     ],
+     "expect": {
+      "largest step m": 0.35
+     },
+     "why": "each platform stands a platform's edge over the track, no more (IPR 0.18-0.21 m): built, the track lay 0.48 m under them"
+    },
+    {
+     "name": "from the track onto the south platform, 2.5 m",
+     "from": [
+      -3271.7,
+      136.5
+     ],
+     "to": [
+      -3271.5,
+      134.0
+     ],
+     "expect": {
+      "rise m at least": 0.12,
+      "largest step m": 0.35
+     },
+     "why": "IPR rises 0.18 m from the track's centre to the platform 2 m on"
+    },
+    {
+     "name": "from the track onto the north platform, 3 m",
+     "from": [
+      -3272.1,
+      139.5
+     ],
+     "to": [
+      -3272.5,
+      142.5
+     ],
+     "expect": {
+      "rise m at least": 0.12,
+      "largest step m": 0.35
+     },
+     "why": "IPR rises 0.21 m from the track to the platform"
+    }
+   ]
   }
  },
  "openTrackReview": {

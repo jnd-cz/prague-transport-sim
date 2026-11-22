@@ -607,12 +607,14 @@ class Sources(unittest.TestCase):
 class Older(unittest.TestCase):
     def hump(self, year=1999, top=0.9, flags=(), held=()):
         # (#539, line 9 at Bertramka: the archive's records of 1999 humped up to 0.83 and 0.92 m over the 2023 lidar for
-        # 200 m on both tracks, no numeric DI; around it the archive 5 cm over the lidar)
+        # 200 m on both tracks, no numeric DI; around it the archive 5 cm over the lidar, and DI 4 cm over it from s 340)
         ground = lambda s: 200 - .025 * s
-        bump = lambda s: max(0.0, top * (1 - abs(s - 200) / 100))
+        bump = lambda s: top * max(0.0, 1 - abs(s - 200) / 100)
         c = chain([(0, 0), (400, 0)], lambda s: ground(s) + .05 + bump(s), terrain=ground)
         for k, x in enumerate(c.bins):
             x['archive'], x['survey'], x['year'], x['flags'] = x['z'], None, year, list(flags)
+            if x['s'] > 340:
+                x['src'], x['z'] = 'di', ground(x['s']) + .04
             if k in held:
                 x['z'], x['w'], x['src'] = None, 0.0, None
         return c, ground
@@ -624,8 +626,29 @@ class Older(unittest.TestCase):
         # (the whole stretch over SOURCES_EDGE goes, not only the part over SOURCES_OFF)
         self.assertTrue(all(x['src'] == 'lidar' for x in c.bins if 115 < x['s'] < 285))
         self.assertLess(max(abs(x['z'] - ground(x['s']) - .05) for x in c.bins), ha.SOURCES_EDGE + 1e-9)
-        self.assertTrue(all(abs(x['z'] - ground(x['s']) - .05) < 1e-9 for x in c.bins if x['src'] == 'lidar'))
-        self.assertTrue(all(x['src'] == 'dtmp' for x in c.bins if x['s'] < 80 or x['s'] > 320))
+        # (the rail's offset over the lidar is DI's within LIDAR_AROUND, not the archive's around it)
+        self.assertTrue(all(abs(x['z'] - ground(x['s']) - .04) < 1e-9 for x in c.bins if x['src'] == 'lidar'))
+        self.assertTrue(all(x['src'] == 'dtmp' for x in c.bins if x['s'] < 80 or 320 < x['s'] < 340))
+
+    def test_an_older_record_under_the_lidar_takes_it_too(self):
+        # (#539, line 9 at (-2606, -1405) west of Bertramka: the archive's record of 1999 0.29-0.59 m under the lidar
+        # for 100 m on both tracks; where DI has a height beside such a record it lies with the lidar)
+        c, ground = self.hump(top=-0.4)
+        n = ha.archive_before_lidar([c])
+        self.assertGreater(n, 0)
+        # (the record lies 0.05 m over the lidar round the dip: under it by more than SOURCES_EDGE from s 140 to 260)
+        self.assertTrue(all(x['src'] == 'lidar' for x in c.bins if 140 < x['s'] < 260))
+        self.assertGreater(min(x['z'] - ground(x['s']) for x in c.bins), -ha.SOURCES_EDGE - 1e-9)
+        self.assertTrue(all(abs(x['z'] - ground(x['s']) - .04) < 1e-9 for x in c.bins if x['src'] == 'lidar'))
+        c, ground = self.hump(top=-0.4)   # (no DI within LIDAR_AROUND: the network's offset)
+        for x in c.bins:
+            x['src'] = 'dtmp' if x['src'] == 'di' else x['src']
+        ha.archive_before_lidar([c])
+        self.assertTrue(all(abs(x['z'] - ground(x['s']) - ha.LIDAR_OFFSET) < 1e-9 for x in c.bins if x['src'] == 'lidar'))
+        c, _ = self.hump(top=-0.2)   # (0.15 m under at most: within what the rails and the lidar differ by)
+        self.assertEqual(ha.archive_before_lidar([c]), 0)
+        c, _ = self.hump(top=-0.4, year=2024)
+        self.assertEqual(ha.archive_before_lidar([c]), 0)
 
     def test_a_held_height_in_the_stretch_takes_it_too(self):
         # (with the style marked paved, the survey 0.4 m under the archive holds the hump's top: #591's mark at Bertramka)
@@ -671,6 +694,14 @@ class Older(unittest.TestCase):
             for x in c.bins:
                 x['kind'] = kind
             self.assertEqual(ha.archive_before_lidar([c]), 0)
+
+    def test_under_the_lidar_track_of_unknown_construction_takes_it_too(self):
+        # (#539, line 22 on Bělohorská: the archive's record of 2014 0.20-0.26 m under the lidar for 50 m, no OSM surface)
+        for kind, moved in (('unknown', True), ('open', False)):
+            c, _ = self.hump(top=-0.4)
+            for x in c.bins:
+                x['kind'] = kind
+            self.assertEqual(ha.archive_before_lidar([c]) > 0, moved)
 
 
 class Held(unittest.TestCase):
