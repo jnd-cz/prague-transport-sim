@@ -64,6 +64,47 @@ class Inside(unittest.TestCase):
         zi.inside(areas[2:], {0: {"verdict": "fits"}}, lambda x, y: np.full(np.shape(x), 200.25))
         self.assertIsNone(areas[2].get("g"))
 
+    def test_a_parking_bay_is_held_as_a_paved_yard(self):
+        """#800: a bay whose outline rises to one point of the survey's line 0.6 m over IPR (Vinohradská, area 3091: 0.38
+        m) lies on the lidar; one whose sheet fits stays, a road never takes the lidar, one held off IPR keeps its sheet."""
+        bay = lambda: rect(0, 0, 60, 8, [200.0, 200.0, 200.6, 200.0], "parking")  # noqa: E731
+        areas = [bay(), rect(0, 0, 60, 8, 200.0, "parking"), rect(0, 0, 60, 8, [200.0, 200.0, 200.6, 200.0], "road"),
+                 bay()]
+        flat = lambda x, y: np.full(np.shape(x), 200.0)  # noqa: E731
+        out = zi.inside(areas, {0: {"verdict": "fits", "m2": 480}, 1: {"verdict": "fits"}, 2: {"verdict": "fits"},
+                                3: {"verdict": "survey"}}, flat)
+        self.assertTrue(zi.MISS_PAVED < zi.misses(bay(), flat) < zi.MISS)
+        self.assertEqual([a.get("g") for a in areas], [1, None, None, None])
+        self.assertEqual(out["classes"], {"parking": {"areas": 1, "m2": 480}})
+        self.assertEqual(out["fit"], {"parking": 1})
+
+    def test_a_parking_area_under_a_cover_keeps_its_sheet(self):
+        """#800: the car parks under the Magistrála's bridges at Hlavní nádraží lie within OFFSET of IPR at their outline
+        (never judged covered) and IPR inside them is the bridges: one over a third under a cover keeps its sheet, one
+        with a corner of it under a cover takes the lidar, and a paved yard is left as it was built."""
+        import shapely
+
+        class Cover:
+            is_empty = False
+
+            def __init__(self, box):
+                self.box = shapely.box(*box)
+
+            def contains_xy(self, x, y):
+                return shapely.contains_xy(self.box, x, y)
+        mk = lambda c: rect(0, 0, 60, 8, [200.0, 200.0, 200.6, 200.0], c)  # noqa: E731
+        flat = lambda x, y: np.full(np.shape(x), 200.0)  # noqa: E731
+        fits = {k: {"verdict": "fits"} for k in range(2)}
+        half, corner = Cover((0, 0, 30, 8)), Cover((0, 0, 10, 8))
+        self.assertAlmostEqual(zi.under_cover(mk("parking"), half), 0.5, 1)
+        areas = [mk("parking"), mk("paved")]
+        out = zi.inside(areas, fits, flat, half)
+        self.assertEqual([a.get("g") for a in areas], [None, 1])
+        self.assertEqual(out["kept"], {"under a cover": 1})
+        areas = [mk("parking"), mk("paved")]
+        zi.inside(areas, fits, flat, corner)
+        self.assertEqual([a.get("g") for a in areas], [1, 1])
+
 
 class UnderDecks(unittest.TestCase):
     """A deck 20 m wide (y 0-20) at DECK over a way running north-south (x 10) whose floor IPR shows at FLOOR."""
