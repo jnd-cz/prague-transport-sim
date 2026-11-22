@@ -5908,6 +5908,51 @@
      "why": "the bay lies smooth along its length, on the lidar or as a sheet"
     }
    ]
+  },
+  "bertramka-track-level": {
+   "line": "9",
+   "at": [
+    -2299.0,
+    -1390.0
+   ],
+   "reach": 45,
+   "issue": 539,
+   "what": "Plzeňská at Bertramka (line 9 s 6930-7020 and, coming back, s 21460-21540): the track lies in the asphalt, level with the road beside it",
+   "source": "the user, 2026-11-21 (session, on the open-track review's two Bertramka cards, #591): \"bertramka is embedded asphalt, same level as the road next to it\"; measured 2026-11-22 on ground batch C: the archive's records of both tracks (survey year 1999) draw a hump up to 0.83 and 0.92 m over IPR's 2023 lidar for 190 and 214 m, the lidar level across the street within 0.15 m with its kerbs, DI without heights there",
+   "sections": [
+    {
+     "name": "across both tracks and the road north of them at x = -2299, 9 m from the south sidewalk's edge",
+     "from": [
+      -2299.0,
+      -1391.3
+     ],
+     "to": [
+      -2299.0,
+      -1382.5
+     ],
+     "expect": {
+      "largest step m": 0.2,
+      "off the lidar m": 0.0
+     },
+     "why": "no step stands between the track and the road: on the archive's hump the two beds stood 0.8-0.9 m over the lidar, a 0.85 m wall at their north edge and a ramp to the south. (The sidewalk south of the track is the survey's, 0.37-0.43 m over the lidar where the lidar has a kerb of 0.15 m: under the 0.5 m at which the survey gives way, tools/zps_ground.py; not this place's)"
+    },
+    {
+     "name": "along the outbound track's axis, 70 m through the hump's top",
+     "from": [
+      -2335.0,
+      -1390.0
+     ],
+     "to": [
+      -2265.0,
+      -1390.0
+     ],
+     "expect": {
+      "off the lidar m": 0.0,
+      "largest step m": 0.1
+     },
+     "why": "the track follows the street the lidar measured: the archive's heights lay 0.5-0.83 m over it along these 70 m"
+    }
+   ]
   }
  },
  "openTrackReview": {

@@ -329,13 +329,17 @@ def beside(chs, tree, ci, x):
 
 
 SOURCES_OFF, SOURCES_ON, SOURCES_EDGE, SOURCES_RUN = 0.5, 0.3, 0.1, 3  # m, m, m, bins (archive_over_di)
+SOURCES_CAP = 1.0     # m: an archive this far over the lidar is another level (archive_before_lidar; the staging holds it:
+                      # track_heights.TERRAIN)
 STRUCTURE_FLAGS = {'structure_hint', 'structure_unverified', 'tunnel_unverified', 'known_archive_disagreement'}
 
 
 HELD_NEAR = 0.10      # m: a held height's source the lidar lies this near, the other source further (held_settled, rule 1)
 LIDAR_AROUND = 100.0  # m: the rail's offset over the lidar where only the lidar has a height: the median of the chain's
 LIDAR_OFFSET = 0.01   # heights this near, else this (the network's median: p10 -0.067, p90 +0.182 m on 61,403 bins)
-LIDAR_LOG = []        # (xy, rule, height) of the heights held_settled gave: reports/line-heights.json
+LIDAR_LOG = []        # (xy, rule, height) of the heights held_settled and archive_before_lidar gave: reports/line-heights.json
+LIDAR_YEAR = 2023     # the year of the lidar's flight (tools/sources.py `ipr-dtm`): an archive record surveyed before it
+                      # (its ROK, a bin's `year`) is the older measurement of the two
 
 
 def held_settled(chs):
@@ -409,6 +413,65 @@ def held_settled(chs):
             else:
                 n3 += 1
     return n1, n2, n3
+
+
+def archive_before_lidar(chs):
+    """On paved track (the bin's `kind`: a style fact, OSM's surface, the survey's pavement at the axis), where the archive
+    is the measured height (no numeric DI, no reviewed span) and its record was surveyed before the lidar's flight (the
+    bin's `year`, the archive's ROK, under LIDAR_YEAR), a stretch of SOURCES_RUN bins and more
+    standing over SOURCES_OFF m over the lidar is the street as it was when the record was made: the lidar is the newer
+    measurement. The track takes the lidar plus the rail's offset over it on the chain's heights within LIDAR_AROUND m of
+    the stretch (else LIDAR_OFFSET), along the whole stretch where the archive stands more than SOURCES_EDGE over the
+    lidar (#539: line 9 at Bertramka, both tracks' records of 1999 humped up to 0.83 and 0.92 m over the lidar for 200 m,
+    the lidar level across the street with its kerbs; the user, 2026-11-21: "bertramka is embedded asphalt, same level as
+    the road next to it"). Not a record of the lidar's year or later (a track rebuilt since the flight stands over it by
+    right), nor one without a year; not on a structure (the bare-earth lidar lies under a deck), under a step answer, or
+    where the lidar itself steps more than any track climbs (MAX_GRADE). Calibrated where numeric DI has a height too
+    (samples off structures, an older record 0.5-1.5 m over the lidar): on paved track DI sides with the lidar at 71 of
+    76, where the construction is unknown at 23 of 52 (a ballast bed on its own body, small bridges nothing marks): paved
+    track only. Each height goes to LIDAR_LOG as rule 4; returns their count."""
+    moved = 0
+    for c in chs:
+        bins = sorted((x for x in c.bins if x['xy']), key=lambda x: x['s'])
+
+        def older(x):
+            return (x.get('kind') == 'paved' and x.get('src') in ('dtmp', 'zps', None)
+                    and x.get('archive') is not None and x.get('terrain') is not None
+                    and x.get('year') is not None and x['year'] < LIDAR_YEAR
+                    and not STRUCTURE_FLAGS & set(x.get('flags') or ()) and not (STEP_ANSWERS and step_answer_at(x['xy'])))
+        over = [older(x) and x['archive'] - x['terrain'] for x in bins]   # (False, or the archive over the lidar)
+        joined = lambda a, b: bins[b]['s'] - bins[a]['s'] <= 2 * BIN + .01
+        todo, k = [], 0
+        while k < len(bins):
+            if over[k] is False or not SOURCES_OFF < over[k] < SOURCES_CAP:
+                k += 1
+                continue
+            e = k
+            while e + 1 < len(bins) and over[e + 1] is not False and SOURCES_OFF < over[e + 1] < SOURCES_CAP and joined(e, e + 1):
+                e += 1
+            if e - k + 1 >= SOURCES_RUN:
+                a, b = k, e
+                while a > 0 and over[a - 1] is not False and SOURCES_EDGE < over[a - 1] < SOURCES_CAP and joined(a - 1, a):
+                    a -= 1
+                while b + 1 < len(bins) and over[b + 1] is not False and SOURCES_EDGE < over[b + 1] < SOURCES_CAP and joined(b, b + 1):
+                    b += 1
+                run = bins[a:b + 1]
+                if all(abs(q['terrain'] - p['terrain']) <= MAX_GRADE * (q['s'] - p['s']) for p, q in zip(run, run[1:])):
+                    todo.append((a, b))
+                e = max(e, b)
+            k = e + 1
+        taken = {i for a, b in todo for i in range(a, b + 1)}
+        ref = [(x['s'], x['z'] - x['terrain']) for i, x in enumerate(bins)
+               if i not in taken and x.get('z') is not None and x.get('terrain') is not None and x.get('src') in ('di', 'dtmp')
+               and not STRUCTURE_FLAGS & set(x.get('flags') or ()) and abs(x['z'] - x['terrain']) < SOURCES_OFF]
+        for a, b in todo:
+            near = sorted(o for t, o in ref if bins[a]['s'] - LIDAR_AROUND <= t <= bins[b]['s'] + LIDAR_AROUND)
+            off = near[len(near) // 2] if near else LIDAR_OFFSET
+            for x in bins[a:b + 1]:
+                x['z'], x['w'], x['src'] = x['terrain'] + off, 1.0, 'lidar'
+                LIDAR_LOG.append((x['xy'], 4, round(x['z'], 3)))
+                moved += 1
+    return moved
 
 
 def archive_over_di(chs):
@@ -528,6 +591,7 @@ def apply(chs):
     n1, n2, n3 = held_settled(chs)
     print(f'held heights settled by the lidar: {n1} where it sided with the archive or the survey, {n2} where only it had one, '
           f'{n3} where it confirmed the only source', flush=True)
+    print(f'{archive_before_lidar(chs)} heights took the lidar where an archive record surveyed before it stood over it', flush=True)
     print(f'{snap_to_neighbour(chs)} heights took the neighbouring track\'s at a step or dip', flush=True)
     print(f'{answered_ground(chs)} heights took the ground, or part way to it, in {len(GROUND_ANSWERS)} areas an answer has '
           f'follow the ground', flush=True)
