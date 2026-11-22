@@ -199,8 +199,8 @@ tmavé sklo je hra.
 
 ### Město
 
-- Terén: koridor trati je zaříznutý do lidarového terénu; opěrné zdi tam, kde trať vede v zářezu ve svahu
-  (Chotkova), Most Legií na mostovce s pilíři.
+- Terén: povrch podle zaměření města a lidaru; opěrné zdi ze zaměření a z dat města jsou jeho součástí
+  (Chotkova, nábřeží pod Letnou), Most Legií na mostovce s pilíři.
 - Značky: klasické červené pražské označníky; rychlostní návěsti podle předpisu D 1/2 (omezení rychlosti černým
   číslem na žluté, rychlostník bílým na černé, předzvěstní trojúhelník, „r“ oblouku o malém poloměru, nebezpečné
   stoupání a klesání), dvakrát větší než skutečné, aby se daly přečíst na obrazovce. Tabulky

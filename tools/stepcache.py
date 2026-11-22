@@ -15,7 +15,10 @@ A tool that reads a file in some other way (C code, a subprocess, a child forked
 seen: rebuild.py --from or --force then. Multiprocessing children are spawned (Linux too) and traced like the step.
 
 Kept in reports/rebuild/cache/: hashes.json (a file's SHA-256 by its size, date and file id), steps/ (each step's
-last records), store/ (the files the records name, by hash).
+last records), store/ (the files the records name, by hash). A rebuild on a machine with a data cache (TRAMDATA_CACHE)
+keeps it there instead, in stepcache/ (machine_dir, Cache(root, dir)): the records name files by their path under the
+checkout, so they hold in any checkout, and a batch's worktree is removed when its PR merges (#797: ground batch C's
+rebuild ran every step of every line with no record).
 """
 import hashlib
 import json
@@ -27,7 +30,8 @@ import threading
 import time
 
 FORMAT = 1
-KEEP = 2  # records kept per step: a branch switched back finds its own
+KEEP = 4  # records kept per step: a branch switched back finds its own, and so do the checkouts that share a cache
+DIR_ENV = "TRAMSTEP_CACHE"  # the cache's folder where it is not the checkout's own: Cache sets it, the tracers read it
 # (the threads of numpy's BLAS: its sums are split by them, so results differ in the last bits with their number)
 ENV = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS")
 _stat, _replace = os.stat, os.replace  # (the tracer wraps os.stat; its own reads must not count)
@@ -62,6 +66,17 @@ def replace(tmp, path):
 def _load(path):
     with open(path, encoding="utf-8") as f:
         return json.load(f)
+
+
+def cache_dir(root):
+    """Where root's step cache is: the folder a rebuild set (DIR_ENV, Cache(root, dir)), else the checkout's own."""
+    return os.environ.get(DIR_ENV) or os.path.join(os.path.abspath(root), "reports", "rebuild", "cache")
+
+
+def machine_dir():
+    """The step cache's folder beside the machine's data cache (TRAMDATA_CACHE/stepcache), None without one."""
+    c = os.environ.get("TRAMDATA_CACHE")
+    return os.path.join(c, "stepcache") if c else None
 
 
 def relpath(root, p):
@@ -166,10 +181,19 @@ class Hashes:
 
 
 def versions(names):
-    """Versions of the packages named (outside the checkout): __version__, else the installed distribution's."""
+    """Versions of the packages named (outside the checkout): __version__, else the installed distribution's. A
+    package only a step's child process imported (street_profile's workers read the raster with PIL) is imported here
+    for its version: its distribution has another name (Pillow), so the record held "" and Cache.versions, which
+    imports it, read 13.0.0: the step ran at every rebuild (#797)."""
     out = {}
     for n in names:
         m = sys.modules.get(n)
+        if m is None:
+            try:
+                import importlib
+                m = importlib.import_module(n)
+            except Exception:
+                m = None
         v = getattr(m, "__version__", None) if m else None
         if v is None:
             try:
@@ -189,7 +213,7 @@ class _Tracer:
 
     def __init__(self, root, record):
         self.root, self.record = os.path.abspath(root), record
-        self.hashes = Hashes(self.root, os.path.join(self.root, "reports", "rebuild", "cache", "hashes.json"))
+        self.hashes = Hashes(self.root, os.path.join(cache_dir(self.root), "hashes.json"))
         self.inputs, self.lists, self.written, self.removed, self.moved = {}, {}, set(), set(), set()
         self.lock, self.busy, self.on, self.osmium, self.parts = threading.RLock(), threading.local(), True, False, []
 
@@ -402,9 +426,15 @@ def child(root, part, argv):
 # ---- the cache (rebuild.py's side) ----
 
 class Cache:
-    def __init__(self, root):
+    def __init__(self, root, dir=None):
+        """root's step cache: in `dir` (machine_dir(): shared by the machine's checkouts), else the checkout's own. The
+        steps' tracers, child processes, find it by DIR_ENV."""
         self.root = os.path.abspath(root)
-        self.dir = os.path.join(self.root, "reports", "rebuild", "cache")
+        if dir:
+            os.environ[DIR_ENV] = os.path.abspath(dir)
+        else:
+            os.environ.pop(DIR_ENV, None)
+        self.dir = cache_dir(self.root)
         self.hashes = Hashes(self.root, os.path.join(self.dir, "hashes.json"))
         self.lock, self.pkgs = threading.Lock(), {}
 

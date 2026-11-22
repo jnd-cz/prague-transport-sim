@@ -154,6 +154,25 @@ class Threads(unittest.TestCase):
             self.assertEqual(len(json.load(f)), 2 * THREADS)
         self.assertEqual(self.parts(), [])
 
+    def test_a_package_only_a_child_imported_is_recorded_with_its_version(self):
+        """A package this process has not imported (a step's child did) whose distribution has another name, as PIL's
+        is Pillow: the record's version is the one Cache.versions reads when it asks whether the record holds (#797:
+        the record held "", the check read the version, and street_profile ran at every rebuild)."""
+        pkg = os.path.join(self.root, "site", "madepkg797")
+        os.makedirs(pkg)
+        with open(os.path.join(pkg, "__init__.py"), "w", encoding="utf-8") as f:
+            f.write('__version__ = "1.2"\n')
+        sys.path.insert(0, os.path.dirname(pkg))
+        try:
+            self.assertNotIn("madepkg797", sys.modules)
+            rec = stepcache.versions(["madepkg797", "no_such_package_797"])
+            self.assertEqual(rec, {"madepkg797": "1.2", "no_such_package_797": ""})
+            sys.modules.pop("madepkg797", None)
+            self.assertEqual(stepcache.Cache(self.root).versions(["madepkg797"]), {"madepkg797": "1.2"})
+        finally:
+            sys.path.remove(os.path.dirname(pkg))
+            sys.modules.pop("madepkg797", None)
+
 
 if __name__ == "__main__":
     unittest.main()

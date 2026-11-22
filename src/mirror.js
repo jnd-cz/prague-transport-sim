@@ -2,6 +2,7 @@
 // The rear view has a separate texture cadence. Its cached picture must still be composited after
 // every main draw, or the main scene wipes it on the frames between updates (#79).
 import * as THREE from 'three';
+import { rectOf } from './boxes.js';
 
 const PERIOD = 1000 / 30, FAR = 300;
 
@@ -23,7 +24,7 @@ export class Mirror {
   }
 
   draw(now, active, pose, model) {
-    const R = this.renderer, box = this.element.getBoundingClientRect();
+    const R = this.renderer, box = rectOf(this.element); // (kept between the changes that move it, #706)
     if (box.width <= 12 || box.height <= 12) return;
     const th = Math.round(Math.max(120, Math.min(640, (box.height - 12) * R.getPixelRatio())));
     const resized = th !== this.target.height;

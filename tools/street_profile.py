@@ -385,12 +385,18 @@ R_CLASS, R_STREET, RAISED_BED, FALL_MAX, SW_FALL = street_geometry()
 # (the places the user confirmed as a raised tram corridor: the line-wide report measures raised_bed() on them)
 with open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8") as _fh:
     RAISED_PLACES = next(x["value"] for x in json.load(_fh)["streetGeometry"]["facts"] if x["id"] == "raised-corridors")
+CONFIRMED_NEAR = 10.0  # m: a tracks string's point this near the line between a confirmed corridor's ends lies on it
 SMOOTH_M = 15.0  # m: IPR along a centreline smoothed over this before the fit (its noise: 1 cm p90 against it)
 SEAM = 1.0  # m: the samples within this of a point's nearest one's distance weigh in its height (governing_height)
 BLEND = 10.0  # m along a street from where it meets its governing street over which it takes on its own crown
 JUNCTION_WAVE = 10.0  # m: the fill's curvature penalty halves IPR's waves of this length (as whittaker's)
 PARALLEL = 30.0  # degrees: a centreline this near another's heading, beside it, runs beside it (pilot)
 STEP_CUT = 0.3  # m between neighbouring cells of the junctions' fill: a step (a wall, a kerb), not a slope
+KERB_WALL = 0.7  # m: a sidewalk's kerb edge whose own height stands this far over a kerb on the road beyond it is a
+# wall's top (wall_lines.STEP: a kerb and a garden's edge are under it)
+KERB_OWN = 0.5  # m: a kerb edge's own height this near IPR inside the sidewalk is the walkway's (wall_lines.OWN)
+KERB_NEAR = (0.5, 0.75, 1.0)  # m in from a kerb edge: IPR's readings of a walkway at the edge's own height, past the
+# smear of a wall at the edge itself (a 1 m raster) and before a drop behind a walkway that narrow
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
 USUAL = 20  # samples (m) either side over which a street's usual width is its running median (a mouth is shorter)
 MOUTH = 1.0  # m: the most a street's width reaches beyond its usual width (a widening for a turn, not a side street)
@@ -398,6 +404,12 @@ OFF_LIDAR = 0.10  # m: a fit further than this off the smoothed lidar is held by
 LOOSEN = 20.0  # m either side of such a place over which the radius is halved
 R_FLOOR = 25.0  # m: the tightest radius a street is given (the calibration's tightest, RADII[0])
 OWN_LANES = 3.0  # m either side of a street's centreline where it lies inside the street that governs it (a lane)
+FALL_FIT = 0.15  # m: a street's crown (its centre's height and its side's crossfall) further than this off IPR for 1 m
+# across is not the road's surface there: the street's width ends before it
+FALL_CLOSE = 0.05  # m: the width ends at the last point before that where the crown lies this near IPR (BAND)
+FALL_ALONG = 3  # samples either side: a street's width is the least its neighbours' crowns reach
+FALL_MIN = 3.0  # m: the least half width that leaves a street (OWN_LANES: a lane, with the drive line LANE from the centre
+# and a car's wheels AXLE / 2 past it; left 1.5 m, the drive lines ran on the fill and line 23's jumps went from 45 to 75)
 
 
 def surface_tris(areas, classes):
@@ -560,6 +572,28 @@ def crossfall(F, ipr, p, t, road, s):
             fall[:, side] = np.clip(tp.whittaker(s, v, 20.0, robust=0.02), -FALL_MAX, FALL_MAX)
         else:
             fall[:, side] = 0.0
+    # (a street's surface is its crown only as far across as the crown holds IPR: the crossfall is smoothed along the
+    # street, and where a side street leaves it downhill the smooth is not the ground. Nad Ohradou, line 37
+    # (3877, -10): its road area runs 10 m south into Na Vápence's mouth, the ground falling 6.5 % there and the
+    # smoothed crossfall 1.3 %; carried across, the crown lay 0.55 m over IPR 9 m out, Na Vápence was pinned to it and
+    # 69 m2 of road stood 0.3-0.6 m up beside the garage ramp, #780. Past the crown's reach the road is the junctions'
+    # fill, which follows IPR. The width ends where the crown still lies on IPR (FALL_CLOSE), and no further than its
+    # neighbours' along the street: ended where the crown had left IPR by FALL_FIT, sample by sample, the fill met the
+    # street across a step and between single samples of it: line 23's jumps over 0.15 m in 1 m went from 45 to 71)
+    for side, sel in ((0, off < -0.25), (1, off > 0.25)):
+        order = np.argsort(np.abs(off[sel]))
+        o = np.abs(off[sel])[order]
+        with np.errstate(invalid="ignore"):
+            d = np.abs(Z[:, sel][:, order] - (z0[:, None] + fall[:, side][:, None] * o[None]))
+            miss = d > FALL_FIT
+            close = d <= FALL_CLOSE
+        run = miss[:, :-1] & miss[:, 1:]
+        first = np.argmax(run, axis=1)
+        before = close & (np.arange(len(o))[None] <= first[:, None])
+        last = np.where(before.any(1), len(o) - 1 - np.argmax(before[:, ::-1], axis=1), -1)
+        reach = np.where(run.any(1), np.maximum(np.where(last >= 0, o[np.maximum(last, 0)], 0.0), FALL_MIN), np.inf)
+        reach = np.array([reach[max(k - FALL_ALONG, 0):k + FALL_ALONG + 1].min() for k in range(len(reach))])
+        width[:, side] = np.where(width[:, side] > 0, np.minimum(width[:, side], reach), width[:, side])
     return fall, width
 
 
@@ -630,13 +664,19 @@ def _track_centre(L):
     return s, c, t, zc, g, half
 
 
-def raised_bed(c, F, ipr, road):
+def raised_bed(c, F, ipr, road, confirmed=None, own=None):
     """Per sample of a tracks string and side (0: -n, 1: +n), whether its bed stands over RAISED_BED above the road
     beside it in IPR: IPR on the tracks (between them and at each) against IPR 1-2 m beyond the bed's edge, where that
     is road; held over 5 m runs (a crossing's ramp, where IPR beside the bed is at its level, is a gap in the run).
     (IPR against itself, not against the tracks' heights: those stood 0.13 m under IPR's corridor at Hartigova, which
-    the user confirmed raised, and read it unraised (2 % of its samples); 0.25 m over IPR's level corridor at
-    Olšanské hřbitovy (#606) read it raised behind a 0.25 m kerb)"""
+    the user confirmed raised, and read it unraised (2 % of its samples).) Where the user confirmed a corridor that IPR
+    reads level (`confirmed`, per sample: confirmed_corridor), the tracks' own surface (`z`) against IPR beside it
+    decides too: on Vinohradská from Olšanské hřbitovy towards Flora the tracks stand 0.26-0.29 m over IPR and the
+    survey, both level across, and the user: "yes it's raised" (#606). There a crossing has no gap in IPR to show it
+    (IPR is older than the corridor), so the survey shows it: where the string's centre lies outside the survey's own
+    tram area (`own`), a road or a footpath runs across the corridor, and its surface comes up to the rails (the
+    user, 2026-11-21: "Where roads or footpaths cross it's level crossing like usual, so the surface comes up to the
+    rail top"): no confirmed sample there."""
     import shapely
     n = np.column_stack([-c["t"][:, 1], c["t"][:, 0]])
     out = np.zeros((len(c["p"]), 2), bool)
@@ -658,9 +698,30 @@ def raised_bed(c, F, ipr, road):
             warnings.simplefilter("ignore", RuntimeWarning)
             beside = np.nanmedian(np.array(zs), axis=0)
         up = np.isfinite(beside) & (bed - beside > RAISED_BED)
+        if confirmed is not None and "z" in c:
+            belt = confirmed if own is None else confirmed & shapely.contains_xy(own, c["p"][:, 0], c["p"][:, 1])
+            up |= np.isfinite(beside) & belt & (c["z"] - beside > RAISED_BED)
         for a, b in runs(up):
             if c["s"][b - 1] - c["s"][a] >= 5.0:
                 out[a:b, side] = True
+    return out
+
+
+def confirmed_corridor(ln, p, places=None):
+    """Per point of a tracks string, whether it lies on a corridor the user confirmed raised between two ends
+    (data/truth.json raised-corridors with `from` and `to`: within CONFIRMED_NEAR m of the line between them, between
+    its ends), on line `ln`."""
+    out = np.zeros(len(p), bool)
+    for r in RAISED_PLACES if places is None else places:
+        if r.get("line") != int(ln) or not (r.get("from") and r.get("to")):
+            continue
+        F = Frame()
+        a = np.array([float(np.ravel(v)[0]) for v in F.xy([r["from"][0]], [r["from"][1]])])
+        b = np.array([float(np.ravel(v)[0]) for v in F.xy([r["to"][0]], [r["to"][1]])])
+        ab = b - a
+        u = ((p - a) @ ab) / (ab @ ab)
+        d = np.hypot(*(p - (a + np.clip(u, 0, 1)[:, None] * ab)).T)
+        out |= (u >= 0) & (u <= 1) & (d <= CONFIRMED_NEAR)
     return out
 
 
@@ -708,7 +769,7 @@ def pilot(at, radius, ln, out_dir, ctx=None):
             # (only the bed is the tracks': carried across a 15 m junction, their tilt (cant included) set the fill up
             # to 0.4 m off IPR and met the side streets in a seam; the road beside it is junctions()' fill)
             c["width"] = np.minimum(c["width"], (c["half"] + BED)[:, None])
-            c["raised"] = raised_bed(c, F, ipr, road)
+            c["raised"] = raised_bed(c, F, ipr, road, confirmed_corridor(ln, c["p"]), ctx.get("tram"))
     # a street's width at a junction's mouth is held to its width along the street: Bělohorská's mouth reached 22 m up
     # Liborova (line 23) with its own crossfall, 1 m under IPR where Liborova starts its 15 % climb, which then lagged
     # 3 m behind it; the mouth is the junctions' fill's
@@ -1215,7 +1276,8 @@ def pilot_report(at, radius, ln, out_dir):
 
 def kerb_edges(dtm):
     """The survey's level-0 sidewalks' kerb edges (`k`, shared with a carriageway) 3 m or longer, as (points every
-    0.25 m, unit normals into the sidewalk), and the sidewalks as one geometry."""
+    0.25 m, unit normals into the sidewalk, the sidewalk's own surveyed height at each point, NaN where an end has
+    none), and the sidewalks as one geometry."""
     import shapely
     from shapely.geometry import Polygon
     out, polys = [], []
@@ -1239,7 +1301,9 @@ def kerb_edges(dtm):
                 if not g.contains(shapely.Point(*(mid + n * 0.5))):
                     n = -n
                 u = np.arange(0.125, L, 0.25)
-                out.append((p0[None] + t[None] * u[:, None], np.tile(n, (len(u), 1))))
+                z0, z1 = ring[i][2], ring[(i + 1) % len(ring)][2]
+                own = z0 + (z1 - z0) * u / L if z0 is not None and z1 is not None else np.full(len(u), np.nan)
+                out.append((p0[None] + t[None] * u[:, None], np.tile(n, (len(u), 1)), own))
     walk = shapely.union_all(polys) if polys else None
     if walk is not None:
         shapely.prepare(walk)
@@ -1250,15 +1314,23 @@ WALL_CLASSES = ("wall", "stairs")
 WALL_ON = 0.05  # m: a sidewalk's outline edge on a wall's or stairs' outline (the survey shares their vertices)
 
 
-def wall_edges(dtm):
-    """The level-0 sidewalks' outline edges along a survey wall or stairs (#653), with the sidewalk's own heights at
+def wall_areas(dtm):
+    """The level-0 survey areas a sidewalk meets as a wall: the walls and stairs, and the paved strips that are a
+    wall's face in plan (ground_mesh.wall_areas, #786)."""
+    import ground_mesh
+    return [dtm["areas"][i] for i in ground_mesh.wall_areas(dtm)]
+
+
+def wall_edges(dtm, walls=None):
+    """The level-0 sidewalks' outline edges along a survey wall or stairs (#653; wall_areas, or those given), with the
+    sidewalk's own heights at
     their ends: (n, 2, 3), each running with its sidewalk on its left. A wall's outline holds its top and its foot at
     one place; the sidewalk's own edge says which it meets, and its side which cells it holds (a sidewalk wrapping round
     a wall has its foot and its top within a cell of each other: Krejcárek's ramp, line 37 (3926, 327))."""
     import shapely
     from shapely.geometry import Polygon
-    walls = [shapely.LineString([q[:2] for q in r] + [r[0][:2]]) for a in dtm["areas"]
-             if a["c"] in WALL_CLASSES and a["l"] == 0 for r in [a["r"]] + a.get("h", []) if len(r) >= 2]
+    walls = [shapely.LineString([q[:2] for q in r] + [r[0][:2]]) for a in (wall_areas(dtm) if walls is None else walls)
+             for r in [a["r"]] + a.get("h", []) if len(r) >= 2]
     if not walls:
         return np.zeros((0, 2, 3))
     tree = shapely.STRtree(walls)
@@ -1286,6 +1358,99 @@ def wall_edges(dtm):
     return np.asarray(segs, float).reshape(-1, 2, 3)
 
 
+STRIP_ALONG = 5  # segments (m) along a strip over which the walkway's level beside it is its running mean
+STRIP_SEEN = 1.5  # m: a walkway narrower than this beside a strip the ground steps across has no reading in IPR's raster
+
+
+def strip_edges(ln, walk, box, lidar, strips=None):
+    """The edges of the level-0 sidewalks (`walk`) along a paved strip the ground steps across, within a box ((x0, y0),
+    (x1, y1)) and SW_KERB_SMEAR round it, with the walkway's level there: (n, 2, 3), each with its sidewalk on its
+    left (wall_edges), and how far across the walkway runs from each (up to twice SW_KERB_SMEAR). The strips: the
+    survey's paved areas up to wall_lines.STRIP across that are no wall's face in plan (wall_lines.strips; or the
+    outlines given, closed (n, 3)): a parapet, a wall's top. Such a strip is a wall for the sidewalk where the ground
+    steps across it, but its outline's heights are neither side's ground: between the platform of Modřanská škola and
+    the road, line 17 (-2479.7, -8440), `paved` 7924 is 0.2 m across at 198.7 and 197.9 m, the platform inside it at
+    199.6 m and a sidewalk 0.6 m wide outside it at 196.5 m by the road (#786).
+    - The walkway's level is IPR (lidar(x, y)) SW_KERB_SMEAR in from the strip, or halfway across a walkway narrower
+      than twice that, its mean over STRIP_ALONG along the strip. North of that stop a ramp 2.15 m wide climbs to the
+      platform between the strip and the wall under the track (line 17 (-2481, -8410); the user's photo from the bus
+      stop, 2026-11-21): IPR has it at its middle, 197.5 to 199.9 m in 36 m, and the track's 200 m and the road's
+      196.1 m a metre either side.
+    - The ground steps across the strip where that level and IPR SW_KERB_SMEAR past the strip's other side part by
+      wall_lines.STEP or more, along runs as wall_lines' (runs()). (wall_lines.stretches reads a side 2.5-4 m off or,
+      between two wall lines, takes one of the two lines' heights: for the ramp, the wall's top, and no step at all
+      where the parapet's own height was the nearer.)"""
+    import shapely
+    import wall_lines
+    none = np.zeros((0, 2, 3)), np.zeros(0)
+    if walk is None or walk.is_empty:
+        return none
+    m = SW_KERB_SMEAR
+    lim = (box[0][0] - m, box[0][1] - m, box[1][0] + m, box[1][1] + m)
+    if strips is None:
+        strips = wall_lines.strips(ln, ROOT, lim)[0]
+    d = np.arange(0.05, 2 * m + 1e-6, 0.05)  # (a strip is 0.2 m across: no coarser)
+    dt = np.arange(0.05, wall_lines.STRIP + 0.5, 0.05)
+    segs, across = [], []
+    for ring in strips:
+        ring = np.asarray(ring, float)
+        S = wall_lines.sample(np.column_stack([ring[:, :2], np.zeros(len(ring))]))
+        if len(S) < 3:
+            continue
+        g = shapely.Polygon(ring[:, :2])
+        g = g if g.is_valid else g.buffer(0)
+        if g.is_empty:
+            continue
+        shapely.prepare(g)
+        a, b = S[:-1, :2], S[1:, :2]
+        mid = (a + b) / 2
+        x, y = ring[:, 0], ring[:, 1]
+        out = -1.0 if float((x[:-1] * y[1:] - x[1:] * y[:-1]).sum()) > 0 else 1.0  # (anticlockwise: the strip to the left)
+        n = S[:-1, 3:5] * out
+        ok = shapely.contains_xy(walk, *(mid + 0.1 * n).T) & (mid[:, 0] >= lim[0]) & (mid[:, 0] <= lim[2]) \
+            & (mid[:, 1] >= lim[1]) & (mid[:, 1] <= lim[3])
+        if not ok.any():
+            continue
+        k = np.flatnonzero(ok)
+        # (how far in the walkway runs from each segment, up to twice the smear; its level at its middle)
+        P = mid[k, None, :] + n[k, None, :] * d[None, :, None]
+        inside = shapely.contains_xy(walk, P[..., 0], P[..., 1])
+        width = np.where(inside.all(1), 2 * m, d[np.argmin(inside, axis=1)] - 0.025)
+        r = mid[k] + n[k] * np.minimum(m, width / 2)[:, None]
+        # (the ground past the strip's other side)
+        T = mid[k, None, :] - n[k, None, :] * dt[None, :, None]
+        thick = shapely.contains_xy(g, T[..., 0], T[..., 1])
+        far = mid[k] - n[k] * (np.where(thick.all(1), dt[-1], dt[np.argmin(thick, axis=1)]) + m)[:, None]
+        z, zf = np.asarray(lidar(r[:, 0], r[:, 1]), float), np.asarray(lidar(far[:, 0], far[:, 1]), float)
+        step = np.zeros(len(mid), bool)
+        with np.errstate(invalid="ignore"):
+            step[k] = np.abs(z - zf) >= wall_lines.STEP
+        zs, ws = np.full(len(mid), np.nan), np.full(len(mid), np.nan)
+        zs[k], ws[k] = z, width
+        along = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(mid, axis=0).T))])
+        # (a run is cut where the strip's outline turns a corner: round it lies another walkway, and a side shorter
+        # than a stretch is the strip's end, no wall's side. A block 2.0 x 1.1 m at the foot of Rašínovo quay's wall,
+        # line 17 (-746.4, -1445.8), `paved` 1231, the lower quay at 188.3 m west of it and the upper sidewalk at
+        # 197.2 m east: one run round it, its mean along the outline 190.0-194.6 m at its two ends, held the lower quay
+        # up to 2 m over the raster for 1.5 m round it)
+        corner = np.flatnonzero((n[:-1] * n[1:]).sum(1) < math.cos(math.radians(wall_lines.TURN))) + 1
+        pieces = []
+        for i0, i1 in wall_lines.runs(step, along):
+            cut = [i0] + [c for c in corner.tolist() if i0 < c <= i1] + [i1 + 1]
+            pieces += [(c0, c1 - 1) for c0, c1 in zip(cut, cut[1:]) if along[c1 - 1] - along[c0] >= wall_lines.MIN_LEN]
+        for i0, i1 in pieces:
+            zz = np.where(ok[i0:i1 + 1], zs[i0:i1 + 1], np.nan)
+            pad = np.pad(zz, STRIP_ALONG // 2, constant_values=np.nan)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                zz = np.nanmean(np.lib.stride_tricks.sliding_window_view(pad, STRIP_ALONG), axis=1)
+            for q in np.flatnonzero(ok[i0:i1 + 1] & np.isfinite(zz)).tolist():
+                A, B = [a[i0 + q, 0], a[i0 + q, 1], zz[q]], [b[i0 + q, 0], b[i0 + q, 1], zz[q]]
+                segs.append([A, B] if out > 0 else [B, A])
+                across.append(ws[i0 + q])
+    return np.asarray(segs, float).reshape(-1, 2, 3), np.asarray(across, float)
+
+
 WALL_LOCAL = 1.0  # m: a wall's or stairs' outline heights within this of a place are its top and its foot there
 
 
@@ -1295,9 +1460,9 @@ class WallLevels:
     along a wall zigzag between its top and its foot: Krejcárek's ramp, line 37 (3927, 322), 228.56 and 230.65 m a metre
     apart along one wall."""
 
-    def __init__(self, dtm):
+    def __init__(self, dtm, walls=None):
         from scipy.spatial import cKDTree
-        p = [q[:3] for a in dtm["areas"] if a["c"] in WALL_CLASSES and a.get("l", 0) == 0
+        p = [q[:3] for a in (wall_areas(dtm) if walls is None else walls)
              for r in [a["r"]] + a.get("h", []) for q in r if q[2] is not None]
         self.p = np.asarray(p, float).reshape(-1, 3)
         self.tree = cKDTree(self.p[:, :2]) if len(self.p) else None
@@ -1359,6 +1524,62 @@ def wall_heights(segs, X, Y, on, reach):
     return z, d, q, n
 
 
+def runs_in(walk, q, n, depth):
+    """Whether the sidewalks (`walk`) run unbroken from each kerb point q along its normal n to `depth` m in (one
+    depth, or one per point). A point
+    that far in can be another sidewalk's, across a wall: at Modřanská škola, line 17 (-2479, -8445), a sidewalk 0.6 m
+    wide along the road lies under a wall with the platform on its top, and IPR 1.5 m in from its kerb is the
+    platform's 199.7 m; taken for the walkway's level, it made the kerb a wall's top 3.2 m over the road (#786)."""
+    import shapely
+    q, n = np.asarray(q, float), np.asarray(n, float)
+    if walk is None or not len(q):
+        return np.zeros(len(q), bool)
+    depth = np.broadcast_to(np.asarray(depth, float), (len(q),))
+    return shapely.contains(walk, shapely.linestrings(np.stack([q + n * 0.05, q + n * depth[:, None]], 1)))
+
+
+def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
+    """Which points of one kerb edge (q, normals n into the sidewalk, the sidewalk's own heights `own`, the road's
+    surface zr beyond them) are a wall's edge and no kerb, and those as wall edges ((m, 2, 3) at the walkway's level,
+    the sidewalk on their left, wall_edges()): where the walkway stands STEP_CUT or more over or under a kerb on that
+    road, along an edge that stands KERB_WALL or more off it somewhere. A garage ramp sunk between walls is a road in
+    the survey and its side a kerb edge: on Na Vápence, line 37 (3868, -22), the walkway held at the ramp's surface
+    plus a kerb sank 2.2 m into the ramp along its edge, its own edge surveyed at 260.4 m (the user's Street View
+    viewpoint, 2026-11-20: a level sidewalk behind a wall with a railing, #779). The wall grows from nothing at the
+    ramp's head: the edge is its top from STEP_CUT on. And a sidewalk at the foot of a road's wall rose to the road
+    along its edge: line 22 (1897.5, -2211.9), 221.2 m to 223.5 m in its last 1.25 m, the road at 223.8 m (#770).
+    ground: IPR SW_KERB_SMEAR in from each point, on the sidewalk; wide: whether the sidewalk reaches that far in and
+    half a metre on, unbroken (runs_in). The walkway's level is the edge's own height where that lies within KERB_OWN of the ground (the
+    ramp's sidewalk rises to the building behind it: its edge 260.43 m, 260.82 m 1.5 m in); where it does not, the
+    ground on a wide sidewalk, and nothing on a narrow one. An outline along a parapet on its kerb carries the
+    parapet's top (by the Modřany viaduct, line 17 (-2396, -9241), 199.24 m over a walkway at 198.1 m: held at it, the
+    edge stood 1.1 m up), one along a road's wall the wall's top. near: IPR at each of KERB_NEAR in from each point,
+    (n, 3). A walkway on a quay wall's top has the drop behind it within SW_KERB_SMEAR: on Rašínovo nábřeží, line 17
+    (-761.2, -1704.8), the sidewalk's edge at 191.90 m beside the road at 191.87 m, IPR 191.99 m 1 m in and 190.17 m
+    1.5 m in, on the wall's face; read as the walkway's level, that sank the edge 1.6 m under the road (the batch's
+    surfaces check: 57 such kerb sites on the five lines, 18 at a wall's foot). Where IPR that near the edge comes
+    within STEP_CUT of the edge's own height and that height is a plain kerb's on the road (within STEP_CUT of the
+    road plus a kerb), a walkway lies at it: its own height. Without `ground`: the edge's own
+    height."""
+    from kerbs import KERB
+    level = np.asarray(own, float)
+    with np.errstate(invalid="ignore"):
+        if ground is not None:
+            ground = np.asarray(ground, float)
+            there = np.full(len(q), np.nan) if wide is None else np.where(np.asarray(wide, bool), ground, np.nan)
+            ours = np.abs(level - ground) <= KERB_OWN
+            if near is not None:
+                # (only an edge that is a plain kerb by its own height: at a wall's foot the raster's smear of the
+                # wall passes through any height between the two levels)
+                ours |= (np.fmin.reduce(np.abs(level[:, None] - np.asarray(near, float).reshape(len(level), -1)), axis=1) <= STEP_CUT)                     & (np.abs(level - np.asarray(zr, float) - KERB) < STEP_CUT)
+            level = np.where(ours, level, there)
+        off = np.abs(level - np.asarray(zr, float) - KERB)
+        top = (off >= STEP_CUT) if np.isfinite(off).any() and np.nanmax(off) >= KERB_WALL else np.zeros(len(q), bool)
+    t = np.column_stack([n[top, 1], -n[top, 0]]) * 0.125
+    z = level[top]
+    return top, np.stack([np.column_stack([q[top] - t, z]), np.column_stack([q[top] + t, z])], 1)
+
+
 def sidewalks(ctx, road_z, box, cell=SW_CELL):
     """The sidewalks around the generated road. The walkway, up to SW_WALK from the kerb, is a plane: at the kerb the
     road's surface 0.5 m beyond it plus KERB (tools/kerbs.py, the measured step), rising across at IPR's crossfall held
@@ -1381,18 +1602,44 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
     acc = np.zeros(X.shape)
     wsum = np.zeros(X.shape)
     lo, hi = SW_FALL
-    for q, n in ctx["kerb_edges"]:
+    tops = []
+    for q, n, *own in ctx["kerb_edges"]:
         ok = (q[:, 0] >= box[0][0] - SW_WALK) & (q[:, 0] <= box[1][0] + SW_WALK) \
             & (q[:, 1] >= box[0][1] - SW_WALK) & (q[:, 1] <= box[1][1] + SW_WALK)
         if not ok.any():
             continue
         q, n = q[ok], n[ok]
         zr = np.asarray(road_z(*(q - n * 0.5).T), float)
+        # (an edge standing over or under the road beyond it is a wall's, held below as a wall's edge: wall_tops, #779)
+        if own:
+            g = q + n * SW_KERB_SMEAR
+            g1 = [q + n * v for v in KERB_NEAR]
+            top, segs = wall_tops(q, n, own[0][ok], zr, np.asarray(ipr.sample(g[:, 0] + F.E0, g[:, 1] + F.N0), float),
+                                  runs_in(walk, q, n, SW_KERB_SMEAR + 0.5),
+                                  np.column_stack([np.asarray(ipr.sample(v[:, 0] + F.E0, v[:, 1] + F.N0), float) for v in g1]))
+            if top.any():
+                tops.append(segs)
+                q, n, zr = q[~top], n[~top], zr[~top]
+                if not len(q):
+                    continue
         # (each kerb point's walkway: its width inwards and IPR's crossfall across it, past the kerb's smear)
         d = np.arange(0.25, SW_WALK + 1e-6, 0.25)
         P = q[:, None, :] + n[:, None, :] * d[None, :, None]
         inside = shapely.contains_xy(walk, P[..., 0], P[..., 1])
         w = np.where(inside.all(1), SW_WALK, d[np.argmin(inside, axis=1)] - 0.25)
+        # (and no further than the sidewalk runs unbroken: a strip 0.2 m across lies between two samples, and the
+        # plane of the kerb on Modřanská ran over the ramp's parapet onto the ramp behind it, line 17 (-2480.7,
+        # -8400), the ramp's cells along the parapet at the road's 196.4 m for the ramp's 197.5 m, #786)
+        cut = np.flatnonzero(w >= 0.5)
+        cut = cut[~runs_in(walk, q[cut], n[cut], w[cut])]
+        broken = np.zeros(len(q), bool)
+        broken[cut] = True
+        for dk in d[1:]:
+            if not len(cut):
+                break
+            far = (w[cut] >= dk) & ~runs_in(walk, q[cut], n[cut], dk)
+            w[cut[far]] = dk - 0.25
+            cut = cut[~far & (w[cut] > dk)]
         Z = np.asarray(ipr.sample(P[..., 0].ravel() + F.E0, P[..., 1].ravel() + F.N0), float).reshape(P.shape[:2])
         # (a least-squares line per kerb point over its walkway, all at once)
         m = (d[None] >= SW_KERB_SMEAR) & (d[None] <= np.minimum(w - 1.0, SW_WALK)[:, None]) & np.isfinite(Z)
@@ -1416,6 +1663,10 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
             j = np.round((p[:, 0] - xs[0]) / cell).astype(int)
             good = np.isfinite(zr) & (dk <= w) & (i >= 0) & (j >= 0) & (i < X.shape[0]) & (j < X.shape[1])
             good[good] &= on[i[good], j[good]]
+            # (before a break the plane's cell lies before it too: the nearest cell to a point 4 cm before the parapet
+            # was the ramp's behind it)
+            g = np.flatnonzero(good & broken)
+            good[g] = (X[i[g], j[g]] - q[g, 0]) * n[g, 0] + (Y[i[g], j[g]] - q[g, 1]) * n[g, 1] <= w[g] + 0.05
             np.add.at(acc, (i[good], j[good]), (zr[good] + KERB + c[good] * dk) / dk)
             np.add.at(wsum, (i[good], j[good]), 1.0 / dk)
     with np.errstate(invalid="ignore", divide="ignore"):
@@ -1425,7 +1676,10 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
     # sidewalk meets, its top or its foot, whichever is nearer IPR SW_KERB_SMEAR in on the sidewalk's side; and no pull
     # from IPR within that smear: IPR's 1 m raster spreads a wall's face over 1-2 m, and the fill sank the walkway 0.5 m
     # into the top of Krejcárek's ramp wall, line 37 (3929, 331))
-    wz, wd, wq, wn = wall_heights(ctx.get("wall_edges"), X, Y, on, SW_KERB_SMEAR)
+    edges = ctx.get("wall_edges")
+    if tops:
+        edges = np.concatenate(([] if edges is None or not len(edges) else [np.asarray(edges, float).reshape(-1, 2, 3)]) + tops)
+    wz, wd, wq, wn = wall_heights(edges, X, Y, on, SW_KERB_SMEAR)
     hold = on & (wd <= cell * 0.75)
     if hold.any() and ctx.get("wall_levels") is not None:
         q, n = wq[hold], wn[hold]
@@ -1434,6 +1688,29 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
         wz[hold] = ctx["wall_levels"].pick(q[:, 0], q[:, 1], wz[hold], ref)
     known = np.where(hold, wz, known)
     data = np.where(on & (wd <= SW_KERB_SMEAR), np.nan, data)
+    # (and its edge on a paved strip the ground steps across (strip_edges, #786): the cells along it held on their own
+    # side, at a kerb's plane where one reaches them, else at the walkway's level there; no pull from IPR there, nor
+    # anywhere across a walkway narrower than twice the smear: IPR has such a one at its middle alone)
+    se, across = ctx["strip_edges"](box) if ctx.get("strip_edges") is not None else (None, None)
+    if se is not None and len(se):
+        # (a walkway under STRIP_SEEN across has no reading of its own in IPR's 1 m raster: where a road lies past it,
+        # it stands a kerb over that road, as at any kerb. The sidewalk 0.6 m wide between the parapet and Modřanská,
+        # line 17 (-2479.3, -8440): IPR halfway across it reads the wall's smear, 197.3 m for 196.5 m)
+        thin = np.flatnonzero(across < STRIP_SEEN)
+        if len(thin):
+            e = se[thin, 1, :2] - se[thin, 0, :2]
+            nrm = np.column_stack([-e[:, 1], e[:, 0]]) / np.maximum(np.hypot(e[:, 0], e[:, 1]), 1e-9)[:, None]
+            k = se[thin, :, :2].mean(1) + nrm * (across[thin] + 0.5)[:, None]
+            zk = np.asarray(road_z(k[:, 0], k[:, 1]), float) + KERB
+            se = se.copy()
+            se[thin[np.isfinite(zk)], :, 2] = zk[np.isfinite(zk)][:, None]
+        sz, sd, _, _ = wall_heights(se, X, Y, on, SW_KERB_SMEAR)
+        known = np.where(on & (sd <= cell * 0.75) & ~hold & np.isnan(known), sz, known)
+        data = np.where(on & (sd <= SW_KERB_SMEAR), np.nan, data)
+        narrow = across < 2 * SW_KERB_SMEAR
+        if narrow.any():
+            _, nd, _, _ = wall_heights(se[narrow], X, Y, on, 2 * SW_KERB_SMEAR)
+            data = np.where(on & (nd <= 2 * SW_KERB_SMEAR), np.nan, data)
     free = on & np.isnan(known)
     lam = (SW_WAVE / (2 * math.pi)) ** 4 / cell ** 4
     grid = fill_2d(known, free, data, lam)
@@ -1456,7 +1733,7 @@ def sidewalk_measures(ctx, walk_z, road_z, box, raw=False):
     zi = np.asarray(ipr.sample(x[inner] + F.E0, y[inner] + F.N0), float)
     d = (zw - zi)[np.isfinite(zw) & np.isfinite(zi)]
     steps, bend, kerb, places, walls = 0, [], [], [], 0
-    for q, n in ctx["kerb_edges"]:
+    for q, n, *_ in ctx["kerb_edges"]:
         q, n = q[::4], n[::4]  # (every metre)
         ok = (q[:, 0] >= box[0][0]) & (q[:, 0] <= box[1][0]) & (q[:, 1] >= box[0][1]) & (q[:, 1] <= box[1][1])
         if ok.sum() < 3:
@@ -1511,9 +1788,21 @@ def context(ln):
     tris, _ = surface_tris(dtm["areas"], {"road", "tram"})
     sw_tris, _ = surface_tris(dtm["areas"], {"sidewalk"})
     edges, walk = kerb_edges(dtm)
-    return {"F": Frame(), "ipr": IprDtm(), "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
-            "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
-            "rings": outlines(dtm), "wall_edges": wall_edges(dtm), "wall_levels": WallLevels(dtm)}
+    # (a street over a passage is the ground there, not the passage's floor the raster shows: covers.py, #783)
+    import covers
+    F, raw = Frame(), IprDtm()
+    xy = np.array([q[:2] for a in dtm["areas"] for q in a["r"]], float).reshape(-1, 2)
+    ways = covers.tunnel_ways((*xy.min(0), *xy.max(0))) if len(xy) else ()
+    ipr = covers.CoveredIpr(raw, covers.Covers(dtm, lambda x, y: np.asarray(raw.sample(np.asarray(x) + F.E0, np.asarray(y) + F.N0), float), ways=ways), F)
+    walls = wall_areas(dtm)
+
+    def lidar(x, y):
+        return np.asarray(ipr.sample(np.asarray(x) + F.E0, np.asarray(y) + F.N0), float)
+    ctx = {"F": F, "ipr": ipr, "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
+           "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
+           "rings": outlines(dtm), "wall_edges": wall_edges(dtm, walls), "wall_levels": WallLevels(dtm, walls),
+           "strip_edges": lambda box: strip_edges(ln, near_box(ctx, "walk", box), box, lidar) if walk is not None else None}
+    return ctx
 
 
 def class_area(dtm, classes):
@@ -1598,8 +1887,9 @@ def _wide_init(ln):
 def wide_square(ln, cell, ij, raised_xy, ctx=None):
     """One square of line_wide: the line's streets built in it and measured, as sums and samples to merge in square
     order (survey and generated: the road 1 m inside its edge against IPR, the drive lines, the sidewalks), the
-    generated jumps' places, and per confirmed raised corridor (raised_xy) its tracks' samples within 50 m and how many
-    read raised. None where the square holds no street."""
+    generated jumps' places, and per confirmed raised corridor (raised_xy: a point, or a place with `from` and `to`) its
+    tracks' samples within 50 m of the point or on the stretch in this square (confirmed_corridor), and how many read
+    raised. None where the square holds no street."""
     import shapely
     ctx = ctx or (_WIDE["ctx"] if _WIDE.get("ln") == ln else context(ln))
     i, j = ij
@@ -1613,7 +1903,10 @@ def wide_square(ln, cell, ij, raised_xy, ctx=None):
         n = r = 0
         for c in cs:
             if "raised" in c:
-                near = np.hypot(*(c["p"] - xy).T) <= 50.0
+                if isinstance(xy, dict):
+                    near = confirmed_corridor(ln, c["p"], [xy]) & (np.abs(c["p"] - at) <= radius).all(1)
+                else:
+                    near = np.hypot(*(c["p"] - xy).T) <= 50.0
                 n += int(near.sum())
                 r += int(c["raised"][near].any(1).sum())
         out["raised"].append((n, r))
@@ -1725,7 +2018,9 @@ def line_wide(lines, cell, out_path, jobs=None):
                 x, y = F.xy([r["lat"]], [r["lon"]])
                 raised_at.append({"place": r["place"], "xy": np.array([float(np.ravel(x)[0]), float(np.ravel(y)[0])]),
                                   "n": 0, "raised": 0})
-        xy = [r["xy"] for r in raised_at]
+        # (a stretch the user confirmed between two ends: its tracks' samples on it, #606)
+        xy = [r["xy"] if not (q.get("from") and q.get("to")) else q
+              for r, q in zip(raised_at, [q for q in RAISED_PLACES if q["line"] == ln])]
         if jobs > 1:
             ex = sysinfo.pool(min(jobs, len(sq)), _wide_init, ln)
             results = ex.map(wide_square, *zip(*[(ln, cell, ij, xy) for ij in sq]))
@@ -1788,7 +2083,7 @@ def line_wide(lines, cell, out_path, jobs=None):
             for c, v in sorted(scat.items()) if v["survey"]}
         res["triangles over the streets (road, tram, sidewalks)"] = tri
         res["squares"] = len(sq)
-        res["confirmed raised corridors, share of the tracks within 50 m read raised"] = {
+        res["confirmed raised corridors, share of the tracks within 50 m (a stretch: on it) read raised"] = {
             r["place"]: round(r["raised"] / r["n"], 2) if r["n"] else None for r in raised_at}
         res["generated jumps, places"] = places
         out[ln] = res

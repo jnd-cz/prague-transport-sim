@@ -2,6 +2,7 @@
 """An issue's session, started and finished the same way every time (#727; AGENTS.md, Start):
 
     python -I tools/session.py start N [--name short-name] [--agent claude|codex] [--fetch-raw]
+    python -I tools/session.py merge N [--discard]      # on the user's word only (AGENTS.md, Merge windows)
     python -I tools/session.py finish N [--discard]
 
 start: the issue's worktree beside the main checkout (../<repo>-N) on a new branch N-<short-name> from origin/main
@@ -9,7 +10,12 @@ start: the issue's worktree beside the main checkout (../<repo>-N) on a new bran
 cache (and raw/ with --fetch-raw, for a build), the issue labelled agent:<agent>. It refuses where the branch or the
 folder exists. Then it says what to read next.
 
-finish: once the branch's PR is merged, the worktree, the local branch and the agent's label go. It refuses while
+merge: the issue's open PR marked ready and squash-merged as `<PR title> (#PR)`, then the session finished and the
+remote branch deleted. It refuses, with nothing changed, while another PR stands on the branch, the PR is not
+mergeable, a check of its has not passed, or the worktree holds changed or untracked files (listed; --discard after
+you have looked).
+
+finish (for a PR merged another way): once the branch's PR is merged, the worktree, the local branch and the agent's label go. It refuses while
 the PR is not merged, and while the worktree holds changed or untracked files: it lists them, and --discard removes
 the worktree with them after you have looked.
 """
@@ -106,6 +112,45 @@ def finish(n, discard=False, run=run, out=print):
     out(f"#{n}: {' and '.join(gone) + ' removed' if gone else 'its worktree and branch were gone already'}, the agent's label taken off")
 
 
+PASSED = {"SUCCESS", "SKIPPED", "NEUTRAL"}
+
+
+def merge(n, discard=False, run=run, out=print):
+    """The issue's open PR squash-merged as `<PR title> (#PR)` and the session finished. Everything is checked before
+    anything changes: one open PR of the branch, none standing on it, mergeable, its checks passed, the worktree's
+    changed and untracked files looked at. gh's own --delete-branch is not used: it removes the worktree with its
+    untracked files at once (#751 and #752, gh 2.103.3)."""
+    wt, branch = folder(n), branch_of(n, run)
+    if not branch:
+        raise SystemExit(f"session: no local branch of #{n}")
+    prs = json.loads(run("gh", "pr", "list", "--head", branch, "--state", "open", "--json",
+                         "number,title,isDraft,mergeable,statusCheckRollup")[0] or "[]")
+    if len(prs) != 1:
+        raise SystemExit(f"session: {branch} has {len(prs)} open PRs, not one: nothing is merged")
+    pr = prs[0]
+    stacked = json.loads(run("gh", "pr", "list", "--base", branch, "--state", "open", "--json", "number")[0] or "[]")
+    if stacked:
+        raise SystemExit(f"session: {', '.join('#' + str(p['number']) for p in stacked)} stand on {branch}: move them to main "
+                         f"first (gh pr edit N --base main); a PR whose base branch is deleted is closed for good (#745)")
+    if pr.get("mergeable") != "MERGEABLE":
+        raise SystemExit(f"session: PR #{pr['number']} is {str(pr.get('mergeable')).lower()}: merge main into {branch} first")
+    waiting = [c.get("name") or c.get("context") or "?" for c in pr.get("statusCheckRollup") or []
+               if (c.get("conclusion") or c.get("state")) not in PASSED]
+    if waiting:
+        raise SystemExit(f"session: PR #{pr['number']}'s checks have not passed: {', '.join(waiting)}")
+    if os.path.isdir(wt):
+        dirty, _ = run("git", "status", "--short", cwd=wt)
+        if dirty and not discard:
+            raise SystemExit(f"session: {wt} holds changed or untracked files; look at them, then --discard:\n{dirty}")
+    if pr.get("isDraft"):
+        run("gh", "pr", "ready", str(pr["number"]))
+    run("gh", "pr", "merge", str(pr["number"]), "--squash", "--subject", f"{pr['title']} (#{pr['number']})")
+    out(f"PR #{pr['number']} merged as \"{pr['title']} (#{pr['number']})\"")
+    finish(n, discard=True, run=run, out=out)  # (its files were looked at above)
+    run("git", "push", "-q", "origin", "--delete", branch, check=False)  # (gone already where GitHub deletes merged branches)
+    run("git", "pull", "-q", "--ff-only", check=False)  # (the main checkout, where it is on main and clean)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -117,13 +162,20 @@ def main(argv=None):
     f = sub.add_parser("finish")
     f.add_argument("issue", type=int)
     f.add_argument("--discard", action="store_true", help="remove the worktree with its changed and untracked files")
+    m = sub.add_parser("merge")
+    m.add_argument("issue", type=int)
+    m.add_argument("--discard", action="store_true", help="merge and remove the worktree with its changed and untracked files")
     a = ap.parse_args(argv)
     if a.cmd == "start":
         start(a.issue, a.name, a.agent, a.fetch_raw)
+    elif a.cmd == "merge":
+        merge(a.issue, a.discard)
     else:
         finish(a.issue, a.discard)
     return 0
 
 
 if __name__ == "__main__":
+    # (an issue's title in Czech: a cp1252 console stopped start 697 at its last line, "Rašínovo", the work done)
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main())

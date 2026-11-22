@@ -553,6 +553,340 @@ Sections:
   ground takes the rail's own height at a point on a rail (`ground_mesh.on_rails`). What reaches a rail without crossing
   the track lies at the bed's height within 5 cm of it (`ground_mesh.rail_band`): line 17 s 17128's stop island, classed
   sidewalk, lies along the outer rail (9.5 cm over it before), line 9's depot hall (a plot) over its tracks' ends.
+- **Geoportál's retaining walls and the walls the page drew** (#765, measured 2026-11-19). The page drew two kinds of
+  wall on top of the ground until #765. Invented ones (`corridorWalls`): where the 10 m terrain grid rose 1.5 m over
+  the track 8-15 m beside it, a face 7 m from the track; 1-4 runs a line, 15-126 m, 21.5 m tall at the Vyšehrad
+  tunnel's mouths. And Geoportál's retaining walls (`data/lineN.geo.json`: a line and one height a wall, 5-9 a line,
+  593-1,641 m) as slabs. Against the survey: 54-75 % of Geoportál's length lies within 2 m of a survey wall line or
+  wall area, and with the paved strips up to 1 m across 85-95 %: the survey has many a wall's face as a paved strip
+  (under Letná, line 17 area 4166: 0.44 m across and 290 m long, its foot's line along the road and its top's behind
+  it). What is left, 35-318 m a line, are walls of the ground from Geoportál's line and height (`wall_lines.retained`):
+  such a line lies a metre or so off the raster's rise, and under a steep bank the raster has no step to fit (a
+  side's fit read back to the line gave the top anywhere between 191.3 and 195.3 m within 30 m of wall), so the top
+  is the foot plus the height, no higher than the ground 4 m behind. A strip that is a wall's face: its outline has
+  the foot one side and the top the other without two neighbouring points climbing (`ground_mesh.two_sided`: 10-87
+  such strips a line beside the 52-155 that climb); triangulated on its outline it stood as teeth 10 m wide, hidden
+  behind the page's slab. The slab was 3.9 m all along; the survey's top steps between 1 and 4 m.
+- **A street in a rock tunnel** (#771, measured 2026-11-20). The mirror of a street under a deck: in the Vyšehrad
+  tunnel (line 17 s 11385.8-11424.0, the only tunnel through rock on the five lines; lines 9, 22 and 23 have covered
+  stretches the lidar is not 8 m over) the lidar is the hill over the vault, and the survey's level-0 areas inside
+  (the road beside the tracks, a wall area at each mouth) took the street surface or their outline, which rise with
+  it at the mouths: the road stood 4.3 m over the track 1.9 m beside the axis at s 11388.8, a dark spike in the south
+  portal, and two slabs in the north one. The page leaves out the terrain in the corridor and nothing else
+  (`src/groundDraw.js` attachGround). OSM's tunnel starts 3 m before the lidar's cliff there (s 11385.8 against
+  11388.5). In the corridor (8.5 m either side, the page's vault) a survey corner 0.5 m or more over the rails lies
+  at the rails' level, and no wall stretch holds it (`ground_mesh.off_the_hill`). The north gate's own masonry is in the survey as one
+  wall-like strip 0.64 m across (area 1237): the arch's line across the road and, as a sliver, the wing wall along the
+  sidewalk from the pier (197.22 m at s 11424.8) to a point on the ground 12 m on. Stood up as a wall its top fell
+  with that line, a grey cone 4 m tall by the road seen from inside the tunnel. A wall-like area with a corner on the
+  hill inside the corridor is the portal's masonry: within 15 m of the corridor all of it lies at the rails' level
+  (`ground_mesh.portal_masonry`). Street View of September 2025 (the user's links, 2026-11-20): a flat road, kerbs
+  and sidewalks, a stone gate and a wing wall about 6 m tall; nothing draws a portal's masonry yet.
+- **A street under a deck** (#761, measured 2026-11-20 on the batch's first build). The street surface follows the
+  tracks onto a deck, so under the deck it has the deck's level. A level-0 street area on a span keeps its own
+  outline for that reason, but one whose outline lies on two levels (`climbs`) cannot, and since #762 took the street
+  surface whole: the road under the Modřany viaduct (line 17 (-2428, -9241), area 7120, 1.4 ha with the ramp's
+  roadside in one outline) stood at 205.3 m where the lidar has 197.6 m, a slab in the viaduct 1.04 m over the
+  deck's underside. The lines' check `groundUnderDecks` found it (0 → 2 places), not the place's sections, which
+  lay beside the ramp. Such an area's corners under a span that the street surface puts 2 m or more over the lidar lie
+  on the lidar (`ground_mesh.off_the_deck`); the place's steep faces fell from 75.9 to 4.8 m².
+- **Abutments: the wall the survey does not have** (#763, measured 2026-11-19). Where a deck lands, the survey's wing
+  walls along the ramp are wall lines; the abutment's face under the deck is not. At the Modřany viaduct (line 17
+  (-2393, -9247)) the two wing walls' lines turn by 0.5 m at the face's corners and run on along the street at its
+  level; without a line across, the ramp's side strips fell 4.5 m in their last metre. The bed's end is not the face:
+  the bed reaches the deck's end (#594) and overhangs the abutment, by 1.3 m there. Nor is a span's end: the route's
+  span runs s 3971-4152, the ramp included. `ground_mesh.abutments` finds the face behind the bed's end where IPR's
+  raster crosses the middle between the ground the deck leaves and the ramp's top; its ends are the wing walls' points
+  there that stand over that ground, else the first wall line across, else the bed's edges. Walls that meet: a corner
+  past a stretch's free end is left (the ground has no step there), but where two stretches meet (a wing wall and the
+  face, a wall's turn) the wedge outside the corner is past both and stood as leaning faces; an end within `WALL_JOIN`
+  of another stretch is not free, and a corner at or past such an end reads the wall its triangle's centre lies by.
+  No step in the raster, no wall: at Krejcárek (line 37 (3954, 380)) the embankment and a stone cone run under the
+  deck's end and the line makes no stretch; that abutment is the structure's (the bridge model, #742).
+- **Terraces: where the lidar's ground is not the ground** (#663, measured 2026-11-19). A lawn or a yard on the lidar
+  (`g`) lies on the city mesh inside (#444). 38-108 of them a line (of 1,375-3,663) have an outline over 1 m above
+  IPR's raster (its points' median); 4-70 lie over 1 m under it. Those over it are of three kinds: terraces inside
+  walls as high (a raised courtyard, line 37 (7590, 743): six beds 2.1-3.7 m over the raster, their walls 2.2-4.2 m),
+  areas on a deck or a roof, where the raster is the ground under the structure, and outlines that are off. A
+  terrace keeps its own outline's surface (`ground_mesh.terraces`: over 1 m, and touching a wall whose outline stands
+  as far over the raster): 2-10 areas a line, 18-3,628 m²; the others, 28-105 a line and 0.7-4.0 ha, stay on the
+  lidar. The median keeps the raster's smear out: a lawn along a retaining wall's top has only that edge over it. A
+  footpath that touches a terrace and has a quarter of its outline's points over 1 m above the raster runs onto it
+  and keeps its own outline too (`beside`: 0-5 a line); a street's sidewalk along a terrace's foot touches it with
+  none of its points over (2-3 a line, up to 2.3 ha) and stays on the street surface. Not solved: one area on both
+  levels (line 37 green 4451, 8,164 m², 37 % of its points over): its strip between a wall and the footpath is a
+  pit.
+- **Fine cells only by a wall** (#770, measured 2026-11-20). #762 cut every street and lidar-ground cell that bends
+  by 0.5 m to 1 m cells, so that the ground beside a wall could carry its two levels. On the lidar's ground away from
+  any wall the fine cells draw the raster's bumps: the sides of line 37's cutting at s 2340 as lumps with a spike
+  (walls the build had no line of: the next entry). The batch's seams of 10 cm (441 -> 536 on line 37, mostly
+  paved / paved and not at a wall) come from there. A lidar-ground cell is cut finer only within 5 m of a wall
+  stretch: every place's section holds as before (Chotkova's terraces need the fine cells: without any, 2.25 m of its
+  section slope against 1.75), and the steep faces that are no wall fall at four places (Žižkov's depot 41.6 -> 21.9
+  m², Krejcárek's abutment 88.5 -> 70.3, Letná 149.0 -> 125.0, Chotkova 498.2 -> 482.2). The price: the ground lies
+  farther from the raster where the raster bumps (4.5 m of a 24 m section along that bank more than 0.5 m off, none
+  before). Streets keep their fine cells.
+- **A paved yard whose sheet misses the ground** (#638, measured 2026-11-20). A paved yard has surveyed heights on
+  its outline only, and inside it is a sheet between them unless that sheet misses IPR's raster by more than 0.5 m
+  at the 95th percentile (`zps_inside.MISS`), when it lies on the lidar. Under that limit a yard can still be far
+  off at one side: line 23 s 557 (-2564, 434), area 3398 (2,031 m², 0.43 m at p95), lay 0.5-0.9 m under the raster
+  beside the sidewalk that cuts through it and 0.29-0.37 m under that sidewalk: a step with its wall, over the
+  0.3 m `ground_mesh.meet_raised` closes. Of line 23's 707 paved areas kept as sheets, 215 (2.4 ha) are within
+  0.2 m of the raster, 308 (6.5 ha) 0.2-0.5 m off and 184 (1.2 ha) farther (held off the lidar: covered, small,
+  the user's or the rails' verdict). A paved yard's limit is 0.3 m (`MISS_PAVED`, the step that can be closed): 107-286
+  more paved areas a line lie on the lidar (line 9: 706 -> 958, 44.6 -> 50.6 ha; 17: 409 -> 673; 22: 595 -> 881;
+  23: 286 -> 464; 37: 221 -> 328), and nothing else in the survey file changes. At the place the step is 0.06 m
+  (0.29) and the walls over 0.3 m in its 80 m square fall from 99.2 to 40.3 m. The old limit's reason was the
+  page's drape (a yard on its 2 m terrain in 5 m triangles: 8 cm waves the street check read); the ground file lays
+  lidar ground in 5 m cells of the city mesh, and the lines' `streetWaviness` comes with the batch.
+- **A parking area is such a yard** (#800, measured 2026-11-21 on ground batch C). It has heights on its outline only,
+  from the survey's lines in height class 5 (a mean error of 0.35 m). The bay along Vinohradská's north carriageway
+  (line 9 s 15360-15420, area 3091, 822 m², 0.42 m at p95) shares one such line with the sidewalk behind it; one
+  point of it, (3214.13, -1444.59), stands 0.38 m over IPR between points 31 and 35 m away, and the bay, a sheet
+  up to it, stood 0.18 m over the sidewalk where IPR has it 0.2 m under: 15 sunk kerb samples. Held to `MISS_PAVED`
+  as paved yards are, 41 / 44 / 29 / 9 / 37 parking areas lie on the lidar (lines 9 / 17 / 22 / 23 / 37; 18.1 ha of
+  the 41 ha of parking), the large lots most of all. One with over a third of its inside under a cover keeps its
+  sheet (`zps_inside.UNDER_COVER`): `zps_ground.judge` calls an area covered only when it is off IPR at its outline,
+  and the two car parks under the Magistrála's bridges at Hlavní nádraží (areas 232 and 233, 50 % and 93 % under
+  level-1 areas) fit there while IPR inside them is the bridges: on the lidar they raised the place's steep faces
+  from 379 to 640 m². Paved yards under a cover are judged as before (34 on the five lines lie on the lidar with
+  over a third under a level-1 area, 0.8 ha).
+- **A wall the survey has only as a strip** (#770, measured 2026-11-20). The tram's cutting north of Ohrada (line 37
+  (3400, 1)) runs between two upright concrete walls of 4.7 and 5.8 m with a ledge at each foot (the user's photos
+  from the footbridge, 2026-11-20). The survey has no `Zeď` line, no wall area and Geoportál no wall there: only a
+  paved strip in plan for each, inside paved ground on the lidar. The west wall's top is area 1847 (0.32 m across,
+  with heights); the east wall area 1818 (0.53 m across, on the lidar's ground: its outline's heights are neither the
+  foot's nor the top's). The raster spreads each wall over 2.5 m, and the ground was a bank. A paved strip up to 1 m
+  across is a wall line (`wall_lines.strip_lines`) where the survey has no wall line within 2 m: one with heights by
+  its outline (the strip keeps its own level, the ground outside it is held at the raster's level 2.5-4 m off), one
+  on the lidar by its low side's edge alone. Such stretches hold the lidar's ground and the terrain, not a street,
+  which has its own surface up to the strip. The five lines have 503-1,505 strips with heights and 3-18 on the lidar;
+  they make 280-1,014 stretches a line (2.2-7.4 km, the step 1.1-1.4 m at the median, most under 5 m long: parapets,
+  edgings, low walls) and the lines' stretches go from 326-610 to 628-1,622. Three things came with it:
+  - the weld let a lidar corner on the wall's line, held at the foot, take the strip's top wherever the area's own
+    outline there was near the top (one area runs behind the wall's top and along its foot): a spike on the ledge
+    every 2 m. A lidar corner a wall holds keeps the wall's level where that is over 0.5 m off the edge it yielded
+    to, whatever that edge's rank (`ground_mesh.weld`);
+  - past a strip's corner the wedge outside it is outside the strip, whichever side of the last segment's line the
+    triangle's centre lies on (`out` of a strip's stretches, `ground_mesh.hold_at_walls`);
+  - tried and not taken: wall lines traced along the raster's own faces inside paved lidar ground (a rise of 1.5 m in
+    a metre, marching squares): 2.6 km on line 9 in 679 stretches, 532 of them under 5 m, and no place needs them.
+  On the place the steep faces that are no wall fall from 220.7 to 41.4 m² and its three sections, which the written
+  file fails (3.25, 1.82 and 8.84 m sloping), hold (0.5, 0.78, 0.0).
+- **A slot between two wall lines ends with them** (#770, measured 2026-11-20). The survey has many a wall as two
+  `Zeď` lines half a metre apart, and `wall_lines._side` gives the strip between them the lower line's surveyed
+  height. Between a terrace's foot line and top line that is the lower ground's level. Between a stairwell's two
+  walls it lies under the ground on both sides: by the house at line 23 (-2329.4, 571.3) one line is surveyed at
+  271.18 m and the other at 272.93 m, the ground at 272.6 m on IPR either side. `ground_mesh.hold_at_walls` held
+  every corner within 1.5 m on the strip's side at its level, also past the lines' end: the footpath and the lawn
+  passing the end lay in a trench 1.3 m deep, a step of 0.96 m inside one sidewalk in the `surfaces` check. A
+  stretch's side that is such a slot (the strip's level 0.7 m or more under the stretch's other side and under IPR
+  past the next line) is marked (`sl`, `sr`; 100 of line 23's 618 stretches) and holds nothing past the stretch's
+  end, unless another stretch runs on from that end (a wall cut at a turn). Whether a corner is past the end is asked
+  of its nearest segment of that stretch: 1 m beyond the end it is still within 1.5 m of the stretch's second
+  segment, which has no end to be past. Tried first for every strip between two lines (479 of the 618): it moved
+  corners by up to 4 m at the ends of Chotkova's terrace walls and Ohrada's, the places' steep faces up, and put
+  teeth of 0.7-0.9 m into the low wall under the park by Krejcárek at a joint of two stretches. (A free end has the
+  same gap: a corner up to about 1 m past it is held by the second segment. Left as it is: no place shows it.)
+- **A road sunk between walls** (#779, measured 2026-11-20). A garage ramp is a road area in the survey, its outline
+  surveyed at the top of its walls, and a wall area stands on some of its sides only: on Na Vápence by the Žižkov
+  depot (line 37 (3871, -24), road 22: 259.7 m at the street, 257.8 m at the door) the walls over the door and on
+  the east side are area 1419 (0.26 m across, its top alone), the side along the sidewalk has none. Two rules read
+  such a road as any other:
+  - the sidewalks' surface is tied at a kerb edge to the road 0.5 m beyond plus a kerb (`street_profile.sidewalks`):
+    here the ramp, and the walkway's last 1.25 m fell 2.2 m. A kerb edge whose own surveyed height stands 0.3 m or
+    more over a kerb on that road, along an edge that stands 0.7 m over it somewhere, is a wall's top and is held at
+    its own height as a survey wall's edge is (`wall_tops`), where that height is the walkway's: within 0.5 m of IPR
+    1.5 m in. A sidewalk's outline along a parapet on its kerb carries the parapet's top (by the Modřany viaduct,
+    line 17 (-2396, -9241): 199.24 m over a walkway at 198.1 m), and without that check 242-1,343 m of kerb a line
+    counted; with it 25-256 m (4-35 edges a line, of 47-145 km of kerb). The mirror case (#770): a sidewalk at the
+    foot of a road's wall has its kerb edge surveyed at the wall's top (line 22 (1897.5, -2212): the walkway at
+    221.2 m, the road at 223.8 m), so the edge is a wall's either way, held at IPR's level 1.5 m in where the
+    sidewalk reaches that far. A walkway on a quay wall's top has the drop within those 1.5 m (Rašínovo nábřeží,
+    line 17 (-761.2, -1704.8): edge 191.90 m, road 191.87 m, IPR 191.99 m 1 m in and 190.17 m 1.5 m in): read at
+    1.5 m alone, its edge was held 1.6 m under the road, 57 such kerb sites in the surfaces check of ground batch B
+    against 18 at a wall's foot. The edge's own height is the walkway's also where it is a plain kerb's (within 0.3 m of the
+    road plus a kerb) and IPR 0.5, 0.75 or 1 m in comes within 0.3 m of it (`KERB_NEAR`): wall edges 1,215 to 875 m (line 9), 1,519 to 1,040 (17), 624 to 515 (22), 352
+    to 280 (23), 386 to 309 (37), the ones lost with their own height -0.16 to +0.23 m off the road (10th-90th
+    percentile), plain kerbs;
+  - the road's surface follows IPR, whose raster spreads a wall's face over 1-1.5 m: the ramp rose 0.76 m in its last
+    metre before the door's wall and the road behind the wall fell 1.6 m towards it. A road's corner within 1.5 m of
+    a survey wall area up to 1 m across (101-231 a line, 7.5-22 km of outline), or of a kerb edge that is a wall's
+    top, takes the road's own surface 1.5 m out, carried on at its grade there (`ground_mesh.off_the_smear`), unless
+    that surface lies 1 m or more off IPR there (under a deck the street surface has the deck's level). The
+    raster is not asked whether it steps across the wall: read 2.5 m past a wall's end beside another wall it showed
+    no step. In a corner of two walls the point out from one lies in the other's smear and is moved clear of both; at
+    a wall's end the short edge across it points through the wall, and the edge taken is the nearest whose point out
+    the corner's triangle sees.
+  The place's three sections fail on the written file (1.57 m sloping at the sidewalk's edge, the ramp 0.67 m off
+  its line, 2.75 m sloping at the door's wall) and hold on the build (0.0, 0.14, 0.0). Seen there and not fixed: the
+  generated road east of the ramp lies up to 0.56 m over IPR (#780).
+- **A street over a pedestrian underpass** (#783, measured 2026-11-20). IPR's raster is bare earth with the bridges
+  taken out, and it takes out the cover of an underpass too: where a street crosses one at grade it shows the
+  passage's floor in a slot as long as the passage and 1-2.5 m wider. The survey has the street's areas at level 0
+  right across, their outlines at the street's level, and (not always) the passage as areas at level -1. South of
+  Čechova čtvrť (line 17 s 3084, (-1453, -9105)) the outlines stand at 214.7-215.4 m and the raster has 211.2 m:
+  the verges on the lidar fell 3.6 m, the generated roads up to 1.8 m, a trench across the street that the layered
+  ground of `alpha-4` did not have. `tools/covers.py` finds such slots and gives the level-0 areas' own outline
+  surface there; the ground build and the street surface read IPR through it (`Covers.over`, `CoveredIpr`). What
+  makes a slot a cover:
+  - it lies over a passage (half of it or more): a survey area at level -1, or an OSM way in a tunnel of layer -1
+    or above from the local extract (not a building's passage, not the metro). The survey's areas alone find 12
+    of the five lines' 30 covers (line 17: 7 of 12, 720 of 1,039 m2). A slot that only touches the passage's end
+    is the open ramp or the stairs down to it, which the survey outlines at their rim (Nádraží Braník, line 17
+    (-2034, -6277)); where such a ramp joins a slot, the cover ends 2.5 m from the passage.
+    Without that key 55 more spots on line 17 qualify, mostly sidewalks whose outline carries a wall's top, and the
+    garage ramp of #779;
+  - a level-0 area's outline triangle stands 2 m or more over the raster there (a walkway's clearance and slab). A
+    triangle steeper than 15 % that rises over 1 m joins the cover with the floor (a stair well drawn as one area
+    with the sidewalk above) and is no surface; stairs and walls are not covers;
+  - it closes within 15 m of the passage. Nádraží Holešovice (line 17 (1512, 1330)) stands on a structure 55 m
+    across that the raster leaves out whole: its two underpasses' covers alone stood as blocks 7 m high in it.
+  Covers per line (the raster cut out under them): 9: 6 (123 m2), 17: 12 (1,039 m2), 22: 6 (494 m2), 23: 2
+  (278 m2), 37: 4 (97 m2); `python -P -E tools/covers.py LINE` lists them. Looked at on plans, all 30 (24 places,
+  six of them on two lines): 10 are slots across a street (line 17's six hold 970 m2, lines 22 and 37 two each),
+  the rest strips of 4-50 m2 where the raster smears a wall's or a well's face into the street above it, and four
+  wells of an underground entrance that the survey has no stairs for (the largest by lines 9 and 22, (-309,
+  -1236), 43 m2: level with the sidewalk now, a pit 6 m deep before). Not covered: a
+  deck the survey has at level 1 (#449), and the ramps and stairs' wells beside a passage (#786, #447).
+- **A paved strip is a wall for the sidewalk beside it** (#786, measured 2026-11-21). The survey has many a
+  retaining wall and parapet as a paved area 0.2-0.5 m across and nothing else: no wall area, no `Zeď` line. What
+  kept a sidewalk off IPR's smear at a wall (#653: the cells along a wall held at its level, a street corner on its
+  outline snapped to it) knew the wall and stairs areas alone. Sidewalk edges on walls and stairs / on strips that
+  are a wall's face in plan (`ground_mesh.wall_like`) / on strips the ground steps across by 0.7 m or more: line 9:
+  6,086 / 1,750 / 720 m; 17: 10,885 / 5,838 / 1,124 m; 22: 6,822 / 1,191 / 543 m; 23: 4,856 / 705 / 294 m; 37:
+  3,271 / 650 / 93 m. Platforms with 5 m or more of such an edge on their side: 1 of 97 (line 9), 12 of 88 (17:
+  Belárie, Přístaviště, Nádraží Braník, Pobřežní cesta, Sídliště Modřany, Modřanská rokle, Modřanská škola, Černý
+  kůň), 1 of 88 (22), 1 of 47 (23), 2 of 42 (37): the Modřany line runs on walls. Five things went wrong at them,
+  each with its rule:
+  - *The strip is a wall's face* (its foot's line one side, its top's the other: Nádraží Braník, line 17 (-2040,
+    -6262), `paved` 2605, 0.18 m across, 197.43 and 194.84 m). The platform on its top lay on the raster's smear,
+    196.35 m at its edge. Such a strip is a wall area for the sidewalks' surface and for the snap
+    (`ground_mesh.wall_areas`).
+  - *The strip's heights are neither side's ground* (Modřanská škola, line 17 (-2479.7, -8440), `paved` 7924:
+    198.7 and 198.3 m between a platform at 199.6 m and a road at 196.4 m; the parapet of the ramp from the bus
+    stop). `street_profile.strip_edges` takes a strip's side as a wall edge where the ground steps across the strip:
+    the walkway's level against IPR 1.5 m past the strip's other side. The walkway's level is IPR 1.5 m in, or
+    halfway across a walkway narrower than 3 m: the ramp north of that stop is 2.15 m wide between two strips, and
+    the raster has it at its middle alone (197.5 to 199.9 m in 36 m), the track's 200 m and the road's 196.1 m a
+    metre either side. Across such a walkway nothing pulls the surface to IPR. A walkway under 1.5 m across has no
+    reading at all and stands a kerb over the road past it (the sidewalk 0.6 m wide between the parapet and the
+    road). `wall_lines.stretches` is not used for it: it reads a side 2.5-4 m off, past the ramp, or between two
+    wall lines takes one line's own height, the wall's top for the ramp. A run of such edges is cut where the
+    strip's outline turns a corner, and a side under 2 m is none: a paved block 2.0 x 1.1 m at the foot of Rašínovo
+    quay's wall (line 17 (-746.4, -1445.8), `paved` 1231), one run round it, held the lower quay at the mean of both
+    its sides' levels, up to 2 m over the raster.
+  - *The surface is read between cells* (`ground_mesh.Streets.at`, cells of 0.5 m), and across a strip thinner than
+    a cell the sidewalk on the other side is among them: the platform's corners on Braník's wall read 195.8-196.5 m
+    for 197.4 m, teeth. A sidewalk's corner within 0.75 m of a wall's outline reads the surface 0.75 m out on its
+    triangle's side (`ground_mesh.own_side`).
+  - *Samples every 0.25 m step over a strip 0.2 m across.* The kerb's walkway plane ran from the roadside sidewalk
+    over the parapet onto the ramp, and the kerb-wall rule (#779) took IPR 1.5 m in from that sidewalk's kerb, the
+    platform's 199.7 m, for its walkway and held the kerb 3.2 m over the road. Both now ask whether the sidewalk
+    runs unbroken that far (`street_profile.runs_in`), and a plane cut at a break fills only cells before it.
+  - *A strip's own surface, triangulated* (0.2 m across, 194 m long, 15 points a side), gave corners on one side the
+    other side's height by turns: a paved area up to 1 m across takes its heights between its two sides
+    (`across_outline`). Where its sides' outlines have few points it stands tilted across instead: the coping of
+    Ohrada's cutting wall (line 37, `paved` 1847: 0.32 m across, 92 m long, 8 points) by up to 0.3 m for 25 m.
+  Three places (`branik-platform-ramps`, `modranska-skola-ramp`, `cerny-kun-platform-wall`): 9 sections fail on the
+  written file of 2026-11-20 and hold on the build; steep faces 105.7 to 50.5 m2, 137.1 to 62.1 m2, 153.8 to
+  109.4 m2. Not done: Černý kůň's ramps are level-1 areas (the footbridge's), not the ground (#449); a ramp of two
+  flights side by side in one area (Braník's lower flights) is one surface between its walls; the platforms stand
+  where the kerb rule puts them (#776).
+- **A stop's platform is a plane at the top of its corners** (#776, measured 2026-11-20). The survey has a platform
+  as a sidewalk, and its street surface runs from one kerb's top to the other's and follows the raster between: at
+  Krejcárek (line 37 s 2904-2974) +0.01 to +0.41 m over the rail top 0.6 m behind the edge. `platform_planes` lays
+  the corners in a platform's band on one plane over the rail top (one height, one crossfall up to 2 %). Fitted to
+  the corners' middle, the plane lay under the kerb tops wherever the road climbs against the rails along the stop
+  or the platform tilts more than 2 %: Motol's platform B (line 9 s 25524-25592, an island 2.9 m across between the track and Plzeňská)
+  came down 0.08 m at the road, flush with it, and ground batch B's surfaces check counted new flat kerbs at 23 /
+  21 / 13 / 5 / 12 platforms (lines 9, 17, 22, 23, 37; on line 9, 176 of its 180 more flat kerb sites). On the street surface's 0.5 m cells, the kerb cells under
+  5 cm in the platforms' bands:
+
+  | line | before any plane | plane at the middle | at the 75th percentile | at the 90th | anchored at the high side |
+  |---|---|---|---|---|---|
+  | 9 | 287 | 1,151 | 501 | 226 | 589 |
+  | 17 | 177 | 1,218 | 432 | 171 | 1,071 |
+  | 22 | 201 | 680 | 226 | 31 | 529 |
+  | 23 | 64 | 157 | 43 | 14 | 40 |
+  | 37 | 73 | 599 | 212 | 63 | 324 |
+
+  The plane lies at the 90th percentile of the corners it fits (`PLATFORM_TOP`); the platforms' edges stand a
+  median 0.11 m over the rail top (0.10 m at the middle; Krejcárek's 0.34 for 0.30). A bed laid flush with the
+  platform's sidewalk (`pits`) follows the plane: the grassy patch behind Krejcárek's shelter stayed 5 cm under it.
+  No fact gives a platform's height over the rail top yet.
+
+  Where the survey has the platform as an area of its own (class `platform`: 14 / 14 / 28 / 12 / 4 of the lines'
+  platforms, their back edge a median 4.1-5.1 m from the axis, up to 6.3 m) it is drawn by its outline alone, and
+  the band of 4 m left its back edge at the survey's few points. In ground batch B, 0.5 m inside the back edge, 10 /
+  3 / 15 / 10 / 2 of them strayed over 5 cm from a straight line along the track and 7 / 1 / 5 / 2 / 2 over 10 cm
+  (at their edge 0.7 m behind the rails: 2 / 0 / 3 / 1 / 2 over 5 cm); Hlušičkova's two (line 9, 68 m, 12 and 14
+  outline points) by 0.30 and 0.43 m, the kerb to Plzeňská from 0.16 m over the road to 0.05 m under it. In such an area
+  the plane holds right across (`PLATFORM_WIDE`), and corners fitted at one distance from the axis tell no
+  crossfall (`PLATFORM_SPREAD`): IPR has Hlušičkova's level across, +0.21 and +0.22 m over the rail top 0.7 and 2 m
+  behind the edge. The sidewalk islands (43-49 platforms on lines 9, 17, 22 whose sidewalk ends within 6.5 m of
+  the axis) stray at the back at 13 / 21 / 12 / 4 / 4 over 5 cm; on line 17 most of those stand on the Modřany
+  line's walls (#786). They keep the band.
+- **How fine the ground is** (measured on line 23's written file, 2026-11-19). The terrain outside the survey's areas
+  is the city mesh: IPR's 1 m raster thinned to triangles that keep it within 10 cm up to 120 m from a track
+  (`city_terrain.py`; 80 % of the line's box, a triangle's edge 2.5 m at the median). Inside a survey area nothing of
+  that mesh is left: the area's outline (the survey's points, a few metres apart) and lattice lines every 5 m make its
+  faces, and each corner reads a surface there: the street surface on roads, tram areas and sidewalks (0.5 m cells,
+  `street_profile.py`), the city mesh under green and yards on the lidar, the outline's own heights elsewhere. So
+  between a street's kerbs and inside a lawn the ground is a 5 m grid of readings, each right to centimetres, with
+  straight triangles between them: a step the survey has no area for crossed a cell as one slope (the quay, Chotkova's
+  terraces). Since #697 a cell whose surface leaves its plane by over 0.5 m is cut to 1 m, and a surveyed wall line is
+  an edge of the faces with a height on either side. Built whole (2026-11-19, 610c3e7, without writing), that costs
+  4.2-7.8 % more triangles a line (18.25 M -> 19.28 M on the five) and the ground lies a little nearer the raster:
+  within 10 m of a track its mean distance 3.98-5.66 -> 3.94-5.33 cm, the p99 27.9-54.9 -> 27.0-41.4 cm. At the
+  places picked for their walls the cost is 2-28 %.
+- **Where walls stand** (#697, measured 2026-11-19 on the five lines; the user: "can we use the open data sources to
+  infer where walls should really stand as opposed to blending between the different height points?"). Four sources,
+  best first:
+  - *The survey's wall areas* (`lineN.dtm.json` class `wall`): used since #653. They lie under only 2-5 % of the
+    survey's wall lines.
+    An area's outline has its foot's side at the foot's height and its top's side at the top's. Where they part by
+    0.7 m or more and the area is a wall's thickness across (twice its area over its outline's length up to 2.5 m:
+    95 % of lines 23's and 37's wall areas are under 2.1 m), it stands upright, its top level at the higher side's
+    height and its face on its foot's outline (`ground_mesh.wall_face`): Chotkova's road wall, 3.2 m tall and 1.7 m
+    across, leaned as a ramp between its sides. A wider one is a battered face and keeps the ramp: the bastion at
+    Strahov (line 23, area 860), 16.5 m up over 5 m.
+  - *The survey's wall lines* (`lineN.zps.json` kind `Zeď`: a wall too thin to be an area, with heights at its points;
+    at level 0 and on structures, a walled ramp's sides being level 1): 7.3-14.0 km a line, to the survey's
+    centimetres. IPR's raster steps by 0.7 m or more across 3.7-7.5 km of them (`tools/wall_lines.py` prints the
+    table: 368-579 stretches a line; over 4 m on 0.5-1.9 km). The line's own height is the foot
+    on about a third of the stepped length, the top on a third and neither on the rest, so the two sides' levels are
+    read from the raster 2.5-4 m off the line (past its smear of the step, 2 m at an 8 m wall) as a level and a slope,
+    and the line's height replaces a side's where it is within 0.5 m of it. Rašínovo nábřeží's quay wall is such a
+    line, 7 cm from the two sidewalk areas' shared edge; no wall area crosses there.
+    A side is read up to the next wall only: 28-38 % of the wall lines' sides have another wall line or a wall area's
+    outline within the readings' 4 m, 25-30 % within 1 m (a wall's two faces, at one height; or its face's foot and
+    top lines, 0.15 m apart under Chotkova at 208.6 and 211.6 m). There the survey's own heights are the levels: the
+    raster 2.5-4 m off lies on another terrace. Under Chotkova (line 23 (-896, 720)) the road at 205.3 m, a wall, a
+    footpath at 208.5, a wall to 211.5, a terrace, a wall to 214.0 stand within 9 m; the raster is one slope through
+    them, and read past the next wall it gave walls of 1.5-2.5 m with wavy tops. With the lines' own heights the
+    section is the survey's staircase to 0.1 m. So read, the line's own height is a side's level on 68-74 % of the
+    wall lines' length, and 3.0-6.6 km a line are stretches.
+  - *OSM `barrier=retaining_wall`*: 12.7-41.5 km a line inside the 1,200 m corridor, 73-78 % of it across a raster
+    step of 0.7 m or more (the same reading as for the survey's lines), so its positions are good enough to find the
+    step. Most of that (7-27 km a line) lies outside the survey's areas, on the terrain; inside them, 1.5-3.8 km a
+    line has neither a survey wall stretch nor a wall area within 2 m. Not used yet: its position is to a metre or
+    two and it has no heights.
+  - *Geoportál's retaining walls* (`lineN.geo.json` `walls`, with a height): 0.6-1.6 km a line. Not used by the
+    ground.
+  - *A survey area's own outline* can hold a wall too: two points next to each other on it within 1 m and 1 m or more
+    apart in height (`ground_mesh.climbs`). 27-97 sidewalks and 9-30 roads a line have one, and 91-291 paved and
+    104-249 green areas. Such an area lies on two levels and its outline's heights, triangulated, are no surface. On
+    a span, where a street keeps its own outline, it now takes the street surface (#761: the Modřany abutment's
+    sidewalk, area 7214, rose 3.4 m in 12 m under the bridge, where the raster and the street surface are level to
+    0.1 m). The paved areas off the lidar still triangulate their outline: not measured yet.
+  - *Paved strips*: parapets, edgings and low walls are often surveyed as paved areas half a metre across. Of the
+    58-174 paved areas a line off the lidar whose outline climbs a wall, 46-128 are under 1 m across and 6-35 more up
+    to 2.5 m; 7-24 % of their area, triangulated on the outline, is steeper than 1:1 (1-2 % of the other paved
+    areas'). They take a wall's heights (`ground_mesh.wall_like`): a terraced garden's edgings, line 23 (-1117, 806),
+    stood as fins up to 2 m across its lawns. The wider ones (6-23 a line, 0.25-0.53 ha) keep their outline.
+  The survey also has 65 km of `Terénní_hrana` (the tops and feet of slopes) on line 17 and 8.4 km of
+  `Hranice_schodiště`; neither is read by the ground yet (#447 for the stairs).
 
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 
@@ -601,6 +935,17 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
+- **A street's crown ends where a side street leaves it downhill** (#780, measured 2026-11-20). A street's surface
+  is its centreline's profile and a crossfall either side, the crossfall smoothed along the street. Its road area
+  runs on into a side street's mouth, and there the smooth is not the ground: on Nad Ohradou (line 37 (3877, -10))
+  the mouth of Na Vápence falls 6.5 % where the smoothed crossfall is 1.3 %, the crown lay 0.55 m over IPR 9 m
+  out, Na Vápence was pinned to it and 69 m2 of road stood 0.3-0.6 m up beside the garage ramp. A side's width
+  now ends where its crown still lies within 0.05 m of IPR before it leaves it by 0.15 m for a metre
+  (`street_profile.crossfall`), no further than its neighbours' 3 m along the street, and never under 3 m; past
+  it the road is the junctions' fill. The least width decides whether that helps: left 1.5 m, the drive lines
+  (1.75 m from the centreline) ran on the fill, which meets a street across a step, and line 23's jumps went
+  from 45 to 75; at 3 m they go to 31. Road patches of 20 m2 or more standing 0.3-1.5 m off IPR, published ->
+  with the rule: line 37 8 -> 2, 23 11 -> 6, 22 43 -> 20, 17 36 -> 19, 9 39 -> 21.
 - **The generated street surface on the five lines** (`street_profile.py --wide 300`, #512, 2026-11-15):
   - **Inside the road** (1 m in from its edge) it lies within 0.18-0.25 m of IPR at p99, the survey's surface within
     0.47-0.83 m; sidewalks 0.18-0.21 m against 1.4-2.1 m.

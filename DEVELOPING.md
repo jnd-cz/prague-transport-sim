@@ -41,7 +41,8 @@ python -P -E tools/rebuild.py --force        # every step runs
 
 A step runs only when something it read changed (`tools/stepcache.py`, #511): each run is traced (the files it
 opened, probed or listed under the checkout, the modules it imported from it, the packages' versions) and
-recorded in `reports/rebuild/cache/`; a step whose record still holds is skipped and its outputs put back as that
+recorded in `TRAMDATA_CACHE/stepcache/` (without a machine cache: `reports/rebuild/cache/` of the checkout; the
+records name files by their path under the checkout, so they hold in a fresh worktree, #797); a step whose record still holds is skipped and its outputs put back as that
 run left them, so the next step reads what it read before (`data/lineN.json` is rewritten by several steps in
 turn). A change to one rule reruns the steps that read what it changed, down to the first whose output stays the
 same. `lineN.log` says per step whether it ran and why (`tools/track_profile.py changed`, `data/line9.json
@@ -122,9 +123,9 @@ Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait t
 | `dtm_points` | `lineN.dtmpoints.json` | street furniture from the archived technical map |
 | `osm_signals` | `lineN.signals.json` | line 17 only, until the placement rules (#22): OSM traffic signals |
 | `osm_validate` | `lineN.validate.json` | every line: a check of the line against OSM |
-| `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22) |
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
 | `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS), their ground level judged against IPR (`tools/zps_ground.py`, #446), their decks checked against Mosty 3D and the raised rails, flat over the ways under them, thinner by `maxheight` (`tools/zps_decks.py`, #445), railway yards, lawns and paved yards on IPR's ground marked to take the lidar inside and the passages' plugged portals on IPR's floor (`tools/zps_inside.py`, #444), with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
+| `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them), where each platform is drawn, and the stop types from the survey's areas (`vienna`: so after `dtm`, #701). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22). From here on a line with surveyed streets needs its `lineN.dtm.json`: a step that reads it and finds none stops `rebuild.py` (`tools/step_inputs.py`) |
 | `track_styles` | `lineN.json` | the track styles (`styles`: the user's marks, prazsketramvaje.cz's grassed-track list, answered review cards, the survey's grass; cut at platforms and crossings, #479, #503) and the rails' height over the bed every 2 m (`lift`, blended inside each section, #480) |
 | `line_heights` (all lines once) | `lineN.json` | the top of rail every 2 m along the path, the opposite path and every drawn track (`heights`, `heightSource`, a track's `zs`, #197); where no source has one, the surface plus the lift (`surface`, #480): no sample is left without a height, else the build fails |
 | `line_structures` | `lineN.json` | the spans the route runs on a bridge, those with a deck the track lies on, and the roads under it with their clearance (`spans`, `realDecks`, `underpasses`, #480) |
@@ -136,9 +137,33 @@ packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](N
 **The city terrain** (#428, the first step of #276's ground): `python -P -E tools/city_terrain.py` meshes IPR's
 1 m raster of the whole city once, 10 cm within 120 m of DI's tracks and growing beyond (at most 3 m), with no
 cell over its tolerance. It is no line step: the mesh goes into the machine cache
-(`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and code), not `data/`, and nothing in the game reads
-it yet. A heavy job: 13 min and 15 GB on the dev PC; `--box x0,y0,x1,y1` meshes a part at once. Its report and a
-picture of the city limits go to `reports/city-terrain/`.
+(`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and the code that makes the mesh: the three files of
+`CODE`, `city_terrain.py` up to its section on the key and the cache, so a change to the command line or the
+heavy-job turn keeps the mesh, #757), not `data/`. The ground file is built from it (`tools/ground_mesh.py`). A
+heavy job: 13 min and 15 GB on the dev PC; `--box x0,y0,x1,y1` meshes a part at once. Its report and a picture of
+the city limits go to `reports/city-terrain/`.
+
+**A place's ground** (#757): `python -P -E tools/ground_place.py NAME` builds the ground of one place of
+`data/truth.json` `groundPlaces` (or `--line N --at X,Y`) with the line build's own code
+(`ground_mesh.build(within=...)`): the tiles its reach touches and one ring of tiles round them, in about a minute
+and 2 GB, with no turn among the heavy jobs (`--all` takes a shared one). Into `reports/places/NAME/` go its
+measures inside the reach (the steps' walls by height, the steep faces that are no wall, the area per class), the
+same of the written file, both from above as pictures, and the **locality**: the place's middle tiles against
+`data/lineN.ground.*`, vertex for vertex and triangle for triangle. A tile's ground is meant to depend on the tile
+and its ring only, so with unchanged tools every difference is a rule that reads something farther away, named by
+what gave the vertex its height. A ground rule is tried on its places first; the lines are rebuilt once for a
+batch of changes.
+
+A place says how it should look and how that is measured. `seen` is what street-level imagery shows there, in
+words, with the points and headings it was looked at from (the pictures themselves are not kept: they are the
+provider's). `sections` are lines across the place, each with the most of a measure it may have: the ground is
+sampled every 0.25 m along the line and compared with IPR's 1 m raster. A wall between level grounds may slope
+for a few metres at most (rise over run between 0.2 and 3) and stay within 0.5 m of the raster but for the wall's
+own 2 m; a ramp or a flight of stairs keeps to the straight line between its ends. `--written` measures the
+written file alone, in seconds: the quay's section slopes for 10 m of its 30 (2.5 allowed) and Krejcárek's stairs
+stray 0.39 m from their chord (0.15 allowed) on the data of 2026-11-19. To see a place as the game draws it from
+where a panorama stands, `tools/shot.py --view review --at X,Y --yaw H --pitch P --dist D` with the target `D` m
+ahead of the camera along `H`; a compass heading is 7.8° more in the local frame.
 
 ## Deploy
 
@@ -214,6 +239,12 @@ fixed minute (the line's middle stop, the trip nearest 8:00, dry, seed 1; the Re
 the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the departure, not a shift's 40 s, and the
 minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
 the detailed model. `tools/test_perf.py --runs N` runs it N times here.
+
+**The HUD's cost** (`python -P -E tools/bench/hud.py`, #706): what one update of the HUD changes in the page (0 when
+nothing changed: texts are written only when they change, `src/hud.js` `put`) and how long it takes with the CPU
+throttled 4 times. Line 17, 2026-11-19, before -> after: 13 -> 0 changes an idle update, an update 7.2 -> 2.9 ms (the
+minimap 4.2 -> 0.35 ms), a frame 45 -> 32-40 ms. A drawing routine that needs an element's box takes it from
+`src/boxes.js` `rectOf`, not from the page on every frame.
 
 **The site's icons** (#485): `assets/icons/icon-{32,180,192,512}.png`, the favicon, the iPhone's home-screen icon
 (`apple-touch-icon` in `index.html`) and the web manifest's (`app.webmanifest`), are drawn by
@@ -470,7 +501,11 @@ and class (#444; `--dtm DIR`, `--page main` for main's drawing); the build marks
 what it took under the decks in `checks.underDecks`. `python -P -E tools/bench/paved_ipr.py` measures paved track
 against IPR along each route: the stretches whose surface lies more than 10 cm under IPR for 6 m or more, each with
 its cause (the source holding it there, split by which of source and IPR the survey sides with; a curve that did not
-follow; no source) and its place (#539; `--json OUT` for every run).
+follow; no source) and its place (#539; `--json OUT` for every run). `python -X utf8 -P -E tools/bench/kerb_causes.py
+DIR` sorts the flat kerbs of a checks folder (`headless.py --checks surfaces --out DIR`, run on the checkout's data) by
+what IPR, the written ground and the street surface have across each kerb: no kerb in the raster either, an area drawn
+from its outline, a kerb spread wider than the check's row, flat in the street surface, the rest (#800; `--list` for
+every sample, `--json OUT`).
 
 **Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
 pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a
@@ -525,6 +560,12 @@ by putting the branch back for a moment). Once the base squash-merges, merge mai
 force-push); a conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and
 merge (#578 on #575).
 
+**Merging** (`python -I tools/session.py merge N`, on the user's word): one open PR of the issue's branch, none
+standing on it, mergeable, its checks passed, the worktree's changed and untracked files looked at; then the squash
+as `<PR title> (#PR)`, the worktree, the local and the remote branch removed and the agent's label taken off. gh's
+own `--delete-branch` removes the worktree folder with its untracked files at once (gh 2.103.3, seen at #751 and
+#752: each folder was gone right after its merge).
+
 **Unattended runs:** an investigation script is committed only when it runs like the other tools: its own server
 on a free port (as `headless.py`), no fixed agent port, a usage line at the top. Without issues allowed, findings
 go into a "Findings" section of the PR.
@@ -574,6 +615,9 @@ replayed up to route s and handed over paused: a stuck scene as it was, #157).
 | count runs and builds share the machine | the user, 2026-11-19, #728, asked whether they may when memory allows, the rule above staying for timings: "yes". A night's sessions waited in one line: 33 min behind another job's count run (PR #461) |
 | one rebuild at a time | two branches publishing rebuilt data overwrite each other's lines (#280) |
 | findings off the path go on a lane's list | issues opened faster than closed: 410 against 251 in 26 days. The user, 2026-11-19: "yes" (#731) |
+| a finding's own issue only for the next step or a failing check, after a search; one issue for a place's or a batch's reports | 202 open on 2026-11-21, 120-129 opened a week against 41-87 closed; a session opened #797 and #800 in a day and reported a build race on #735 that #701 already held. The user, 2026-11-21, on "their number is still slowly but steadily climbing": "yes let's do this" |
+| merges in batches, the heaviest work at night | the user, 2026-11-21, having stopped the other lanes' sessions to save "resources, time as well as attention": "If we can merge in batches like today, keep the heavy work for nights, I'll be happy to resume the other lanes and sessions"; night from 22:00 to 07:00, plus any time the user says go: "yes" |
+| a ground rule's issue closes at the rule's merge | it stayed open as "Part of" until the batch's rebuild, 5-10 issues between batches, while #757 tracks the batch. The user, 2026-11-21: "ok, let's try this approach" |
 | a security hole is not written up in public | the repository is public and the alpha is live. The user, 2026-11-19: "fix and file privately" |
 
 ## How the game's parts work
@@ -605,7 +649,9 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   tiles on the S-JTSK grid, each decoded on its own in a pool of workers (`src/groundFile.js`, #30): every tile's height
   lookup at load, then only those within the fog's end of the camera and of 1 km of route ahead, drawn in detail (9-17
   MB of lookups held, 48-120 MB before #658). `?keepgeo` and `?bot` keep every tile's lookup and meshes. `tools/bench/ground_tiles.py` drives the window along a line:
-  what is held, each tile's time, any tile missing in view.
+  what is held, each tile's time, any tile missing in view. The build's report (`reports/ground-mesh/`) holds the
+  mesh's error against IPR's raster only where `tools/ground_mesh.py --error` asked for it (0.6-8 minutes a line,
+  #704): a checkpoint's run, or a change of the terrain's thinning.
 - **The network** (the traffic's roads, lanes, footways and doors, the signals bound to the lanes, what the platforms and
   stops read of the survey) is built once, after `tools/ground_mesh.py`, by `tools/network.py` into
   `data/lineN.network.json` ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658). Start

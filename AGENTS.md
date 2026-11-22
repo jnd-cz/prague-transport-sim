@@ -23,18 +23,22 @@ things are done, and why a rule exists, is in the files it points to:
    `../<repo>-N` on a branch `N-short-name` from `origin/main`, the repository's author email, the built data from
    the machine cache, the agent's label.
 4. `gh issue view N --comments`: what is now, where, and when it is done. The known failures (below) are not yours.
-5. When its PR merges: `python -I tools/session.py finish N` removes the worktree, the branch and the label. It
-   lists changed and untracked files first and stops until they have been looked at.
+5. On the user's word to merge: `python -I tools/session.py merge N` lists the worktree's changed and untracked
+   files and stops until they have been looked at, then merges the PR and removes the worktree, the branch and the
+   label (`finish N` does the removing for a PR merged another way).
 
 ## What to work on
 
-- **The order:** ROADMAP.md. Until the city's tram world runs (#731): the small fixes, the city data model, one
+- **The order:** ROADMAP.md. Until the city's tram world runs (#731): the fused ground stable on its places (#757),
+  the small fixes, the city data model, one
   tram world built per tile, driving on the track graph, the simulation's core apart from drawing. Scenery (W4)
   and Backlog wait for it.
 - **Tasks are GitHub issues** (`jnd-cz/prague-transport-sim`). A new one says what is now (with numbers), where
   in the code, what done means and which checks prove it: a fresh session should need nothing else.
-- **Findings** that are not fixed now: on the path, or failing a check or a build, an issue; off the path, a
-  comment on the lane's list (#732 world, #733 sim, #734 assets, #735 tooling), picked from at checkpoints.
+- **Findings** that are not fixed now go on the lane's list as one line (#732 world, #733 sim, #734 assets,
+  #735 tooling), picked from at checkpoints. A finding gets an issue of its own only when the roadmap's next step
+  needs it or a check or a build fails on it, and only after a search finds no open issue that covers it
+  (`gh issue list --search "…"`). The user's reports from one place or one batch share one issue.
 - **Lanes** (the issues' `lane:*` labels; the board counts live sessions and shows a paused lane):
 
   | lane | covers | sessions | checks (below) |
@@ -65,9 +69,12 @@ things are done, and why a rule exists, is in the files it points to:
   to its `(#issue)` and the text to its keyword (`tools/pr_text.py`).
 - **`Closes #N` only when the PR meets every point of the issue's "Done when".** Anything open (the user's
   answers, an import, a rebuild, a publish, another line) makes it `Part of #N`, and the PR and a comment on the
-  issue list what remains. A reviewer who finds an open point changes the keyword before the merge.
-- **Merge windows:** the user merges in batches. A PR is marked ready and merged on the user's word only, as a squash titled
-  `<PR title> (#PR)` (the title ends with `(#issue)`), the branch deleted. A session whose checks are done says
+  issue list what remains. A reviewer who finds an open point changes the keyword before the merge. A ground
+  rule's PR closes its issue once the rule's places hold: the lines' rebuild is the batch's (#757), whose PR
+  lists the rules it rebuilt (the user, 2026-11-21).
+- **Merge windows:** the user merges in batches, once or twice a day. A PR is marked ready and merged on the user's word only, as a squash titled
+  `<PR title> (#PR)` (the title ends with `(#issue)`), the branch deleted: `session.py merge N`, not gh's
+  `--delete-branch`, which removes the worktree with its untracked files. A session whose checks are done says
   so and waits. A draft idle for 48 h is closed or labelled `parked`, saying what is left.
 - **Review findings** go in a PR comment ("To fix before merge", "Smaller"); the author answers point by point
   and pushes.
@@ -101,6 +108,10 @@ things are done, and why a rule exists, is in the files it points to:
   merge). Take the label with `gh issue edit N --add-label rebuild` while nobody holds it; it goes when that
   PR merges. Other branches change tools, test them on a local rebuild and wait. `main`'s manifest always names
   data that is in the store; a publish is checked with `snapshot.py verify`.
+- **Ground changes are proven on places, rebuilt in batches** (the user, 2026-11-19, #757: "faster iteration over
+  specific problematic places instead of trying one fix in one issue and waiting four hour+ long rebuilds"): a
+  ground rule's PR carries the tool, its test and its places' numbers and merges without a rebuild; the holder of
+  `rebuild` rebuilds every line once for the merged batch, and that PR carries the lines' check table.
 - **Sources** come only from the pinned snapshot in `raw/` (`snapshot.py fetch`), OSM only from its local
   extract: the public Overpass API is not used. A new source file goes into a snapshot with its URL, licence
   and date, and into `tools/sources.py`. A provider that refuses scripted requests is waited out, never fooled.
@@ -120,12 +131,16 @@ things are done, and why a rule exists, is in the files it points to:
   machine's other heavy jobs and holds its turn, so that it does not spoil another's measurement (the user,
   2026-11-12, #516). These take their turn themselves: `headless.py`, `rebuild.py`, `frametime.py`,
   `city_terrain.py`, `ground_mesh.py`; `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py`,
-  `street_profile.py` and `ground_partition.py` when run alone; `test_all.py` for the whole suite. Anything
+  `street_profile.py` and `ground_partition.py` when run alone; `ground_place.py` for several places or
+  `--rings` (one place runs as it is); `test_all.py` for the whole suite. Anything
   else runs through `python -I tools/heavy.py "what" -- CMD ...`. Start one in the background and let it wait;
   never start a second beside it. A timing runs alone (`frametime.py`, a bench, the whole test suite, plain
   `heavy.py`). Count runs and builds (`headless.py`, `rebuild.py`, `ground_mesh.py`, `city_terrain.py`,
   `heavy.py --shared GB,CORES` for pictures and the like) run beside each other while their memory and cores
   fit (the user, 2026-11-19, #728). A wait that ends with "does nothing" names a stuck job: look at that one.
+- **The heaviest work runs at night** (22:00 to 07:00) or on the user's word (the user, 2026-11-21): a rebuild of
+  every line, a seeded compare of every line, a checkpoint's run. By day a session runs the place loop, the tools' tests and
+  one-line runs, and leaves the night's jobs queued with what they are to prove.
 - **A long job pins its checkout:** work on another issue meanwhile in its own worktree.
 - **Which checks a change needs** (`/regress` picks them from the diff and has the commands; a change of two
   kinds runs both):
@@ -134,6 +149,7 @@ things are done, and why a rule exists, is in the files it points to:
   |---|---|---|
   | docs, research, harness | nothing; the PR says so | all |
   | the review page, review cards | `tools/test_review.py` (phone and desktop sizes) | headless |
+  | a ground rule (`ground_mesh.py`, `ground_partition.py`, `bed_surface.py`) | the tool's test; `tools/ground_place.py` on the rule's places and `--all`, before → after (a new case becomes a place in `data/truth.json` `groundPlaces`); no line rebuilt | the lines' rebuild and checks: once for the batch, below |
   | a build tool, its data rebuilt (world) | the tool's test; `--checks lint,surfaces,canted,crossing,spacing,heights` on the rebuilt lines; `tools/datadiff.py` or `tools/track_moves.py` per line; a smoke drive per line (`--checks u3 --seeds 1`) | redruns, traffic, seeds 2–5 |
   | drawn geometry in the game (surfaces, track beds, crossings, kerbs) | `lint,surfaces,crossing,canted`; every seedless move needs a reason | seeded checks |
   | drawing or load that keeps the world (models, materials, load cuts) | screenshots main vs branch, `tools/frametime.py`; for a load cut, the world after load compared with main's | seeded checks |
@@ -165,6 +181,7 @@ things are done, and why a rule exists, is in the files it points to:
 
 | check | line | symptom | issue |
 |---|---|---|---|
+| stops, load10 | 9 seed 2; 17 `load10` seed 5 | one brake-to-drive change with nothing in front, 1.7 m before the stop point (Klamovka s 6087; Strossmayerovo náměstí s 16329) | #756 |
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
 
 ## Code and docs
