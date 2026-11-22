@@ -295,7 +295,11 @@ Sections:
   Where numeric DI can judge (samples off structures, an older record 0.5-1.5 m over the lidar): on paved track DI
   sides with the lidar at 71 of 76 (the 5: one 20 m stretch at (3405, -439), a record of 2006); where the construction
   is unknown at 23 of 52 (a ballast bed on its own body, small bridges nothing marks), so the rule holds on paved
-  track only. `archive_before_lidar`: network-wide it moves Bertramka (445 m of track) and one track at Letenské
+  track only. Under the lidar the same holds with a smaller margin: where an older record lies 0.2-1.5 m under it on
+  paved track, DI lies with the lidar at 694 of 725 samples (within 0.1 m of it at 90 %, median -0.1 cm), and at 176 of
+  184 even where the survey agrees with the archive; on track of unknown construction DI lies with the lidar too (868 of
+  871) but over it by a ballast bed's height (median +5 cm, p90 +23 cm), so the rule keeps to paved track both ways.
+  `archive_before_lidar`: network-wide the over side moves Bertramka (445 m of track) and one track at Letenské
   náměstí (a record of 2013 on a 1.0 m plateau for 25 m beside a track on the lidar; the user, 2026-11-22: "both track
   at the same height ... there shouldn't be 1m step anywhere near").
 - **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
