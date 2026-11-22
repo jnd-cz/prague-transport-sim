@@ -25,7 +25,8 @@ function bodyTo(route, p) {
 }
 
 export async function run(seed = 1, opts = {}) {
-  const { trip = 40, chunk = 400, weather = 'dry' } = opts;
+  // (opts.stopAt: end where our tram reaches this route s, a replay of the moment, ?seed=N&at=S; opts.progress: a line per chunk)
+  const { trip = 40, chunk = 400, weather = 'dry', stopAt = Infinity, progress = () => {} } = opts;
   window.runSeed = seed >>> 0; // the run's seeded stream (src/random.js)
   const $ = (id) => document.getElementById(id);
   $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
@@ -67,7 +68,7 @@ export async function run(seed = 1, opts = {}) {
   await new Promise((resolve) => {
     const tick = () => {
       for (let k = 0; k < chunk; k++) {
-        if (game.finished || game.tram.s > game.route.length - 5) { R.done = true; break; }
+        if (game.finished || game.tram.s > game.route.length - 5 || game.tram.s >= stopAt) { R.done = true; break; }
         const alsoBefore = also.map((w) => w.before());
         // (headless nothing moves the camera: keep it at the cab for the once-a-second draw; the cars spawn round the
         // tram's front whatever it shows, traffic.focus, #722)
@@ -78,7 +79,8 @@ export async function run(seed = 1, opts = {}) {
         // line (lane.light.back before the lane end, up to 40 m), else at the junction's entry)
         const lit = new Map(traffic.cars.filter((c) => c.active && !c.conn && c.lane?.light).map((c) => [c, { lane: c.lane, a: traffic.lightAspect(c.lane.light), go: c.lightGo === c.lane, v: c.vNow, age: c._age = (c._lane === c.lane ? (c._age || 0) + 1 : 0), spawnedOn: c._spawnLane === c.lane, front: c.toEnd - c.lane.light.back - 3.2 }]));
         for (const c of traffic.cars) { if (c.active && c._lane !== c.lane) { if (c._lane === undefined || c.id !== c._id) { c._spawnLane = c.lane; c._spawnS = c.s; } c._lane = c.lane; c._id = c.id; } }
-        pilot.step(game, h); game.update(h, pilot.input); traffic.update(h, camera); R.steps++;
+        const focus = traffic.focus(); // (where the step begins, as the camera above)
+        pilot.step(game, h); game.update(h, pilot.input); traffic.update(h, camera, true, focus); R.steps++;
         also.forEach((w, i) => w.after(alsoBefore[i]));
         for (const [c, b] of lit) {
           if (!c.conn && c.lane === b.lane && b.front > -0.5 && c.toEnd - b.lane.light.back - 3.2 <= -0.5) c._atLine = { lane: b.lane, a: traffic.lightAspect(b.lane.light), go: c.lightGo === b.lane };
@@ -155,6 +157,7 @@ export async function run(seed = 1, opts = {}) {
         }
       }
       R.tramS = Math.round(game.tram.s);
+      progress(`drive: ${Math.round(game.clock)} s, s ${R.tramS}, stop ${game.nextStop}`);
       if ((R.stuck = stuck()) !== null) { R.done = true; R.stuckScene = stuckScene(game, traffic, pilot); }
       if (!R.done) setTimeout(tick, 0);
       else resolve();

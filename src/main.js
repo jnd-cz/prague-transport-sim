@@ -1156,23 +1156,25 @@ function frame(now) {
     // (inspecting: several game steps per frame, or none while paused)
     const steps = inspect.active ? inspect.steps(span) : fixedSteps(span);
     input.deadman = shiftHeld || pad.active;
+    let focus = null; // (the traffic's focus where the step began, src/traffic.js update)
     steps.forEach((h, i) => {
       const lastStep = i === steps.length - 1;
       sWas = tram.s;
+      focus = traffic.focus();
       if (pedalKey && !pilot && !game.paused && (pedalKey.t += h) > 0.35) tram.eq.hold(pedalKey.dir, h);
       if (pilot && !game.paused && !game.finished) pilot.step(game, h);
       if (!game.paused && !game.finished) simmed += h;
       game.update(h, pilot ? pilot.input : input);
       // (the traffic steps with the tram, as in the checks; posed for drawing on the frame's last step only,
       // which outside inspect mode runs after the camera has moved, below)
-      if ((inspect.active || !lastStep) && !game.paused && !game.finished) traffic.update(h, camera, inspect.active && lastStep);
+      if ((inspect.active || !lastStep) && !game.paused && !game.finished) traffic.update(h, camera, inspect.active && lastStep, focus);
     });
     game.updateVisuals();
     updateCamera(dt, now / 1000);
     if (inspect.active) inspect.update(dt);
     updateRain(dt);
     updateSnow(dt, now / 1000);
-    if (!inspect.active && !game.paused && !game.finished && steps.length) traffic.update(steps[steps.length - 1], camera);
+    if (!inspect.active && !game.paused && !game.finished && steps.length) traffic.update(steps[steps.length - 1], camera, true, focus);
     // The shift may have finished during game.update().
     if (game.finished) audio.setActive(false, !inMenu && !game.paused && !(inspect.active && inspect.paused));
     audio.update(tram, game.currentLimit, dt);

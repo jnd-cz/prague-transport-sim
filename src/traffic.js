@@ -394,9 +394,11 @@ export class Traffic {
   // draw: false for a step whose result is not shown (inspect mode runs several steps per frame):
   // cars and walkers move but are not posed (their height and matrices wait for the drawn step). `view`: the camera,
   // for what only the drawing reads (an AI tram's detailed model near it); nothing the run does depends on it.
-  update(dt, view, draw = true) {
+  // `focus`: the focus where the step began, taken before the game's step (the page and the benches do: they set the
+  // camera at the cab before it, and a focus after it, 0.3 m on at 10 m/s, gave another run of the seed).
+  update(dt, view, draw = true, focus = this.focus()) {
     const tram = this.game.tram;
-    const [cx, cy] = this.focus();
+    const [cx, cy] = focus;
     this.cam = view ? [view.position.x, -view.position.z] : [cx, cy];
     this._carsOnTracks();
     this._updateRoadCars(dt, cx, cy, draw);
