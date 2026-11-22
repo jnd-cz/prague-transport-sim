@@ -8,13 +8,13 @@ import { groundStyles } from './groundDraw.js';
 import { fetchGround, GroundTiles, WINDOW_AHEAD, WINDOW_STEP } from './groundFile.js';
 import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
-import { Game, fmtTime, fmtDev } from './game.js';
+import { fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
 import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor, soundPacksFor } from './vehicles.js';
-import { Traffic } from './traffic.js';
 import { Autopilot } from './autopilot.js';
+import { createRun } from './run.js';
 import { junctionTurns, indicating } from './indicators.js';
 import { signalsAt } from './lamps.js';
 import { Inspect } from './inspect.js';
@@ -483,6 +483,7 @@ const audio = new TramAudio();
 let tram = new Tram();
 let game = null;
 let traffic = null;
+let run = null; // the shift's run (src/run.js): its game, traffic, autopilot and tram, stepped each frame
 let pilot = null; // autopilot driving the tram (watch the ride), or null
 // our tram's lamps (#436): the indicators ('left', 'right', 'hazard' or none: the driver's switch, the autopilot's
 // own while it drives), the high beams (latched on, or held for a flash); the line's junction turns and the
@@ -552,22 +553,41 @@ function fillTrips() {
 selStop.addEventListener('change', fillTrips);
 fillTrips();
 
+// The run's options from the menu (#226): what start() and src/run.js createRun read; a bench starts a run with its own
+// over these (window.startRun), as clicking Start with the menu set that way
+function menuOpts() {
+  return {
+    vehicle: $('optModel').value, sounds: $('optSounds').value,
+    cars: $('optCars').value === 'auto' ? lineCars : +$('optCars').value,
+    controls: controlMode(), weather: $('optWeather').value, temp: $('optTemp').value,
+    trip: +selTrip.value, startStop: +selStop.value,
+    assist: $('optAssist').checked, deadman: $('optDeadman').checked, autoSwitch: $('optAutoSwitch').checked,
+    obstacles: $('optObst').value, autopilot: $('optAuto').checked,
+  };
+}
 $('btnStart').addEventListener('click', () => start());
+// a bench's shift (#226): the menu's options with the bench's over them (seed, trip, startStop, weather, temp, obstacles,
+// autopilot, ...), started as Start starts it; the run returned
+window.startRun = async (opts = {}) => {
+  const o = { ...menuOpts(), ...opts };
+  // (a trip past the timetable as the menu took it: its select had no such option and read as trip 0. The drives ask
+  // for trip 40; line 23 has 19 trips, so its drives have always run trip 0, and still do)
+  if (!(o.trip >= 0 && o.trip < data.timetable.length)) o.trip = 0;
+  await start({}, o);
+  return run;
+};
 
-// extra: Game options over the menu's (the performance test's lead to the departure)
-async function start(extra = {}) {
-  await useVehicle($('optModel').value);
+// extra: Game options over the menu's (the performance test's lead to the departure); o: the run's options (menuOpts)
+async function start(extra = {}, o = menuOpts()) {
+  await useVehicle(o.vehicle);
   audio.start();
   await figureFont;   // after audio.start: the click's activation unlocks the audio
   // the sound pack picked for the vehicle (#528, #636), the built-in sounds where none is
-  try { await audio.usePack(soundsFor(pickVehicle($('optModel').value), $('optSounds').value)); } catch (e) { console.warn('sound pack not loaded: the built-in sounds play', e); await audio.usePack(null); }
-  const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
-  tram = new Tram(cars);
+  try { await audio.usePack(soundsFor(pickVehicle(o.vehicle), o.sounds)); } catch (e) { console.warn('sound pack not loaded: the built-in sounds play', e); await audio.usePack(null); }
+  const { cars, vehicle } = o;
   zoom = zoomTarget = 1;
-  tram.eq.mode = controlMode();
-  const vehicle = $('optModel').value;
-  // one seeded stream for the whole run (rules and traffic), apart from Math.random
-  const seed = runSeed(), random = rng(seed);
+  // the run's seed: the bench's, else ?seed=N, window.runSeed or a fresh one (src/random.js)
+  const seed = o.seed ?? runSeed();
   const dealer = fleetDealer(vehicle, seed), ours = ourSet(dealer, vehicle, cars);
   if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id
     || String(tramModel.userData.fleet) !== String(ours.numbers) || tramModel.userData.livery !== (ours.livery ?? null)) {
@@ -577,43 +597,26 @@ async function start(extra = {}) {
     scene.add(tramModel);
   }
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
-  const weather = $('optWeather').value;
-  applyWeather(weather);
+  if (traffic) traffic.dispose();
+  applyWeather(o.weather);
   sWas = null; carry = 0; // (the steps start afresh with the shift: fixedSteps, drawnS)
-  game = new Game(scene, data, route, tram, audio, {
-    weather,
-    tripIndex: +selTrip.value,
-    startStop: +selStop.value,
-    assist: $('optAssist').checked,
-    deadman: $('optDeadman').checked,
-    // onboard computer sets every switch by radio (no overhead contacts to work)
-    autoSwitch: $('optAutoSwitch').checked,
-    autoIrc: $('optAutoSwitch').checked,
-    obstacles: $('optObst').value,
-    toutAt: outdoorTemperature($('optTemp').value),
-    vehicle: $('optModel').value,
-    dealer,
-    seed: Math.floor(random() * 1e9),
-    substations: truth.substations?.list,
-    speedFacts: speedFacts(truth),
-    signFacts: signFacts(truth),
-    ...extra,
+  run = createRun({ scene, data, route, ground, audio }, {
+    ...o, seed, dealer, toutAt: outdoorTemperature(o.temp), extra,
+    facts: { substations: truth.substations?.list, speedFacts: speedFacts(truth), signFacts: signFacts(truth) },
   });
-  game.runSeed = seed; // (replay: ?seed=N)
-  perfLog.reset({ line: data.line, model: tramModel.userData.vehicle, cars, weather, controls: tram.eq.mode, autopilot: $('optAuto').checked });
+  ({ game, traffic, tram } = run);
+  pilot = run.pilot;
+  perfLog.reset({ line: data.line, model: tramModel.userData.vehicle, cars, weather: o.weather, controls: tram.eq.mode, autopilot: o.autopilot });
   // the line number shown on the tram, the top bar and in messages follows the run
   const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l, game.destination, runNumber(game.opts.tripIndex)); };
   showLine(game.line);
   game.onLineChange = showLine;
-  if (traffic) traffic.dispose();
-  traffic = new Traffic(scene, data, route, ground, game, random);
   debugOverlay.reset();
   Object.assign(lamps, { indicate: null, high: false, held: false, turns: junctionTurns(route, data.switches), kerb: game.stops.filter((st) => st.vienna).map((st) => st.target) });
   game.lamps = lamps; // (the console and tests: the junction turns and kerb stops found, the lamps' state)
-  pilot = $('optAuto').checked ? new Autopilot() : null;
-  game.autopilot = !!pilot;
   pedalKey = null;
   window.game = game; // handy for debugging from the console
+  window.run = run;
   window.hud = hud; // (its cost measured: tools/bench/hud.py)
   game.provenance = { files: built, fallbacks: () => fallbacks(built) }; // where each list came from (#10)
   game.mirror = mirror.stats;
@@ -1156,25 +1159,23 @@ function frame(now) {
     // (inspecting: several game steps per frame, or none while paused)
     const steps = inspect.active ? inspect.steps(span) : fixedSteps(span);
     input.deadman = shiftHeld || pad.active;
-    let focus = null; // (the traffic's focus where the step began, src/traffic.js update)
+    let step = null; // (the frame's last step's game half: its traffic's focus, src/run.js)
     steps.forEach((h, i) => {
       const lastStep = i === steps.length - 1;
       sWas = tram.s;
-      focus = traffic.focus();
       if (pedalKey && !pilot && !game.paused && (pedalKey.t += h) > 0.35) tram.eq.hold(pedalKey.dir, h);
-      if (pilot && !game.paused && !game.finished) pilot.step(game, h);
       if (!game.paused && !game.finished) simmed += h;
-      game.update(h, pilot ? pilot.input : input);
+      step = run.stepGame(h, input, pilot);
       // (the traffic steps with the tram, as in the checks; posed for drawing on the frame's last step only,
       // which outside inspect mode runs after the camera has moved, below)
-      if ((inspect.active || !lastStep) && !game.paused && !game.finished) traffic.update(h, camera, inspect.active && lastStep, focus);
+      if (inspect.active || !lastStep) run.stepTraffic(step, camera, inspect.active && lastStep);
     });
     game.updateVisuals();
     updateCamera(dt, now / 1000);
     if (inspect.active) inspect.update(dt);
     updateRain(dt);
     updateSnow(dt, now / 1000);
-    if (!inspect.active && !game.paused && !game.finished && steps.length) traffic.update(steps[steps.length - 1], camera, true, focus);
+    if (!inspect.active && step) run.stepTraffic(step, camera);
     // The shift may have finished during game.update().
     if (game.finished) audio.setActive(false, !inMenu && !game.paused && !(inspect.active && inspect.paused));
     audio.update(tram, game.currentLimit, dt);

@@ -85,6 +85,11 @@ Simulating a whole city at full detail won't be playable. Use three tiers with c
 
 ## 4. Separate the simulation core from rendering
 
+Where it stands: a run is built from a plain options object and stepped by one loop (`src/run.js`
+`createRun`, `run.step`, #226), which the page and the benches share; the page steps it at a fixed
+1/30 s with the rest carried over, and the traffic lives round the tram, not the camera (#722). The
+game and the traffic still make their own meshes.
+
 - **A fixed-step, deterministic core** with no Three.js inside it, and seeded random numbers
   everywhere (the benches depend on that; `Math.random` must not leak into the simulation).
 - **State in flat typed arrays** (structure of arrays) for the numerous things: cars, walkers,

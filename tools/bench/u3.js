@@ -7,7 +7,6 @@
 // tram's stopping distance (v²/2 + 10 m at 1 m/s2) while it moved faster than 2 m/s (of them bold);
 // bells = the autopilot's bell; hits = collisions with crossing cars.
 import { stuckWatch, stuckScene } from './stuck.js';
-import { startShift } from './shift.js';
 
 const CAR_FRONT = 2.2; // a car's front bumper ahead of its position (its middle), as traffic.js CAR_HALF
 // #602: a car's body (src/models.js: 1.8 x 4.3 m) against both tracks. FOUL: a tram's half width (1.25 m) with its swing in a
@@ -27,21 +26,16 @@ function bodyTo(route, p) {
 export async function run(seed = 1, opts = {}) {
   // (opts.stopAt: end where our tram reaches this route s, a replay of the moment, ?seed=N&at=S; opts.progress: a line per chunk)
   const { trip = 40, chunk = 400, weather = 'dry', stopAt = Infinity, progress = () => {} } = opts;
-  window.runSeed = seed >>> 0; // the run's seeded stream (src/random.js)
-  const $ = (id) => document.getElementById(id);
-  $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
-  // (nothing from the real weather: the menu's default temperature is today's Prague forecast, which sets
-  // the autopilot's heaters and flap, #205; autumn as tools/traffic_lint.js)
-  $('selTrip').value = String(trip); $('optWeather').value = weather; $('optObst').value = 'normal'; $('optTemp').value = 'autumn';
   window.headless = true;
-  const game = await startShift(), traffic = window.traffic, camera = window.camera;
-  const { Autopilot } = await import('/src/autopilot.js');
-  const pilot = new Autopilot();
+  // the run (src/run.js, #226): its seeded stream, the first stop, the autopilot driving; nothing from the real weather:
+  // the menu's default temperature is today's Prague forecast, which sets the autopilot's heaters and flap (#205)
+  const run = await window.startRun({ seed: seed >>> 0, startStop: 0, trip, weather, obstacles: 'normal', temp: 'autumn', autopilot: true });
+  const { game, traffic, pilot } = run, camera = window.camera;
   game.pilot = pilot; // (for the watchers: what it stops for, tools/bench/stops.js)
   const stuck = stuckWatch(game);
   // (other checks' watchers along on the same drive, opts.also: [(game, traffic) => watcher], #205)
   const also = (opts.also || []).map((make) => make(game, traffic));
-  game.autopilot = true; game.paused = false;
+  game.paused = false;
   const R = window._u3 = { seed, steps: 0, done: false, bells: 0, hits: [], cuts: [] };
   const yielded = new Set(), crossed = new Set(), cut = new Set();
   const ring = game.ringBell.bind(game);
@@ -79,8 +73,7 @@ export async function run(seed = 1, opts = {}) {
         // line (lane.light.back before the lane end, up to 40 m), else at the junction's entry)
         const lit = new Map(traffic.cars.filter((c) => c.active && !c.conn && c.lane?.light).map((c) => [c, { lane: c.lane, a: traffic.lightAspect(c.lane.light), go: c.lightGo === c.lane, v: c.vNow, age: c._age = (c._lane === c.lane ? (c._age || 0) + 1 : 0), spawnedOn: c._spawnLane === c.lane, front: c.toEnd - c.lane.light.back - 3.2 }]));
         for (const c of traffic.cars) { if (c.active && c._lane !== c.lane) { if (c._lane === undefined || c.id !== c._id) { c._spawnLane = c.lane; c._spawnS = c.s; } c._lane = c.lane; c._id = c.id; } }
-        const focus = traffic.focus(); // (where the step begins, as the camera above)
-        pilot.step(game, h); game.update(h, pilot.input); traffic.update(h, camera, true, focus); R.steps++;
+        run.step(h, null, camera); R.steps++;
         also.forEach((w, i) => w.after(alsoBefore[i]));
         for (const [c, b] of lit) {
           if (!c.conn && c.lane === b.lane && b.front > -0.5 && c.toEnd - b.lane.light.back - 3.2 <= -0.5) c._atLine = { lane: b.lane, a: traffic.lightAspect(b.lane.light), go: c.lightGo === b.lane };
