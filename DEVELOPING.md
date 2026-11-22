@@ -561,6 +561,25 @@ the pinned #291 and only proposes.
   with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
 - Each job prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
   (`tools/sysinfo.py`). `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
+- A job in its own turn watches itself (#815; on 2026-11-22 a trace expected to take 5 min ran 100 min and held
+  17 GB against the 6 it declared, and the job behind it waited 26 min). Once a minute it reads its process tree
+  (`HeavyJob.verdict` has the rules): past 2× its expected time it warns, and it will end past 4× and 30 min over
+  it once a week of history has calibrated the rule (`HeavyJob.TIME_ENDS`; `heavy.py --history` shows each
+  kind's spread); over its share's memory it warns at 1.25× and ends at 2×, or at 1× with under 4 GB free on the
+  machine (a job alone: under 4 GB free), seen at two looks in a row; with its processes under 2 s of CPU in
+  10 min, or the process that started it gone, it ends. A warning goes on its ticket, which the board and a
+  waiting job's line show (`…, running 100 min, expected 5 (shared: 6 GB, 4 cores): LATE ×20; 17 of 6 GB`), and
+  once into the job's output. Ending stops everything the job started (on Windows a Job Object: a stopped
+  `heavy.py` stops its command too), exits 86 and prints one line: what, how long, how much against what. The
+  board lists the jobs a watch ended in the last hour. The expected time is `heavy.py --expect`, what
+  `headless.py` plans from its runs' times, or the median of the same kind's last full runs (a command's script
+  and its option names) in `history.jsonl` beside the tickets. `--no-limit` (`TRAM_HEAVY_NOLIMIT=1`) keeps the
+  warnings and ends nothing. A job waiting behind one that watches itself gives it 20 min before calling it stuck.
+- A stopped background task can leave its job running: when the command ended in a Git Bash program (`bash
+  chain.sh`), bash handed its process over to it, and the stop kills a pid that is gone (measured 2026-11-22: the
+  chain's shells and its python ran on, their parents unchanged; with the outer shell alive the stop ends the
+  whole tree). `python -I tools/heavy.py --stop PID` asks such a job to end with what it started; a job of
+  another checkout only with `--force`.
 
 **Stacked work:** an issue that needs another branch's unmerged work branches from it and opens its PR with
 `--base` on that branch. Before the base's PR merges, move the stacked PR onto main (`gh pr edit N --base main`):

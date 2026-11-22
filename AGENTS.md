@@ -138,6 +138,8 @@ things are done, and why a rule exists, is in the files it points to:
   `heavy.py`). Count runs and builds (`headless.py`, `rebuild.py`, `ground_mesh.py`, `city_terrain.py`,
   `heavy.py --shared GB,CORES` for pictures and the like) run beside each other while their memory and cores
   fit (the user, 2026-11-19, #728). A wait that ends with "does nothing" names a stuck job: look at that one.
+  A job watches itself and ends with the reason (exit 86) when it is idle, orphaned or over twice its memory
+  (#815); after stopping a background task, `heavy.py --stop PID` ends a job it left running.
 - **The heaviest work runs at night** (22:00 to 07:00) or on the user's word (the user, 2026-11-21): a rebuild of
   every line, a seeded compare of every line, a checkpoint's run. By day a session runs the place loop, the tools' tests and
   one-line runs, and leaves the night's jobs queued with what they are to prove.

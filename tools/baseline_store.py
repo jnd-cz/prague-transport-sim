@@ -18,7 +18,9 @@ full nightly run, and autodeploy would skip measuring it.
 
 Heavy jobs (headless.py, rebuild.py, frametime.py) queue for the machine with a ticket in the system temp
 folder (`HeavyJob`, #280): a timing runs alone, count runs and builds side by side while their memory and
-cores fit (#728); the nightly measurement does not start while any job waits or runs.
+cores fit (#728); the nightly measurement does not start while any job waits or runs. A job holding its turn
+watches itself (#815): far too long, over its memory, idle or orphaned, it ends with the reason, and everything it
+started ends with it. Finished jobs go into a history beside the tickets, from which a job's expected time comes.
 """
 import ctypes
 import hashlib
@@ -26,9 +28,12 @@ import json
 import os
 import re
 import shutil
+import signal
+import statistics
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -358,6 +363,182 @@ def _free_gb():
     return sysinfo.available_gb()
 
 
+ENDED = 86  # (the exit code of a job its own watch ended, #815)
+NOLIMIT = "TRAM_HEAVY_NOLIMIT"  # (=1: a job's watch warns but ends nothing; heavy.py --no-limit)
+
+
+def history_path():
+    return os.path.join(LOCKS, "history.jsonl")
+
+
+def history(path=None):
+    """The machine's finished heavy jobs, oldest first (#815): dicts with kind, what, root, t (when it started to run),
+    wall and cpu (s), gb (the most its processes held at a look), commit (Windows: the Job Object's peak commit, GB),
+    expect (s or None), rc (None: not known) and ended (why its watch ended it, or None)."""
+    out = []
+    try:
+        with open(path or history_path(), encoding="utf-8") as f:
+            for line in f:
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    pass  # (a line cut by a crash)
+    except OSError:
+        pass
+    return out
+
+
+def _append(rec):
+    os.makedirs(LOCKS, exist_ok=True)
+    with open(history_path(), "a", encoding="utf-8", newline="\n") as f:  # (one write: appends do not interleave)
+        f.write(json.dumps(rec) + "\n")
+
+
+def expected(kind, records=None, last=10, least=3, shortest=60.0):
+    """A job's expected wall time from the history: the median of the last `last` runs of the same kind that ran to
+    their end (exit 0 or not known, not ended by a watch, at least `shortest` s: a heavy job's shorter run failed
+    early); None with fewer than `least` of them."""
+    walls = [r["wall"] for r in (history() if records is None else records)
+             if r.get("kind") == kind and r.get("rc") in (0, None) and not r.get("ended") and r.get("wall", 0) >= shortest]
+    walls = walls[-last:]
+    return statistics.median(walls) if len(walls) >= least else None
+
+
+def recent_ends(now=None, within=3600.0, records=None):
+    """The jobs a watch ended in the last `within` s, oldest first (tools/board.py shows them)."""
+    now = time.time() if now is None else now
+    return [r for r in (history() if records is None else records)
+            if r.get("ended") and now - (r.get("t", 0) + r.get("wall", 0)) <= within]
+
+
+SCRIPTS = (".py", ".sh", ".js", ".ps1")
+
+
+def kind_of(argv):
+    """A command's kind in the history: the script it runs (else its program) and the names of its options, without
+    their values or the positional arguments, e.g. 'ground_place.py --all --rings' (#815)."""
+    argv = [str(a) for a in argv]
+    at = next((i for i, a in enumerate(argv) if os.path.splitext(a)[1].lower() in SCRIPTS), None)
+    head = os.path.basename(argv[at if at is not None else 0]) if argv else "?"
+    if at is None and head.lower().endswith(".exe"):
+        head = head[:-4]
+    flags = sorted({a.split("=", 1)[0] for a in argv[(at if at is not None else 0) + 1:] if a.startswith("--") and len(a) > 2})
+    return " ".join([head, *flags])
+
+
+def seconds(text):
+    """'90s', '20m', '1.5h' or plain minutes ('20') as seconds; None when it is none of them."""
+    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([smh]?)\s*", str(text))
+    return float(m[1]) * {"s": 1, "m": 60, "": 60, "h": 3600}[m[2]] if m and float(m[1]) > 0 else None
+
+
+class _BasicLimits(ctypes.Structure):  # (JOBOBJECT_BASIC_LIMIT_INFORMATION)
+    _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                ("LimitFlags", ctypes.c_ulong), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", ctypes.c_ulong),
+                ("Affinity", ctypes.c_size_t), ("PriorityClass", ctypes.c_ulong), ("SchedulingClass", ctypes.c_ulong)]
+
+
+class _Limits(ctypes.Structure):  # (JOBOBJECT_EXTENDED_LIMIT_INFORMATION)
+    _fields_ = [("basic", _BasicLimits), ("io", ctypes.c_uint64 * 6), ("ProcessMemoryLimit", ctypes.c_size_t),
+                ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+
+class _Accounting(ctypes.Structure):  # (JOBOBJECT_BASIC_ACCOUNTING_INFORMATION: times in 100 ns)
+    _fields_ = [("TotalUserTime", ctypes.c_int64), ("TotalKernelTime", ctypes.c_int64),
+                ("ThisPeriodTotalUserTime", ctypes.c_int64), ("ThisPeriodTotalKernelTime", ctypes.c_int64),
+                ("TotalPageFaultCount", ctypes.c_ulong), ("TotalProcesses", ctypes.c_ulong),
+                ("ActiveProcesses", ctypes.c_ulong), ("TotalTerminatedProcesses", ctypes.c_ulong)]
+
+
+_JOB = None  # (Windows: the Job Object this process runs in with everything it starts, contain(); a handle)
+_K32 = None
+
+
+def _k32():
+    global _K32
+    if _K32 is None:
+        k = ctypes.WinDLL("kernel32", use_last_error=True)  # (its own: the types set here are not windll's for everyone)
+        k.CreateJobObjectW.restype = ctypes.c_void_p
+        k.GetCurrentProcess.restype = ctypes.c_void_p
+        for f in (k.SetInformationJobObject, k.QueryInformationJobObject):
+            f.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_ulong] + (
+                [ctypes.c_void_p] if f is k.QueryInformationJobObject else [])
+        k.AssignProcessToJobObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        k.TerminateJobObject.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+        _K32 = k
+    return _K32
+
+
+def contain():
+    """Puts this process, and so everything it starts from now on, in a Job Object that ends them all when its last
+    handle closes: at this process's end, however it comes (#815: a stopped wrapper left its command running). Windows
+    only, once a process; None elsewhere or where the system refuses it, and end_tree() then walks the process table."""
+    global _JOB
+    if _JOB is not None or os.name != "nt":
+        return _JOB
+    k = _k32()
+    h = k.CreateJobObjectW(None, None)  # (not inherited: only this process holds it, so its end closes the job)
+    if not h:
+        return None
+    lim = _Limits()
+    lim.basic.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    if not (k.SetInformationJobObject(h, 9, ctypes.byref(lim), ctypes.sizeof(lim))  # JobObjectExtendedLimitInformation
+            and k.AssignProcessToJobObject(h, k.GetCurrentProcess())):
+        k.CloseHandle(ctypes.c_void_p(h))
+        return None
+    _JOB = h
+    return _JOB
+
+
+def job_totals():
+    """(CPU seconds of every process the job has held, ended ones too; the job's peak commit in GB) of contain()'s Job
+    Object; None without one."""
+    if _JOB is None:
+        return None
+    k, acc, lim = _k32(), _Accounting(), _Limits()
+    if not (k.QueryInformationJobObject(_JOB, 1, ctypes.byref(acc), ctypes.sizeof(acc), None)
+            and k.QueryInformationJobObject(_JOB, 9, ctypes.byref(lim), ctypes.sizeof(lim), None)):
+        return None
+    return (acc.TotalUserTime + acc.TotalKernelTime) / 1e7, lim.PeakJobMemoryUsed / 1e9
+
+
+def descendants(pid, table=None):
+    """The pids of everything `pid` started that still runs, parents before their children (a child older than its
+    parent is not that process's: Windows keeps a dead parent's pid, which may be reused)."""
+    table = processes() if table is None else table
+    kids = {}
+    for p, q in table.items():
+        kids.setdefault(q, []).append(p)
+    top = _process(pid)
+    out, seen, todo = [], {pid}, [(pid, top[0] if top else 0)]
+    while todo and len(seen) < 4096:
+        p, made = todo.pop(0)
+        for c in kids.get(p, ()):
+            if c in seen:
+                continue
+            seen.add(c)
+            if (u := _process(c)) and u[0] >= made:
+                out.append(c)
+                todo.append((c, u[0]))
+    return out
+
+
+def end_tree(code):
+    """Ends this process and everything it started with exit code `code`: the Job Object at once where contain() made
+    one, else each process found under this one in the process table (children last first), then this one."""
+    if _JOB is not None:
+        _k32().TerminateJobObject(_JOB, code)  # (this process is in it: it ends here too)
+    else:
+        for pid in reversed(descendants(os.getpid())):
+            try:
+                os.kill(pid, getattr(signal, "SIGKILL", signal.SIGTERM))  # (Windows: TerminateProcess)
+            except OSError:
+                pass
+    os._exit(code)
+
+
 class Stuck(SystemExit):
     """A wait ended: the job ahead does nothing (HeavyJob.IDLE). Exits with its message and code 1 when not caught."""
 
@@ -378,42 +559,193 @@ class HeavyJob:
     ticket without a share (an older checkout's too) is a job alone. TRAM_HEAVY_NOWAIT=1 runs a job at once beside the
     others (it still shows in the queue). A job that waits IDLE s behind a running one whose processes use no CPU
     ends with an error (Stuck) instead of waiting for good (#585: a night lost behind a job waiting for its own
-    child)."""
+    child).
+
+    A job in its own turn (not a step in another's) watches itself from the start of its run (#815; the user,
+    2026-11-22: "so that one misbehaving process doesn't hold up the queue"). Every EVERY s it reads its process tree
+    and the machine (verdict() has the rules: time against its expected time, memory against its share, idle,
+    orphaned); a warning goes on its ticket and once to `out`, a breach ends it with one line saying what, how long
+    and how much, and everything it started ends with it (contain(), end_tree(), exit ENDED). A request from
+    `heavy.py --stop PID` ends it the same way. TRAM_HEAVY_NOLIMIT=1 (limits=False) keeps the warnings and ends
+    nothing. Its end, with its time, CPU and peak memory, goes into history(), from which expected() gives the next
+    run of the same kind its time."""
     POLL = 5.0
     TELL = 300.0  # (seconds between "still waiting" lines)
     KEEP = 8.0  # (GB left free beside shared jobs: city_terrain.py stops itself under 6, ground_mesh.py under 4)
     IDLE, IDLE_CPU, LOOK = 600.0, 2.0, 60.0  # (a job ahead does nothing: under IDLE_CPU s of CPU in IDLE s, read every LOOK s)
     CORES = os.cpu_count() or 2
     FREE = staticmethod(_free_gb)  # (the machine's free memory in GB, None if unknown: a test's own)
+    WATCH = True  # (a job in its own turn watches itself; a test's own may not)
+    EVERY, TICK = 60.0, 5.0  # (its tree read every EVERY s; a stop request looked for every TICK s)
+    LATE = (2.0, 4.0, 1800.0)  # (warns past 2× its expected time; ends past 4× and at least 30 min over it…)
+    TIME_ENDS = False  # (…once a week of history has calibrated the rule, #815: until then it only warns)
+    OVER = (1.25, 2.0)  # (warns over 1.25× its declared memory; ends over 2×, or over 1× with the machine short)
+    TWICE = 2  # (a memory breach ends the job when seen at this many looks in a row: not a moment's peak)
+    RECORD = 60.0  # (a run this long or longer goes into the history; shorter ones only when their watch ended them)
 
-    def __init__(self, what, wait=None, out=None, share=None):
+    def __init__(self, what, wait=None, out=None, share=None, expect=None, kind=None, limits=None):
         self.path = os.path.join(LOCKS, f"{os.getpid()}.lock")
         self.what = what
         self.share = None if share is None else {"gb": float(share.get("gb", 0)), "cores": int(share.get("cores", 1))}
         parent = os.environ.get(HELD, "")
-        nested = parent.isdigit() and int(parent) != os.getpid() and alive(int(parent))
-        self.wait = (os.environ.get("TRAM_HEAVY_NOWAIT") != "1" and not nested) if wait is None else wait
+        self.nested = parent.isdigit() and int(parent) != os.getpid() and alive(int(parent))
+        self.wait = (os.environ.get("TRAM_HEAVY_NOWAIT") != "1" and not self.nested) if wait is None else wait
         self.out = out or sys.stderr
         self.t = None
         self.state, self.since = None, None
         self.why = ""  # (what a shared job waits for beside the jobs running: "memory …", "cores …")
         self.held = None  # (HELD as __enter__ found it, put back by __exit__: a nested job's end must not end its parent's turn)
+        self.kind = kind or kind_of(sys.argv)
+        self.expect_s = expect  # (s; None: from the history when the run starts)
+        self.limits = os.environ.get(NOLIMIT) != "1" if limits is None else limits
+        self.own = False  # (holds a turn of its own: watched, recorded)
+        self.warn, self.gb, self.peak, self.cpu = "", None, 0.0, 0.0
+        self.mark, self.over = None, 0  # (idle: (when, CPU) when the CPU last moved; memory: looks in a row over)
+        self.parent, self.parent_made = None, None
+        self.ended, self.rc = None, None
+        self.lock = threading.Lock()  # (the ticket is written by the job and by its watch)
+        self.done = threading.Event()
+        self.thread = None
 
     def _write(self, state):
-        if state != self.state:
-            self.state, self.since = state, time.time()
-        tmp = f"{self.path}.{state}.tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump({"what": self.what, "root": ROOT, "pid": os.getpid(), "t": self.t, "state": state,
-                       "since": self.since, "share": self.share}, f)
-        for wait in (0.05, 0.2, 0.5, 1, 2, 0):  # (Windows refuses while a queue() in another process reads the ticket;
-            try:                                # measured 2026-11-06: a check run died at its turn, #282)
-                os.replace(tmp, self.path)
+        with self.lock:
+            if state != self.state:
+                self.state, self.since = state, time.time()
+            tmp = f"{self.path}.{state}.tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"what": self.what, "root": ROOT, "pid": os.getpid(), "t": self.t, "state": state,
+                           "since": self.since, "share": self.share, "kind": self.kind, "expect": self.expect_s,
+                           "warn": self.warn, "gb": self.gb, "watch": bool(self.thread) and self.limits,
+                           "stops": bool(self.thread)}, f)  # (watch: it ends itself; stops: heavy.py --stop reaches it)
+            for wait in (0.05, 0.2, 0.5, 1, 2, 0):  # (Windows refuses while a queue() in another process reads the
+                try:                                # ticket; measured 2026-11-06: a check run died at its turn, #282)
+                    os.replace(tmp, self.path)
+                    return
+                except PermissionError:
+                    if not wait:
+                        raise
+                    time.sleep(wait)
+
+    def expect(self, secs):
+        """A job says how long it expects to run, once it has sized itself (headless.py: its batches' times)."""
+        self.expect_s = float(secs) if secs else None
+        if self.state:
+            self._write(self.state)
+
+    def verdict(self, now, cpu, gb, free, orphan):
+        """(warnings, why the job ends or None) at `now`, from its tree's CPU seconds and GB, the machine's free GB
+        (None: unknown) and whether the process that started it is gone. Moves the idle mark and the memory count.
+
+        | rule   | warns                         | ends                                                          |
+        | time   | past LATE[0]× expected        | past LATE[1]× and LATE[2] s over it (only with TIME_ENDS)     |
+        | memory | over OVER[0]× its share's GB  | over OVER[1]×, or over 1× under KEEP / 2 free (TWICE in a row) |
+        |        | alone: under KEEP free        | alone: under KEEP / 2 free (TWICE in a row)                   |
+        | idle   | -                             | under IDLE_CPU s of CPU in IDLE s                             |
+        | orphan | -                             | the process that started it is gone                           |
+        Without limits the warnings stay and nothing ends."""
+        warns, ends, run = [], [], now - self.since
+        if self.expect_s:
+            x = run / self.expect_s
+            if x > self.LATE[0]:
+                warns.append(f"LATE ×{x:.0f}" if x >= 10 else f"LATE ×{x:.1f}")
+                if self.TIME_ENDS and x > self.LATE[1] and run - self.expect_s >= self.LATE[2]:
+                    ends.append(f"time: running {run / 60:.0f} min, expected {self.expect_s / 60:.0f}")
+        mine = self.share["gb"] if self.share else 0.0
+        short = free is not None and free < self.KEEP / 2
+        breach = None
+        if mine:
+            if gb > self.OVER[0] * mine:
+                warns.append(f"{gb:.0f} of {mine:.0f} GB")
+            if gb > self.OVER[1] * mine or (short and gb > mine):
+                breach = (f"memory: {gb:.1f} GB held, {mine:.0f} declared"
+                          + (f", {free:.1f} GB left free on the machine" if short else ""))
+        elif not self.share and free is not None and free < self.KEEP:
+            warns.append(f"{free:.0f} GB free")
+            if short:
+                breach = f"memory: {free:.1f} GB left free on the machine, {gb:.1f} GB held by this job, which runs alone"
+        self.over = self.over + 1 if breach else 0
+        if breach and self.over >= self.TWICE:
+            ends.append(breach)
+        m = self.mark
+        if m is None or cpu - m[1] >= self.IDLE_CPU or cpu < m[1]:
+            self.mark = (now, cpu)  # (a fall: a child ended and took its CPU from the sum)
+        elif now - m[0] >= self.IDLE:
+            ends.append(f"idle: {cpu - m[1]:.1f} s of CPU in {(now - m[0]) / 60:.0f} min")
+        if orphan:
+            ends.append(f"orphan: the process that started it (pid {self.parent}) is gone")
+        return warns, (ends[0] if ends and self.limits else None)
+
+    def _orphan(self):
+        """Whether the process that started this one is gone (Windows keeps its pid as this one's parent: the pid
+        no longer runs, or another process took it; an ended process whose handle another holds still reads)."""
+        if os.name != "nt":
+            return os.getppid() != self.parent
+        if self.parent_made is None:
+            return False  # (not readable at the start: not watched)
+        p = _process(self.parent)
+        return p is None or p[0] != self.parent_made or not alive(self.parent)
+
+    def stop_path(self, pid=None):
+        return os.path.join(LOCKS, f"{pid or os.getpid()}.stop")
+
+    def _watch(self):
+        last, told = time.time(), set()
+        while not self.done.wait(self.TICK):
+            now = time.time()
+            if os.path.exists(self.stop_path()):
+                self._end("stopped on request (heavy.py --stop)", hint=False)
+            if now - last < self.EVERY:
+                continue
+            last = now
+            u = usage(os.getpid())
+            if u is None:
+                continue
+            self.cpu, self.gb = max(self.cpu, u[0]), round(u[1], 2)
+            self.peak = max(self.peak, u[1])
+            warns, why = self.verdict(now, u[0], u[1], self.FREE(), self._orphan())
+            if why:
+                self._end(why)
+            kinds = {"time" if w.startswith("LATE") else "memory" for w in warns}
+            if kinds - told:  # (said once a rule: the owner reads it with the job's output)
+                told |= kinds
+                ran = f"running {(now - self.since) / 60:.0f} min"
+                exp = f", expected {self.expect_s / 60:.0f}" if self.expect_s else ""
+                mine = f", declared {self.share['gb']:.0f} GB" if self.share else ""
+                print(f"heavy jobs: {self.what} warns: {'; '.join(warns)} ({ran}{exp}{mine})", file=self.out, flush=True)
+            self.warn = "; ".join(warns)
+            self._write("running")  # (the board reads its warning and memory from the ticket)
+
+    def _end(self, why, hint=True):
+        """Ends the job and all it started: one line on `out`, its record, its ticket gone, exit ENDED."""
+        with self.lock:
+            if self.ended or self.done.is_set():
                 return
-            except PermissionError:
-                if not wait:
-                    raise
-                time.sleep(wait)
+            self.ended = why
+        now = time.time()
+        print(f"heavy jobs: {self.what} ended by its watch after {(now - self.since) / 60:.0f} min: {why}. It and "
+              f"everything it started are stopped (exit {ENDED})"
+              + ("; TRAM_HEAVY_NOLIMIT=1 or heavy.py --no-limit lets a job run past its limits." if hint else "."),
+              file=self.out, flush=True)
+        self._close(now)
+        end_tree(ENDED)
+
+    def _close(self, now):
+        """The job's record in the history (a run of RECORD s or more, or one its watch ended), its files gone."""
+        totals = job_totals()
+        wall = now - self.since
+        if self.ended or wall >= self.RECORD:
+            try:
+                _append({"kind": self.kind, "what": self.what, "root": ROOT, "t": round(self.since, 1),
+                         "wall": round(wall, 1), "cpu": round(totals[0] if totals else self.cpu, 1),
+                         "gb": round(self.peak, 2), "commit": round(totals[1], 2) if totals else None,
+                         "expect": self.expect_s and round(self.expect_s), "rc": self.rc, "ended": self.ended})
+            except OSError:
+                pass  # (a record lost is a run the expected time does not know)
+        for p in (self.path, self.stop_path()):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
 
     def room(self, jobs=None):
         """What a shared job may take beside the shared jobs running now: {"gb", "cores"}. The free memory less KEEP
@@ -465,7 +797,8 @@ class HeavyJob:
 
     def _idle(self, ahead, marks, now):
         """The running job ahead that does nothing, as (job, its CPU seconds since, the seconds watched), or None.
-        marks: {pid: (when, CPU)} of each job when first seen or when its CPU last moved (or fell: a child ended)."""
+        marks: {pid: (when, CPU)} of each job when first seen or when its CPU last moved (or fell: a child ended).
+        A job that watches itself ends itself after IDLE s (#815): it is given twice that before this wait ends."""
         table = processes()
         for j in ahead:
             if j["state"] != "running" or not (u := usage(j["pid"], table, skip=(os.getpid(),))):
@@ -473,17 +806,18 @@ class HeavyJob:
             at = marks.get(j["pid"])
             if at is None or u[0] - at[1] >= self.IDLE_CPU or u[0] < at[1]:
                 marks[j["pid"]] = (now, u[0])
-            elif now - at[0] >= self.IDLE:
+            elif now - at[0] >= self.IDLE * (2 if j.get("watch") else 1):
                 return j, u[0] - at[1], now - at[0]
         return None
 
     def __enter__(self):
         os.makedirs(LOCKS, exist_ok=True)
         self.t = time.time()
+        self.own = not self.nested
         if self.wait and (up := set(ancestors())) and (mine := [j for j in queue() if j["pid"] in up]):
             print(f"heavy jobs: {self.what} runs in the turn of {describe(mine[0])}, a process that started it",
                   file=self.out, flush=True)
-            self.wait = False
+            self.wait, self.own = False, False
         self._write("waiting" if self.wait else "running")
         told, last, marks, looked = None, 0.0, {}, 0.0
         while self.wait and (ahead := self.ahead()):
@@ -507,21 +841,41 @@ class HeavyJob:
             time.sleep(self.POLL)
         if self.wait and told:
             print(f"heavy jobs: {self.what} starts after {time.time() - self.t:.0f} s", file=self.out, flush=True)
+        if self.own and self.WATCH:
+            self.parent = os.getppid()
+            p = _process(self.parent) if os.name == "nt" else None
+            self.parent_made = p[0] if p else None
+            if self.expect_s is None:
+                self.expect_s = expected(self.kind)
+            contain()
+            self.thread = threading.Thread(target=self._watch, name="heavy-job watch", daemon=True)
         self._write("running")
+        if self.thread:
+            self.thread.start()
         self.held = os.environ.get(HELD)
         os.environ[HELD] = str(os.getpid())
         return self
 
     def __exit__(self, *exc):
+        """exc: a with statement's (type, value, traceback), or none from atexit (heavy.turn) or a direct call."""
         if os.environ.get(HELD) == str(os.getpid()):
             if self.held is None:
                 del os.environ[HELD]
             else:
                 os.environ[HELD] = self.held
-        try:
-            os.remove(self.path)
-        except OSError:
-            pass
+        with self.lock:
+            self.done.set()
+        if self.rc is None and exc:
+            e = exc[1]
+            self.rc = 0 if exc[0] is None else (e.code if isinstance(e, SystemExit) and isinstance(e.code, int)
+                                                 else 0 if isinstance(e, SystemExit) and e.code is None else 1)
+        if self.own and self.since and self.state == "running":
+            self._close(time.time())
+        else:
+            try:
+                os.remove(self.path)
+            except OSError:
+                pass
 
 
 def queue():
@@ -533,11 +887,18 @@ def queue():
         return out
     for n in os.listdir(LOCKS):
         p = os.path.join(LOCKS, n)
-        if not n.endswith(".lock"):
+        if not n.endswith((".lock", ".stop")):
             continue
         try:
             pid = int(n.split(".")[0])
         except ValueError:
+            continue
+        if n.endswith(".stop"):  # (a stop request, heavy.py --stop: dropped once its job is gone)
+            if not alive(pid):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
             continue
         if not alive(pid):
             try:
@@ -561,11 +922,15 @@ def queue():
 
 
 def describe(j, now=None):
-    """'frametime in transport-game-268, running 12 min'; a shared job: '…, running 12 min (shared: 16 GB, 8 cores)'"""
+    """'frametime in transport-game-268, running 12 min'; a shared job: '…, running 12 min (shared: 16 GB, 8 cores)';
+    one that knows its time and has a warning (#815): '…, running 100 min, expected 5 (shared: 6 GB, 4 cores): LATE
+    ×20; 17 of 6 GB'"""
     mins = max(0.0, ((now or time.time()) - j["since"]) / 60)  # (a ticket written after `now` was read: "-0 min")
     s = j.get("share")
     return (f"{j['what']} in {os.path.basename(os.path.normpath(j['root']))}, {j['state']} {mins:.0f} min"
-            + (f" (shared: {s['gb']:.0f} GB, {s['cores']} core{'s' * (s['cores'] != 1)})" if s else ""))
+            + (f", expected {j['expect'] / 60:.0f}" if j.get("expect") and j["state"] == "running" else "")
+            + (f" (shared: {s['gb']:.0f} GB, {s['cores']} core{'s' * (s['cores'] != 1)})" if s else "")
+            + (f": {j['warn']}" if j.get("warn") else ""))
 
 
 def busy():
