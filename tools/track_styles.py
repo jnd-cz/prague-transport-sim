@@ -64,6 +64,7 @@ from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 from route import Route  # noqa: E402
 import sources  # noqa: E402
+from step_inputs import there  # noqa: E402
 import track_beds  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -703,7 +704,7 @@ def main():
     data = json.loads(p.read_text(encoding="utf-8"))
     truth = json.loads((ROOT / "data" / "truth.json").read_text(encoding="utf-8"))
     dp = ROOT / "data" / f"line{line}.dtm.json"
-    dtm = json.loads(dp.read_text(encoding="utf-8")) if dp.exists() else None
+    dtm = json.loads(dp.read_text(encoding="utf-8")) if there(dp, ROOT) else None
     survey = Survey(dtm) if dtm else None
     import open_track
     opens = open_track.found(data)

@@ -38,6 +38,7 @@ from shapely.geometry import Point, Polygon
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing  # noqa: E402
 from route import Route  # noqa: E402
+from step_inputs import there  # noqa: E402
 from track_styles import RANK, ground_area  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -282,7 +283,7 @@ def main():
     p = ROOT / "data" / f"line{line}.json"
     data = json.loads(p.read_text(encoding="utf-8"))
     dp = ROOT / "data" / f"line{line}.dtm.json"
-    dtm = json.loads(dp.read_text(encoding="utf-8")) if dp.exists() else None
+    dtm = json.loads(dp.read_text(encoding="utf-8")) if there(dp, ROOT) else None
     surf = Surface(dtm) if dtm else None
     from import_track_heights import Terrain
     T = Terrain()

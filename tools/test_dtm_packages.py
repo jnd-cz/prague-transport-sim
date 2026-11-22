@@ -145,7 +145,7 @@ class Selection(unittest.TestCase):
     def test_rebuild_uses_one_pinned_month_and_shared_district_list(self):
         pin(self.root, [(DISTRICT, OLD)])
         with patch.object(rebuild, 'ROOT', str(self.root)), patch.dict(packages.DTM, {'17': [DISTRICT]}):
-            _, groups = rebuild.steps('17')
+            _, groups, _ = rebuild.steps('17')
         args = next(group[0] for group in groups if group[0][0] == 'dtm.py')
         self.assertEqual(len(args), 4)
         self.assertIn(OLD, args[-1])
@@ -261,7 +261,7 @@ class Readers(unittest.TestCase):
             self.assertEqual({p[2] for a in result['areas'] for p in a['r']},{201})
             with patch.object(rebuild, 'ROOT', str(root)), patch.dict(packages.DTM, {'17':[DISTRICT]}):
                 with self.assertLogs('dtm_packages',level='WARNING'):
-                    _, groups = rebuild.steps('17')
+                    _, groups, _ = rebuild.steps('17')
             args = next(g[0] for g in groups if g[0][0]=='dtm.py')
             self.assertEqual(len(args),4)
             self.assertIn(NEW,args[-1])

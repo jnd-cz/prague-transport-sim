@@ -80,6 +80,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing  # noqa: E402
 from cant import CANT_MAX  # noqa: E402
 from route import Route  # noqa: E402
+from step_inputs import there  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 STEP = 2.0               # m, as `cant` and `heights`
@@ -646,7 +647,7 @@ def cards(lines):
         big = [q for q in CL["places"] if abs(q["mm"]) >= CARD_MM and not q.get("di")]
         dtm_p = ROOT / "data" / f"line{line}.dtm.json"
         tris = survey_tris(json.loads(dtm_p.read_text(encoding="utf-8"))["areas"], [(q["x"], q["y"]) for q in big]) \
-            if big and dtm_p.exists() else np.zeros((0, 3, 3))
+            if big and there(dtm_p, ROOT) else np.zeros((0, 3, 3))
         out = []
         for q in big:
             a, b = rt.at(q["s"])[:2], rt.at(q["s"] + q["length"])[:2]
@@ -774,7 +775,7 @@ def main():
     truth = json.loads((ROOT / "data" / "truth.json").read_text(encoding="utf-8"))
     dtm_p = ROOT / "data" / f"line{line}.dtm.json"
     survey = None
-    if dtm_p.exists():
+    if there(dtm_p, ROOT):
         tris = survey_tris(json.loads(dtm_p.read_text(encoding="utf-8"))["areas"])
         survey = lambda x, y: sample_tris(tris, np.asarray(x, float), np.asarray(y, float))  # noqa: E731
     method = sys.argv[sys.argv.index("--fuse") + 1] if "--fuse" in sys.argv else FUSE
