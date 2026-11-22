@@ -17,13 +17,15 @@ class Flat:
         return np.full(np.shape(E), 100.0)
 
 
-def line(dips, staged, areas=()):
-    """A straight 300 m route along x; the rails 0.2 m under the ground over each (s0, s1) of `dips`; staged heights as
-    given ([s, z]); the archive named as the source throughout."""
+def line(dips, staged, areas=(), humps=()):
+    """A straight 300 m route along x; the rails 0.2 m under the ground over each (s0, s1) of `dips` and 0.5 m over it
+    over each of `humps`; staged heights as given ([s, z]); the archive named as the source throughout."""
     s = np.arange(151) * 2.0
     z = np.full(len(s), 100.0)
     for a, b in dips:
         z[(s >= a) & (s <= b)] = 99.8
+    for a, b in humps:
+        z[(s >= a) & (s <= b)] = 100.5
     d = {'path': [[0, 0], [300, 0]], 'heights': {'step': 2.0, 'path': z.tolist(), 'staged': {'path': staged}},
          'heightSource': {'path': [[0, 300, 'dtmp']]}}
     return pi.measure_data('t', d, list(areas), Flat())
@@ -55,6 +57,18 @@ class Measure(unittest.TestCase):
         self.assertEqual(line([(250, 252)], [])['runs'], [])     # (4 m)
         r = line([], [])
         self.assertEqual((r['runs'], r['under_m']), ([], 0))
+
+    def test_a_track_over_ipr_is_a_run_with_its_source_and_the_street_beside(self):
+        # (#539, line 9 at Bertramka: the archive up to 0.9 m over the lidar for 200 m, the street level across)
+        r = line([], [], [tram(40, 110, 100.3)], humps=[(50, 100)])
+        (run,) = r['over_runs']
+        self.assertEqual((run['s0'], run['s1'], run['sources'], run['sides_minus_centre']), (50, 100, ['dtmp'], 0.0))
+        self.assertAlmostEqual(run['survey_minus_ipr'], 0.3)
+        self.assertAlmostEqual(run['worst'], 0.5)
+        self.assertEqual((r['over_m'], r['over_by_source'], r['runs']), (52, {'dtmp': 52}, []))
+
+    def test_a_short_stretch_over_ipr_is_no_run(self):
+        self.assertEqual(line([], [], humps=[(50, 56)])['over_runs'], [])   # (8 m)
 
     def test_along_samples_the_route_every_step(self):
         s, xy, d = pi.along([[0, 0], [10, 0], [10, 10]], 2.0, 11)

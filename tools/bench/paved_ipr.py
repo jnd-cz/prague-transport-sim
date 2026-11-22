@@ -6,6 +6,10 @@
 Along each line's route (`path`, every heights.step), on paved track only (the styles' grass and ballast left out):
 the track's surface (top of rail less the style's lift) against IPR's 1 m bare-earth DTM at the track's centre.
 - **Runs:** where the surface lies more than UNDER under IPR for MIN_RUN m or more.
+- **Over:** where it stands more than OVER over IPR for MIN_OVER m or more (up to HIGH: a deck the build did not mark
+  stands higher): the source of the heights there, the survey against IPR, and IPR across the street (the higher of
+  its cells 4 and 6 m either side, less the centre: near 0 or over it, the street lies level with the track's IPR and
+  the track drawn over it stands on a step no street has).
 - **Left out:** our bridges (`spans`), tunnels, and samples more than DEEP under IPR, where IPR reads the ground above a
   structure (line 9 at Hlavní nádraží, line 17 under the Barrandov bridge); these are counted apart.
 - **Causes:** each run gets one, by the medians over it:
@@ -24,7 +28,8 @@ the track's surface (top of rail less the style's lift) against IPR's 1 m bare-e
   IPR across the track (`trough`: the lower side's lowest cell at 3-6 m less the centre; negative where the track
   stands higher than its sides) and the survey's class at the centre are listed with each run.
 
-Prints a table per line (paved km, metres under, p1 / p99 of surface - IPR, metres by cause) and the largest runs.
+Prints a table per line (paved km, metres under, p1 / p99 of surface - IPR, metres by cause, metres over by the
+heights' source) and the largest runs of both kinds.
 """
 import argparse
 import json
@@ -48,6 +53,9 @@ F = Frame()
 UNDER = 0.10   # m: under IPR by more than this
 MIN_RUN = 6.0  # m: for this long at least
 DEEP = 2.0     # m: deeper than this under IPR, IPR reads the ground over a structure
+OVER = 0.20    # m: over IPR by more than this (a kerbed bed's 15 cm stays out) ...
+MIN_OVER = 10.0  # m: ... for this long at least
+HIGH = 3.0     # m: higher than this over IPR is a deck
 FOLLOW = 0.05  # m: the built curve under the staged heights by more than this: it did not follow them
 NEAR = 6.0     # m: the other track's staged heights count within this
 MEASURED = {"di", "dtmp", "review", "zps"}  # (heightSource codes of a measured height, line_heights.LEVELS)
@@ -189,13 +197,42 @@ def measure_data(line, d, areas, ipr):
                          "survey_class": survey_cls.class_at(*xy[m]) if survey_cls else None,
                          "trough": round(tr, 3), "staged_n": int(len(st)), "sources": sources})
         i = j + 1
+    # over IPR: per run the heights' sources, the survey against IPR and IPR's sides against its centre
+    side = np.nanmax(np.stack([ipr.sample(*F.to_jtsk(xy[:, 0] + sg * o * nx, xy[:, 1] + sg * o * ny)).astype(float)
+                               for sg in (-1, 1) for o in (4, 6)]), axis=0) - g
+    over, over_runs = use & (diff > OVER) & (diff < HIGH), []
+    i = 0
+    while i < len(s):
+        if not over[i]:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(s) and over[j + 1]:
+            j += 1
+        if (j - i + 1) * step >= MIN_OVER:
+            k = slice(i, j + 1)
+            m = i + int(np.argmax(diff[k]))
+            tris = survey_tris(areas, near=xy[k][::3], r=3.0) if areas else np.zeros((0, 3, 3))
+            zs = sample_tris(tris, xy[k, 0], xy[k, 1]) if len(tris) else np.full(j - i + 1, np.nan)
+            over_runs.append({"line": line, "s0": float(s[i]), "s1": float(s[j]), "m": float((j - i + 1) * step),
+                              "worst": round(float(diff[m]), 3), "median": round(float(np.median(diff[k])), 3),
+                              "at": [round(float(xy[m, 0]), 1), round(float(xy[m, 1]), 1)],
+                              "sources": sorted({source_at(v) for v in (s[i], s[m], s[j])} - {None}),
+                              "survey_minus_ipr": round(float(np.nanmedian(zs - g[k])), 3) if np.isfinite(zs).any() else None,
+                              "sides_minus_centre": round(float(np.nanmedian(side[k])), 3)})
+        i = j + 1
+    over_by = {}
+    for r in over_runs:
+        over_by["/".join(r["sources"]) or "-"] = over_by.get("/".join(r["sources"]) or "-", 0) + r["m"]
     v = diff[use]
     by = {}
     for r in runs:
         by[r["cause"]] = by.get(r["cause"], 0) + r["m"]
     return {"line": line, "paved_km": round(float(paved.sum() * step) / 1000, 1), "under_m": round(sum(r["m"] for r in runs)),
             "p1": round(float(np.percentile(v, 1)), 2), "p99": round(float(np.percentile(v, 99)), 2),
-            "deep_m": round(float(deep.sum() * step)), "by_cause": {k: round(m) for k, m in sorted(by.items())}, "runs": runs}
+            "deep_m": round(float(deep.sum() * step)), "by_cause": {k: round(m) for k, m in sorted(by.items())}, "runs": runs,
+            "over_m": round(sum(r["m"] for r in over_runs)), "over_by_source": {k: round(m) for k, m in sorted(over_by.items())},
+            "over_runs": over_runs}
 
 
 def main(argv=None):
@@ -212,12 +249,22 @@ def main(argv=None):
     for r in res:
         print(f"| {r['line']} | {r['paved_km']} | {r['under_m']} m | {r['p1']:+.2f} / {r['p99']:+.2f} m | "
               + " | ".join(f"{r['by_cause'].get(c, 0)} m" for c in causes) + f" | {r['deep_m']} m |")
+    print(f"\n| line | over by >{OVER * 100:.0f} cm for {MIN_OVER:.0f} m and more | by the heights' source |")
+    print("|---|---|---|")
+    for r in res:
+        print(f"| {r['line']} | {r['over_m']} m in {len(r['over_runs'])} runs | "
+              + (", ".join(f"{k} {m} m" for k, m in sorted(r["over_by_source"].items(), key=lambda kv: -kv[1])) or "-") + " |")
     for r in res:
         print(f"\nline {r['line']}, the largest:")
         for x in sorted(r["runs"], key=lambda x: x["worst"] * x["m"])[:a.top]:
             print(f"  s {x['s0']:.0f}-{x['s1']:.0f} ({x['m']:.0f} m) at ({x['at'][0]:.0f}, {x['at'][1]:.0f}): {x['worst']:+.2f} m, {x['cause']}"
                   f" (staged ({x['staged']}) - IPR {x['staged_minus_ipr']:+.2f}, staged - built {x['staged_minus_built']:+.2f},"
                   f" survey ({x['survey_class']}) - IPR {x['survey_minus_ipr']:+.2f}, trough {x['trough']:+.2f}, {'/'.join(x['sources'])})")
+        for x in sorted(r["over_runs"], key=lambda x: -x["worst"] * x["m"])[:a.top]:
+            sv = "none" if x["survey_minus_ipr"] is None else f"{x['survey_minus_ipr']:+.2f}"
+            print(f"  over: s {x['s0']:.0f}-{x['s1']:.0f} ({x['m']:.0f} m) at ({x['at'][0]:.0f}, {x['at'][1]:.0f}): worst {x['worst']:+.2f} m, "
+                  f"median {x['median']:+.2f}; heights from {'/'.join(x['sources']) or '-'}; survey - IPR {sv}; "
+                  f"IPR's sides - centre {x['sides_minus_centre']:+.2f}")
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:
             json.dump(res, f, indent=1)
