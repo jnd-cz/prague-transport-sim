@@ -409,6 +409,17 @@ export class Traffic {
     this._clearAiTramCycles(dt);
   }
 
+  // what the steps move, for the page to draw between the last two (src/between.js): the cars in sight (posed on a
+  // drawn step: update's draw) and the other trams' cars (placed every step). The walkers (1.1-1.6 m/s, 5 cm a step)
+  // stay where the step left them.
+  movers() {
+    const out = [];
+    for (const c of this.cars) if (c.alpha > 0) out.push(c.mesh);
+    for (const t of this.ahead) out.push(...t.mesh.userData.cars);
+    for (const t of this.oncoming) out.push(...t.mesh.userData.cars);
+    return out;
+  }
+
   _carSlot() {
     let c = this.cars.find((x) => !x.active && x.alpha <= 0);
     if (!c && this.cars.length < MAX_CARS) {

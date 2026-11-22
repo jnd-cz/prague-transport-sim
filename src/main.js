@@ -14,6 +14,7 @@ import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
 import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor, soundPacksFor } from './vehicles.js';
 import { Traffic } from './traffic.js';
+import { Between } from './between.js';
 import { Autopilot } from './autopilot.js';
 import { junctionTurns, indicating } from './indicators.js';
 import { signalsAt } from './lamps.js';
@@ -579,7 +580,7 @@ async function start(extra = {}) {
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
   const weather = $('optWeather').value;
   applyWeather(weather);
-  sWas = null; carry = 0; // (the steps start afresh with the shift: fixedSteps, drawnS)
+  sWas = null; carry = 0; between.clear(); // (the steps start afresh with the shift: fixedSteps, drawnS, src/between.js)
   game = new Game(scene, data, route, tram, audio, {
     weather,
     tripIndex: +selTrip.value,
@@ -1116,9 +1117,18 @@ let last = performance.now(), hudTimer = 0, lastDraw = 0;
 // Up to SPAN_MAX a frame: past that (a stall, a hidden tab coming back, a breakpoint) the game slows rather than run
 // seconds at once; the game keeps real time down to 4 fps (#609: the 50 ms cap alone ran the user's 16 fps perftests
 // of 2026-11-15 at 74-80 % of real time). A frame between two steps draws our tram and the camera between them
-// (drawnS); the rest is drawn as the last step left it.
+// (drawnS), and the cars, the other trams and the game's movers too (src/between.js: recorded after the frame's last
+// two steps, put back after the draw); the walkers are drawn as the last step left them.
 const STEP = 1 / 30, STEP_MAX = 0.05, SPAN_MAX = 0.25;
 let carry = 0, sWas = null;
+const between = new Between();
+window.between = between; // (tools/test_frame_rate.py)
+// after a step the page draws from: where what it moved stands (a step the traffic did not take, paused or the shift
+// over, moved none of it)
+function recordStep(moved) {
+  if (moved) between.record([...traffic.movers(), ...game.movers()]);
+  else between.hold();
+}
 function fixedSteps(span) {
   carry += span;
   const n = Math.floor(carry / STEP + 1e-9);
@@ -1156,25 +1166,35 @@ function frame(now) {
     // (inspecting: several game steps per frame, or none while paused)
     const steps = inspect.active ? inspect.steps(span) : fixedSteps(span);
     input.deadman = shiftHeld || pad.active;
+    between.back(); // (the last draw's poses are gone before anything steps: the steps read some of them)
+    if (inspect.active) between.clear(); // (its steps are its own, drawn as they leave the world)
     let focus = null; // (the traffic's focus where the step began, src/traffic.js update)
     steps.forEach((h, i) => {
-      const lastStep = i === steps.length - 1;
+      const lastStep = i === steps.length - 1, drawn = i >= steps.length - 2;
       sWas = tram.s;
       focus = traffic.focus();
       if (pedalKey && !pilot && !game.paused && (pedalKey.t += h) > 0.35) tram.eq.hold(pedalKey.dir, h);
       if (pilot && !game.paused && !game.finished) pilot.step(game, h);
       if (!game.paused && !game.finished) simmed += h;
       game.update(h, pilot ? pilot.input : input);
-      // (the traffic steps with the tram, as in the checks; posed for drawing on the frame's last step only,
-      // which outside inspect mode runs after the camera has moved, below)
-      if ((inspect.active || !lastStep) && !game.paused && !game.finished) traffic.update(h, camera, inspect.active && lastStep, focus);
+      // (the traffic steps with the tram, as in the checks; posed for drawing on the frame's last two steps, the
+      // last of which outside inspect mode runs after the camera has moved, below)
+      if (inspect.active || !lastStep) {
+        const moved = !game.paused && !game.finished;
+        if (moved) traffic.update(h, camera, inspect.active ? lastStep : drawn, focus);
+        if (!inspect.active && drawn) recordStep(moved);
+      }
     });
     game.updateVisuals();
     updateCamera(dt, now / 1000);
     if (inspect.active) inspect.update(dt);
     updateRain(dt);
     updateSnow(dt, now / 1000);
-    if (!inspect.active && !game.paused && !game.finished && steps.length) traffic.update(steps[steps.length - 1], camera, true, focus);
+    if (!inspect.active && steps.length) {
+      const moved = !game.paused && !game.finished;
+      if (moved) traffic.update(steps[steps.length - 1], camera, true, focus);
+      recordStep(moved);
+    }
     // The shift may have finished during game.update().
     if (game.finished) audio.setActive(false, !inMenu && !game.paused && !(inspect.active && inspect.paused));
     audio.update(tram, game.currentLimit, dt);
@@ -1196,6 +1216,8 @@ function frame(now) {
   const lazy = idle();
   const draw = window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS;
   if (draw) {
+    // (the movers between the last two steps, as our tram; back where the steps left them after the draw, below)
+    if (game && !inspect.active && !window.headless) between.show(Math.min(1, carry / STEP));
     if (people && game) people.sync(camera, traffic, game);
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
@@ -1219,6 +1241,7 @@ function frame(now) {
   if (draw && mirrorShown()) {
     mirror.draw(now, !lazy, poseMirror, tramModel);
   }
+  between.back();
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back
