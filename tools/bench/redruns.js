@@ -31,10 +31,12 @@ export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
       for (let k = 0; k < chunk; k++) {
         if (game.finished || game.tram.s > game.route.length - 5) { R.done = true; break; }
         const before = watch.before();
-        // (headless nothing moves the camera, and road cars spawn around it: keep it at the cab)
+        // (headless nothing moves the camera: keep it at the cab for the once-a-second draw; road cars spawn round the
+        // tram's front whatever it shows, traffic.focus, #722)
         const q = game.route.at(game.tram.s);
         camera.position.set(q.x, game.profile.height(game.tram.s) + 2.6, -q.y);
-        pilot.step(game, h); game.update(h, pilot.input); traffic.update(h, camera);
+        const focus = traffic.focus(); // (where the step begins, as the camera above)
+        pilot.step(game, h); game.update(h, pilot.input); traffic.update(h, camera, true, focus);
         watch.after(before);
       }
       R.tramS = Math.round(game.tram.s);

@@ -23,7 +23,7 @@ if (mode === 'loading') document.getElementById('loading').className = '';
 // (as the real page: Start makes a new game, after an await, #400)
 document.getElementById('btnStart').onclick = async () => {
   await null;
-  window.traffic = {oncoming: [], ahead: [], backStops: [], cars: [], update() {}};
+  window.traffic = {oncoming: [], ahead: [], backStops: [], cars: [], focus: () => [0, 0], update() {}};
   window.camera = {position: {set() {}}};
   window.game = {
     clock: 0, tram: {s: 11221, v: 0}, route: {length: 20000, at: () => ({x: 0, y: 0})},

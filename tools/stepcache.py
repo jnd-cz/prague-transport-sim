@@ -21,6 +21,12 @@ last records), store/ (the files the records name, by hash). A rebuild on a mach
 keeps it there instead, in stepcache/ (machine_dir, Cache(root, dir)): the records name files by their path under the
 checkout, so they hold in any checkout, and a batch's worktree is removed when its PR merges (#797: ground batch C's
 rebuild ran every step of every line with no record).
+
+A file of facts (SECTIONED: data/truth.json) is keyed by the top-level sections a step read, not whole (#816: every
+ground PR adds a place to groundPlaces, and build_line, dtm and the rest ran again on every line). A step that parses
+it with json.load or json.loads gets a dict that notes the keys read from it (Sections); the record then holds each
+section's hash, and a change elsewhere in the file leaves the step skipped. A step that reads the file whole (iterates
+it, copies it, writes it), opens it without parsing it, or reads no section keeps the file's hash.
 """
 import hashlib
 import json
@@ -37,7 +43,72 @@ DIR_ENV = "TRAMSTEP_CACHE"  # the cache's folder where it is not the checkout's 
 # (the threads of numpy's BLAS: its sums are split by them, so results differ in the last bits with their number)
 ENV = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS")
 _stat, _replace = os.stat, os.replace  # (the tracer wraps os.stat; its own reads must not count)
+_loads = json.loads  # (the tracer wraps json.load and json.loads; its own parses must not count)
 WAIT = 10.0  # s: how long a file another thread or process holds open is waited for
+SECTIONED = ("data/truth.json",)  # (files keyed by the top-level sections a step read, #816)
+SECTIONS = "sections:"  # (an input's value keyed by its sections: never a file's hash, so a checkout from before #816
+                        # sharing the cache sees it changed and runs the step)
+
+
+def section_hash(v):
+    """The hash of one section of a sectioned file: its JSON value, keys sorted."""
+    return hashlib.sha256(json.dumps(v, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def sections_key(secs):
+    """A record's input value for a file keyed by sections {name: hash or None}."""
+    return SECTIONS + hashlib.sha256(json.dumps(secs, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+class Sections(dict):
+    """A sectioned file as a step parsed it: note(key) for each top-level key read; note(None) when the step reads it
+    whole (iterates it or its keys, values or items, takes its length, compares, copies, pickles or changes it). Its
+    truth value notes nothing (a step that reads no section keeps the file's hash: Tracer.sections)."""
+    __slots__ = ("_note",)
+
+    def __init__(self, d, note):
+        super().__init__(d)
+        self._note = note
+
+    def __getitem__(self, k):
+        self._note(k)
+        return dict.__getitem__(self, k)
+
+    def get(self, k, default=None):
+        self._note(k)
+        return dict.get(self, k, default)
+
+    def __contains__(self, k):
+        self._note(k)
+        return dict.__contains__(self, k)
+
+    def pop(self, k, *default):
+        self._note(None)
+        return dict.pop(self, k, *default)
+
+    def setdefault(self, k, default=None):
+        self._note(None)
+        return dict.setdefault(self, k, default)
+
+    def __bool__(self):
+        return dict.__len__(self) > 0
+
+    def __reduce_ex__(self, protocol):  # (copy, deepcopy and a multiprocessing argument: a plain dict, all of it read)
+        self._note(None)
+        return dict, (dict.copy(self),)
+
+
+def _whole(name):
+    def f(self, *a, **k):
+        self._note(None)
+        return getattr(dict, name)(self, *a, **k)
+    f.__name__ = name
+    return f
+
+
+for _n in ("__iter__", "__reversed__", "__len__", "__eq__", "__ne__", "__repr__", "__or__", "__ror__", "__ior__",
+           "__setitem__", "__delitem__", "keys", "values", "items", "copy", "update", "popitem", "clear"):
+    setattr(Sections, _n, _whole(_n))  # (dict(s), {**s} and json.dumps(s) go through __iter__, keys or items)
 
 
 def _waiting(f, *a):
@@ -218,6 +289,66 @@ class _Tracer:
         self.hashes = Hashes(self.root, os.path.join(cache_dir(self.root), "hashes.json"))
         self.inputs, self.lists, self.written, self.removed, self.moved = {}, {}, set(), set(), set()
         self.lock, self.busy, self.on, self.osmium, self.parts = threading.RLock(), threading.local(), True, False, []
+        # (each sectioned file read: how often opened for reading and parsed, its texts as opened, the keys read, read whole)
+        self.sec = {}
+
+    def opened(self, p):
+        """A sectioned file opened for reading: counted, and its text kept to know its parse (parsed())."""
+        if not self.on or getattr(self.busy, "v", False):
+            return
+        r = relpath(self.root, p)
+        if r not in SECTIONED:
+            return
+        self.busy.v = True
+        try:
+            with open(os.path.join(self.root, r), "rb") as f:
+                raw = f.read()
+        except OSError:
+            raw = None
+        finally:
+            self.busy.v = False
+        with self.lock:
+            s = self.sec.setdefault(r, {"opens": 0, "parses": 0, "texts": [], "keys": set(), "all": False})
+            s["opens"] += 1
+            if raw is not None:
+                text = raw.decode("utf-8", "replace")
+                for t in (raw, text, text.replace("\r\n", "\n").replace("\r", "\n")):  # (as bytes, read, newlines read)
+                    if t not in s["texts"]:
+                        s["texts"].append(t)
+
+    def parsed(self, src, obj):
+        """obj as json.loads(src) gave it: a Sections that notes its keys when src is a sectioned file's text."""
+        if not isinstance(obj, dict) or not self.on or getattr(self.busy, "v", False):
+            return obj
+        for s in self.sec.values():
+            if any(len(t) == len(src) and t == src for t in s["texts"] if type(t) is type(src)):
+                with self.lock:
+                    s["parses"] += 1
+
+                def note(k, s=s):
+                    with self.lock:
+                        if isinstance(k, str):
+                            s["keys"].add(k)
+                        else:
+                            s["all"] = True
+                return Sections(obj, note)
+        return obj
+
+    def sections(self):
+        """{file: {"opens", "parses", "all", "keys": {name: hash or None}}} of the sectioned files this process read;
+        the hashes from the file as it was first opened."""
+        out = {}
+        for r, s in self.sec.items():
+            try:
+                whole = _loads(next(t for t in s["texts"] if isinstance(t, str)))
+            except (StopIteration, ValueError):
+                whole = None
+            if not isinstance(whole, dict):
+                s["all"] = True
+                whole = {}
+            out[r] = {"opens": s["opens"], "parses": s["parses"], "all": s["all"],
+                      "keys": {k: section_hash(whole[k]) if k in whole else None for k in sorted(s["keys"])}}
+        return out
 
     def seen(self, p, kind="read"):
         if not self.on or getattr(self.busy, "v", False):
@@ -255,6 +386,7 @@ class _Tracer:
                 r = acc != os.O_WRONLY and not flags & (os.O_TRUNC | os.O_EXCL) or bool(flags & os.O_APPEND)
             if r:
                 self.seen(a[0])
+                self.opened(a[0])
             if w:
                 self.seen(a[0], "write")
         elif event == "os.rename":
@@ -279,6 +411,13 @@ class _Tracer:
         os.stat = probe(os.stat)
         for n in ("exists", "isfile", "isdir", "getsize", "getmtime"):
             setattr(os.path, n, probe(getattr(os.path, n)))
+
+        def loads(s, *a, **k):  # (json.load reads the file and calls loads: one parse, seen once)
+            return self.parsed(s, _loads(s, *a, **k))
+
+        def load(fp, *a, **k):
+            return loads(fp.read(), *a, **k)
+        json.loads, json.load = loads, load
         try:  # (osmium opens its file in C, past the audit hook)
             import osmium
             fp = osmium.FileProcessor
@@ -326,6 +465,7 @@ class _Tracer:
                     name not in self.before or name == "osmium" and self.osmium):
                 pkgs.add(name)  # (imported by the tool; osmium, imported here first, only when it read with it)
         cpu, missing = time.process_time(), 0
+        self.found_sections = secs = self.sections()
         for part in self.parts:
             try:
                 with open(part, encoding="utf-8") as f:
@@ -347,6 +487,14 @@ class _Tracer:
             self.hashes.merge(c["hashes"])
             cpu += c["cpu"]
             missing += c["missing"]
+            for r, s in c.get("sections", {}).items():
+                m = secs.setdefault(r, {"opens": 0, "parses": 0, "all": False, "keys": {}})
+                m["opens"] += s["opens"]
+                m["parses"] += s["parses"]
+                m["all"] = m["all"] or s["all"]
+                for k, h in s["keys"].items():
+                    if m["keys"].setdefault(k, h) != h:
+                        m["all"] = True  # (the file changed between the two reads: keyed whole)
         return modules, pkgs, cpu, missing
 
     def part(self, path):
@@ -357,7 +505,7 @@ class _Tracer:
             json.dump({"inputs": self.inputs, "lists": {r: None if n is None else sorted(n) for r, n in self.lists.items()},
                        "written": sorted(self.written), "removed": sorted(self.removed), "moved": sorted(self.moved),
                        "modules": sorted(modules), "packages": sorted(pkgs), "cpu": cpu, "missing": missing,
-                       "hashes": self.hashes.new}, f)
+                       "hashes": self.hashes.new, "sections": self.found_sections}, f)
         replace(tmp, path)
 
 
@@ -393,9 +541,17 @@ def trace(root, record, tool, args):
     for r in t.moved - set(outputs):
         if r in t.inputs:
             outputs[r] = None  # (an input moved away)
+    inputs = {r: s for r, s in sorted(t.inputs.items()) if r not in modules and r != "."}
+    secs = {}
+    for r, s in sorted(t.found_sections.items()):
+        # (by its sections only where every read of it was a parse, some section was read and none read it whole)
+        if r in inputs and inputs[r] not in (None, "dir", "?") and r not in outputs and not s["all"] \
+                and s["keys"] and s["opens"] and s["opens"] == s["parses"]:
+            secs[r] = s["keys"]
+            inputs[r] = sections_key(s["keys"])
     rec = {"format": FORMAT, "tool": tools, "args": args, "python": sys.version.split()[0],
            "env": env, "packages": versions(sorted(pkgs)), "modules": modules,
-           "inputs": {r: s for r, s in sorted(t.inputs.items()) if r not in modules and r != "."},
+           "inputs": inputs, **({"sections": secs} if secs else {}),
            "listings": {r: (None if names is None else
                             hashlib.sha256("\n".join(sorted(names - {o.rsplit("/", 1)[-1] for o in outputs if o.rsplit("/", 1)[0] == r})).encode("utf-8")).hexdigest())
                         for r, names in sorted(t.lists.items())},
@@ -438,7 +594,26 @@ class Cache:
             os.environ.pop(DIR_ENV, None)
         self.dir = cache_dir(self.root)
         self.hashes = Hashes(self.root, os.path.join(self.dir, "hashes.json"))
-        self.lock, self.pkgs = threading.Lock(), {}
+        self.lock, self.pkgs, self.secs = threading.Lock(), {}, {}
+
+    def sections(self, r):
+        """{name: hash} of a sectioned file's top-level sections now ({} when it is not a JSON object), None when it
+        is not there; parsed once per state of the file."""
+        st = self.hashes.state(r)
+        if st in (None, "dir", "?"):
+            return None
+        with self.lock:
+            if r in self.secs and self.secs[r][0] == st:
+                return self.secs[r][1]
+        try:
+            with open(os.path.join(self.root, r), encoding="utf-8") as f:
+                whole = _loads(f.read())
+        except (OSError, ValueError):
+            return None
+        out = {k: section_hash(v) for k, v in whole.items()} if isinstance(whole, dict) else {}
+        with self.lock:
+            self.secs[r] = (st, out)
+        return out
 
     def name(self, label, tool, args):
         """The file of a step's records: label (line9, heights) and tool, and a hash of its arguments."""
@@ -494,6 +669,14 @@ class Cache:
                 return f"{r} changed"
         out = rec["outputs"]
         for r, h in rec["inputs"].items():
+            if isinstance(h, str) and h.startswith(SECTIONS):  # (keyed by the sections the step read, #816)
+                was, now = rec.get("sections", {}).get(r), self.sections(r)
+                if was is None or now is None:
+                    return f"{r} {'not there' if now is None else 'changed'}"
+                for k, v in was.items():
+                    if now.get(k) != v:
+                        return f"{r}: {k} {'not there' if now.get(k) is None else 'there' if v is None else 'changed'}"
+                continue
             cur = phase0[r] if phase0 is not None and r in rec.get("phase", ()) and r in phase0 else st(r)
             if cur != h and not (r in out and cur == out[r]):
                 return f"{r} {'not there' if cur is None else 'there' if h is None else 'changed'}"
