@@ -18,6 +18,7 @@ from unittest import mock
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, TOOLS)
+import build_id  # noqa: E402
 import rebuild  # noqa: E402
 import stepcache  # noqa: E402
 
@@ -218,6 +219,21 @@ class StepCacheTest(unittest.TestCase):
         self.write("raw/in.txt", "two")
         self.assertEqual(rebuild.CACHE.match(name, env=rebuild.step_env("line")), (None, "raw/in.txt changed"))
 
+    def test_a_declared_input_in_the_key(self):
+        """A file outside the checkout (the city mesh the ground reads, #702) is not traced: the step declares it by a
+        value that changes with it, and another value runs it again."""
+        log = os.path.join(self.root, "reports", "rebuild", "line9.a.log")
+        run = lambda k: rebuild.run_step("line9", ["a.py", "--line", "9"], log, declared={"city mesh": k})[2]  # noqa: E731
+        self.assertEqual(run("k1"), 0)
+        self.assertEqual(run("k1"), "skip")
+        name = rebuild.CACHE.name("line9", "a.py", ["--line", "9"])
+        self.assertEqual(rebuild.CACHE.records(name)[0]["declared"], {"city mesh": "k1"})
+        self.assertEqual(rebuild.CACHE.match(name, env=rebuild.step_env("line"), declared={"city mesh": "k2"}),
+                         (None, "city mesh k1 → k2"))
+        self.assertEqual(run("k2"), 0)
+        self.assertEqual(run("k1"), "skip")  # (the earlier record is kept beside it)
+        self.assertEqual(rebuild.run_step("line9", ["a.py", "--line", "9"], log)[2], 0)  # (none declared: another key)
+
     def test_blas_threads_in_the_key(self):
         """numpy's BLAS threads change results in their last bits: another number runs the step again."""
         self.build()
@@ -305,7 +321,117 @@ class StepCacheTest(unittest.TestCase):
         self.assertEqual(self.build(), ["skip", "skip"])
 
 
+# (a made-up step of a line's chain by the real step's name: it reads its files (a CRC of each, so it sees a stamped file
+# as another) and writes its own, or adds to the line file as the writers after build_line do)
+FAKE = '''import json, os, sys, zlib
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+from atomic import replacing
+NAME, READS, WRITES, FRESH = {name!r}, {reads!r}, {writes!r}, {fresh!r}
+seen = {{}}
+for r in READS:
+    p = os.path.join(ROOT, r)
+    seen[r] = zlib.crc32(open(p, "rb").read()) if os.path.exists(p) else None
+out = os.path.join(ROOT, WRITES)
+d = {{"provenance": {{"lists": {{}}}}}} if FRESH else json.load(open(out, encoding="utf-8"))
+d[NAME] = seen
+with replacing(out, "w", encoding="utf-8") as f:
+    json.dump(d, f)
+'''
+L = "data/line9.json"
+CHAIN = {  # name: (what it reads, what it writes, a file of its own)
+    "build_line": (["raw/in.txt"], L, True), "platforms": ([], L, False), "osm_speeds": ([], L, False),
+    "cant": ([], L, False), "clearances": ([], L, False), "dtm_points": ([L], "data/line9.dtmpoints.json", True),
+    "osm_validate": ([L], "data/line9.validate.json", True), "geoportal": (["raw/in.txt"], "data/line9.geo.json", True),
+    "dtm": (["raw/in.txt"], "data/line9.dtm.json", True), "zps_source": (["data/line9.dtm.json"], "data/line9.zps.json", True),
+    "placement": (["data/line9.dtm.json"], L, False), "track_styles": (["data/line9.dtm.json"], L, False),
+    "line_heights": (["data/line9.dtm.json"], L, False), "line_structures": ([], L, False), "cross_level": ([], L, False),
+    "street_profile": ([L, "data/line9.dtm.json"], "data/line9.streets.json", True),
+    "ground_mesh": ([L, "data/line9.dtm.json", "data/line9.streets.json"], "data/line9.ground.json", True),
+    "network": ([L, "data/line9.ground.json", "data/line9.dtm.json", "data/line9.geo.json"], "data/line9.network.json", True)}
+
+
+class ChainTest(unittest.TestCase):
+    """A line's whole chain (rebuild, heights, ground) with made-up steps and the real build_id.py: a second rebuild with
+    nothing changed runs no step, though build_id rewrote the files the steps before it wrote (#702)."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="test_rebuild_chain_")
+        self.addCleanup(shutil.rmtree, self.root, True)
+        for d in ("tools", "data", "raw", "reports/rebuild"):
+            os.makedirs(os.path.join(self.root, d))
+        for f in ("atomic.py", "stepcache.py", "step_inputs.py", "build_id.py"):
+            shutil.copy(os.path.join(TOOLS, f), os.path.join(self.root, "tools", f))
+        for name, (reads, writes, fresh) in CHAIN.items():
+            self.write(f"tools/{name}.py", FAKE.format(name=name, reads=reads, writes=writes, fresh=fresh))
+        self.write("raw/in.txt", "one")
+        self.saved = rebuild.ROOT, rebuild.CACHE, set(rebuild.FORCE)
+        self.addCleanup(self.restore)
+        rebuild.ROOT, rebuild.CACHE = self.root, stepcache.Cache(self.root)
+        rebuild.FORCE.clear()
+        self.mesh = "k1"
+        for p in (mock.patch.dict(rebuild.DTM, {"9": ["x"]}), mock.patch.dict(rebuild.HOLD, {}, clear=True),
+                  mock.patch.object(rebuild, "select_packages", lambda *a, **k: []),
+                  mock.patch.object(rebuild, "city_mesh", lambda: self.mesh)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    restore = StepCacheTest.restore
+    write = StepCacheTest.write
+
+    def chain(self):
+        """The line's three phases as rebuild.main runs them: their summaries."""
+        with contextlib.redirect_stdout(io.StringIO()):
+            return [rebuild.rebuild("9"), rebuild.heights(["9"]), rebuild.ground(["9"])]
+
+    def files(self):
+        d = os.path.join(self.root, "data")
+        return {f: open(os.path.join(d, f), "rb").read() for f in sorted(os.listdir(d))}
+
+    def test_a_second_rebuild_runs_no_step(self):
+        first = self.chain()
+        self.assertTrue(all("FAILED" not in r and "skipped" not in r for r in first), first)
+        want, off = build_id.check("9", self.root)
+        self.assertEqual(off, {})
+        self.assertEqual(set(build_id.ids("9", self.root)), {"line9.geo.json", "line9.dtm.json", "line9.dtmpoints.json",
+                                                            "line9.network.json", "line9.ground.json"})
+        built = self.files()
+        again = self.chain()
+        self.assertEqual([r.rsplit(", ", 1)[1] for r in again], ["all 12 steps skipped", "all 4 steps skipped", "all 3 steps skipped"])
+        self.assertEqual(self.files(), built)  # (each step's output put back, build_id's stamped files last)
+        self.assertEqual(build_id.check("9", self.root), (want, {}))
+
+    def test_the_ground_runs_on_another_city_mesh_and_the_network_after_it_only_if_it_changed(self):
+        self.chain()
+        self.mesh = "k2"
+        r = self.chain()
+        self.assertTrue(r[2].endswith("ran ground_mesh; 2 skipped"), r)  # (the same ground: the network and the ID stand)
+        self.assertIn("city mesh k1 → k2", open(os.path.join(self.root, "reports", "rebuild", "ground.summary.log"), encoding="utf-8").read())
+        self.write("tools/street_profile.py", FAKE.format(name="street_profile", reads=[L], writes="data/line9.streets.json", fresh=True))
+        r = self.chain()
+        self.assertTrue(r[1].endswith("ran street_profile; 3 skipped"), r)
+        self.assertTrue(r[2].endswith("ran ground_mesh, network, build_id"), r)  # (a new ground, a new network on it)
+        self.assertEqual(build_id.check("9", self.root)[1], {})
+
+    def test_a_line_file_changed_stamps_every_file_again(self):
+        self.chain()
+        old = build_id.line_id("9", self.root)
+        self.write("raw/in.txt", "two")
+        self.assertTrue(all("FAILED" not in r for r in self.chain()))
+        want, off = build_id.check("9", self.root)
+        self.assertNotEqual(want, old)
+        self.assertEqual(off, {})
+
+
 class StepsTest(unittest.TestCase):
+    def test_ground_network_and_build_id_after_the_street_surfaces(self):
+        """#702: the ground reads the street surfaces, the network the ground file, the build ID every file: each a step
+        of the cache, --from names them."""
+        self.assertEqual([st[0] for st in rebuild.ground_steps("17")], ["ground_mesh.py", "network.py", "build_id.py"])
+        self.assertIn("--no-network", rebuild.ground_steps("17")[0])  # (the network a step of its own)
+        self.assertTrue({"ground_mesh", "network", "build_id"} <= rebuild.names())
+        self.assertEqual(rebuild.args(["9", "--from", "ground"])[2], {"ground_mesh"})
+
     def test_platforms_before_the_survey(self):
         """dtm reads the platforms platforms.py writes (the shelters' stops, #617): it runs before the groups, and no
         group beside dtm's writes them."""
@@ -342,7 +468,7 @@ class ArgsTest(unittest.TestCase):
         self.assertEqual(rebuild.args(["--force"])[2], {"*"})
         with contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertIsNone(rebuild.args(["--from", "nothing"]))
-        self.assertIn("the steps: build_line", out.getvalue())
+        self.assertIn("the steps: build_id, build_line", out.getvalue())
         self.assertIsNone(rebuild.args(["--help"]))
 
 

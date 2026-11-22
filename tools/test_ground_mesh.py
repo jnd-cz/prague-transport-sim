@@ -37,6 +37,43 @@ class File(unittest.TestCase):
         self.assertEqual(got, want)
         self.assertEqual({c: len(t) for c, t in by.items()}, {"terrain": 1, "survey": 2, "bed": 0, "plot": 1, "wall": 0})
 
+    def test_the_round_trip_compares_the_triangles_and_their_names(self):
+        """#702: the file decodes to the built mesh, else round_trip names the difference. Counting alone read False
+        where two vertices stand at one position (once in the file) and True for a wrong triangle with the right counts."""
+        V = mm([300000, 0, 200000], [306000, 0, 200100], [306000, -1000, 199900], [300000, -1000, 200000],
+               [312000, 0, 200300], [312000, -1000, 200200], [306000, 0, 200100])  # (the last: the second at one position)
+        F = np.array([[0, 1, 2], [0, 2, 3], [6, 4, 5], [1, 5, 2]])
+        built = {"V": V, "F": F, "cls": np.array([0, 1, 1, 0]), "draw": np.array(["grass", "road", "sidewalk", ""], dtype=object),
+                 "area": np.array(["", "road", "sidewalk", ""], dtype=object)}
+        blob, layout = gm.encode_tiles(V, F, built["cls"], built["draw"], built["area"])
+        self.assertIsNone(gm.round_trip(built, blob, layout))
+        self.assertIsNone(gm.round_trip({**built, "F": F[:, [1, 2, 0]]}, blob, layout))  # (from another corner: the same)
+        wrong = gm.round_trip({**built, "F": F[:, [0, 2, 1]]}, blob, layout)  # (turned over: the same counts)
+        self.assertRegex(wrong, r"^terrain: a triangle decoded as .* 2 differ$")
+        moved = V.copy()
+        moved[3, 2] += 1
+        self.assertRegex(gm.round_trip({**built, "V": moved}, blob, layout), r"^vertices: the \dth position decoded as \[300000, -1000, 200000\]")
+        self.assertRegex(gm.round_trip({**built, "draw": np.array(["grass", "road", "road", ""], dtype=object)}, blob, layout),
+                         r"^survey: a triangle decoded as .*'sidewalk'.*'road'")
+        self.assertEqual(gm.round_trip({**built, "cls": np.array([0, 1, 1, 1])}, blob, layout), "terrain: 2 triangles decoded, 1 built")
+
+    def test_a_file_that_does_not_decode_to_the_mesh_is_not_written(self):
+        import tempfile
+        root = tempfile.mkdtemp(prefix="test_ground_mesh_")
+        os.makedirs(os.path.join(root, "data"))
+        V = mm([0, 0, 200000], [1000, 0, 200100], [1000, -1000, 199900])
+        built = {"V": V, "F": np.array([[0, 1, 2]]), "cls": np.array([0])}
+        keep = gm.ROOT, gm.round_trip
+        gm.ROOT, gm.round_trip = root, lambda *a: "vertices: 2 decoded, 3 built"
+        try:
+            with self.assertRaisesRegex(SystemExit, "line t: the ground file does not decode to the built mesh: vertices"):
+                gm.write("t", built, {})
+            self.assertEqual(os.listdir(os.path.join(root, "data")), [])
+        finally:
+            gm.ROOT, gm.round_trip = keep
+            import shutil
+            shutil.rmtree(root, True)
+
     def test_the_raster_error_is_measured_on_request(self):
         # (#704: a plain build's report says it was not measured; --error measures it)
         asked = []

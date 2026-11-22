@@ -604,6 +604,75 @@ class Sources(unittest.TestCase):
         self.assertEqual(ha.archive_over_di([a, b]), 0)
 
 
+class Older(unittest.TestCase):
+    def hump(self, year=1999, top=0.9, flags=(), held=()):
+        # (#539, line 9 at Bertramka: the archive's records of 1999 humped up to 0.83 and 0.92 m over the 2023 lidar for
+        # 200 m on both tracks, no numeric DI; around it the archive 5 cm over the lidar)
+        ground = lambda s: 200 - .025 * s
+        bump = lambda s: max(0.0, top * (1 - abs(s - 200) / 100))
+        c = chain([(0, 0), (400, 0)], lambda s: ground(s) + .05 + bump(s), terrain=ground)
+        for k, x in enumerate(c.bins):
+            x['archive'], x['survey'], x['year'], x['flags'] = x['z'], None, year, list(flags)
+            if k in held:
+                x['z'], x['w'], x['src'] = None, 0.0, None
+        return c, ground
+
+    def test_an_older_record_over_the_lidar_takes_it_with_the_rails_offset(self):
+        c, ground = self.hump()
+        n = ha.archive_before_lidar([c])
+        self.assertEqual(n, sum(x['src'] == 'lidar' for x in c.bins))
+        # (the whole stretch over SOURCES_EDGE goes, not only the part over SOURCES_OFF)
+        self.assertTrue(all(x['src'] == 'lidar' for x in c.bins if 115 < x['s'] < 285))
+        self.assertLess(max(abs(x['z'] - ground(x['s']) - .05) for x in c.bins), ha.SOURCES_EDGE + 1e-9)
+        self.assertTrue(all(abs(x['z'] - ground(x['s']) - .05) < 1e-9 for x in c.bins if x['src'] == 'lidar'))
+        self.assertTrue(all(x['src'] == 'dtmp' for x in c.bins if x['s'] < 80 or x['s'] > 320))
+
+    def test_a_held_height_in_the_stretch_takes_it_too(self):
+        # (with the style marked paved, the survey 0.4 m under the archive holds the hump's top: #591's mark at Bertramka)
+        c, _ = self.hump(held=range(36, 44))
+        ha.archive_before_lidar([c])
+        self.assertTrue(all(x['src'] == 'lidar' and x['z'] is not None for x in c.bins[36:44]))
+
+    def test_a_record_of_the_lidars_year_or_later_stays(self):
+        # (a track rebuilt since the flight: the archive's records of 2023 and 2024 stand over 0.5 m over the lidar on
+        # 4.9 and 9.1 % of their length, the older ones on 0-1.1 %)
+        for year in (2023, 2024, None):
+            c, _ = self.hump(year=year)
+            self.assertEqual(ha.archive_before_lidar([c]), 0)
+
+    def test_a_low_hump_stays(self):
+        c, _ = self.hump(top=0.4)
+        self.assertEqual(ha.archive_before_lidar([c]), 0)
+
+    def test_on_a_structure_and_another_level_the_archive_stays(self):
+        c, _ = self.hump(flags=['structure_hint'])
+        self.assertEqual(ha.archive_before_lidar([c]), 0)
+        c, _ = self.hump()
+        for x in c.bins[38:42]:   # (the bare earth under a small bridge nothing marks)
+            x['terrain'] -= 2.0
+        self.assertGreater(ha.archive_before_lidar([c]), 0)
+        self.assertTrue(all(x['src'] == 'dtmp' for x in c.bins[38:42]))
+
+    def test_a_lidar_that_steps_more_than_a_track_climbs_is_not_taken(self):
+        c, _ = self.hump()
+        c.bins[40]['terrain'] += 0.6   # (a wall's cell: 12 % from the bin before)
+        self.assertEqual(ha.archive_before_lidar([c]), 0)
+
+    def test_di_and_a_reviewed_span_stay(self):
+        c, _ = self.hump()
+        for x in c.bins:
+            x['src'] = 'di'
+        self.assertEqual(ha.archive_before_lidar([c]), 0)
+
+    def test_open_track_and_track_of_no_known_construction_stay(self):
+        # (a ballast bed on its own body stands over the ground beside it, and the lidar's cell reads both)
+        for kind in ('open', 'unknown'):
+            c, _ = self.hump()
+            for x in c.bins:
+                x['kind'] = kind
+            self.assertEqual(ha.archive_before_lidar([c]), 0)
+
+
 class Held(unittest.TestCase):
     def track(self, archive, survey, held=range(20, 40), flags=()):
         # (#202: a held stretch, the archive and the survey 0.35 m apart, as on line 17 between Čechův most and

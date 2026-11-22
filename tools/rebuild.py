@@ -4,7 +4,8 @@
     python -P -E tools/rebuild.py 17 22         # lines (default: all)
     python -P -E tools/rebuild.py --parallel     # also the lines side by side
     python -P -E tools/rebuild.py 9 --from build_line   # that step runs again (track = build_line, heights =
-                                                        # line_heights), the others as their inputs say
+                                                        # line_heights, ground = ground_mesh), the others as their
+                                                        # inputs say
     python -P -E tools/rebuild.py --force        # every step runs
 
 build_line first, then platforms (dtm names the shelters' stops from them, #617); then, side by side (each step
@@ -20,16 +21,22 @@ once for all the lines rebuilt (the top of rail, #197: the network's profile rea
 lines' lift, so it runs after them all), then line_structures per line (the spans, decks and underpasses: they read the
 built top of rail, #480) and cross_level (the cross level of paved track where the road tilts across it: it reads the
 opposite track's offset and the spans, #538), and for lines with surveyed streets street_profile (the street surfaces
-generated from profiles, data/lineN.streets.*, #512: they read the built top of rail and the survey's areas), then the
+generated from profiles, data/lineN.streets.*, #512: they read the built top of rail and the survey's areas), then per
+line, one line after another (a line's ground takes up to 21 GB, ground_mesh.PEAK_GB), ground_mesh (data/lineN.ground.*:
+it reads the street surfaces), network (data/lineN.network.json: it reads the ground file, #658) and build_id (the line
+file's CRC-32 into the provenance of the files the page loads with it, which refuses a set of two builds, #702), then the
 validation report (tools/validation.py, #23). On a line with surveyed streets the steps after dtm need its survey file:
-a step that reads it and finds none stops the build (tools/step_inputs.py, #701).
+a step that reads it and finds none stops the build (tools/step_inputs.py, #701). The ground reads the city mesh from the
+machine cache (tools/city_terrain.py: outside the checkout, so its key is declared in the step's record); where the
+mesh of the current inputs is not there, city_terrain.py builds it first (13 min, 15 GB).
 
 A step whose tool, the modules it imports and the files it read hash as in one of its recorded runs is skipped, and
 its outputs and log are put back as that run left them (tools/stepcache.py, #511): a rebuild after a change to one
 rule runs the steps that read what changed. The steps side by side are keyed with data/lineN.json as build_line
 left it (what they read of it; the writers rewrite it meanwhile).
 Logs: reports/rebuild/lineN.<step>.log, summary in lineN.log (each step's seconds, or "skip", and why it ran),
-reports/rebuild/heights.log, validation.md. After it: python -I tools/snapshot.py data-publish.
+reports/rebuild/heights.log, heights.summary.log, ground.summary.log, validation.md. After it: python -I
+tools/snapshot.py data-publish.
 """
 import os
 import subprocess
@@ -45,7 +52,7 @@ import step_inputs  # noqa: E402
 
 PY = [sys.executable, "-P", "-E"]
 BUILD = {"9": ["--line", "9", "--then", "10"], "22": ["--line", "22", "--headsign", "Zahradní Město"]}
-ALIAS = {"track": "build_line", "heights": "line_heights", "structures": "line_structures"}
+ALIAS = {"track": "build_line", "heights": "line_heights", "structures": "line_structures", "ground": "ground_mesh"}
 CACHE = None  # (stepcache.Cache of ROOT, made by main)
 FORCE = set()  # steps that run whatever their records say ("*": all)
 CPU = []  # (the CPU seconds of each step run)
@@ -53,8 +60,8 @@ CPU = []  # (the CPU seconds of each step run)
 # hundreds of them fought for 24 cores (an ADMM-sized inverse and 300 products, n 1200: 5.1 s against 0.08 s with 4
 # threads, #511). A line's steps run four at a time (and lines side by side), the heights alone. The same numbers
 # whatever runs beside them: they enter the results' last bits, so the steps' keys (tools/stepcache.py ENV). An
-# OPENBLAS_NUM_THREADS of the caller's own is kept.
-BLAS = {"line": "1", "heights": "4"}
+# OPENBLAS_NUM_THREADS of the caller's own is kept. The ground's steps run one line at a time, as the heights.
+BLAS = {"line": "1", "heights": "4", "ground": "4"}
 
 
 def step_env(phase, needs=()):
@@ -111,22 +118,29 @@ def steps(line):
 def names():
     """Every step's name (for --from)."""
     out = {"build_line", "geoportal", "dtm", "zps_source", "line_heights", "line_structures", "cross_level", "street_profile"}
-    return out | {st[0][:-3] for st in writers("17") + after("17")}
+    return out | {st[0][:-3] for st in writers("17") + after("17") + ground_steps("17")}
 
 
-def run_step(label, st, log, phase0=None, phase="line", needs=()):
+def ground_steps(line):
+    """A line's steps after its street surfaces, in order: its ground (the network built apart: a change to a traffic
+    rule runs the network alone), the network on it, the build ID in the files (#702)."""
+    return [["ground_mesh.py", "--line", line, "--no-network"], ["network.py", "--lines", line], ["build_id.py", "--line", line]]
+
+
+def run_step(label, st, log, phase0=None, phase="line", needs=(), declared=None):
     """One step, or its outputs put back when a record of it holds: (name, seconds, exit code or "skip", why, key,
-    record, ran). needs: the inputs the step may not go on without (tools/step_inputs.py)."""
+    record, ran). needs: the inputs the step may not go on without (tools/step_inputs.py); declared: what it reads that
+    its trace cannot see ({name: a value that changes with it}, tools/stepcache.py Cache.save)."""
     key, t, env = CACHE.name(label, st[0], st[1:]), time.time(), step_env(phase, needs)
     name = st[0][:-3]
-    rec, why = (None, "--force" if "*" in FORCE else "--from") if FORCE & {"*", name} else CACHE.match(key, phase0, env)
+    rec, why = (None, "--force" if "*" in FORCE else "--from") if FORCE & {"*", name} else CACHE.match(key, phase0, env, declared)
     if rec:
         CACHE.restore(rec, stepcache.relpath(ROOT, log))
         return st[0], round(time.time() - t), "skip", f"as run {rec['when']}, {rec['secs']:.0f} s", key, rec, False
     tmp = CACHE.tmp_record(key)
     with open(log, "w", encoding="utf-8") as f:
         r = subprocess.run(CACHE.command(PY, st[0], st[1:], tmp), cwd=ROOT, stdout=f, stderr=subprocess.STDOUT, env=env)
-    rec = CACHE.save(key, tmp, log) if r.returncode == 0 else None
+    rec = CACHE.save(key, tmp, log, declared) if r.returncode == 0 else None
     if rec:
         CPU.append(rec.get("cpu", 0))
     return st[0], round(time.time() - t), r.returncode, why, key, rec, True
@@ -240,6 +254,53 @@ def heights(lines):
     return f"heights and structures of {', '.join(lines)}: done in {(time.time() - t) / 60:.1f} min, {ran_text(ran, len(times))}"
 
 
+def city_mesh():
+    """The key of the city mesh the ground reads (tools/city_terrain.py, in the machine cache), the mesh built first
+    where the current inputs have none; None when that fails (reports/rebuild/city_terrain.log). The mesh lies outside
+    the checkout, so the ground step declares the key (tools/stepcache.py): the key holds the mesh's inputs and code."""
+    import contextlib
+    import io
+    import city_terrain
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):  # (its inputs' counts)
+            return city_terrain.cached()[1]
+    except SystemExit:
+        pass
+    log = os.path.join(ROOT, "reports", "rebuild", "city_terrain.log")
+    print("the city mesh of the current inputs is not there: tools/city_terrain.py builds it (13 min, 15 GB)", flush=True)
+    with open(log, "w", encoding="utf-8") as f:
+        r = subprocess.run([*PY, os.path.join(ROOT, "tools", "city_terrain.py")], cwd=ROOT, stdout=f, stderr=subprocess.STDOUT,
+                           env=step_env("ground"))
+    if r.returncode:
+        return None
+    with contextlib.redirect_stdout(io.StringIO()):
+        return city_terrain.cached()[1]
+
+
+def ground(lines):
+    """Each line's ground, the network on it and the build ID (ground_steps), one line after another after the heights
+    and the street surfaces of all of them (the ground reads both)."""
+    t = time.time()
+    mesh = city_mesh()
+    if mesh is None:
+        return f"ground of {', '.join(lines)}: FAILED, the city mesh: see reports/rebuild/city_terrain.log"
+    times, failed = [], []
+    for line in lines:
+        for st in ground_steps(line):
+            log = os.path.join(ROOT, "reports", "rebuild", f"line{line}.{st[0][:-3]}.log")
+            times.append(run_step(f"line{line}", st, log, phase="ground", needs=needs(line),
+                                  declared={"city mesh": mesh} if st[0] == "ground_mesh.py" else None))
+            if times[-1][2] not in (0, "skip"):
+                failed.append(f"line {line} at {st[0]}, see reports/rebuild/line{line}.{st[0][:-3]}.log")
+                break  # (the line's network and ID wait for its ground; the next line goes on)
+    with open(os.path.join(ROOT, "reports", "rebuild", "ground.summary.log"), "w", encoding="utf-8") as f:
+        f.write(f"city mesh {mesh}\n" + summary(times))
+    if failed:
+        return f"ground of {', '.join(lines)}: FAILED " + "; ".join(failed)
+    ran = [t[0][:-3] for t in times if t[6]]
+    return f"ground, network and build ID of {', '.join(lines)}: done in {(time.time() - t) / 60:.1f} min, {ran_text(ran, len(times))}"
+
+
 def args(argv):
     """(lines, --parallel, the steps forced) from the command line; None when it does not parse."""
     lines, par, force, it = [], False, set(), iter(argv)
@@ -285,6 +346,8 @@ def main():
     built = [line for line, r in zip(lines, results) if "FAILED" not in r]
     if built:
         results.append(heights(built))
+        if "FAILED" not in results[-1]:
+            results.append(ground(built))
     CACHE.hashes.save()
     n, size = CACHE.prune()
     print("\n".join(results))
@@ -306,7 +369,8 @@ if __name__ == "__main__":
     from board import check_rebuild_label
     check_rebuild_label("rebuild", warn_only=True)  # (a local rebuild is fine; its publish needs the label, #280)
     lines, par, _ = args(sys.argv[1:])
+    from ground_mesh import PEAK_GB
     # (waits its turn among the heavy jobs, and the nightly baseline for it; a build: beside counts and other builds
-    # while 2.5 GB a line built side by side and half the cores fit, #728)
-    with HeavyJob("rebuild", share={"gb": 2.5 * (len(lines) if par else 1), "cores": max(1, (os.cpu_count() or 2) // 2)}):
+    # while 2.5 GB a line built side by side, a line's ground (one at a time) and half the cores fit, #728, #702)
+    with HeavyJob("rebuild", share={"gb": max(2.5 * (len(lines) if par else 1), PEAK_GB), "cores": max(1, (os.cpu_count() or 2) // 2)}):
         main()
