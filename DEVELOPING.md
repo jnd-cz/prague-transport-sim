@@ -48,7 +48,10 @@ records name files by their path under the checkout, so they hold in a fresh wor
 run left them, so the next step reads what it read before (`data/lineN.json` is rewritten by several steps in
 turn). A change to one rule reruns the steps that read what it changed, down to the first whose output stays the
 same. `lineN.log` says per step whether it ran and why (`tools/track_profile.py changed`, `data/line9.json
-changed`). A tool that reads a file the trace cannot see (C code other than osmium's reader, a subprocess) needs
+changed`). `data/truth.json` is keyed by the sections a step read (#816): a step that parses it with `json.load`
+or `json.loads` gets a dict that notes the top-level keys it reads, so a new place in `groundPlaces` reruns no
+build step (`data/truth.json: stopSigns changed` where one did change). A step that reads it whole (iterates,
+copies or dumps it) or opens it without parsing keeps the whole file in its key. A tool that reads a file the trace cannot see (C code other than osmium's reader, a subprocess) needs
 `--from` or `--force`, or the file declared: `rebuild.py` gives the step a name and a value that changes with it, kept
 in its record (`run_step(declared=...)`). The ground declares the city mesh it reads from the machine cache by its
 key; where the mesh of the current inputs is not there, `rebuild.py` runs `tools/city_terrain.py` first (#702).
