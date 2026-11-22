@@ -34,6 +34,7 @@ The five user photographs supplied in the 2026-11-09 session are visual referenc
 | `C5R09032.JPG`, `C5R09035.JPG` (2026-11-20) | 6892 straight-on rear and open rear doorway. These show the top-mounted wiper, narrow cream sill and rounded quarter-light beside the last door. |
 | `16806.jpg` | 6921: sloping windscreen, folding door leaves, steps, mirror and lamp housings |
 | `16447.jpg` | 8080: left side windows, skirt, wheel recesses and louvres |
+| `18347.jpg`, `18348.jpg` (2026-11-22) | 8053 bogie sides, used as the reference for 6892's wheel faces, hex nuts, rail brake and visible equipment between the wheels. |
 | `16191.jpg` | 8015: three right-side doors, four leaves each, long body proportions |
 | `15611.jpg`, `15609.jpg`, `15606.jpg` (2026-11-16 follow-up) | 6312: shallow centre bow, tighter corner windows, brow overhang and aligned route plate; bumper and sill trim |
 | `17884.jpg` (2026-11-16 follow-up) | 7000: headlight pods, aluminium bumper with red inserts, cast coupler, collar, handle and chain |
@@ -65,7 +66,9 @@ Long faces are split at both shoulders before tapering, so the central walls and
 full width. The seat-frame check measures clearance against the actual side panels.
 Steps have closed risers and side walls; door leaves end just above the first tread and fold to 84°.
 The 84° stop is a visual interpretation of the user's “a bit less” than 90°, not a factory dimension.
-Wheels have continuous profiled faces, dusty brown material and distinct running treads.
+Each wheel has a solid disc, a separate tyre and a single central hex nut. The side frame, layered suspension
+pack, flared cover and inboard housings occupy the space above the brake. The two 8053 views establish their
+silhouettes. The hidden geometry and hanger construction are estimates repeated on both bogies.
 The four magnetic brakes include coil casings, pole shoes, spring hangers, reaction links and feed
 cables, following the FC33 construction described in section 2.2.4 of
 [Ondřej Kocourek's 2015 VUT thesis](https://www.vut.cz/www_base/zav_prace_soubor_verejne.php?file_id=104984).
@@ -141,7 +144,7 @@ The studio works without world data. Its first load needs the same CDN as the ga
 
 | Files | Author / origin | Licence |
 |---|---|---|
-| `tatra-t3-6892.glb`, generated lettering | Original model made for this project by Codex, 2026-11-09, revised 2026-11-20 | AGPL-3.0-or-later |
+| `tatra-t3-6892.glb`, generated lettering | Original model made for this project by Codex, 2026-11-09, revised 2026-11-22 | AGPL-3.0-or-later |
 | `rig.json`, `preview.png`, `doors-open.png` | Rig manifest and renders of the original model | AGPL-3.0-or-later |
 | `../../src/t3photo.js` | Reproducible geometry and pose source | AGPL-3.0-or-later |
 

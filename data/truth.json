@@ -27,6 +27,12 @@
  },
  "t3PhotoModel": [
   {
+   "id": "bogie-wheel-faces-and-track-brake",
+   "source": "user, bogie review on 2026-11-22, #437, photos 18347.jpg and 18348.jpg",
+   "quote": "wheel is full without holes, has one large hex nut, the track brake is the lowest rectangle close to the rail, has I think one hinge and couple springs on each side. In between there's couple large parts and shouldn't be visible through.",
+   "implementation": "The two 8053 views guide the side silhouette. The pivot and spring arrangement is a visual estimate."
+  },
+  {
    "id": "6892-front-and-hand-operated-rear-wipers",
    "source": "user, 6892 model review, 2026-11-20, #437",
    "quote": "the front ones are mounted under the window and the motion should sweep more of the glass - meet in the middle and go towards the glass metal divider. The back wiper looks better but should swing to both sides and can be left no animated as it's for hand operation only, not usually used, only when backing up by the driver from the rear control panel."

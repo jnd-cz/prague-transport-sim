@@ -92,12 +92,39 @@ CHECK = """async () => {
   }));
   checks.solidWheelFaces = r.wheelsets.every(w => [-1, 1].every(side => [0, .08, .17, .26, .33].every(radius => {
     const p = pos(w), h = hit([side * 1.4, p.y + radius, p.z], [-side, 0, 0], [w]);
-    return h && h.object.material.name === 'Wheel_brown_dust';
+    return h?.object.material.name === (radius > .32 ? 'Wheel_running_tread' : 'Wheel_brown_dust');
   })));
+  checks.oneCentralHexPerWheel = r.wheelsets.every(w => [-1, 1].every(side => {
+    const p = w.children.find(mesh => mesh.material?.name === 'Wheel_brown_dust').geometry.attributes.position;
+    const hex = new Set();
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i), z = p.getZ(i);
+      if (near(side * p.getX(i), .7525 + .101) && near(Math.hypot(y, z), .107))
+        hex.add(Math.round(1000 * y) + ',' + Math.round(1000 * z));
+    }
+    return hex.size === 6 && Array.from({length: 12}, (_, i) => {
+      // Probe just off the radial triangle seam, still inside the old bolt footprint.
+      const a = i * Math.PI / 6 + .031, centre = pos(w);
+      const h = hit([side * 1.2, centre.y + .18 * Math.cos(a), centre.z + .18 * Math.sin(a)], [-side, 0, 0], [w]);
+      return h && near(side * h.point.x, .7525 + .064);
+    }).every(Boolean);
+  }));
+  checks.betweenWheelEquipmentBlocksDaylight = r.bogies.every(b => [-1, 1].every(side =>
+    [-.53, -.36, -.16, 0, .16, .36, .53].every(dz => [.20, .24, .33, .43, .51].every(y => {
+      const h = hit([side * 1.25, y, pos(b).z + dz], [-side, 0, 0], [b]);
+      return h && side * h.point.x > .40 && !h.object.material.transparent;
+    }))));
   const brakes = []; m.traverse(o => { if (o.isGroup && o.name.startsWith('Magnetic_brake_')) brakes.push(o); });
   checks.fourSuspendedMagneticBrakes = brakes.length === 4 && brakes.every(b => {
     const box = new THREE.Box3().setFromObject(b), size = box.getSize(new THREE.Vector3());
     return box.min.y > .015 && box.min.y < .03 && size.y > .4 && size.z > 1;
+  });
+  checks.trackBrakeShoesFollowRails = brakes.every(b => {
+    const centre = pos(b), side = Math.sign(centre.x);
+    return near(Math.abs(centre.x), .7175) && [-.54, 0, .54].every(dz => {
+      const h = hit([centre.x + side * .045, -.01, centre.z + dz], [0, 1, 0], [b]);
+      return h && near(h.point.y, .0225);
+    });
   });
   checks.twoSideIndicators = ['left', 'right'].every(side => m.getObjectByName('Side_indicator_' + side));
   checks.singleCollectorDiagonal = r.pantograph.arms.every(a => a.lower.userData.diagonalRods === 1 && a.upper.userData.diagonalRods === 1);

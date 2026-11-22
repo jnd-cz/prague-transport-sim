@@ -146,8 +146,8 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     for (let i = 0; i < a.count; i++) uv.setXY(i, (a.getX(i) + pos[0]) / .064, (a.getZ(i) + pos[2]) / .064);
     return m;
   };
-  const wheelMat = material('Wheel_brown_dust', '#665044', .88, .2);
-  const treadMat = material('Wheel_running_tread', '#817568', .54, .55);
+  const wheelMat = material('Wheel_brown_dust', '#827a66', .89, .18);
+  const treadMat = material('Wheel_running_tread', '#9a8975', .53, .48);
   const casting = material('Coupler_cast_steel', '#4f5150', .79, .42);
   const orange = material('Collector_orange', '#cc522a', .44, .25);
   const lamp = material('Headlight_lens', '#eee6ce', .2, .12, { emissive: '#ffcb79', emissiveIntensity: .55 });
@@ -434,41 +434,84 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   for (const [i, z] of [3.2, -3.2].entries()) {
     const b = group(root, `Bogie_${i + 1}`, 0, .35, z); b.userData.axis = 'Y';
     const chassis = group(b, 'Bogie_frame');
-    for (const x of [-.60, .60]) {
-      box(chassis, 'Side_frame', [.16, .22, 2.35], [x, .08, 0], dark);
-      for (const dz of [-.56, .56]) {
-        for (let k = 0; k < 5; k++) mesh(chassis, 'Spring_coil', new THREE.TorusGeometry(.095, .014, 4, 10), steel, x, .05 + k * .035, dz).rotation.x = Math.PI / 2;
-      }
-      // FC33: enclosed coil between two pole shoes, spring hangers and a reaction link.
-      const brake = group(chassis, `Magnetic_brake_${i + 1}_${x < 0 ? 'right' : 'left'}`, Math.sign(x) * .7175, -.35, 0);
-      brake.userData.assembly = true;
-      box(brake, 'Magnet_coil_casing', [.18, .12, .91], [0, .121, 0], wheelMat);
-      for (const dx of [-.072, .072]) box(brake, 'Pole_shoe', [.047, .055, 1.10], [dx, .05, 0], wheelMat);
-      for (const dz of [-.49, .49]) {
-        box(brake, 'Magnet_end_plate', [.19, .15, .07], [0, .106, dz], wheelMat);
-        rod(brake, 'Suspension_pin', V(0, .17, dz), V(0, .47, dz), .021, steel);
-        for (let k = 0; k < 6; k++) mesh(brake, 'Hanger_spring', new THREE.TorusGeometry(.043, .009, 4, 10), wheelMat, 0, .23 + k * .025, dz).rotation.x = Math.PI / 2;
-        box(brake, 'Hanger_bracket', [.26, .05, .11], [Math.sign(x) * .07, .46, dz], dark);
-      }
-      rod(brake, 'Brake_reaction_link', V(.10, .16, -.34), V(.16, .40, .17), .025, wheelMat);
-      tube(brake, 'Magnet_feed_cable', [V(-.06, .20, .29), V(-.14, .36, .25), V(-.15, .42, -.20)], .017, rubber);
+    // The cast housings fill the space behind the suspended brake (18347/18348).
+    // Separate solids leave recesses around the exposed pins and cable.
+    box(chassis, 'Transverse_bolster', [1.39, .30, .58], [0, .18, 0], dark);
+    for (const dz of [-.35, .35]) {
+      mesh(chassis, 'Equipment_housing', new THREE.CylinderGeometry(.265, .265, 1.06, 16),
+        dark, 0, .077, dz).rotation.z = Math.PI / 2;
     }
-    box(chassis, 'Bogie_crossmember', [1.9, .22, .32], [0, .12, 0], dark);
+    for (const side of [-1, 1]) {
+      const x = side * .68;
+      box(chassis, 'Side_frame', [.18, .355, 1.42], [side * .53, .006, 0], dark);
+      box(chassis, 'Frame_top_flange', [.22, .052, 1.64], [side * .54, .18, 0], wheelMat);
+      box(chassis, 'End_casting', [.23, .24, .23], [x, .066, -.36], wheelMat);
+      box(chassis, 'End_casting_flange', [.265, .043, .31], [x, -.007, -.36], wheelMat);
+      for (const dz of [-.425, -.31]) {
+        rod(chassis, 'Flange_bolt', V(x, .014, dz), V(x, .036, dz), .022, wheelMat, 6);
+        rod(chassis, 'Bearing_bolt', V(x + side*.11, -.031, dz), V(x + side*.129, -.031, dz), .024, wheelMat, 6);
+      }
+      // A stack of broad, rounded layers and a flared cover are visible above the shoe.
+      const pack = [[.126,-.122],[.158,-.106],[.159,-.084],[.145,-.073],[.168,-.064],
+        [.168,-.035],[.155,-.027],[.172,-.018],[.172,.008],[.158,.016],[.169,.026],
+        [.169,.052],[.153,.061],[.161,.071],[.16,.095],[.136,.108],[0,.108]];
+      mesh(chassis, 'Suspension_pack', new THREE.LatheGeometry(pack.map(p => new THREE.Vector2(...p)), 24),
+        wheelMat, x, .09, -.035);
+      box(chassis, 'Cover_top', [.255, .15, .245], [x, .154, .325], wheelMat);
+      mesh(chassis, 'Flared_cover', new THREE.CylinderGeometry(.139, .18, .177, 16),
+        wheelMat, x, -.003, .325);
+      box(chassis, 'Cover_mount', [.20, .075, .21], [x, -.101, .325], dark);
+      // Brake coordinates are measured from the rail head, along its centreline.
+      const brake = group(chassis, `Magnetic_brake_${i + 1}_${side < 0 ? 'right' : 'left'}`, side * .7175, -.35, 0);
+      brake.userData.assembly = true;
+      for (const dx of [-.048, .048]) box(brake, 'Pole_shoe', [.078, .043, 1.13], [dx, .044, 0], wheelMat);
+      box(brake, 'Magnet_coil_casing', [.177, .113, 1.13], [0, .118, 0], wheelMat);
+      box(brake, 'Magnet_top_flange', [.162, .033, 1.06], [0, .187, 0], wheelMat);
+      for (const dz of [-.555, .555]) {
+        box(brake, 'Magnet_end_lug', [.19, .145, .077], [0, .151, dz], wheelMat);
+        rod(brake, 'Suspension_pin', V(0, .211, dz), V(0, .49, dz), .014, wheelMat);
+        const spring = Array.from({length: 55}, (_, k) => {
+          const a = k * Math.PI / 3;
+          return V(.027 * Math.cos(a), .236 + k * .0035, dz + .027 * Math.sin(a));
+        });
+        mesh(brake, 'Hanger_spring', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(spring),
+          spring.length - 1, .0065, 4, false), wheelMat);
+        box(brake, 'Hanger_bracket', [.175, .038, .093], [0, .478, dz], dark);
+      }
+      box(brake, 'Pivot_saddle', [.15, .105, .144], [0, .223, -.07], wheelMat);
+      for (const dx of [-.073, .073]) {
+        box(brake, 'Pivot_ear', [.03, .080, .125], [dx, .206, -.07], wheelMat);
+        rod(brake, 'Rounded_pivot_ear', V(dx-.015, .246, -.07), V(dx+.015, .246, -.07), .061, wheelMat, 16);
+      }
+      rod(brake, 'Pivot_pin', V(-.103, .246, -.07), V(.103, .246, -.07), .028, wheelMat, 12);
+      rod(brake, 'Suspension_link', V(side*.058, .246, -.07), V(side*.058, .56, -.034), .016, dark);
+      for (const dz of [-.51, -.30, -.16, .07, .51]) {
+        rod(brake, 'Casing_fastener', V(side * .085, .119, dz), V(side * .099, .119, dz), .016, wheelMat, 6);
+      }
+      tube(brake, 'Magnet_feed_cable', [V(0,.38,-.29), V(side*.102,.29,-.26),
+        V(side*.11,.174,-.24), V(side*.113,.15,-.05), V(side*.113,.113,.21),
+        V(side*.11,.142,.30), V(side*.073,.18,.31)], .011, dark);
+      for (const [height, dz] of [[.157,-.10],[.123,.16]]) {
+        box(brake, 'Cable_clip', [.048, .034, .017], [side*.101,height,dz], wheelMat);
+      }
+    }
     for (const [j, dz] of [.95, -.95].entries()) {
       const axle = group(b, `Wheelset_${i + 1}_${j + 1}`, 0, 0, dz); axle.userData.axis = 'X';
-      rod(axle, 'Axle', V(-.86, 0, 0), V(.86, 0, 0), .065, wheelMat);
+      rod(axle, 'Axle', V(-.75, 0, 0), V(.75, 0, 0), .065, wheelMat);
       for (const side of [-1, 1]) {
         const x = side * .7525;
-        const section = [[0, -.082], [.105, -.082], [.15, -.061], [.27, -.061], [.325, -.052], [.35, -.052],
-          [.35, .052], [.325, .052], [.27, .061], [.15, .061], [.105, .082], [0, .082]];
-        const wheel = mesh(axle, 'Solid_wheel', new THREE.LatheGeometry(section.map(p => new THREE.Vector2(...p)), 48), wheelMat, x, 0, 0);
-        wheel.rotation.z = Math.PI / 2;
-        const tread = mesh(axle, 'Running_tread', new THREE.CylinderGeometry(.3501, .3501, .102, 48, 1, true), treadMat, x, 0, 0);
-        tread.rotation.z = Math.PI / 2;
-        for (let k = 0; k < 6; k++) {
-          const a = k * Math.PI / 3;
-          mesh(axle, 'Wheel_bolt', new THREE.SphereGeometry(.018, 6, 4), wheelMat, x + side * .067, .18 * Math.cos(a), .18 * Math.sin(a));
+        const section = [[0,-.061],[.318,-.061],[.321,.052],[.300,.055],[.297,.051],
+          [.293,.051],[.290,.061],[.285,.064],[.109,.064],[.101,.069],[0,.069]];
+        const rim = [[.317,-.061],[.347,-.061],[.350,-.057],[.350,.048],[.346,.053],[.317,.055]];
+        for (const [name, profile, mat] of [['Solid_wheel',section,wheelMat],['Wheel_tyre',rim,treadMat]]) {
+          mesh(axle, name, new THREE.LatheGeometry(profile.map(p => new THREE.Vector2(...p)), 48), mat,
+            x, 0, 0).rotation.z = -side * Math.PI / 2;
         }
+        // A bevel catches the light around the single hex on the plain wheel disc.
+        const nut = [[.108,.066],[.118,.073],[.118,.091],[.107,.101],[0,.101]];
+        mesh(axle, 'Hub_hex_nut', new THREE.LatheGeometry(nut.map(p => new THREE.Vector2(...p)), 6),
+          wheelMat, x, 0, 0).rotation.z = -side * Math.PI / 2;
+        rod(axle, 'Axle_tip', V(x + side*.101,0,0), V(x + side*.110,0,0), .025, wheelMat, 12);
       }
       rig.wheelsets.push(axle);
     }
@@ -625,6 +668,19 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   label('Fleet_rear', fleet, [.68, .23], [0, 1.22, -7.009], Math.PI, null, '#d3b665', 1);
   label('Route_rear', line, [.29, .31], [0, 1.97, -6.92], Math.PI, '#e4ddc4', '#145488', 3);
   label('Route_mirror', line, [.22, .27], [-1.58, 2.53, 6.44], 0, '#145488', '#fff8df', 0);
+  // The bogie cover warning uses the spare row of the lettering atlas.
+  ctx.save(); ctx.translate(0, 400); ctx.scale(1024 / 72, 1);
+  ctx.fillStyle = '#e7e1d1'; ctx.fillRect(0, 0, 72, 96);
+  ctx.fillStyle = '#e3b839'; ctx.fillRect(4, 4, 64, 88);
+  ctx.strokeStyle = '#332f27'; ctx.lineWidth = 3; ctx.beginPath();
+  ctx.moveTo(36, 10); ctx.lineTo(60, 60); ctx.lineTo(12, 60); ctx.closePath(); ctx.stroke();
+  ctx.fillStyle = '#332f27'; ctx.beginPath(); ctx.moveTo(38, 22); ctx.lineTo(29, 42);
+  ctx.lineTo(36, 42); ctx.lineTo(31, 55); ctx.lineTo(45, 35); ctx.lineTo(38, 35); ctx.closePath(); ctx.fill();
+  ctx.fillRect(14, 72, 44, 3); ctx.fillRect(21, 80, 30, 2); ctx.restore();
+  writtenRows.add(4);
+  for (const b of rig.bogies) for (const side of [-1, 1]) {
+    label('Bogie_warning', '', [.064, .085], [side * .809, .155, .325], side * Math.PI / 2, null, null, 4, b);
+  }
   for (const side of [-1, 1]) {
     label('Fleet_side', fleet, [.68, .23], [side * 1.257, 1.47, side < 0 ? 3.80 : 1.80], side * Math.PI / 2, null, '#d3b665', 1);
     const indicator = group(detail, side < 0 ? 'Side_indicator_right' : 'Side_indicator_left', side * 1.269, 1.49, 4.35);
