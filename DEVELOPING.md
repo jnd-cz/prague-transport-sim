@@ -31,11 +31,13 @@ All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`)
 
 The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps
 side by side; `--parallel` also builds the lines side by side, as many as free memory holds (~2.5 GB each).
-A line takes ~2-4 min:
+A line takes ~2-4 min to its street surfaces; then its ground (4-10 min a line, up to 21 GB), the network on it and
+the build ID, one line after another (#702):
 
 ```bash
 python -P -E tools/rebuild.py 17 22          # or all lines: python -P -E tools/rebuild.py --parallel
-python -P -E tools/rebuild.py 9 --from dtm   # that step runs again (track = build_line, heights = line_heights)
+python -P -E tools/rebuild.py 9 --from dtm   # that step runs again (track = build_line, heights = line_heights,
+                                             # ground = ground_mesh)
 python -P -E tools/rebuild.py --force        # every step runs
 ```
 
@@ -46,8 +48,14 @@ records name files by their path under the checkout, so they hold in a fresh wor
 run left them, so the next step reads what it read before (`data/lineN.json` is rewritten by several steps in
 turn). A change to one rule reruns the steps that read what it changed, down to the first whose output stays the
 same. `lineN.log` says per step whether it ran and why (`tools/track_profile.py changed`, `data/line9.json
-changed`). A tool that reads a file the trace cannot see (C code other than osmium's reader, a subprocess) needs
-`--from` or `--force`.
+changed`). `data/truth.json` is keyed by the sections a step read (#816): a step that parses it with `json.load`
+or `json.loads` gets a dict that notes the top-level keys it reads, so a new place in `groundPlaces` reruns no
+build step (`data/truth.json: stopSigns changed` where one did change). A step that reads it whole (iterates,
+copies or dumps it) or opens it without parsing keeps the whole file in its key. A tool that reads a file the trace cannot see (C code other than osmium's reader, a subprocess) needs
+`--from` or `--force`, or the file declared: `rebuild.py` gives the step a name and a value that changes with it, kept
+in its record (`run_step(declared=...)`). The ground declares the city mesh it reads from the machine cache by its
+key; where the mesh of the current inputs is not there, `rebuild.py` runs `tools/city_terrain.py` first (#702).
+`reports/rebuild/ground.summary.log` names the mesh.
 
 The single steps:
 
@@ -130,13 +138,17 @@ Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait t
 | `line_heights` (all lines once) | `lineN.json` | the top of rail every 2 m along the path, the opposite path and every drawn track (`heights`, `heightSource`, a track's `zs`, #197); where no source has one, the surface plus the lift (`surface`, #480): no sample is left without a height, else the build fails |
 | `line_structures` | `lineN.json` | the spans the route runs on a bridge, those with a deck the track lies on, and the roads under it with their clearance (`spans`, `realDecks`, `underpasses`, #480) |
 | `cross_level` | `lineN.json` | the cross level of paved track where the road tilts across both tracks: one plane of IPR across them, the rails tilted with it (`crossLevel`, #538) |
+| `ground_mesh` (`--no-network`) | `lineN.ground.*` | after `street_profile`: the ground welded into one mesh (below, **Ground**); written only when the file decodes to the mesh built, its vertices and each class's triangles with their names, else the build fails (#702) |
+| `network` | `lineN.network.json` | on the ground file: the traffic's roads, lanes, walks, doors, the signals bound to the lanes (below, **The network**) |
+| `build_id` | the line's other files | the line's build ID, `data/lineN.json`'s CRC-32, into the provenance (`build`) of the files the page loads with it (`FILES`); the page computes the line file's and refuses a set of another build, or with a file that carries none, naming `rebuild.py N` (`src/buildId.js`, #702). A tool that writes one of those files stamps its provenance afresh, so a file built by hand after a rebuild carries none; a set where no file carries one was built before #702 and loads. `python -I tools/build_id.py --check N` lists them |
 
 The page computes no profile of its own (#480): it reads the built top of rail, the lift and the structures. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
 packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
 
 **The city terrain** (#428, the first step of #276's ground): `python -P -E tools/city_terrain.py` meshes IPR's
 1 m raster of the whole city once, 10 cm within 120 m of DI's tracks and growing beyond (at most 3 m), with no
-cell over its tolerance. It is no line step: the mesh goes into the machine cache
+cell over its tolerance. It is no line step (`rebuild.py` runs it before the ground where the mesh of the current
+inputs is not there): the mesh goes into the machine cache
 (`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and the code that makes the mesh: the three files of
 `CODE`, `city_terrain.py` up to its section on the key and the cache, so a change to the command line or the
 heavy-job turn keeps the mesh, #757), not `data/`. The ground file is built from it (`tools/ground_mesh.py`). A
@@ -554,6 +566,25 @@ the pinned #291 and only proposes.
   with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
 - Each job prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
   (`tools/sysinfo.py`). `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
+- A job in its own turn watches itself (#815; on 2026-11-22 a trace expected to take 5 min ran 100 min and held
+  17 GB against the 6 it declared, and the job behind it waited 26 min). Once a minute it reads its process tree
+  (`HeavyJob.verdict` has the rules): past 2× its expected time it warns, and it will end past 4× and 30 min over
+  it once a week of history has calibrated the rule (`HeavyJob.TIME_ENDS`; `heavy.py --history` shows each
+  kind's spread); over its share's memory it warns at 1.25× and ends at 2×, or at 1× with under 4 GB free on the
+  machine (a job alone: under 4 GB free), seen at two looks in a row; with its processes under 2 s of CPU in
+  10 min, or the process that started it gone, it ends. A warning goes on its ticket, which the board and a
+  waiting job's line show (`…, running 100 min, expected 5 (shared: 6 GB, 4 cores): LATE ×20; 17 of 6 GB`), and
+  once into the job's output. Ending stops everything the job started (on Windows a Job Object: a stopped
+  `heavy.py` stops its command too), exits 86 and prints one line: what, how long, how much against what. The
+  board lists the jobs a watch ended in the last hour. The expected time is `heavy.py --expect`, what
+  `headless.py` plans from its runs' times, or the median of the same kind's last full runs (a command's script
+  and its option names) in `history.jsonl` beside the tickets. `--no-limit` (`TRAM_HEAVY_NOLIMIT=1`) keeps the
+  warnings and ends nothing. A job waiting behind one that watches itself gives it 20 min before calling it stuck.
+- A stopped background task can leave its job running: when the command ended in a Git Bash program (`bash
+  chain.sh`), bash handed its process over to it, and the stop kills a pid that is gone (measured 2026-11-22: the
+  chain's shells and its python ran on, their parents unchanged; with the outer shell alive the stop ends the
+  whole tree). `python -I tools/heavy.py --stop PID` asks such a job to end with what it started; a job of
+  another checkout only with `--force`.
 
 **Stacked work:** an issue that needs another branch's unmerged work branches from it and opens its PR with
 `--base` on that branch. Before the base's PR merges, move the stacked PR onto main (`gh pr edit N --base main`):
@@ -656,7 +687,8 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   #704): a checkpoint's run, or a change of the terrain's thinning.
 - **The network** (the traffic's roads, lanes, footways and doors, the signals bound to the lanes, what the platforms and
   stops read of the survey) is built once, after `tools/ground_mesh.py`, by `tools/network.py` into
-  `data/lineN.network.json` ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658). Start
+  `data/lineN.network.json` ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658), a step of
+  `rebuild.py` of its own after the ground's (#702): a change to a traffic rule runs it alone. Start
   builds none of it and reads no lookup past the window: what it places stands on the heights the build read from the
   ground file as the page reads it (`tools/ground_at.py`, held to the page's reads by `tools/test_ground_at.py --browser`,
   #682): the bridges' and road tunnels' ends, the signal heads, the platforms. Our stops' signs and shelters settle once
