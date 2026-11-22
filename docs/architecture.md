@@ -80,12 +80,17 @@ Simulating a whole city at full detail won't be playable. Use three tiers with c
   number, destination. A tram met at Palackého náměstí then really came from Modřany, 3 minutes late
   and full.
 - A handoff must not teleport anything visible. Promote at the edge of the micro area, and fade
-  where nothing can be promoted cleanly. The camera spawn ring is the first version of this.
+  where nothing can be promoted cleanly. The spawn ring round the tram's front (`traffic.focus`, #722; it was
+  round the camera) is the first version of this.
 
 ## 4. Separate the simulation core from rendering
 
 - **A fixed-step, deterministic core** with no Three.js inside it, and seeded random numbers
   everywhere (the benches depend on that; `Math.random` must not leak into the simulation).
+- **Drawn between two steps:** the page steps 1/30 s and draws our tram, the camera, the cars, the other trams
+  and the game's movers between the last two steps (`drawnS`, `src/between.js`, #722). The steps still read
+  some poses off the meshes (`traffic._pathObstacles`: the other trams' cars), so a drawn pose is put back
+  after the draw; once the core keeps its own state, the renderer blends two of its snapshots instead.
 - **State in flat typed arrays** (structure of arrays) for the numerous things: cars, walkers,
   passengers. The WASM benchmark (PERF §9) showed data layout matters more than the language. WASM
   is worth it only for hot kernels later.
