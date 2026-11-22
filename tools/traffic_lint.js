@@ -6,6 +6,8 @@
 //   jump   - a visible car or walker that teleports between two samples
 //   overlap- two vehicles intersecting (car/car, car/tram, tram/tram), once per episode
 //   walker - a walker inside a vehicle
+//   walkerStuck - a walker that keeps within STILL_R of one place for STILL_T while not waiting at a kerb or in a door,
+//            once per episode: 'turning' (its way flips), 'loop' (its walks change), 'still' (neither) (#366, #269, #393)
 // Used by tools/lint.js ({ traffic: true }); returns checks in the same shape.
 import { Autopilot } from '../src/autopilot.js';
 import { CAR_PITCH } from '../src/tram.js';
@@ -14,6 +16,8 @@ import { startShift } from './bench/shift.js';
 
 const CAR = [4.3, 1.8], TRAM = [14.0, 2.5];
 const TOP = 12;
+// a walker walks 1.1-1.6 m/s: one that stays within 2 m of a place for 30 s without a reason is caught (#393's measure)
+const STILL_R = 2, STILL_T = 30;
 const AT_MAX = 2000; // every place as [x, y, s] up to this many (headless.py keeps them in the baseline, #157)
 export const placesAt = (items) => (items.length <= AT_MAX ? { at: items.map((i) => [i.x == null ? null : Math.round(i.x), i.y == null ? null : Math.round(i.y), i.s == null ? null : Math.round(i.s)]) } : {});
 
@@ -95,7 +99,8 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
   const g = await startShift(), tr = window.traffic;
   g.audio.setMuted(true);
   const ap = new Autopilot();
-  const slides = [], jumps = [], overlaps = [], hits = [], knobs = [], redRuns = [];
+  const slides = [], jumps = [], overlaps = [], hits = [], knobs = [], redRuns = [], stuckWalkers = [];
+  const still = new Map(); // walker -> { x, y, t: since when within STILL_R of (x, y), flips, walks, dir, walk, rec }
   const lastS = new Map(); // oncoming tram -> its position at the previous step
   let heat = null; // last heating setting: saloon / cab / flap, to count the autopilot's knob changes
   const prev = new Map(), open = new Map(); // id -> last sample; pair -> open overlap episode
@@ -181,6 +186,27 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
         }
         break;
       }
+      // walkers that stay in one place without a reason: a kerb wait or a door starts the watch again
+      const seen = new Set();
+      for (const o of snap.walk) {
+        const w = o.walk;
+        seen.add(w);
+        let a = still.get(w);
+        if (!a || w.waitKerb || w.door || Math.hypot(o.x - a.x, o.y - a.y) > STILL_R) {
+          still.set(w, { x: o.x, y: o.y, t: T, flips: 0, walks: 0, dir: w.dir, walk: w.walk, rec: null });
+          continue;
+        }
+        if (w.dir !== a.dir) a.flips++;
+        if (w.walk !== a.walk) a.walks++;
+        a.dir = w.dir; a.walk = w.walk;
+        const long = T - a.t;
+        if (long < STILL_T) continue;
+        if (a.rec) { a.rec.mag = long; continue; }
+        const kind = a.walks > 2 ? 'loop' : a.flips > 2 ? 'turning' : 'still';
+        a.rec = { kind, x: o.x, y: o.y, mag: long, s: Math.round(g.tram.s), info: `walker ${kind} within ${STILL_R} m for ${STILL_T} s (${a.flips} turns, ${a.walks} walks)` };
+        stuckWalkers.push(a.rec);
+      }
+      for (const w of [...still.keys()]) if (!seen.has(w)) still.delete(w);
       for (const k of [...open.keys()]) if (!live.has(k)) open.delete(k);
     }
     progress(`traffic run: ${Math.round(T)} s, stop ${g.nextStop}`);
@@ -204,6 +230,7 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
       jump: pick('traffic-no-teleport', jumps, samples),
       overlap: pick('traffic-no-overlap', overlaps, Math.round(minutes)),
       walkerHit: pick('traffic-walkers-clear-of-vehicles', hits, Math.round(minutes)),
+      walkerStuck: pick('traffic-walkers-keep-walking', stuckWalkers, Math.round(minutes)),
       heatingKnobs: pick('autopilot-calm-heating', knobs, Math.round(minutes)),
       redRuns: pick('trams-obey-junction-signals', redRuns, Math.round(minutes)),
     },
