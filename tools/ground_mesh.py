@@ -56,6 +56,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 from geo import TILE, on_grid, tile_box, tile_index, tile_name  # noqa: E402 (the squares the faces are built in: the world's tiles, #30)
+import ties  # noqa: E402 (of candidates as near, the first by where they lie, not by an STRtree's order, #812)
 Q = 1000  # vertices per m: positions and heights in mm
 CLASS_IDS = {"terrain": 0, "survey": 1, "bed": 2, "plot": 3, "wall": 4}
 RAISED = {"sidewalk", "island", "median", "platform"}  # (src/world.js RAISED: they keep their height over a bed)
@@ -449,7 +450,7 @@ class SurveySurface:
             k = np.flatnonzero(self.area == area)
             if len(k):
                 pts = shapely.points(x[miss], y[miss])
-                qi, j = shapely.STRtree(self.polys[k]).query_nearest(pts, all_matches=False)
+                qi, j = ties.nearest(shapely.STRtree(self.polys[k]), ties.by_place(self.polys[k]), pts)
                 near = shapely.get_coordinates(shapely.shortest_line(pts[qi], self.polys[k[j]]))[1::2]
                 out[miss[qi]] = plane(self.tris[k[j]], near[:, 0], near[:, 1])
                 self.missed += len(qi)
@@ -468,7 +469,7 @@ def off_cuts(px, py, tx, ty, cuts, step=None):
     if not S:
         return px, py
     S = np.asarray(S, float)
-    qi, j = shapely.STRtree(shapely.linestrings(S)).query_nearest(shapely.points(px, py), all_matches=False)
+    qi, j = ties.nearest(shapely.STRtree(shapely.linestrings(S)), ties.segments(S[:, 0], S[:, 1]), shapely.points(px, py))
     seg = np.empty(len(px), int)
     seg[qi] = j
     t = S[seg, 1] - S[seg, 0]
@@ -942,14 +943,18 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     t = np.clip(raw, 0, 1)
     d = np.hypot(*(P - A[si] - t[:, None] * v).T)
     past = ((raw < -1e-9) & END[si, 0]) | ((raw > 1 + 1e-9) & END[si, 1])
+    # (of segments as near, the first by where they lie and their levels, ties.py: two stretches laid over one wall in
+    # opposite directions, 0.343 m from a corner by lattice-cell (line 23 (-742.1, 903.0)), went by the tree's order,
+    # 228.78 or 228.81 m with the box's extent, #812)
+    rk = ties.segments(A, B, ZL[:, 0], ZL[:, 1], ZR[:, 0], ZR[:, 1], GL[:, 0], GR[:, 0], OUT)[si]
     # (whether a corner lies past a stretch's end is its nearest segment of that stretch's to say: 1 m beyond the end it
     # is still within WALL_HOLD of the stretch's second segment, which has no end to be past)
-    o = np.lexsort((d, SID[si], pi))
+    o = np.lexsort((rk, d, SID[si], pi))
     lead = np.concatenate([[True], (pi[o][1:] != pi[o][:-1]) | (SID[si[o]][1:] != SID[si[o]][:-1])])
     near = o[lead][np.cumsum(lead) - 1]
     gtip = np.empty(len(pi), bool)
     gtip[o] = ((raw[near] < -1e-9) & LAST[si[near], 0]) | ((raw[near] > 1 + 1e-9) & LAST[si[near], 1])
-    order = np.lexsort((d, past, pi))  # (per corner the nearest segment it is not past first)
+    order = np.lexsort((rk, d, past, pi))  # (per corner the nearest segment it is not past first)
     first = np.concatenate([[True], pi[order][1:] != pi[order][:-1]])
     k = order[first]
     # (a corner at or beyond its segment's end, at a bend or where two stretches meet: its triangle lies on one of the
@@ -961,7 +966,7 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     dc = np.hypot(*(C - A[si] - np.clip(rawc, 0, 1)[:, None] * v).T)
     dmin = np.full(len(idx), np.inf)
     np.minimum.at(dmin, pi, np.where(past, np.inf, d))
-    order2 = np.lexsort((dc, (rawc < -1e-9) | (rawc > 1 + 1e-9), d > dmin[pi] + WALL_JOIN, past, pi))
+    order2 = np.lexsort((rk, dc, (rawc < -1e-9) | (rawc > 1 + 1e-9), d > dmin[pi] + WALL_JOIN, past, pi))
     k2 = order2[np.concatenate([[True], pi[order2][1:] != pi[order2][:-1]])]
     k = np.where(((raw[k] < 1e-9) | (raw[k] > 1 - 1e-9)) & ~past[k], k2, k)
     c, s, t, d, raw, gtip = idx[pi[k]], si[k], t[k], d[k], raw[k], gtip[k]
@@ -1018,7 +1023,14 @@ def meet_raised(sc, x, y, zs):
     island) where they share a corner: at each such corner the step to the raised one's height when within MEET_STEP,
     pinned (no shift) where a corner is shared with any other survey class; every MEET corner within MEET_FADE of those edge
     corners takes their inverse-distance-weighted shift, faded linearly to none at MEET_FADE. All MEET corners together,
-    so two yards sharing an edge shift alike. Returns (zs, per corner the shift, NaN where none applied)."""
+    so two yards sharing an edge shift alike. Returns (zs, per corner the shift, NaN where none applied).
+    The edge is weighed per point, not per corner: a point holds a corner of each face round it (12 at one by
+    lattice-cell, line 23 (-787.3, 559.0), 1 mm apart), and the MEET_NEAR nearest corners were copies of that one point,
+    which of them by the KD tree's order: the shift moved with what else the box held, and one point crowded out the
+    other edge points within MEET_FADE (#812). A point's raised height is its raised corners' mean, its step the mean of
+    its MEET corners' steps; of points as near a corner, the first by place."""
+    import itertools
+
     from scipy.spatial import cKDTree
     shift = np.full(len(zs), np.nan)
     own = np.flatnonzero(np.isin(sc, MEET) & np.isfinite(zs))
@@ -1030,26 +1042,44 @@ def meet_raised(sc, x, y, zs):
     if not len(ko):
         return zs, shift
     up = oth[np.isin(sc[oth], list(RAISED))]
-    ku, fu = np.unique(key[up], return_index=True)
+    ku, iu = np.unique(key[up], return_inverse=True)
+    zu = np.bincount(iu, weights=zs[up], minlength=len(ku)) / np.maximum(np.bincount(iu, minlength=len(ku)), 1)
     j = np.clip(np.searchsorted(ko, key[own]), 0, len(ko) - 1)
     edge = own[ko[j] == key[own]]
+    if not len(edge):
+        return zs, shift
     dl = np.zeros(len(edge))
     if len(ku):
         ju = np.clip(np.searchsorted(ku, key[edge]), 0, len(ku) - 1)
         at = ku[ju] == key[edge]
-        dl[at] = zs[up[fu[ju[at]]]] - zs[edge[at]]
+        dl[at] = zu[ju[at]] - zs[edge[at]]
     dl[np.abs(dl) > MEET_STEP] = 0.0
-    if not len(edge) or not (dl != 0).any():
+    ke, first, ie = np.unique(key[edge], return_index=True, return_inverse=True)
+    dp = np.bincount(ie, weights=dl, minlength=len(ke)) / np.bincount(ie, minlength=len(ke))
+    if not (dp != 0).any():
         return zs, shift
-    d, i = cKDTree(np.column_stack([x[edge], y[edge]])).query(np.column_stack([x[own], y[own]]), k=min(MEET_NEAR, len(edge)),
-                                                              distance_upper_bound=MEET_FADE)
-    d, i = d.reshape(len(own), -1), i.reshape(len(own), -1)
-    ok = np.isfinite(d)
-    w = np.where(ok, 1.0 / np.maximum(d, 1e-3) ** 2, 0.0)
-    dv = np.where(ok, dl[np.minimum(i, len(edge) - 1)], 0.0)
-    has = ok.any(1)
+    ex, ey = x[edge[first]], y[edge[first]]
+    P = np.column_stack([x[own], y[own]])
+    nb = cKDTree(np.column_stack([ex, ey])).query_ball_point(P, r=MEET_FADE)
+    cnt = np.fromiter(map(len, nb), int, len(nb))
+    row = np.repeat(np.arange(len(own)), cnt)
+    col = np.fromiter(itertools.chain.from_iterable(nb), int, int(cnt.sum()))
+    d = np.hypot(P[row, 0] - ex[col], P[row, 1] - ey[col])
+    k = d < MEET_FADE
+    row, col, d = row[k], col[k], d[k]
+    o = np.lexsort((ke[col], d, row))  # (per corner its nearest points first; of points as near, the first by place)
+    row, col, d = row[o], col[o], d[o]
+    start = np.r_[0, np.flatnonzero(row[1:] != row[:-1]) + 1] if len(row) else np.zeros(0, int)
+    k = (np.arange(len(row)) - np.repeat(start, np.diff(np.r_[start, len(row)]))) < MEET_NEAR
+    row, col, d = row[k], col[k], d[k]
+    w = 1.0 / np.maximum(d, 1e-3) ** 2
+    num = np.bincount(row, weights=w * dp[col], minlength=len(own))
+    den = np.bincount(row, weights=w, minlength=len(own))
+    dmin = np.full(len(own), np.inf)
+    np.minimum.at(dmin, row, d)
+    has = den > 0
     s = np.zeros(len(own))
-    s[has] = (w[has] * dv[has]).sum(1) / w[has].sum(1) * np.clip(1 - d[has, 0] / MEET_FADE, 0, 1)
+    s[has] = num[has] / den[has] * np.clip(1 - dmin[has] / MEET_FADE, 0, 1)
     zs = zs.copy()
     zs[own] += s
     shift[own[has]] = s[has]
@@ -1126,7 +1156,9 @@ def own_side(walls, x, y, tx, ty, z, own):
     li, _ = tree.query(shapely.linestrings(np.stack([np.column_stack([tx[c], ty[c]]), np.column_stack([qx, qy])], 1)),
                        predicate="intersects")
     sees[np.unique(li)] = False
-    o = np.lexsort((d, ~sees, pi))  # (per corner, its nearest edge with a clear point out)
+    # (of edges as near, the first by where they lie, ties.py: a corner on the vertex two edges share read one side's
+    # surface or the other's by the tree's order, at lattice-cell (line 23 (-805.44, 964.86)) 230.21 or 230.37 m, #812)
+    o = np.lexsort((ties.segments(a, b)[si], d, ~sees, pi))  # (per corner, its nearest edge with a clear point out)
     o = o[np.r_[True, pi[o][1:] != pi[o][:-1]]]
     o = o[sees[o]]
     c, qx, qy = c[o], qx[o], qy[o]
@@ -1369,8 +1401,9 @@ def off_the_smear(walls, x, y, tx, ty, z, own, lidar=None):
     side = np.where((tx[c] - fx) * nx + (ty[c] - fy) * ny >= 0, 1.0, -1.0)  # (the corner's triangle's side of the edge)
     qx, qy = fx + side * nx * WALL_HOLD, fy + side * ny * WALL_HOLD
     moved = np.zeros(len(c), bool)
+    rk = ties.segments(a, b)  # (of edges as near, the first by where they lie, not by the tree's order: #812)
     for _ in range(2):
-        (k, j), dj = tree.query_nearest(shapely.points(qx, qy), max_distance=WALL_HOLD - 0.05, return_distance=True, all_matches=False)
+        (k, j), dj = ties.nearest(tree, rk, shapely.points(qx, qy), max_distance=WALL_HOLD - 0.05, return_distance=True)
         k, j, dj = k[dj > 1e-6], j[dj > 1e-6], dj[dj > 1e-6]
         if not len(k):
             break
@@ -1383,10 +1416,10 @@ def off_the_smear(walls, x, y, tx, ty, z, own, lidar=None):
     li, _ = tree.query(shapely.linestrings(np.stack([np.column_stack([tx[c], ty[c]]), np.column_stack([qx, qy])], 1)),
                        predicate="intersects")
     sees[np.unique(li)] = False
-    o = np.lexsort((d, ~sees, pi))  # (per corner, its nearest edge with a clear point out)
+    o = np.lexsort((rk[si], d, ~sees, pi))  # (per corner, its nearest edge with a clear point out)
     o = o[np.r_[True, pi[o][1:] != pi[o][:-1]]]
     o = o[sees[o]]
-    c, fx, fy, nx, ny, side, d, qx, qy, moved = (v[o] for v in (c, fx, fy, nx, ny, side, d, qx, qy, moved))
+    c, fx, fy, nx, ny, side, d, qx, qy, moved =(v[o] for v in (c, fx, fy, nx, ny, side, d, qx, qy, moved))
     zq = np.asarray(own(qx, qy), float)
     with np.errstate(invalid="ignore"):
         g = (zq - np.asarray(own(fx + side * nx * 2 * WALL_HOLD, fy + side * ny * 2 * WALL_HOLD), float)) / WALL_HOLD
@@ -1446,7 +1479,8 @@ def snap_to_walls(D, x, y, z, street, walls=None):
     up = zw - z[s][pi]
     d = np.abs(up)
     lim = np.asarray(reach, float)[si]
-    o = np.lexsort((d, pi))  # (per point, its nearest height first)
+    # (per point, its nearest height first; of heights as near, the first segment by where it lies: ties.py, #812)
+    o = np.lexsort((ties.segments(a, b, a[:, 2], b[:, 2], np.asarray(reach, float))[si], d, pi))
     pi, zw, up, lim = pi[o], zw[o], up[o], lim[o]
     first = np.r_[True, pi[1:] != pi[:-1]]
     pi, zw, up, lim = pi[first], zw[first], up[first], lim[first]
@@ -1984,11 +2018,14 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     faces, inner = faces[keep], inner[keep]
     fi, oi = own_tree.query(inner, predicate="intersects")
     owner = np.full(len(faces), -1)
-    order = np.argsort(shapely.area(own_geoms[oi]))[::-1]  # (smallest last: it wins)
+    # (smallest last: it wins; of pieces as small, and of the nearest pieces to a sliver, which touches two at 0 m, the
+    # first by where they lie, not by the tree's order: ties.py, #812)
+    own_rank = ties.by_place(own_geoms)
+    order = np.lexsort((-own_rank[oi], -shapely.area(own_geoms[oi])))
     owner[fi[order]] = oi[order]
     lost = owner < 0
     if lost.any():  # (slivers between the pieces, under SLIVER: the nearest piece's class)
-        li, lo = own_tree.query_nearest(inner[lost], all_matches=False)
+        li, lo = ties.nearest(own_tree, own_rank, inner[lost])
         owner[np.flatnonzero(lost)[li]] = lo
     n_lost, a_lost = int(lost.sum()), float(shapely.area(faces[lost]).sum())
     lost = owner < 0
@@ -2025,7 +2062,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # the water: its level at each corner, a corner on a cut seen from inside its own triangle (the level steps there)
     from geo import Frame
     from ipr_dtm import IprDtm
-    levels = gp.WaterLevels(G["water"], G["cuts"], IprDtm(), Frame(), extent=box.buffer(gp.WATER_REACH)) if not wet.is_empty else None
+    levels = gp.WaterLevels(G["water"], G["cuts"], IprDtm(), Frame(), extent=box.buffer(gp.WATER_FAR)) if not wet.is_empty else None
 
     def water_level(ci):
         out = np.full(len(ci), np.nan)

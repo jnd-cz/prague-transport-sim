@@ -1006,6 +1006,27 @@ class MeetRaised(unittest.TestCase):
                               np.concatenate([zs, zs[22:33]]))
         np.testing.assert_allclose(z[-11:], z[22:33])
 
+    def test_the_shift_is_the_same_whatever_else_the_box_holds(self):
+        # (each edge corner a point of 9 faces, 1 mm apart, as at lattice-cell, line 23 (-787.3, 559.0): weighed per corner,
+        # the 8 nearest were copies of one point, which by the KD tree's order; here the corners shuffled and a second
+        # yard 100 m off, meeting its own sidewalk, put in the box, #812)
+        sc, sa, x, y, zs = self.corners(0.2)
+        rep = np.r_[np.repeat(np.arange(11), 9), np.arange(11, len(x))]
+        sc, x, y = sc[rep], x[rep], y[rep]
+        zs = zs[rep] + np.r_[np.tile(np.linspace(-5e-4, 5e-4, 9), 11), np.zeros(len(rep) - 99)]
+        z0, _ = gm.meet_raised(sc, x, y, zs)
+        rng = np.random.default_rng(812)
+        o = rng.permutation(len(x))
+        far = 100.0 + rng.uniform(0, 40, 300)
+        sc2 = np.r_[sc[o], np.where(np.arange(300) < 150, "paved", "sidewalk")]
+        x2 = np.r_[x[o], far]
+        y2 = np.r_[y[o], np.r_[np.arange(150) * 0.2, np.arange(150) * 0.2]]
+        x2[-150:] = x2[-300:-150]  # (the far sidewalk's corners on the far yard's)
+        zs2 = np.r_[zs[o], np.full(150, 100.0), np.full(150, 100.1)]
+        z1, _ = gm.meet_raised(sc2, x2, y2, zs2)
+        np.testing.assert_array_equal(z1[:len(x)][np.argsort(o)], z0)
+        np.testing.assert_allclose(z0[:99], zs[:99] + 0.2, atol=1e-9)  # (on the edge: each corner its point's step)
+
 
 class Steps(unittest.TestCase):
     def square_with_a_step(self):

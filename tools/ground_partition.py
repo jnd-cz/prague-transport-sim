@@ -30,6 +30,7 @@ terrain's counts and the mesh's key), lineN.json (the report) and pictures at th
 (#508) calls partition() itself: it needs the geometry and the city mesh, which only a building machine holds.
 """
 import json
+import math
 import os
 import sys
 import time
@@ -41,8 +42,9 @@ from shapely.geometry import Point, Polygon
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
+import ties  # noqa: E402 (of candidates as near, the first by where they lie, not by an STRtree's order, #812)
 
-CLASSES = ("survey", "street", "bed", "plot", "water", "terrain")
+CLASSES =("survey", "street", "bed", "plot", "water", "terrain")
 LEVEL = 2.5  # m: a bed's ground this far from IPR's lies on a structure (src/world.js LEVEL, a bridge or an underpass)
 # m: near a span's end (DECK_END), a track this near the route and its height lies on the route's deck or on the ground
 # where the route does (bed_pieces; a paired track 3.5-4.4 m from the route on line 17's bridges)
@@ -55,6 +57,7 @@ RULES = {"min": lambda z: float(np.min(z)), "p10": lambda z: float(np.percentile
 STRIP = 1.0  # m: terrain narrower than this between a plot and the classes above joins the plot (thin_strips)
 GAP = 0.01  # m: gaps between beds narrower than twice this are closed (bed_pieces)
 SLIVER = 1e-4  # m²: pieces smaller than this are left out (float noise of the cuts)
+GRID = 1e-3  # m: the pieces' vertices on this grid, the ground file's (ground_mesh.Q)
 TILE = 500.0  # m: the terrain is cut in squares this size side by side (threads; the world's tiles are geo.TILE)
 GAUGE = 0.72  # m: a rail from the axis (track_beds.GAUGE)
 # (the line's ground reaches this far from its route and tracks: the fog ends at 950 m (src/main.js), nothing farther is
@@ -71,8 +74,11 @@ BUILDINGS_KR = "010000029902_Hranice_budovy"  # the survey's 3D building outline
 WATER_CUTS = ("weir", "dam", "lock_gate")  # OSM's waterway=* ways a river's level steps at (pools)
 WATER_CUT_EXT, WATER_CUT_NEAR = 3.0, 2.0  # m: a cut extended past its ends; its banks' heights read this far from it
 WATER_LEVEL = 0.1  # a pool's level: this quantile of IPR's ground along its banks (src/terrain.js DtmSurface's water)
-WATER_STEP = 10.0  # m: the banks' samples this far apart
-WATER_REACH, WATER_FEW, WATER_FAR = 250.0, 10, 1000.0  # m, samples, m: the banks a level is read from (WaterLevels)
+WATER_STEP = 10.0  # m: the banks' samples where they cross the lines of this grid (bank_samples)
+# m, samples, m: the banks a level is read from (WaterLevels). WATER_FAR is a tile's side (geo.TILE): a tile's ground
+# reads its ring of tiles and nothing farther, or a tile has one level in a line's build and another in a place's or
+# the city's (#812: 1,000 m read past lattice-cell's ring)
+WATER_REACH, WATER_FEW, WATER_FAR = 250.0, 10, 500.0
 WATER_SEE, WATER_RES, WATER_CUT_W = 1.0, 1.0, 3  # m, m, cells: the lines of sight (WaterLevels._seen)
 
 
@@ -302,6 +308,17 @@ def plot_pieces(L, box, above, ipr, F):
     return res
 
 
+def on_the_grid(qs):
+    """Pieces ([{g, ...}], in place) with their vertices on the mm grid the ground file keeps (GRID), those left under
+    SLIVER dropped. The cuts run over the whole box, and where pieces meet they leave needles and slivers of float
+    noise that differ with the box: lattice-cell's tile held a plot with a needle 9 m long and 1e-13 m wide in one box
+    and not in the other, and its edges were among the faces' lines (#812). On the grid they are gone."""
+    for q in qs:
+        q["g"] = polygonal(shapely.set_precision(q["g"], GRID))
+    qs[:] = [q for q in qs if q["g"].area > SLIVER]
+    return qs
+
+
 def thin_strips(terrain, plots, width=STRIP):
     """Terrain narrower than `width` that touches a plot joins that plot (in place): OSM's footprints lie up to a metre
     off the survey's outlines of the same walls, and the strip between them is under the wall. {pieces, area}."""
@@ -416,15 +433,49 @@ def water_cuts(W, F, ext=None):
     return out
 
 
+def bank_samples(line, step=WATER_STEP):
+    """The points where a line crosses the S-JTSK grid's lines every `step` m (x and y; geo.ORIGIN), each once: a
+    bank's samples that depend on the bank near them alone. (Spaced evenly from a ring's first point, they moved with
+    where the ring started and how long it ran: the union with water past the ring started a pond's ring elsewhere,
+    and its level moved by up to 12.8 cm in lattice-cell's tile, #812.) About one sample every `step` m along a
+    bank, up to 1.41 on a diagonal."""
+    from geo import ORIGIN
+    out = [np.zeros((0, 2))]
+    for q in shapely.get_parts(line):
+        c = shapely.get_coordinates(q)
+        if len(c) < 2:
+            continue
+        a, b = c[:-1], c[1:]
+        for ax in (0, 1):
+            u, w = a[:, ax] + ORIGIN[ax], b[:, ax] + ORIGIN[ax]
+            k0, k1 = np.ceil(np.minimum(u, w) / step), np.floor(np.maximum(u, w) / step)
+            n = np.where(u != w, np.maximum(k1 - k0 + 1, 0), 0).astype(int)
+            if not n.sum():
+                continue
+            seg = np.repeat(np.arange(len(a)), n)
+            k = k0[seg] + np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n)
+            t = (k * step - u[seg]) / (w[seg] - u[seg])
+            out.append(a[seg] + t[:, None] * (b[seg] - a[seg]))
+    P = np.concatenate(out)
+    if not len(P):
+        return P
+    _, first = np.unique(np.round(P * 1000).astype(np.int64), axis=0, return_index=True)  # (a point on two segments)
+    return P[np.sort(first)]
+
+
 class WaterLevels:
     """The water's level at points: the `level` quantile (WATER_LEVEL) of IPR's ground along the banks of the point's own
     water (W's polygon holding it) within `reach` m (WATER_REACH) that a straight line from the point reaches over the
     water without crossing a cut (a weir, a dam, a lock gate). Where fewer than WATER_FEW do, the nearest WATER_FEW
-    within WATER_FAR it reaches so, else the nearest WATER_FEW of its water. A river falls at its weirs: line 17's Modřany
-    weir 2.2 m, Štvanice's 3.9; the level from every bank within 150 m put the step 50-100 m upstream of the weir (#632).
-    The cuts close no pools: the Vltava passes Prague's weirs through Čertovka and side channels with no weir mapped
-    across them, so a point's level is the banks' it sees, not its pool's outline's. The lines of sight run on a raster
-    of WATER_RES m: the water, one cell grown (a line along a bank), less the cuts drawn WATER_CUT_W cells wide."""
+    within WATER_FAR it reaches so, else the nearest WATER_FEW within WATER_FAR on its side of the cuts. A river falls
+    at its weirs: line 17's Modřany weir 2.2 m, Štvanice's 3.9; the level from every bank within 150 m put the step
+    50-100 m upstream of the weir (#632). The cuts close no pools: the Vltava passes Prague's weirs through Čertovka and
+    side channels with no weir mapped across them, so a point's level is the banks' it sees, not its pool's outline's.
+    The lines of sight run on a raster of WATER_RES m on the S-JTSK grid: the water, one cell grown (a line along a
+    bank), less the cuts drawn WATER_CUT_W cells wide.
+    A level reads the banks within WATER_FAR of its point and nothing else: the samples where the banks cross a fixed
+    grid (bank_samples), the raster's cells on that grid whatever the extent (from the water's bounds in the box they
+    moved with the box, and a pond saw 17, 18 or 19 of its 23 banks, #812)."""
 
     def __init__(self, W, cuts, ipr, F, reach=None, level=None, extent=None):
         from PIL import Image, ImageDraw
@@ -439,14 +490,14 @@ class WaterLevels:
         near = C.buffer(WATER_CUT_NEAR) if C is not None else None
         self.parts = [g for g in shapely.get_parts(W) if g.geom_type == "Polygon"]
         self.part_tree = shapely.STRtree(self.parts) if self.parts else None
+        self.part_rank = ties.by_place(self.parts)
         P, lab = [np.zeros((0, 2))], [np.zeros(0, int)]
         for j, g in enumerate(self.parts):
             bank = g.boundary if near is None else g.boundary.difference(near)
-            for part in shapely.get_parts(bank):
-                if part.length > 0:
-                    k = max(2, int(part.length / WATER_STEP))
-                    P.append(shapely.get_coordinates(shapely.line_interpolate_point(part, np.linspace(0, part.length, k))))
-                    lab.append(np.full(len(P[-1]), j))
+            q = bank_samples(bank)
+            if len(q):
+                P.append(q)
+                lab.append(np.full(len(q), j))
         P, lab = np.concatenate(P), np.concatenate(lab)
         z = np.asarray(ipr.sample(P[:, 0] + F.E0, P[:, 1] + F.N0), float) if len(P) else np.zeros(0)
         ok = np.isfinite(z)
@@ -455,10 +506,14 @@ class WaterLevels:
         for j in np.unique(self.lab).tolist():
             ids = np.flatnonzero(self.lab == j)
             self.trees[j] = (ids, cKDTree(self.P[ids]))
-        # the raster the lines of sight run on (the extent's water: the line's ground grown by the reach)
+        # the raster the lines of sight run on (the extent's water: the line's ground grown by WATER_FAR), its cells on
+        # the S-JTSK grid
+        from geo import ORIGIN
         ex = W if extent is None else W.intersection(extent)
         r = WATER_RES
-        self.x0, y0, x1, self.y1 = ex.bounds if not ex.is_empty else (0, 0, 1, 1)
+        bx0, y0, x1, by1 = ex.bounds if not ex.is_empty else (0, 0, 1, 1)
+        self.x0 = math.floor((bx0 + ORIGIN[0]) / r) * r - ORIGIN[0]
+        self.y1 = math.ceil((by1 + ORIGIN[1]) / r) * r - ORIGIN[1]
         nx, ny = int((x1 - self.x0) / r) + 2, int((self.y1 - y0) / r) + 2
         im = Image.new("1", (nx, ny), 0)
         d = ImageDraw.Draw(im)
@@ -507,11 +562,14 @@ class WaterLevels:
         V = np.column_stack([px if vx is None else vx, py if vy is None else vy]).astype(float)
         pts = shapely.points(V)
         own = np.full(len(V), -1)
+        # (a point on two parts, or as near two: the first part by where it lies, not by the tree's order, #812)
         pi, gi = self.part_tree.query(pts, predicate="intersects")
-        own[pi[::-1]] = gi[::-1]
+        k = ties.firsts(pi, self.part_rank[gi])
+        own[pi[k]] = gi[k]
         lost = np.flatnonzero(own < 0)
         if len(lost):
-            own[lost] = self.part_tree.query_nearest(pts[lost], all_matches=False)[1]
+            li, lo = ties.nearest(self.part_tree, self.part_rank, pts[lost])
+            own[lost[li]] = lo
         for j in np.unique(own).tolist():
             if j not in self.trees:
                 continue
@@ -520,14 +578,19 @@ class WaterLevels:
             for k, loc in zip(sel.tolist(), tree.query_ball_point(V[sel], self.reach)):
                 idx = self._seen(V[k], ids[np.asarray(loc, int)])
                 if len(idx) < WATER_FEW:
-                    dist, loc = tree.query(V[k], k=min(len(ids), 4 * WATER_FEW), distance_upper_bound=WATER_FAR)
-                    loc = np.atleast_1d(loc)[np.isfinite(np.atleast_1d(dist))]
+                    # (the nearest 4 WATER_FEW within WATER_FAR; of samples as near, the first by place, not by the KD
+                    # tree's order, which every sample in the box moves, #812)
+                    loc = np.asarray(tree.query_ball_point(V[k], WATER_FAR), int)
+                    q = self.P[ids[loc]]
+                    dist = np.hypot(q[:, 0] - V[k, 0], q[:, 1] - V[k, 1])
+                    loc = loc[np.lexsort((q[:, 1], q[:, 0], dist))][:4 * WATER_FEW]
                     idx = self._seen(V[k], ids[loc])[:WATER_FEW]
                     if len(idx) < WATER_FEW:  # (the nearest on its side of the cuts, over the land too; else the nearest)
-                        near = ids[np.atleast_1d(tree.query(V[k], k=min(len(ids), 4 * WATER_FEW))[1])]
+                        near = ids[loc]
                         side = self._this_side(V[k], near)[:WATER_FEW]
                         idx = side if len(side) else near[:WATER_FEW]
-                out[k] = np.quantile(self.z[idx], self.level)
+                if len(idx):
+                    out[k] = np.quantile(self.z[idx], self.level)
         return out
 
     def _this_side(self, v, idx):
@@ -662,10 +725,14 @@ def partition(ln, mesh=None, threads=8, windows=(), geometry=False, within=None)
     cuts = water_cuts(W, F) if not W.is_empty else []
     Wp = polygonal(W.intersection(box).difference(shapely.union_all([S, B, P]))) if not W.is_empty else Polygon()
     water = [{"g": g} for g in shapely.get_parts(Wp) if g.geom_type == "Polygon" and g.area > SLIVER]
-    Wp = shapely.union_all([q["g"] for q in water]) if water else Polygon()
     lap("water")
-    cover = shapely.union_all([S, B, P, Wp])
-    terrain = polygonal(box.difference(cover))
+    for qs in (survey, beds, plots, water):
+        on_the_grid(qs)
+    S, B, P, Wp = (shapely.union_all([q["g"] for q in qs], grid_size=GRID) if qs else Polygon() for qs in (survey, beds, plots, water))
+    B0 = polygonal(shapely.set_precision(B0, GRID))
+    lap("on the grid")
+    cover = shapely.union_all([S, B, P, Wp], grid_size=GRID)
+    terrain = polygonal(box.difference(cover, grid_size=GRID))
     rep["strips joined to plots"] = {"pieces": strips["pieces"], "m2": round(strips["area"], 1)}
     tp = [g for g in shapely.get_parts(terrain) if g.geom_type == "Polygon"]
     thin = [g for g in tp if 2 * g.area / max(g.length, 1e-9) < 2 * GAP]

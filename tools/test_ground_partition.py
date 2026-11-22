@@ -210,5 +210,69 @@ class Water(unittest.TestCase):
         self.assertEqual(z.tolist(), [30.0, 10.0])
 
 
+def keyed(P):
+    return sorted(map(tuple, np.round(P, 6).tolist()))
+
+
+class Grid(unittest.TestCase):
+    def test_a_needle_of_float_noise_is_gone_on_the_grid(self):
+        # (building 1174's plot in lattice-cell's tile, #812: a needle 9.4 m long, its base a few 1e-13 m wide)
+        base = (-1009.7171, 518.4534)
+        ring = [(-1030.0, 491.1), (-975.4, 500.0), (-997.44, 529.25), (-1004.8, 526.53), base, (-1004.9, 526.6),
+                (base[0] + 3e-13, base[1] - 2e-13), (-1014.27, 509.35)]
+        plain = [(-1030.0, 491.1), (-975.4, 500.0), (-997.44, 529.25), (-1004.8, 526.53), base, (-1014.27, 509.35)]
+        a, b = [{"g": shapely.Polygon(ring)}], [{"g": shapely.Polygon(plain)}]
+        gp.on_the_grid(a)
+        gp.on_the_grid(b)
+        self.assertTrue(shapely.equals_exact(shapely.normalize(a[0]["g"]), shapely.normalize(b[0]["g"]), 0))
+        self.assertFalse(np.isclose(shapely.get_coordinates(a[0]["g"]), (-1004.9, 526.6)).all(1).any())
+        # (and a piece left under SLIVER goes)
+        c = [{"g": shapely.box(0, 0, 0.005, 0.01)}, {"g": shapely.box(0, 0, 1, 1)}]
+        self.assertEqual(len(gp.on_the_grid(c)), 1)
+
+
+class WaterLocality(unittest.TestCase):
+    """#812: a level reads the water within WATER_FAR of its point, and nothing of where the box ends."""
+    # (a pond with corners off the grid, and a river that runs out of either box)
+    POND = shapely.Polygon([(13.3, 7.1), (61.7, 4.4), (78.2, 39.9), (40.6, 71.3), (9.8, 48.2)])
+    RIVER = shapely.Polygon([(-2000.3, -40.2), (2000.7, -60.4), (2000.2, 30.6), (300.1, 45.3), (-2000.9, 20.1)])
+
+    def test_a_banks_samples_do_not_follow_where_its_ring_starts(self):
+        c = list(self.POND.exterior.coords)[:-1]
+        turned = shapely.Polygon(c[2:] + c[:2])
+        self.assertEqual(keyed(gp.bank_samples(self.POND.boundary)), keyed(gp.bank_samples(turned.boundary)))
+        # (nor how far the water runs: another pond merged in at its far end leaves the near samples as they were)
+        more = shapely.union_all([self.POND, shapely.box(75, 30, 140, 36)])
+        near = lambda P: keyed(P[P[:, 0] < 60])  # noqa: E731
+        self.assertEqual(near(gp.bank_samples(self.POND.boundary)), near(gp.bank_samples(more.boundary)))
+        # (about one sample every WATER_STEP m)
+        n = len(gp.bank_samples(self.POND.boundary))
+        self.assertTrue(self.POND.length / gp.WATER_STEP <= n <= 1.5 * self.POND.length / gp.WATER_STEP, n)
+        # (the old samples, spaced evenly from the ring's first point, moved with it)
+        old = lambda g: shapely.get_coordinates(shapely.line_interpolate_point(g, np.linspace(0, g.length, int(g.length / 10))))  # noqa: E731
+        self.assertNotEqual(keyed(old(self.POND.boundary)), keyed(old(turned.boundary)))
+
+    def test_a_level_is_the_same_in_a_small_box_and_a_larger(self):
+        from geo import ORIGIN
+        ipr = Ipr(lambda x, y: 180.0 + 0.002 * x + 0.5 * np.sin(x / 37.0) + 0.3 * np.cos(y / 11.0))
+        px, py = np.linspace(-300.5, 300.5, 41), np.linspace(-35.2, 20.3, 41)
+        out = []
+        for box in (shapely.box(-700.37, -400.81, 700.12, 400.55), shapely.box(-1203.9, -900.4, 1207.6, 903.2)):
+            lv = gp.WaterLevels(self.RIVER, [], ipr, Frame(), extent=box.buffer(gp.WATER_FAR))
+            self.assertEqual(((lv.x0 + ORIGIN[0]) % gp.WATER_RES, (lv.y1 + ORIGIN[1]) % gp.WATER_RES), (0.0, 0.0))
+            out.append(lv.at(px, py))
+        self.assertTrue(np.isfinite(out[0]).all())
+        self.assertEqual(out[0].tolist(), out[1].tolist())
+
+    def test_no_bank_farther_than_water_far(self):
+        # (a lake's middle, 600 m from every bank: no level, where the old fallback read banks at any distance; the
+        # build gives such a corner the lidar's height. Prague's widest water, the Vltava, is under 400 m across)
+        W = shapely.Point(0, 0).buffer(600, 64)
+        lv = gp.WaterLevels(W, [], Ipr(lambda x, y: np.full(np.shape(x), 10.0)), Frame())
+        z = lv.at(np.array([0.0, 450.0]), np.array([0.0, 0.0]))
+        self.assertTrue(np.isnan(z[0]))
+        self.assertEqual(z[1], 10.0)
+
+
 if __name__ == "__main__":
     unittest.main()

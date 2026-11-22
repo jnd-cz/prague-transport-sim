@@ -474,7 +474,10 @@ class Beds:
             np.fmin.at(out, pi, plane(T[ti], x[pi], y[pi]))
         miss = np.flatnonzero(np.isnan(out))
         if reach and len(miss):
-            mi, mt = self._tree.query_nearest(pts[miss], max_distance=reach, all_matches=False)
+            import ties  # (of triangles as near, the first by where it lies, not by the tree's order, #812)
+            if getattr(self, "_rank", None) is None:
+                self._rank = ties.rank(*(T[:, i, j] for i in range(3) for j in range(3)))
+            mi, mt = ties.nearest(self._tree, self._rank, pts[miss], max_distance=reach)
             out[miss[mi]] = plane(T[mt], x[miss[mi]], y[miss[mi]])
         return out
 
