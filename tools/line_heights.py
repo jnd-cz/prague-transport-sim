@@ -251,6 +251,14 @@ def other_heights(samples):
     return pick(arch), pick(surv)
 
 
+def archive_year(samples, years):
+    """The newest survey year of the archive records a bin's archive heights come from (`years`: record id -> the
+    archive's ROK); None where one of them states no year (-99) or there is none."""
+    ys = [years.get(str(c.get('id'))) for h in samples for c in h.get('candidates', ())
+          if c['dataset'] == 'archive' and not c.get('excluded')]
+    return max(ys) if ys and all(isinstance(y, int) and y > 0 for y in ys) else None
+
+
 def smooth_heights(chs):
     """The smoother in front of the band rule (#358): each run of heights, moved at most SMOOTH_CLAMP, nearly not at all near a
     junction, where the tracks must meet. A run shorter than two of its wavelengths stays: it has no waves to tell from its
@@ -286,6 +294,7 @@ def build_chains(staged):
     for h in staged['height_samples']:
         if h['di_id'] in lines:
             per[h['di_id']].append(h)
+    years = {k: (v.get('attributes') or {}).get('ROK') for k, v in (staged.get('archive_sources') or {}).items()}
     out = []
     for chain in chains(paths):
         xy, cum, bins = [], 0.0, defaultdict(list)
@@ -313,7 +322,8 @@ def build_chains(staged):
             h = (sel or v)[len(sel or v) // 2]
             kinds = Counter((x.get('construction') or {}).get('kind') or 'unknown' for x in v)
             archive, survey = other_heights(v)
-            series.append({'archive': archive, 'survey': survey, 's': min((b + .5) * BIN, cum), 'z': h['z'] if sel else None, 'w': 1.0 if sel else 0.0,
+            series.append({'archive': archive, 'survey': survey, 'year': archive_year(v, years),
+                           's': min((b + .5) * BIN, cum), 'z': h['z'] if sel else None, 'w': 1.0 if sel else 0.0,
                            'src': CODE.get((h.get('height_source') or {}).get('dataset')) if sel else None,
                            'kind': kinds.most_common(1)[0][0], 'terrain': h.get('terrain_z'), 'xy': h['xy'],
                            'flags': sorted({f for x in v for f in x.get('review_flags', [])})})

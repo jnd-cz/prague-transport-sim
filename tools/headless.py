@@ -925,6 +925,7 @@ def main():
         pages = min(a.jobs, len(batches))  # (what the queue keeps for this run: the pages it opens, #728)
         heavy.claim(gb=PAGE_GB * pages, cores=PAGE_CORES * pages)
         dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
+        heavy.expect(finish(dur, a.jobs))  # (its watch's time, #815)
         print(f"{len(runs)} runs in {len(batches)} batches on {min(a.jobs, len(batches))} pages, longest first; "
               f"expected {finish(dur, a.jobs):.0f} s from {len(t['runs'])} timed runs", flush=True)
         i = 0
