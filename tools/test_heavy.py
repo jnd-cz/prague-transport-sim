@@ -144,6 +144,54 @@ class Queue(unittest.TestCase):
     def test_the_same_variable_as_the_queue(self):
         self.assertEqual(heavy.HELD, baseline_store.HELD)
 
+    def test_options_before_the_name(self):
+        """#815: --expect DURATION and --no-limit beside --shared, in any order."""
+        self.assertEqual(heavy.options(["--expect", "20m", "--no-limit", "--shared", "4,2", "x", "--", "c"], baseline_store.seconds),
+                         ({"share": {"gb": 4.0, "cores": 2}, "expect": 1200.0, "limits": False}, ["x", "--", "c"]))
+        self.assertEqual(heavy.options(["x", "--", "c", "--no-limit"], baseline_store.seconds)[0],
+                         {"share": None, "expect": None, "limits": None})  # (the command's own options stay its own)
+        for bad in (["--expect", "soon", "x"], ["--expect"], ["--fast", "x"]):
+            self.assertIsNone(heavy.options(bad, baseline_store.seconds)[0], bad)
+
+    def test_the_command_kind_and_expected_time_go_on_the_ticket_and_into_the_history(self):
+        code = ("import json, os, sys; d = sys.argv[1]\n"
+                "j, = (json.load(open(os.path.join(d, n), encoding='utf-8')) for n in os.listdir(d) if n.endswith('.lock'))\n"
+                "print(j['kind'], j['expect'], j['watch'], j['stops'])")
+        r = subprocess.run(self.heavy("--expect", "90s", "--no-limit", "k", "--", sys.executable, "-I", "-c", code, self.locks),
+                           env=self.env, capture_output=True, text=True, timeout=60)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "python 90.0 False True"), r.stderr)  # (no limits: no ends)
+        with open(os.path.join(self.locks, "history.jsonl"), "w", encoding="utf-8") as f:
+            for w in (100, 200, 300):
+                f.write(json.dumps({"kind": "python", "what": "k", "t": 0, "wall": w, "rc": 0, "ended": None, "gb": 1}) + "\n")
+            f.write(json.dumps({"kind": "python", "what": "k", "t": 0, "wall": 99, "rc": None, "ended": "idle: …"}) + "\n")
+        r = subprocess.run(self.heavy("k", "--", sys.executable, "-I", "-c", code, self.locks), env=self.env,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.stdout.strip(), "python 200 True True", r.stderr)  # (the median of the full runs)
+        r = subprocess.run(self.heavy("--history"), env=self.env, capture_output=True, text=True, timeout=60)
+        self.assertIn("python | 3 | 3.3 | 1.5 | 1.0", r.stdout)
+        self.assertRegex(r.stdout, r"ended: k \(python\) at .* after 2 min: idle: …")
+
+    def test_stop_refuses_what_is_not_this_checkouts_job(self):
+        r = subprocess.run(self.heavy("--stop", "4242424"), env=self.env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("no heavy job has pid 4242424", r.stderr)
+        other = subprocess.Popen([sys.executable, "-I", "-c", "import time; time.sleep(60)"])
+        self.addCleanup(lambda: (other.kill(), other.wait()))
+        os.makedirs(self.locks)
+        ticket = {"what": "theirs", "root": "C:/x/transport-game-1", "pid": other.pid, "t": 0, "state": "running",
+                  "since": time.time(), "stops": True}
+        with open(os.path.join(self.locks, f"{other.pid}.lock"), "w", encoding="utf-8") as f:
+            json.dump(ticket, f)
+        r = subprocess.run(self.heavy("--stop", str(other.pid)), env=self.env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("theirs in transport-game-1, running 0 min is another checkout's job; --force", r.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.locks, f"{other.pid}.stop")))
+        with open(os.path.join(self.locks, f"{other.pid}.lock"), "w", encoding="utf-8") as f:  # (an older checkout's)
+            json.dump({k: v for k, v in ticket.items() if k != "stops"} | {"root": str(ROOT)}, f)
+        r = subprocess.run(self.heavy("--stop", str(other.pid)), env=self.env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("does not watch itself (its checkout is from before #815)", r.stderr)
+
 
 def queuing(path):
     """Whether a tool takes a turn among the heavy jobs: it enters a HeavyJob or calls heavy.turn."""
