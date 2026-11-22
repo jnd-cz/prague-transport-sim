@@ -92,6 +92,10 @@ game and the traffic still make their own meshes.
 
 - **A fixed-step, deterministic core** with no Three.js inside it, and seeded random numbers
   everywhere (the benches depend on that; `Math.random` must not leak into the simulation).
+- **Drawn between two steps:** the page steps 1/30 s and draws our tram, the camera, the cars, the other trams
+  and the game's movers between the last two steps (`drawnS`, `src/between.js`, #722). The steps still read
+  some poses off the meshes (`traffic._pathObstacles`: the other trams' cars), so a drawn pose is put back
+  after the draw; once the core keeps its own state, the renderer blends two of its snapshots instead.
 - **State in flat typed arrays** (structure of arrays) for the numerous things: cars, walkers,
   passengers. The WASM benchmark (PERF §9) showed data layout matters more than the language. WASM
   is worth it only for hot kernels later.

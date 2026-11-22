@@ -4,7 +4,9 @@
 made-up clock once the shift has started: one seed and the autopilot, at 20 and at 60 frames a second, in the cab and
 in the chase view. After the same number of game steps, our tram, the clock, every car, walker and AI tram stand
 exactly where they stand in the others. Before #722 the game cut each frame's time into its own steps (16.7 ms at
-60 fps) and the traffic lived round the camera, so neither held."""
+60 fps) and the traffic lived round the camera, so neither held. And at 60 fps the cars are drawn between the steps
+(src/between.js): each moves about the same way every frame, and its mesh is back where the step left it after the
+frame."""
 import argparse
 import faulthandler
 import os
@@ -64,6 +66,64 @@ RUN = """async ({ seed, fps, chase, steps }) => {
   return { snap, steps: n, chase: document.body.classList.contains('chase') };
 }"""
 
+# At 60 fps from game step `steps` on, for `frames` frames: where each car in full sight is drawn (src/between.js show)
+# and where the last step left it. How unevenly a car advances from frame to frame: the sum over three frames in a
+# row of how much the second move differs from the first, over the sum of the moves (cars moving 3 m/s or more). Drawn
+# where the step left it, a car stands every other frame at 60 fps and moves two frames' way on the next: 2. Drawn
+# between the steps, it moves about the same each frame: near 0. `bad`: frames after which a car's mesh was not
+# back where the step left it (the steps read the meshes).
+GLIDE = """async ({ seed, steps, frames }) => {
+  const $ = (id) => document.getElementById(id);
+  window.runSeed = seed;
+  window.headless = true;
+  $('menu').classList.remove('hidden');
+  $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
+  $('selTrip').value = '0'; $('optWeather').value = 'dry'; $('optTemp').value = 'autumn'; $('optObst').value = 'normal';
+  $('optAuto').checked = true;
+  const { startShift } = await import('/tools/bench/shift.js');
+  const g = await startShift(), tr = window.traffic, b = window.between;
+  g.audio.setMuted?.(true);
+  let n = 0;
+  const update = g.update.bind(g);
+  g.update = (h, input) => { update(h, input); n++; };
+  window.__manual();
+  await new Promise((res) => setTimeout(res, 100));
+  window.__frame(0);
+  window.headless = false;
+  const ms = 1000 / 60;
+  for (let k = 0; k < 100000 && n < steps; k++) window.__frame(ms);
+  const drawn = [], left = [], show = b.show.bind(b);
+  b.show = (u) => {
+    show(u);
+    const d = new Map(), l = new Map();
+    for (const c of tr.cars) {
+      const e = b.poses.get(c.mesh);
+      if (!c.active || c.alpha < 1 || !e) continue;
+      d.set(c, [c.mesh.position.x, c.mesh.position.z]);
+      l.set(c, [e.now[0], e.now[2]]);
+    }
+    drawn.push(d); left.push(l);
+  };
+  let bad = 0;
+  for (let k = 0; k < frames; k++) {
+    window.__frame(ms);
+    if (tr.cars.some((c) => { const e = b.poses.get(c.mesh); return e && (c.mesh.position.x !== e.now[0] || c.mesh.position.y !== e.now[1] || c.mesh.position.z !== e.now[2]); })) bad++;
+  }
+  b.show = show;
+  const uneven = (seq) => {
+    let dif = 0, sum = 0, cars = new Set();
+    for (let k = 0; k + 2 < seq.length; k++) for (const [c, p0] of seq[k]) {
+      const p1 = seq[k + 1].get(c), p2 = seq[k + 2].get(c);
+      if (!p1 || !p2) continue;
+      const d1 = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]), d2 = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+      if (d1 + d2 < 2 * 3 / 60) continue;
+      dif += Math.abs(d2 - d1); sum += (d1 + d2) / 2; cars.add(c);
+    }
+    return { ratio: sum ? +(dif / sum).toFixed(3) : null, cars: cars.size };
+  };
+  return { drawn: uneven(drawn), left: uneven(left), bad, frames: drawn.length };
+}"""
+
 
 class FrameRate(unittest.TestCase):
     @classmethod
@@ -102,6 +162,21 @@ class FrameRate(unittest.TestCase):
                 self.assertIsNotNone(out["snap"])
                 for k in ("h", "s", "v", "clock", "next", "ahead", "oncoming", "cars", "walkers"):
                     self.assertEqual(out["snap"][k], ref[k], f"{fps} fps, {'chase' if chase else 'cab'}: {k}")
+
+    def test_cars_drawn_between_the_steps_at_60_fps(self):
+        page = self.browser.new_page()
+        try:
+            page.add_init_script(CLOCK)
+            page.goto(f"{self.url}/index.html?line={LINE}")
+            page.wait_for_selector("#btnStart:visible", timeout=240000)
+            out = page.evaluate(GLIDE, {"seed": SEED, "steps": 300, "frames": 120})
+        finally:
+            page.close()
+        print(f"\n  {out['frames']} frames at 60 fps: drawn {out['drawn']}, where the steps left them {out['left']}")
+        self.assertGreaterEqual(out["drawn"]["cars"], 3, "too few moving cars to judge")
+        self.assertGreater(out["left"]["ratio"], 1.5)  # (a step every other frame: the measure sees it)
+        self.assertLess(out["drawn"]["ratio"], 0.3)
+        self.assertEqual(out["bad"], 0, "a car's mesh not back where the step left it after a frame")
 
 
 if __name__ == "__main__":
