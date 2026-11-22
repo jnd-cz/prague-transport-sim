@@ -379,7 +379,11 @@ def show(rs, issues, jobs, now):
     head = git("log", "-1", "--format=%h %s", "origin/main") or "?"
     print(f"origin/main {head[:90]}")
     print("Heavy jobs: " + ("; ".join(baseline_store.describe(j, now) for j in jobs) if jobs else "none"))
-    holders = [i["number"] for i in issues or [] if REBUILD in labels(i)]
+    if ends := baseline_store.recent_ends(now):  # (#815: what a job's watch ended in the last hour, and why)
+        print("Ended by their watch (1 h): " + "; ".join(
+            f"{r['what']} in {os.path.basename(os.path.normpath(r['root']))}, {ago(r['t'] + r['wall'], now)} ago "
+            f"after {r['wall'] / 60:.0f} min: {r['ended']}" for r in ends))
+    holders =[i["number"] for i in issues or [] if REBUILD in labels(i)]
     print(f"Rebuild label: {', '.join(f'#{n}' for n in holders) if holders else 'nobody'}"
           + ("  (more than one: only one branch may publish)" if len(holders) > 1 else ""))
     print()
