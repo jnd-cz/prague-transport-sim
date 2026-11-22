@@ -286,6 +286,18 @@ Sections:
   141, the survey 11 of 14). On ordinary track the rail lies a median +1 cm over the lidar (p10 -7, p90 +18 cm). The
   lidar alone is no height for a funicular: Petřín's, held its whole length, took the hill's bare earth in steps of
   2-6 m. `held_settled`: held stretches over 60 m 81 -> 50 network-wide, 5 -> 0 on the lines' routes.
+- **An archive record states its survey year (`ROK`), which says whether it or the 2023 lidar is the newer** (#539,
+  2026-11-22): `DAT_VZNIK` is the database's (2008-03-10 on the 1,892 records of 1999, 53.9 km), `ROK` the survey's.
+  Records up to 2022 stand over 0.5 m over the lidar on 0-1.1 % of their points (those within 1.5 m of it), records of
+  2023 on 4.9 %, of 2024 on 9.1 %: tracks rebuilt since the flight. Line 9 at Bertramka: both tracks' records of 1999
+  hump up to 0.83 and 0.92 m over the lidar for 200 m, the survey 0.3-0.4 m over it, the lidar level across the street
+  with its kerbs, DI without heights (`NeuplnaData`); the user: the track lies in the asphalt level with the road.
+  Where numeric DI can judge (samples off structures, an older record 0.5-1.5 m over the lidar): on paved track DI
+  sides with the lidar at 71 of 76 (the 5: one 20 m stretch at (3405, -439), a record of 2006); where the construction
+  is unknown at 23 of 52 (a ballast bed on its own body, small bridges nothing marks), so the rule holds on paved
+  track only. `archive_before_lidar`: network-wide it moves Bertramka (445 m of track) and one track at Letenské
+  náměstí (a record of 2013 on a 1.0 m plateau for 25 m beside a track on the lidar; the user, 2026-11-22: "both track
+  at the same height ... there shouldn't be 1m step anywhere near").
 - **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
   user's photos show the paving following the slope. Held at 500 m, Malovanka's curves lay up to 40 cm off the 1 m lidar
   and its junction still needed 355 m (meeting points metres apart). The archive put Královka's arms 15-78 cm above the
