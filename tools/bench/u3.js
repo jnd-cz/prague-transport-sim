@@ -69,7 +69,8 @@ export async function run(seed = 1, opts = {}) {
       for (let k = 0; k < chunk; k++) {
         if (game.finished || game.tram.s > game.route.length - 5) { R.done = true; break; }
         const alsoBefore = also.map((w) => w.before());
-        // (headless nothing moves the camera, and the cars spawn around it: keep it at the cab)
+        // (headless nothing moves the camera: keep it at the cab for the once-a-second draw; the cars spawn round the
+        // tram's front whatever it shows, traffic.focus, #722)
         const tr = game.tram, q = game.route.at(tr.s);
         camera.position.set(q.x, game.profile.height(tr.s) + 2.6, -q.y);
         // (D2: cars entering a junction from a lane with a light: on red / red-amber without having

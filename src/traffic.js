@@ -383,12 +383,21 @@ export class Traffic {
 
   dispose() { this.scene.remove(this.group); disposeModel(this.group); }
 
+  // The point the traffic lives round (#722): our tram's front, whatever the camera shows. Cars and walkers appear in a
+  // ring round it and go to sleep by their distance from it. Before, the camera's place: the cab and the chase view, or
+  // a free camera, gave different runs of one seed, and the benches put the camera at the cab to get this point.
+  focus() {
+    const p = this.route.at(this.game.tram.s);
+    return [p.x, p.y];
+  }
+
   // draw: false for a step whose result is not shown (inspect mode runs several steps per frame):
-  // cars and walkers move but are not posed (their height and matrices wait for the drawn step)
-  update(dt, camera, draw = true) {
+  // cars and walkers move but are not posed (their height and matrices wait for the drawn step). `view`: the camera,
+  // for what only the drawing reads (an AI tram's detailed model near it); nothing the run does depends on it.
+  update(dt, view, draw = true) {
     const tram = this.game.tram;
-    const cx = camera.position.x, cy = -camera.position.z;
-    this.cam = [cx, cy];
+    const [cx, cy] = this.focus();
+    this.cam = view ? [view.position.x, -view.position.z] : [cx, cy];
     this._carsOnTracks();
     this._updateRoadCars(dt, cx, cy, draw);
     this._updateWalkers(dt, cx, cy, draw);
@@ -455,9 +464,8 @@ export class Traffic {
           // light at its start; a car spawned 16 m before such a red line at 11.2 m/s, line 9 s 15074, seed 3)
           const redAt = (l, d) => l.light && this.lightAspect(l.light) !== 'green' && d + l.path.length - l.light.back < 50;
           const redNear = redAt(lane, -s) || this.nextLanes(lane).some((b) => redAt(b, lane.path.length - s + (this.connector(lane, b)?.path.length || 0)));
-          // (and at least 50 m from the camera itself: the ring's point picks an index cell, and a cell
-          // can reach the camera; a car came in at 8 m/s 6 m before the track with the tram 4 m off,
-          // line 17 s 19919)
+          // (and at least 50 m from the focus itself, the tram's front: the ring's point picks an index cell, and a
+          // cell can reach it; a car came in at 8 m/s 6 m before the track with the tram 4 m off, line 17 s 19919)
           const sp = lane.path.at(s), close = Math.hypot(sp.x - cx, sp.y - cy) < 50;
           const c = redNear || close || cars.some((o) => o.active && o.path === lane.path && Math.abs(o.s - s) < 12) ? null : this._carSlot();
           if (c) Object.assign(c, { id: undefined, active: true, kind: 'road', lane, road: r, dir: lane.dir, conn: null, next: undefined, next2: undefined, next2From: null, lightGo: null, lightHold: null, lead: null, path: lane.path, s, v: 7 + this.rand() * 6, vNow: null, coast: null, hitTram: false, cycleT: 0, z: undefined, seen: null, why: null });

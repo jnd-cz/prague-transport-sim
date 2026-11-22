@@ -80,7 +80,8 @@ Simulating a whole city at full detail won't be playable. Use three tiers with c
   number, destination. A tram met at Palackého náměstí then really came from Modřany, 3 minutes late
   and full.
 - A handoff must not teleport anything visible. Promote at the edge of the micro area, and fade
-  where nothing can be promoted cleanly. The camera spawn ring is the first version of this.
+  where nothing can be promoted cleanly. The spawn ring round the tram's front (`traffic.focus`, #722; it was
+  round the camera) is the first version of this.
 
 ## 4. Separate the simulation core from rendering
 
