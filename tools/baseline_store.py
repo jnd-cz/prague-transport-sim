@@ -227,9 +227,10 @@ def alive(pid):
         return code.value == 259  # STILL_ACTIVE
     try:
         os.kill(pid, 0)
-        return True
     except OSError:
         return False
+    s = _stat(pid)
+    return not (s and s[0] == "Z")  # (an ended process its parent has not reaped yet answers the signal too)
 
 
 HELD = "TRAM_HEAVY_HELD"  # (set for a job's children: a step of a heavy job runs in its parent's turn)
