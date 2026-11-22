@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-18",
- "built_at_commit": "c165971",
- "published": "2026-11-21 21:20",
- "note": "Ground batch C (#757): platforms' planes, tunnel floors, strip sides, style borders, raised corridor kerbs, stray survey points; all five lines rebuilt from c165971",
+ "built_at_commit": "d88f565",
+ "published": "2026-11-22 09:22",
+ "note": "Network files version 3 (#694): one stops record per stop, the stop point at the sign for every set, our stops' sign and shelter heights stored; all five lines' network rebuilt on c165971's data",
  "files": {
   "line17.bld.bin": {
    "size": 6348366,
@@ -37,8 +37,8 @@
    "sha256": "46b876ab96fd92d8ee125cb2894d5efe3d819fd79c31f217391fb1d310a08907"
   },
   "line17.network.json": {
-   "size": 9289335,
-   "sha256": "752cd1c6d425a761a668ce552e455a4bc6492603798d1864fb45826877fa2574"
+   "size": 9288860,
+   "sha256": "3ce99ebabc5394d9d1348691a83a7b2f26c533e46d3db4f04b0d1940ebc78603"
   },
   "line17.signals.json": {
    "size": 36582,
@@ -93,8 +93,8 @@
    "sha256": "e237967fae8c614a709f2ebc94781cdb289ccd18b5239f0c2856aaf25fde7b5b"
   },
   "line22.network.json": {
-   "size": 10038928,
-   "sha256": "72d0fe0b746c44eaad018f165751dfa6a7a3a872eac84e368e4cd00850b5b731"
+   "size": 10038381,
+   "sha256": "cff1f270df81c50de24677f0cbdc1e82be42001e187abbbf07171dafc6fb45ee"
   },
   "line22.streets.bin": {
    "size": 5531635,
@@ -145,8 +145,8 @@
    "sha256": "731b3d6f9197586c53967f9164d92a217ecc54eccac51b423795e99338a6556f"
   },
   "line23.network.json": {
-   "size": 3963252,
-   "sha256": "2f8088f40b0a3d55d5bf187db65b7164665fa473633c32b2feb3caecb8a5117d"
+   "size": 3963023,
+   "sha256": "6e55e2e63c174b7af582f4b8d29e12871508eb6522e01b252c4a7edb98e830b9"
   },
   "line23.streets.bin": {
    "size": 2502611,
@@ -197,8 +197,8 @@
    "sha256": "120c03ba0120db93e4ba9903eb095f263e148eb1143ff570513ee6a5b9a5632c"
   },
   "line37.network.json": {
-   "size": 4084944,
-   "sha256": "a2f6d9f09808737791b4a2a4b75c3a9d090b383167b94e84b3d9c013bc8dea2b"
+   "size": 4084663,
+   "sha256": "c30506d32f09bab4988299bdf83802d315106948c9d95199797650b3380cae42"
   },
   "line37.streets.bin": {
    "size": 2619906,
@@ -249,8 +249,8 @@
    "sha256": "4aa67831aea932037d2dcd29a60cd3d72627daaf338e917d4c5d812ac4fc8a15"
   },
   "line9.network.json": {
-   "size": 10465869,
-   "sha256": "f37da2259a674df57913c3bbd7cfbaa517b7d0cb27906e1a03fe5f7ef40c814d"
+   "size": 10465115,
+   "sha256": "e9efe7070490fc255e26be341aab08a3b912d212c91bf460c0a7bbbe2ca7f488"
   },
   "line9.streets.bin": {
    "size": 6195477,
