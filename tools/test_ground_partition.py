@@ -159,6 +159,27 @@ class Strips(unittest.TestCase):
         self.assertAlmostEqual(r["area"], 4.0, places=3)
         self.assertAlmostEqual(plots[0]["g"].area, 104.0, places=3)
 
+    def test_strips_read_their_tile_and_its_margin_alone(self):
+        # (a footprint and a survey area 0.4 m apart across a tile's edge: the strip between them as the opening of the
+        # whole terrain gives it, one piece across the edge; and the same strip whatever terrain lies beyond the margin,
+        # #812: GEOS's buffer of the whole box's terrain moved its vertices with the box)
+        from geo import tile_box, tile_index
+        (e, _), (n, _) = tile_index([0.0, 0.0], [0.0, 0.0])
+        X = tile_box(int(e), int(n))[2]  # (the tile's east edge)
+        plot = shapely.box(X - 20, 0, X + 20, 10)
+        survey = shapely.box(X - 20, 10.4, X + 20, 30)
+        box = shapely.box(X - 40, -20, X + 40, 50)
+        terrain = box.difference(plot.union(survey))
+        thin = gp.thin_parts(terrain)
+        whole = terrain.difference(terrain.buffer(-0.5).buffer(0.5, join_style="mitre"))
+        self.assertEqual(len(shapely.get_parts(thin)), 1)
+        self.assertAlmostEqual(thin.area, whole.area, places=2)
+        self.assertAlmostEqual(thin.area, 16.0, delta=0.1)  # (40 m by 0.4 m, its ends rounded where they open)
+        far = shapely.box(X + 900, 2000, X + 1400, 2600).difference(shapely.box(X + 1000, 2100, X + 1000.3, 2400))
+        thin2 = gp.thin_parts(terrain.union(far))
+        near = shapely.box(X - 40, -20, X + 40, 50)
+        self.assertTrue(thin2.intersection(near).equals_exact(thin.intersection(near), 0.0))
+
 
 class Terrain(unittest.TestCase):
     def setUp(self):

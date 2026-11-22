@@ -319,21 +319,50 @@ def on_the_grid(qs):
     return qs
 
 
+THIN_MARGIN = 4.0  # widths: round each tile the terrain is opened in (thin_parts)
+
+
+def thin_parts(terrain, width=STRIP):
+    """The terrain narrower than `width`: what an opening by width takes off it. Opened per tile (geo's) with
+    THIN_MARGIN widths round it and the part within the tile kept, so a tile's strips read its terrain and that margin
+    alone: GEOS's buffer of the whole box's terrain put a strip's vertex 0.2 mm apart in a larger box and added two,
+    and on the mm grid the plot it joined had a vertex 1 mm off (modrany-viaduct-ramps, line 17 (-2290.9, -9151.6),
+    #812). Within the tile the opening is the same: its disc of width/2 lies within a width of a point, and the mitred
+    dilation's spikes (up to 2.5 widths at GEOS's mitre limit of 5) within the margin."""
+    from geo import tile_box, tile_index
+    if terrain.is_empty:
+        return Polygon()
+    x0, y0, x1, y1 = terrain.bounds
+    (e0, e1), (n0, n1) = tile_index([x0, x1], [y0, y1])
+    out = []
+    for e in range(int(e0), int(e1) + 1):
+        for n in range(int(n0), int(n1) + 1):
+            sq = shapely.box(*tile_box(e, n))
+            chunk = polygonal(shapely.set_precision(terrain.intersection(sq.buffer(THIN_MARGIN * width, join_style="mitre")), GRID))
+            if chunk.is_empty:
+                continue
+            thin = chunk.difference(chunk.buffer(-width / 2).buffer(width / 2, join_style="mitre"))
+            out.append(polygonal(shapely.set_precision(thin.intersection(sq), GRID)))
+    return polygonal(shapely.union_all(out, grid_size=GRID)) if out else Polygon()
+
+
 def thin_strips(terrain, plots, width=STRIP):
     """Terrain narrower than `width` that touches a plot joins that plot (in place): OSM's footprints lie up to a metre
-    off the survey's outlines of the same walls, and the strip between them is under the wall. {pieces, area}."""
-    thin = polygonal(terrain.difference(terrain.buffer(-width / 2).buffer(width / 2, join_style="mitre")))
+    off the survey's outlines of the same walls, and the strip between them is under the wall. {pieces, area}.
+    A strip touching two plots as long joins the first by place (ties.py, #812)."""
+    thin = thin_parts(terrain, width)
     parts = [g for g in shapely.get_parts(thin) if g.geom_type == "Polygon" and g.area > SLIVER]
     if not parts or not plots:
         return {"pieces": 0, "area": 0.0}
     tree = shapely.STRtree([q["g"] for q in plots])
+    rank = ties.by_place([q["g"] for q in plots])
     joined = {}
     n, a = 0, 0.0
     for g in parts:
         near = tree.query(g, predicate="dwithin", distance=1e-3).tolist()
         if not near:
             continue
-        k = max(near, key=lambda j: g.buffer(1e-3).intersection(plots[j]["g"].boundary).length)
+        k = max(near, key=lambda j: (g.buffer(1e-3).intersection(plots[j]["g"].boundary).length, -rank[j]))
         joined.setdefault(k, []).append(g)
         n, a = n + 1, a + g.area
     for k, gs in joined.items():

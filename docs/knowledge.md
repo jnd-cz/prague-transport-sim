@@ -852,6 +852,26 @@ Sections:
   4.2-7.8 % more triangles a line (18.25 M -> 19.28 M on the five) and the ground lies a little nearer the raster:
   within 10 m of a track its mean distance 3.98-5.66 -> 3.94-5.33 cm, the p99 27.9-54.9 -> 27.0-41.4 cm. At the
   places picked for their walls the cost is 2-28 %.
+- **What a tile's ground reads** (#812, measured 2026-11-22). A tile's ground is built from the tile and its ring of
+  tiles (`ground_place.py --rings` builds it with one ring and with two and compares the middle tile). On main
+  lattice-cell's middle tile had 220 triangles in one build only, modrany-viaduct-ramps' 10. What read past the ring,
+  or took what the box held into account:
+  - The water levels (`ground_partition.WaterLevels`): the sight raster started at the box's corner, the banks were
+    sampled evenly from wherever each ring starts, and banks up to 1,000 m off were read. Now the raster is on the
+    S-JTSK grid, the banks are sampled where they cross a 10 m grid, and no bank is read farther than a tile's side.
+  - Float noise of the box-wide overlays: the cover's union left needles 9 m long and 1e-13 m wide, and GEOS's buffer
+    of the whole box's terrain (the thin strips by a plot) put a vertex 0.2 mm apart, 1 mm on the ground file's grid.
+    The pieces go on the 1 mm grid before they are united; the strips are opened per tile with a 4 m margin.
+  - Ties broken by an STRtree's order: its hits come in the order of its traversal, which every geometry in the
+    tree moves, and `query_nearest(all_matches=False)` takes the first of the equally near. A sidewalk corner on
+    the vertex two wall edges share read the surface on one side or the other, 230.21 or 230.37 m; a lidar corner
+    0.343 m from two stretches laid over one wall in opposite directions 228.78 or 228.81 m. Ten picks take the
+    first by place now (`tools/ties.py`).
+  - `meet_raised` weighed the edge per corner: its 8 nearest were copies of one point (12 corners, 1 mm apart),
+    which by the KD tree's order. It weighs points now.
+  Still box-wide: the covers over passages (`covers.Covers`: a passage merges with those the box holds, its cut
+  lattice starts at its bounds; lattice-cell's one ring held one cover of 153 m², its two rings three of 273 m²,
+  none in the middle tile). street-over-an-underpass, the cover in its middle tile, is the same in both builds.
 - **Where walls stand** (#697, measured 2026-11-19 on the five lines; the user: "can we use the open data sources to
   infer where walls should really stand as opposed to blending between the different height points?"). Four sources,
   best first:
