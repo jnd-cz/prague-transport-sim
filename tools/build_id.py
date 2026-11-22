@@ -79,9 +79,13 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.check:
         want, off = check(a.check)
+        have = ids(a.check)
         print(f"line {a.check}: build {want}")
-        for f, v in ids(a.check).items():
-            print(f"  {f:28s} {v or 'none'}{'' if v == want else '  (another build: ' + MESSAGE.format(line=a.check) + ')'}")
+        for f, v in have.items():
+            print(f"  {f:28s} {v or 'none'}{'' if v == want else '  (not the line file' + chr(39) + 's)' if v else ''}")
+        if off:
+            print(("no file carries one (built before #702: the page loads it, with a note); " if not any(have.values()) else
+                   "the page refuses this set; ") + MESSAGE.format(line=a.check) + " stamps them")
         return 1 if off else 0
     if not a.line:
         ap.error("--line or --check")
