@@ -13,6 +13,8 @@ wrote: files opened for writing, the targets of renames, files removed. The key 
 version of every package imported from outside the checkout; other files outside the checkout are not in it.
 A tool that reads a file in some other way (C code, a subprocess, a child forked by an explicit fork context) is not
 seen: rebuild.py --from or --force then. Multiprocessing children are spawned (Linux too) and traced like the step.
+Files outside the checkout are not seen either; a step that reads one has it declared (Cache.save's `declared`: a name
+and a value that changes with the file, as the city mesh's key for the ground, #702), and a changed value runs it.
 
 Kept in reports/rebuild/cache/: hashes.json (a file's SHA-256 by its size, date and file id), steps/ (each step's
 last records), store/ (the files the records name, by hash). A rebuild on a machine with a data cache (TRAMDATA_CACHE)
@@ -466,13 +468,17 @@ class Cache:
                 self.pkgs.update(versions(missing))
         return {n: self.pkgs[n] for n in names}
 
-    def why(self, rec, phase0=None, env=None):
+    def why(self, rec, phase0=None, env=None, declared=None):
         """None when rec still holds (the step may be skipped), else the first thing that differs. env: the step's
-        environment (os.environ by default)."""
+        environment (os.environ by default); declared: the step's declared inputs now (save())."""
         if rec.get("format") != FORMAT:
             return "the record's format"
         if rec.get("untraced"):
             return rec["untraced"]
+        was, now = rec.get("declared") or {}, declared or {}
+        for k in sorted(set(was) | set(now)):
+            if was.get(k) != now.get(k):
+                return f"{k} {was.get(k)} → {now.get(k)}"
         if rec["python"] != sys.version.split()[0]:
             return f"Python {rec['python']} → {sys.version.split()[0]}"
         env = os.environ if env is None else env
@@ -502,14 +508,14 @@ class Cache:
             return "the log: not in the store"
         return None
 
-    def match(self, name, phase0=None, env=None):
+    def match(self, name, phase0=None, env=None, declared=None):
         """(the record that holds, None) or (None, why the latest does not)."""
         recs = self.records(name)
         if not recs:
             return None, "no record"
         first = None
         for rec in recs:
-            w = self.why(rec, phase0, env)
+            w = self.why(rec, phase0, env, declared)
             if w is None:
                 return rec, None
             first = first or w
@@ -552,11 +558,15 @@ class Cache:
         os.makedirs(os.path.join(self.dir, "steps"), exist_ok=True)
         return os.path.join(self.dir, "steps", f"{name}.{os.getpid()}.{threading.get_ident()}.run")
 
-    def save(self, name, tmp, log=None):
-        """The run's record (from the tracer's file tmp) kept as the step's latest; its outputs into the store."""
+    def save(self, name, tmp, log=None, declared=None):
+        """The run's record (from the tracer's file tmp) kept as the step's latest; its outputs into the store.
+        declared: what the step reads that its trace cannot see, by a name and a value that changes with it (a file
+        outside the checkout by the key it is kept under: the city mesh, #702); a later run matches only with the same."""
         with open(tmp, encoding="utf-8") as f:
             rec = json.load(f)
         os.remove(tmp)
+        if declared:
+            rec["declared"] = dict(sorted(declared.items()))
         self.hashes.merge(rec.pop("hashes", {}))
         for r, h in rec["outputs"].items():
             if h not in (None, "dir", "?"):
@@ -574,7 +584,7 @@ class Cache:
         """rec first among name's records (one equal in its key replaced), at most KEEP of them; amend: rec
         replaces the first, the same run's record changed after it was kept."""
         with self.lock:
-            same = lambda o: all(o.get(k) == rec.get(k) for k in ("modules", "inputs", "listings", "packages", "env"))  # noqa: E731
+            same = lambda o: all(o.get(k) == rec.get(k) for k in ("modules", "inputs", "listings", "packages", "env", "declared"))  # noqa: E731
             old = self.records(name)
             if amend and old and (old[0]["when"], old[0]["outputs"]) == (rec["when"], rec["outputs"]):
                 old = old[1:]
