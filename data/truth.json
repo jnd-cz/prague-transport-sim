@@ -27,7 +27,8 @@
   "bedTroughReview": "tools/bed_troughs.py (an answered place gets no card); reference for the walls step (`wall`) until an issue reads it",
   "groundRules": "reference: the rules tools/ground_mesh.py holds (crossing_pieces, rail_band, on_rails) and checks (heads_check)",
   "groundPlaces": "tools/ground_place.py: the places a ground change is built and measured at (#757)",
-  "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)"
+  "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)",
+  "stairsReview": "tools/stairs_review.py (an answered place gets no card); reference for the stairs rules of #447 in tools/ground_mesh.py until they read it"
  },
  "contactorSound": [
  {
@@ -6176,5 +6177,9 @@
     "source": "user, open track review (reports/review/open-track-22.json), 2026-11-14 (#591)"
    }
   ]
+ },
+ "stairsReview": {
+  "note": "The user's answers to the stairs review (reports/review/stairs-N.json, tools/stairs_review.py, #447): what kind of stairs stand at a place, for the rules that draw the ground under the survey's stairs. `place` is a point inside the survey's stairs area (lat, lon); `kind` is one of flight, turning, sunk, two levels, more than stairs, structure, not stairs.",
+  "answers": []
  }
 }
