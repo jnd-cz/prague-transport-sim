@@ -615,6 +615,9 @@ replayed up to route s and handed over paused: a stuck scene as it was, #157).
 | count runs and builds share the machine | the user, 2026-11-19, #728, asked whether they may when memory allows, the rule above staying for timings: "yes". A night's sessions waited in one line: 33 min behind another job's count run (PR #461) |
 | one rebuild at a time | two branches publishing rebuilt data overwrite each other's lines (#280) |
 | findings off the path go on a lane's list | issues opened faster than closed: 410 against 251 in 26 days. The user, 2026-11-19: "yes" (#731) |
+| a finding's own issue only for the next step or a failing check, after a search; one issue for a place's or a batch's reports | 202 open on 2026-11-21, 120-129 opened a week against 41-87 closed; a session opened #797 and #800 in a day and reported a build race on #735 that #701 already held. The user, 2026-11-21, on "their number is still slowly but steadily climbing": "yes let's do this" |
+| merges in batches, the heaviest work at night | the user, 2026-11-21, having stopped the other lanes' sessions to save "resources, time as well as attention": "If we can merge in batches like today, keep the heavy work for nights, I'll be happy to resume the other lanes and sessions"; night from 22:00 to 07:00, plus any time the user says go: "yes" |
+| a ground rule's issue closes at the rule's merge | it stayed open as "Part of" until the batch's rebuild, 5-10 issues between batches, while #757 tracks the batch. The user, 2026-11-21: "ok, let's try this approach" |
 | a security hole is not written up in public | the repository is public and the alpha is live. The user, 2026-11-19: "fix and file privately" |
 
 ## How the game's parts work
