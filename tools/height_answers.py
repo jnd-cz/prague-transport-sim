@@ -426,9 +426,13 @@ def archive_before_lidar(chs):
     """Where the archive is a track's measured height (no numeric DI, no reviewed span) and its record was surveyed before
     the lidar's flight (the bin's `year`, the archive's ROK, under LIDAR_YEAR), a stretch of SOURCES_RUN bins and more
     standing over SOURCES_OFF m over the lidar, or lying over UNDER_OFF m under it, is the street as it was when the
-    record was made: the lidar is the newer measurement. The track takes the lidar plus the rail's offset over it on the
-    chain's DI heights within LIDAR_AROUND m of the stretch (else LIDAR_OFFSET), along the whole stretch where the
-    archive lies more than SOURCES_EDGE off the lidar the same way.
+    record was made: the lidar is the newer measurement. The track takes the lidar plus LIDAR_OFFSET, the rail's offset
+    over it on the network, along the whole stretch where the archive lies more than SOURCES_EDGE off the lidar the same
+    way. (Not the offset of the chain's heights around the stretch: the archive's own are the measurement in doubt, and
+    at Modřany, 0.1-0.2 m under the lidar, they left the stretch 0.12 m under it; DI's within 100 m stood 0.2 m over the
+    lidar at Sokolovská's junction, line 37, and set the junction's moved tracks 0.15-0.24 m over the tracks beside
+    them: 5 rails under a neighbour's bed, ground batch D's first build. Where DI has a height beside such a record it
+    lies a median 0.1 cm under the lidar on paved track.)
     - Over: on paved track (the bin's `kind`: a style fact, OSM's surface, the survey's pavement at the axis;
       OVER_KINDS). A kerbed bed or a crown stands a little over the street, hence the larger margin. #539: line 9 at
       Bertramka, both tracks' records of 1999 humped up to 0.83 and 0.92 m over the lidar for 200 m, the lidar level
@@ -479,18 +483,9 @@ def archive_before_lidar(chs):
                         todo.append((a, b))
                     e = max(e, b)
                 k = e + 1
-        taken = {i for a, b in todo for i in range(a, b + 1)}
-        # (the rail's offset over the lidar where DI measured it: the archive's own heights around are the measurement
-        # in doubt, and pulled the stretch back towards them: line 17 at Modřany, its neighbours 0.1-0.2 m under the
-        # lidar, left the stretch 0.12 m under it)
-        ref = [(x['s'], x['z'] - x['terrain']) for i, x in enumerate(bins)
-               if i not in taken and x.get('z') is not None and x.get('terrain') is not None and x.get('src') == 'di'
-               and not STRUCTURE_FLAGS & set(x.get('flags') or ()) and abs(x['z'] - x['terrain']) < SOURCES_OFF]
         for a, b in todo:
-            near = sorted(o for t, o in ref if bins[a]['s'] - LIDAR_AROUND <= t <= bins[b]['s'] + LIDAR_AROUND)
-            lift = near[len(near) // 2] if near else LIDAR_OFFSET
             for x in bins[a:b + 1]:
-                x['z'], x['w'], x['src'] = x['terrain'] + lift, 1.0, 'lidar'
+                x['z'], x['w'], x['src'] = x['terrain'] + LIDAR_OFFSET, 1.0, 'lidar'
                 LIDAR_LOG.append((x['xy'], 4, round(x['z'], 3)))
                 moved += 1
     return moved
