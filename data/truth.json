@@ -5934,7 +5934,24 @@
       "largest step m": 0.2,
       "off the lidar m": 0.0
      },
-     "why": "no step stands between the track and the road: on the archive's hump the two beds stood 0.8-0.9 m over the lidar, a 0.85 m wall at their north edge and a ramp to the south. (The sidewalk south of the track is the survey's, 0.37-0.43 m over the lidar where the lidar has a kerb of 0.15 m: under the 0.5 m at which the survey gives way, tools/zps_ground.py; not this place's)"
+     "why": "no step stands between the track and the road: on the archive's hump the two beds stood 0.8-0.9 m over the lidar, a 0.85 m wall at their north edge and a ramp to the south"
+    },
+    {
+     "name": "from the outbound track onto the south sidewalk at x = -2299, 4 m",
+     "from": [
+      -2299.0,
+      -1390.5
+     ],
+     "to": [
+      -2299.0,
+      -1394.5
+     ],
+     "expect": {
+      "rise m at least": 0.05,
+      "largest step m": 0.25,
+      "off the lidar m": 0.0
+     },
+     "why": "the sidewalk stands a kerb over the track beside it (the user, 2026-11-22: \"so it has normal kerb height\"; IPR rises 0.13-0.18 m from the track onto it). The street surface lays a sidewalk a kerb over the road beside it, here the track's bed: on the hump it stood with it, and with the track's heights alone rebuilt it stayed there, a 0.49 m step over the track"
     },
     {
      "name": "along the outbound track's axis, 70 m through the hump's top",

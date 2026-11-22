@@ -424,7 +424,9 @@ def archive_before_lidar(chs):
     the stretch (else LIDAR_OFFSET), along the whole stretch where the archive stands more than SOURCES_EDGE over the
     lidar (#539: line 9 at Bertramka, both tracks' records of 1999 humped up to 0.83 and 0.92 m over the lidar for 200 m,
     the lidar level across the street with its kerbs; the user, 2026-11-21: "bertramka is embedded asphalt, same level as
-    the road next to it"). Not a record of the lidar's year or later (a track rebuilt since the flight stands over it by
+    the road next to it"; and one track at Letenské náměstí, its record of 2013 on a 1.0 m plateau for 25 m beside a track on
+    the lidar; the user, 2026-11-22: "Letenské náměstí has both track at the same height ... there shouldn't be 1m step
+    anywhere near"). Not a record of the lidar's year or later (a track rebuilt since the flight stands over it by
     right), nor one without a year; not on a structure (the bare-earth lidar lies under a deck), under a step answer, or
     where the lidar itself steps more than any track climbs (MAX_GRADE). Calibrated where numeric DI has a height too
     (samples off structures, an older record 0.5-1.5 m over the lidar): on paved track DI sides with the lidar at 71 of
