@@ -145,7 +145,7 @@ class Selection(unittest.TestCase):
     def test_rebuild_uses_one_pinned_month_and_shared_district_list(self):
         pin(self.root, [(DISTRICT, OLD)])
         with patch.object(rebuild, 'ROOT', str(self.root)), patch.dict(packages.DTM, {'17': [DISTRICT]}):
-            _, groups = rebuild.steps('17')
+            _, groups, _ = rebuild.steps('17')
         args = next(group[0] for group in groups if group[0][0] == 'dtm.py')
         self.assertEqual(len(args), 4)
         self.assertIn(OLD, args[-1])
@@ -180,7 +180,7 @@ class Readers(unittest.TestCase):
             tools.mkdir()
             for name in ('dtm.py','registration.py','dtm_packages.py','gpkg.py','geo.py','atomic.py','sources.py','kerbs.py',
                          'zps_ground.py','survey_ground_answers.py','dmr5g.py','zps_decks.py','mosty3d.py','zps_inside.py','zps_outline.py','zps_medians.py',
-                         'zps_shelters.py','heavy.py','baseline_store.py'):
+                         'zps_shelters.py','zps_layers.py','heavy.py','baseline_store.py'):
                 shutil.copyfile(Path(__file__).parent / name, tools / name)
             (tools / 'ipr_dtm.py').write_text('import numpy as np\n\n\nclass IprDtm:\n'
                                               '    def sample(self, E, N):\n        return np.full(np.shape(E), 200.0)\n',
@@ -209,7 +209,7 @@ class Readers(unittest.TestCase):
             tools.mkdir()
             for name in ('dtm.py','registration.py','dtm_packages.py','gpkg.py','geo.py','atomic.py','sources.py','kerbs.py',
                          'zps_ground.py','survey_ground_answers.py','dmr5g.py','zps_decks.py','mosty3d.py','zps_inside.py','zps_outline.py','zps_medians.py',
-                         'zps_shelters.py','heavy.py','baseline_store.py'):
+                         'zps_shelters.py','zps_layers.py','heavy.py','baseline_store.py'):
                 shutil.copyfile(Path(__file__).parent / name, tools / name)
             # (the IPR terrain is a 2 GB raster: a flat stand-in at the test's 200 m)
             (tools / 'ipr_dtm.py').write_text('import numpy as np\n\n\nclass IprDtm:\n'
@@ -261,7 +261,7 @@ class Readers(unittest.TestCase):
             self.assertEqual({p[2] for a in result['areas'] for p in a['r']},{201})
             with patch.object(rebuild, 'ROOT', str(root)), patch.dict(packages.DTM, {'17':[DISTRICT]}):
                 with self.assertLogs('dtm_packages',level='WARNING'):
-                    _, groups = rebuild.steps('17')
+                    _, groups, _ = rebuild.steps('17')
             args = next(g[0] for g in groups if g[0][0]=='dtm.py')
             self.assertEqual(len(args),4)
             self.assertIn(NEW,args[-1])

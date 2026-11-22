@@ -4,9 +4,9 @@
 // the 🎮 button in the menu switches them, remembered per device. "Pult" (where ⋯ was) opens the driver's panel's sheet
 // (src/panel.js, #246) with the rarer controls where they are in the cab, and the game's own (autopilot, sound, ✉ the note).
 // Full screen (#485): asked once in the menu on a touch screen; with a yes, a shift starts in full screen turned to
-// landscape (a browser goes full screen only from a tap: Start's), and ⛶ switches it any time. Leaving it (the back
-// gesture) holds until the next start. Safari on an iPhone has no full screen for a page: there the question becomes how
-// to add the game to the home screen, from where it opens full screen (app.webmanifest, the apple-* tags in index.html);
+// landscape (a browser goes full screen only from a tap: Start's), and ⛶ switches it any time: in the menu, and in a shift
+// on the pause panel. Leaving it (the back gesture) holds until the next start or ⛶. Safari on an iPhone has no full
+// screen for a page: there the question becomes how to add the game to the home screen, from where it opens full screen (app.webmanifest, the apple-* tags in index.html);
 // opened so, it asks nothing and only the hint to turn the phone stays. In landscape on a phone the controller is a column at the right thumb and the
 // other buttons two columns at the left, the dashboard between them (the CSS below).
 import { t } from './i18n.js';
@@ -66,6 +66,8 @@ body.shift .tbToggle { display: none }
 #fsTurn { position: fixed; top: 40%; left: 50%; transform: translateX(-50%); z-index: 7; display: none; pointer-events: none;
   background: rgba(10,14,12,.86); color: #eee; padding: 8px 14px; border-radius: 8px; font: 600 15px system-ui, sans-serif }
 @media (orientation: portrait) { body.fs.shift #fsTurn { display: block } }
+/* (in portrait the pause panel stands right of the side column: with ⛶ it reached under View, #691) */
+@media (orientation: portrait) { body.touch #pausePanel { left: calc(50% + 42px); max-width: calc(100vw - 100px) } }
 /* a phone in landscape: the controller at the right thumb, the rest at the left, the dashboard and the top bar between */
 @media (orientation: landscape) and (max-height: 520px) {
   body.touch { --padL: 132px; --padR: 104px }
@@ -153,6 +155,16 @@ body.shift .tbToggle { display: none }
       ask.classList.remove('show');
     };
     document.body.appendChild(fs);
+    // ⛶ in a shift: the pause panel's (#691). A shift that had left full screen (the back gesture) had no way back but the
+    // menu (the user's phone, 2026-11-18: "there is no button for full screen"). A click, as ⛶'s: the browser takes no
+    // touch's pointerdown as the gesture full screen needs, so it is no key sent from one.
+    const pause = document.getElementById('pausePanel');
+    if (pause) {
+      const b = (this.fsPause = document.createElement('button'));
+      b.id = 'btnFs';
+      b.onclick = fs.onclick;
+      pause.appendChild(b);
+    }
     const ask = (this.fsAsk = document.createElement('div'));
     ask.id = 'fsAsk';
     ask.innerHTML = '<span></span><button data-a="1"></button><button data-a="0"></button>';
@@ -185,6 +197,7 @@ body.shift .tbToggle { display: none }
   fsLabels() {
     if (this.fsTurn) this.fsTurn.textContent = '↻ ' + t('fs.turn');
     if (this.fsToggle) this.fsToggle.title = t(fsElement() ? 'fs.off' : 'fs.on');
+    if (this.fsPause) this.fsPause.textContent = '⛶ ' + t(fsElement() ? 'fs.leave' : 'fs.yes');
     if (!this.fsAsk) return;
     const [q, a, b] = this.fsAsk.children;
     if (this.fsAsk.classList.contains('home')) { q.textContent = t('fs.home'); a.textContent = t('fs.ok'); return; }

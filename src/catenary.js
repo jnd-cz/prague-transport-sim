@@ -22,13 +22,9 @@ export function buildCatenary(group, data, route, ground, trackDist) {
   const roads = new SegmentIndex(12);
   for (const r of data.roads) if (!r.f && !r.b) roads.addLine(r.p, r.w - 0.6);
   const houses = new FootprintIndex(data.buildings.map((b) => b.p));
-  // retaining walls: surveyed ones and the synthetic walls of the track cutting
+  // retaining walls (Geoportál's lines)
   const walls = new SegmentIndex(10);
   for (const w of data.geo?.walls || []) walls.addLine(w.p, 0.8);
-  const cut = { 1: [], '-1': [] };
-  for (const run of ground.walls?.runs || []) if (run.pts.length > 1) cut[run.side].push([run.pts[0].s, run.pts[run.pts.length - 1].s]);
-  const cutAt = (s, side) => cut[side].some(([a, b]) => s >= a - 3 && s <= b + 3);
-  const B = ground.walls?.bench ?? 7;
 
   // find the anchor on one side (+1 left, -1 right) of route position s
   const pole = (s, side, lat) => { const p = route.offset(s, side * lat); return { wall: false, lat, sl: side * lat, x: p.x, y: p.y }; };
@@ -37,8 +33,8 @@ export function buildCatenary(group, data, route, ground, trackDist) {
     for (let lat = 2.4; lat <= 22; lat += 0.4) {
       const o = route.offset(s, side * lat);
       if (houses.inside(o.x, o.y)) return lat <= 16 ? { wall: true, lat: lat - 0.1, sl: side * (lat - 0.1), x: o.x, y: o.y } : null;
-      // a retaining wall: the pole stands at its foot, inside the cutting
-      if (walls.dist(o.x, o.y) < 0 || (lat >= B - 0.4 && cutAt(s, side))) return trackDist(o.x, o.y) > 2.2 ? pole(s, side, lat - 0.5) : null;
+      // a retaining wall: the pole stands at its foot
+      if (walls.dist(o.x, o.y) < 0) return trackDist(o.x, o.y) > 2.2 ? pole(s, side, lat - 0.5) : null;
       if (trackDist(o.x, o.y) < 2.3 || roads.dist(o.x, o.y) < 0) continue;
       // first free spot beyond the tracks and the carriageway: the kerb
       // a facade just behind the sidewalk carries the span wire on a rosette instead

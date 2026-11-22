@@ -206,8 +206,8 @@ tram, dark glass is the game.
 
 ### The city
 
-- Terrain: the track corridor is carved into the lidar terrain; retaining walls where the line is cut into
-  a hillside (Chotkova), Most Legií on a deck with piers.
+- Terrain: the ground follows the city's survey and the lidar; the retaining walls of the survey and of the
+  city's data are part of it (Chotkova, the embankment under Letná), Most Legií on a deck with piers.
 - Signs: classic red Prague stop signs; the speed signs of the D 1/2 rules (a restriction in black on yellow,
   a Rychlostník in white on black, the warning triangle, the "r" of a small-radius curve, the dangerous climb
   and descent), twice their real size so they can be read on a screen. Contact
@@ -268,8 +268,9 @@ left and the dashboard between them.
 
 **Full screen:** a phone asks once in the menu; with "Full screen", every shift starts in full screen, turned
 sideways where the browser allows it (Chrome on Android), elsewhere the game asks you to turn the phone. ⛶ in the
-menu switches it any time; the back gesture leaves it until the next start. Safari on an iPhone doesn't allow a page
-full screen: the game says once to use Share ⬆ → Add to Home Screen, and started from that icon it runs full screen.
+menu, and in a shift on the pause panel (II), switches it any time; the back gesture leaves it until the next start or
+⛶. Safari on an iPhone doesn't allow a page full screen: the game says once to use Share ⬆ → Add to Home Screen, and
+started from that icon it runs full screen.
 
 ### With a gamepad
 

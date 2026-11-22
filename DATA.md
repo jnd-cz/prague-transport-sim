@@ -130,7 +130,7 @@ be retired), changed, and for a fact that confirmed a source agrees or moved (`t
 `sources.OVERRIDES` names the sections, where their facts are and their stable ids). `tools/fact_status.py` lists them
 across the built lines; the weekly housekeeping pass posts those to retire or look at again, and `tools/rebuild.py`
 prints the counts. A fact that corrects a source records what the source said when it was recorded (`postedSpeeds`
-`osm`, a stop sign's `pin`), so a later change of the source can show as changed, and a source that still gives
+`osm`, a stop sign's `pin`, a stepped-curve answer's `step`: its card's radii, #672), so a later change of the source can show as changed, and a source that still gives
 what it gave then holds, however near the fact: the user saw that value and set theirs apart (#685).
 
 Each match is reviewed before it retires (the user, 2026-11-18: "I will need to review each case of new match to make
@@ -148,7 +148,7 @@ and the code of `tools/osm_local.py` and `tools/geo.py`, and recomputed when any
 extract's index beside the machine cache (`TRAMDATA_CACHE/osm-index/<extract>-<code>/`, DEVELOPING.md), DI's and the
 archive's parsed tracks and DI's network (`TRAMDATA_CACHE/kept/`, keyed by the sources' provenance hashes and the code
 that reads them; `tools/dtmp_tracks.py` `kept`) and the rebuild's step records with the outputs they name
-(`reports/rebuild/cache/`).
+(`TRAMDATA_CACHE/stepcache/`; `reports/rebuild/cache/` of the checkout without a machine cache).
 
 ## Regional DTM monthly downloads and JVF transition (#63)
 

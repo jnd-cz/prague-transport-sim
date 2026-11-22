@@ -25,7 +25,9 @@
   "crossLevelReview": "tools/cross_level.py (level where answered so; an answered place gets no card)",
   "trackSurfaceReview": "tools/surface_review.py (an answered place gets no card); tools/track_styles.py's setts (#574) once it reads them",
   "bedTroughReview": "tools/bed_troughs.py (an answered place gets no card); reference for the walls step (`wall`) until an issue reads it",
-  "groundRules": "reference: the rules tools/ground_mesh.py holds (crossing_pieces, rail_band, on_rails) and checks (heads_check)"
+  "groundRules": "reference: the rules tools/ground_mesh.py holds (crossing_pieces, rail_band, on_rails) and checks (heads_check)",
+  "groundPlaces": "tools/ground_place.py: the places a ground change is built and measured at (#757)",
+  "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)"
  },
  "contactorSound": [
  {
@@ -738,6 +740,14 @@
    "style": "grass",
    "extent": "our track along Drinopol's platform B (U103Z2P) and 3 m past its ends (line 22 s 3679-3717 in the 2026-11-14 build); the other direction's track beside the platform stays paved",
    "source": "user 2026-11-14, #584, with a Street View picture of platform B: \"Other platform is similar. It's the only place like this that I saw so far and now it's clear why: it's also bus stop, usually for replacement bus, so the asphalt has to run from the road and back.\""
+  },
+  {
+   "line": "9",
+   "between": [[50.071977, 14.390368], [50.072261, 14.393352]],
+   "style": "embedded",
+   "extent": "between the two points: both tracks past Bertramka towards Anděl (line 9 s 6844-7060 in the 2026-11-21 build), the open-track cards open-50.07214-14.39185 and open-50.07217-14.39187",
+   "note": "level with the road beside it; the rails' heights there come from the track archive (DI's axes carry none) and stood up to 0.82 m over IPR's 2023 lidar in ground batch C (#539)",
+   "source": "user 2026-11-21 (session), on the two cards answered paved on 2026-11-14 (#591): \"bertramka is embedded asphalt, same level as the road next to it\""
   }
  ],
  "grassTrack": {
@@ -4413,5 +4423,1636 @@
    "where": "the user, #508 session of 2026-11-16, answering PR #628's question on the pedestrian crossings over a reservation at its stops (classed sidewalk by the survey, raised by #512's sidewalk profile 8-21 cm over the rails on line 37)",
    "applied": "tools/ground_mesh.py: a raised area across a track lies at the bed's height within the beds' outline (crossing_pieces); what reaches a rail beside a track lies at the bed's height within RAIL_CLEAR of it (rail_band); a point on a rail takes the rail's height (on_rails); heads_check counts the ground over the top of rail"
   }
+ },
+ "groundPlaces": {
+  "note": "The places the ground file is judged at (#757, tools/ground_place.py): each a point of a line (local m) and a reach round it, with the issue it comes from and what was said or measured there. A place stays in the list once its issue closes: it is then a case that must not come back. `seen` is what street-level imagery shows there, in words, with where it was looked at from; `sections` are lines the ground is sampled along, each with the most of a measure the place may have (tools/ground_place.py).",
+  "rasinovo-quay": {
+   "line": "17",
+   "at": [
+    -728.0,
+    -1421.3
+   ],
+   "reach": 60,
+   "issue": 697,
+   "what": "the quay wall between the street and the lower quay: a straight wall, the sidewalk on its top at the street's level",
+   "said": "there should be a wall and sidewalk on top, on the street level",
+   "source": "the user's report fb-20261118-160427-4cd2b219 (test site, 518adaf, line 17 s 12568.2), #697",
+   "seen": {
+    "what": "From the lower quay: a straight vertical wall of ashlar stone, about 8 m, from the cobbled lower quay up to a stone parapet at the street's sidewalk; arched doors of vaults in it. The lower quay is level, cobbled, about 13 m wide, with a low edge to the river. A flight of stairs runs down along the wall's face: its upper part of stone on corbels, its foot a metal landing and stair standing free over the quay. No slope anywhere between the street and the quay.",
+    "from": [
+     {
+      "at": [
+       50.0738156,
+       14.4136692
+      ],
+      "headings": [
+       25,
+       95,
+       160
+      ]
+     }
+    ],
+    "source": "Google Street View, seen 2026-11-19 (looked at, not copied)"
+   },
+   "sections": [
+    {
+     "name": "from the track across the sidewalk, the wall and the lower quay to the river",
+     "from": [
+      -728.0,
+      -1421.3
+     ],
+     "to": [
+      -758.0,
+      -1421.3
+     ],
+     "expect": {
+      "sloping m": 2.5,
+      "off the lidar m": 2.5
+     },
+     "why": "IPR's raster has the street level to 14 m from the track, the wall within 2 m (196.9 to 189.0) and the level quay to 27 m; the generated sidewalk surface (data/line17.streets.*) follows it within 0.6 m, but the ground file has corners only at the kerb (11.0 m), on the two sidewalk areas' shared edge (15.1 m, at the surface's mid-wall 191.95) and at 16.0 m: its 5 m lattice runs a straight line across the wall"
+    }
+   ]
+  },
+  "krejcarek-ramp": {
+   "line": "37",
+   "at": [
+    3925.0,
+    330.0
+   ],
+   "reach": 40,
+   "issue": 653,
+   "what": "the stop's access from the road Pod Krejcárkem: the road on a retaining wall over a ramp that falls along it to the platform, a cheek wall between ramp and landing tapering to nothing, a straight flight of stairs at the ramp's top",
+   "said": "on Krejcárek I saw malformed sidewalk/ramp to the tram stop",
+   "source": "the user, 2026-11-17, #653",
+   "seen": {
+    "what": "Three levels side by side. The road stands on a retaining wall (a concrete beam on ribbed pilasters, a railing on it), about 1 m over the ramp at the stairs and 2 m at the ramp's foot. The ramp, asphalt, about 3 m wide, falls evenly along that wall from the stairs' top to the platform's level over some 30 m. Between the ramp and the platform's landing runs a low concrete cheek wall with a railing, as high as the stairs at their top and tapering to nothing at the ramp's foot. The stairs are one straight flight of 8 granite steps, about 2 m wide, between that cheek wall's end and the white retaining wall, from the landing up to the ramp's top. The platform has a granite edge; the track through the stop is ballasted with sleepers, and setts begin past the platform's end.",
+    "from": [
+     {
+      "photos": "raw/reference/photos/krejcarek/user-2026-11-19-1..5 (SOURCES.md)"
+     },
+     {
+      "at": [
+       50.0950058,
+       14.4750885
+      ],
+      "headings": [
+       285,
+       345,
+       45
+      ],
+      "source": "Google Street View, seen 2026-11-19 (looked at, not copied)"
+     }
+    ],
+    "source": "the user's five photos of 2026-11-19 (session: \"Got some fresh photo from Krejcárek for reference: stop, ramps, stairs, wall\")",
+    "game": "with the stairs' rule (#447, PR #762) drawn from the photos' viewpoints 1 and 3 (tools/shot.py --line 37 --s 2975 --view review --at=3927.25,328.6 --yaw 58 --pitch 10 --dist 8; --at=3917.6,322.7 --yaw 238 --pitch 9 --dist 14): the road's wall, the ramp, the tapering cheek wall and the landing as in the photos, the stairs one even slope (no steps: the ground has none); thin shards at the stairs' track-side foot"
+   },
+   "sections": [
+    {
+     "name": "up the stairs (survey area 1339), foot to top",
+     "from": [
+      3926.25,
+      328.0
+     ],
+     "to": [
+      3928.25,
+      329.25
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the survey's outline has the foot at 228.56-228.82 and the top at 229.75-229.82: one even flight of 8 steps (#447)"
+    },
+    {
+     "name": "up the ramp along the road's wall, its foot to the stairs' top",
+     "from": [
+      3902.92,
+      310.53
+     ],
+     "to": [
+      3931.9,
+      328.3
+     ],
+     "expect": {
+      "off the chord m": 0.25,
+      "off the lidar m": 1.0,
+      "largest step m": 0.15
+     },
+     "why": "an even ramp of 4 %: 228.49 to 229.90 m over 33 m, within 5 cm of IPR's raster in the written file of 2026-11-19: right today, a case that must stay"
+    },
+    {
+     "name": "from the ramp across the cheek wall to the landing, 6 m before the stairs",
+     "from": [
+      3923.36,
+      323.08
+     ],
+     "to": [
+      3920.22,
+      328.19
+     ],
+     "expect": {
+      "sloping m": 1.0
+     },
+     "why": "the ramp at 229.41 m, the landing at 228.7 m, the cheek wall (survey wall area 1442) between them within 0.6 m"
+    },
+    {
+     "name": "from the far edge of Pod Krejcárkem across the verge and the low wall under the park",
+     "from": [
+      3933.59,
+      313.86
+     ],
+     "to": [
+      3935.28,
+      310.91
+     ],
+     "expect": {
+      "sloping m": 0.75
+     },
+     "why": "a stone wall about 1.2 m tall stands 1.5 m behind the kerb along the road's south-east side, a grass verge before it and the wooded slope above (Google Street View from the road, 50.0950058, 14.4750885, headings 75 and 150, seen 2026-11-19, looked at, not copied). The survey has it as wall lines: its foot at 230.51, its top's two faces 0.5 m apart at 231.87 and 231.82, the road's edge at 230.73. IPR's raster and the written file of 2026-11-19 are one slope there (#697)"
+    }
+   ]
+  },
+  "garden-beds": {
+   "line": "37",
+   "at": [
+    7590.0,
+    743.0
+   ],
+   "reach": 40,
+   "issue": 663,
+   "what": "a courtyard's raised garden beds: the beds at their walls' top, no wall standing as a blade over a sunk bed",
+   "source": "found on #653 (PR #660): survey green areas laid on the lidar 2.1-3.7 m under their own outline, #663",
+   "sections": [
+    {
+     "name": "from the footpath over a bed's wall into the bed, x = 7593",
+     "from": [
+      7593.0,
+      742.2
+     ],
+     "to": [
+      7593.0,
+      748.0
+     ],
+     "expect": {
+      "largest step m": 0.5
+     },
+     "why": "the survey's own heights there: the footpath (sidewalk 2962) 210.17, the wall's top (wall 3322) 210.17 and 209.88, the bed (green 4245) 209.88: one level, the wall 0.3 m over the bed. IPR's raster has 206.4 under all of it, and the written file of 2026-11-19 drops 3.65 m from the wall into the bed (#663)"
+    }
+   ]
+  },
+  "zizkov-depot-paving": {
+   "line": "37",
+   "at": [
+    3888.9,
+    -53.8
+   ],
+   "reach": 50,
+   "issue": 676,
+   "what": "the junction at Vozovna Žižkov: the embedded paving's outline against the asphalt without saw-teeth and stepped edges",
+   "said": "Mixup of track styles within a junction and track crossings",
+   "source": "the user's report fb-20261113-130646-77302ec0 (test site, 455f6dd, line 37 s 1681.6), #676",
+   "seen": {
+    "what": "The junction's tracks lie in setts over the whole junction; the sett field ends about half a metre outside the outer rails along smooth curves that follow them, flush with the asphalt, with no step and no teeth.",
+    "from": [
+     {
+      "at": [
+       50.0915851,
+       14.4753086
+      ],
+      "headings": [
+       280,
+       60
+      ]
+     }
+    ],
+    "source": "Google Street View, seen 2026-11-19 (looked at, not copied)"
+   }
+  },
+  "yard-at-a-sidewalk": {
+   "line": "23",
+   "at": [
+    -2564.4,
+    434.0
+   ],
+   "reach": 40,
+   "issue": 638,
+   "what": "a paved yard meeting a sidewalk on their shared edge: no step with its wall (it stood 0.33-0.37 m under the sidewalk)",
+   "source": "found on #632 (PR #633), line 23 s 557; fixed by #750: a case that must stay; its step still read 0.29 m on the written file of 2026-11-20 (the yard's sheet 0.5-0.9 m under IPR beside the sidewalk), #638",
+   "sections": [
+    {
+     "name": "from the sidewalk east into the yard, 7 m along y = 434",
+     "from": [
+      -2566.4,
+      434.0
+     ],
+     "to": [
+      -2559.4,
+      434.0
+     ],
+     "expect": {
+      "largest step m": 0.15,
+      "off the lidar m": 1.0
+     },
+     "why": "the yard (survey area 3398) rises from the sidewalk's edge with the ground, 0.2 m a metre. On its own sheet it lay 0.29 m under the sidewalk at the edge and 0.5-0.9 m under IPR for the 5 m beyond: the written file of 2026-11-20 has a step of 0.29 m and 4.5 m off the raster"
+    }
+   ]
+  },
+  "lattice-cell": {
+   "line": "23",
+   "at": [
+    -886.55,
+    721.45
+   ],
+   "reach": 30,
+   "issue": 738,
+   "what": "the terraced retaining walls between Chotkova (205 m) and the road above it (213 m): three walls of about 3 m with a footpath on the first terrace; and a 5 m lattice cell on them with corners far from a plane (207.07, 209.15, 212.81, 213.63 m): its diagonal the same whatever lines are added elsewhere in the tile",
+   "source": "found on #676: an unrelated change moved the ground here 210.3 -> 210.9 m, #738; the walls: #697",
+   "seen": {
+    "what": "South of Chotkova's roadway: a stone retaining wall about 3 m tall at the road's edge, slightly battered, a narrow gravel verge at its foot; on its top a footpath (gravel, a steel grating) behind the wall's coping and a fence; behind the footpath the hill, ivy over the next wall. The lawn rising to the trees is the north side of the road.",
+    "from": [
+     {
+      "at": [
+       50.0927863,
+       14.4075084
+      ],
+      "headings": [
+       90,
+       180,
+       270
+      ]
+     }
+    ],
+    "source": "the user's photo from the footpath on the wall looking west to the hairpin, 2026-11-19 (this session: \"Chotkova has road, wall, footpath, hill, so maybe that's why it's tricky\"; kept in raw/reference/photos/chotkova/, not published); a contributor's car-mounted photosphere on Google Maps at the same place, seen 2026-11-19",
+    "corrects": "the entry of 2026-11-19 read the photosphere's view across the road, north, as the view south: \"a lawn rising evenly from the road's edge to the trees; no wall seen at the road\"",
+    "game": "main draws one lawn slope from the road wall's top to the upper road. With the survey's wall lines read by their own heights (#697): the road wall, the footpath's terrace at 208.5 m, a wall to 211.5 m, a terrace, a wall to 214.0 m."
+   },
+   "sections": [
+    {
+     "name": "from the footpath on the road wall's top south over the two walls behind it, x = -896",
+     "from": [
+      -896.0,
+      725.6
+     ],
+     "to": [
+      -896.0,
+      719.6
+     ],
+     "expect": {
+      "sloping m": 2.0
+     },
+     "why": "the survey's own heights there: the road 205.3, the first wall's top and the footpath 208.5 (wall area 842, a wall line at 208.54), the next wall's foot and top lines 0.15 m apart at 208.6 and 211.6, the third's at 214.0, the upper road 213.2: level terraces between upright walls. IPR's 1 m raster is one slope through them, and so was the written file of 2026-11-19 (the whole 6 m sloping). The footpath's 1.75 m may count as sloping: its surveyed heights rise from 208.47 at the road wall's top to 208.7 at the next wall's foot; the walls must not"
+    }
+   ]
+  },
+  "garden-edgings": {
+   "line": "23",
+   "at": [
+    -1116.8,
+    806.1
+   ],
+   "reach": 30,
+   "issue": 697,
+   "what": "a terraced garden's edgings and low walls surveyed as paved strips half a metre across (survey areas 946 and 956, 138 and 71 outline points over 232.6-245.7 m): level lawns between level strips, no sheet leaning across a lawn",
+   "source": "found on #697 measuring the paved areas whose outline climbs a wall: 46-128 a line are strips under 1 m across. The written file of 2026-11-19 triangulates each strip's outline, its foot's side and its top's, and they stand as fins up to 2 m over the lawns; as walls (ground_mesh.wall_like) the place's steep faces go 144.4 -> 92.6 m2"
+  },
+  "modrany-viaduct-ramps": {
+   "line": "17",
+   "at": [
+    -2385.0,
+    -9250.0
+   ],
+   "reach": 60,
+   "issue": 757,
+   "what": "the tram viaduct at Generála Šišky and Modřanská (s 3971-4152, rails 201.0 at its east end, 204.7 on it, 203.7 at its north end): the walled ramp up to it and the sidewalk and road along the wall's foot",
+   "said": "for the bridge ramps you can try here at Krejcárek https://maps.app.goo.gl/h4Ma3hN5VuqppSyW9 and at Generála Šišky x Modřanská: https://maps.app.goo.gl/XBfSoVMpTfcx6qqZA. The one near Nádraží Modřany isn't visible, only from the underpass there is street view",
+   "source": "the user, 2026-11-19 (session, two messages naming places to look at in street-level imagery), #757",
+   "seen": {
+    "what": "From Generála Šišky beside it: the ramp to the viaduct is concrete with an upright side wall, growing along the road from nothing to the abutment's full height (about 5 m), a door in it; the span's beam starts at the abutment's square end. The sidewalk and the road along the wall's foot are level and even. (From Modřanská to the north the track's other approach is hidden under trees.)",
+    "from": [
+     {
+      "at": [
+       50.0021899,
+       14.4057555
+      ],
+      "headings": [
+       135
+      ]
+     },
+     {
+      "at": [
+       50.0026816,
+       14.4045196
+      ],
+      "headings": [
+       165,
+       235
+      ]
+     }
+    ],
+    "source": "Google Street View at the user's link, seen 2026-11-19 (looked at, not copied)",
+    "game": "main 95b3162's data, the same camera (tools/shot.py --line 17 --s 4060 --view review --at=-2382.1,-9253.0 --yaw 143 --pitch 4 --dist 25): the wall stands, but the sidewalk along its foot rises against it in two peaks up to the deck, and the road swells towards it"
+   },
+   "sections": [
+    {
+     "name": "from the ramp's south side strip over the abutment's face down to the street under the deck, y = -9249.7",
+     "from": [
+      -2389.5,
+      -9249.7
+     ],
+     "to": [
+      -2395.5,
+      -9249.7
+     ],
+     "expect": {
+      "sloping m": 0.5
+     },
+     "why": "the span's beam starts at the abutment's square end (the place's `seen`): the ramp's top ends at an upright face. The survey's wing wall lines turn their corners at (-2392.66, -9250.81) and (-2391.92, -9241.77) and run on at the street's level; no line crosses the structure. On PR #762's ground the side strips (sidewalk 7214) fell 4.5 m in their last metre as leaning faces: 49 survey triangles steeper than 1:1 rising over 1 m in the box (-2396, -9252.5)-(-2390, -9242) (#763)"
+    },
+    {
+     "name": "from the ramp's north wall across the road beside it, x = -2379",
+     "from": [
+      -2379.0,
+      -9240.6
+     ],
+     "to": [
+      -2379.0,
+      -9234.6
+     ],
+     "expect": {
+      "off the lidar m": 0.5,
+      "sloping m": 0.5
+     },
+     "why": "the sidewalk and the road along the wall's foot are level and even (the place's `seen`). The written file of 2026-11-19 has the road there at 201.1 m, 2.9 m over IPR's raster (198.2): of 580 points 1-6 m off the low side of the viaduct's walls 355 stood more than 0.5 m over the raster, the largest 3.33 m (#761); on #762's and #763's ground none does, the largest 0.19 m"
+    },
+    {
+     "name": "across the road under the viaduct's deck, x = -2430",
+     "from": [
+      -2430.0,
+      -9237.5
+     ],
+     "to": [
+      -2430.0,
+      -9245.0
+     ],
+     "expect": {
+      "off the lidar m": 0.5
+     },
+     "why": "the road passes under the deck at the street's level (IPR 197.6 m). On #762's ground the road's area (7120, one outline on two levels) took the street surface, which follows the tracks onto the deck: 205.3 m, a slab in the viaduct 1.04 m over the deck's underside (the lines' check groundUnderDecks 0 -> 2 on the batch's first build, #761)"
+    }
+   ]
+  },
+  "krejcarek-abutment": {
+   "line": "37",
+   "at": [
+    3954.0,
+    380.0
+   ],
+   "reach": 40,
+   "issue": 742,
+   "what": "the Krejcárek viaduct's south abutment (s 3030-3038): the ground under and beside the deck's end",
+   "said": "for the bridge ramps you can try here at Krejcárek https://maps.app.goo.gl/h4Ma3hN5VuqppSyW9 and at Generála Šišky x Modřanská: https://maps.app.goo.gl/XBfSoVMpTfcx6qqZA. The one near Nádraží Modřany isn't visible, only from the underpass there is street view",
+   "source": "the user, 2026-11-19 (session), #757; the same place as #742 and #594's bridge ends",
+   "seen": {
+    "what": "From the path under the viaduct: the deck's beam lands on a concrete abutment with an upright ribbed wing wall; beside the wall the embankment falls away as an even slope under bushes; under the deck's end a cone of pitched stone with a narrow stair along it runs down to the path.",
+    "from": [
+     {
+      "at": [
+       50.0956967,
+       14.4751601
+      ],
+      "headings": [
+       130
+      ]
+     }
+    ],
+    "source": "Google Street View at the user's link, seen 2026-11-19 (looked at, not copied)",
+    "game": "main 95b3162's data, the same camera (tools/shot.py --line 37 --s 3030 --view review --at=3954.3,380.3 --yaw 138 --pitch 4 --dist 18): the deck and the embankment's slope are there; there is no abutment wall, and under the deck's end the ground is a facetted pit with a patch of the survey's tram area lying in it"
+   }
+  },
+  "letna-road-wall": {
+   "line": "17",
+   "at": [
+    145.0,
+    806.0
+   ],
+   "reach": 60,
+   "issue": 765,
+   "what": "the retaining wall along nábřeží Edvarda Beneše under Letná (s 15298): Geoportál has it as one line of 720 m, 3.5 m tall; the survey has its face as a paved strip 0.44 m across (area 4166, x 26 to 317: the foot's line at 191.4-192.3 m, the top's stepping 0.6 m at a time between 193.2 and 196.3 m) and nothing west of x = 26",
+   "said": "As I thought and you suggest we can remove the old invented walls and move retaining walls into the build where we don't have them yet.",
+   "source": "the user, 2026-11-19 (session), #765",
+   "seen": {
+    "what": "From the road beside it: a wall of irregular stone masonry stands at the road's edge, between 2 and 3 m tall here, under a flat coping that steps down along the road; behind its top a bank of grass and bushes rises to the trees.",
+    "from": [
+     {
+      "at": [
+       50.0947797,
+       14.4225173
+      ],
+      "headings": [
+       350
+      ]
+     }
+    ],
+    "source": "Google Street View (a car's panorama), seen 2026-11-19 (looked at, not copied)",
+    "game": "main 2a8ddf2: the page's slab, 3.9 m tall and level along the whole line; behind it the written ground has the strip's outline as teeth 10 m wide (tools/shot.py --line 17 --s 15298 --view review --at=150,806 --yaw 20 --pitch 10 --dist 35)"
+   },
+   "sections": [
+    {
+     "name": "from the road across the wall onto its top, x = 200",
+     "from": [
+      200.0,
+      803.0
+     ],
+     "to": [
+      200.0,
+      807.5
+     ],
+     "expect": {
+      "sloping m": 0.5
+     },
+     "why": "a wall stands at the road's edge (the survey's strip: its foot 191.85 m, its top 194.3 m at x = 197-210), the bank rising behind it at about 1:1. Built on #765: one step of 2.65 m, 0.5 m sloping (the top's first half metre). The written file of 2026-11-19: a step of 0.81 m and 0.75 m of slope here, and teeth 10 m wide along the wall"
+    }
+   ]
+  },
+  "ohrada-cutting-walls": {
+   "line": "37",
+   "at": [
+    3400.5,
+    1.0
+   ],
+   "reach": 30,
+   "issue": 770,
+   "what": "the tram's cutting north of Ohrada between two upright concrete walls. The survey has each wall only as a strip in plan, inside paved ground on the lidar (areas 1848 and 1817): the west wall's top (area 1847: 0.32 m across, 87 m long, with heights 248.2-248.6 m) and the east wall (area 1818: 0.53 m across, 250 m long, on the lidar's ground). IPR's raster spreads the west wall's 4.7 m and the east wall's 5.8 m over 2.5 m each",
+   "source": "found on #770 as a paved bank creased by the raster's bumps (the seams of 10 cm on line 37 rose 441 -> 536 with the batch, 24 of the new ones here at s 2348); the user, 2026-11-20, on the draft's picture of plain banks: \"it's a straight wall, attaching photos from the top of footwalk bridge\"",
+   "seen": {
+    "what": "From the footbridge over the cutting. North: the two ballasted tracks between upright concrete walls 4-5 m tall, as far as the road bridge that crosses the cutting at a slant; the west wall carries the road's sidewalk and a railing on its top and stands straight up from a narrow concrete ledge beside the ballast; the east wall, concrete panels with a railing and a lawn behind it, stands on a ledge about 1.5 m wide where the catenary poles stand. South, to the junction at Ohrada: the same two walls with railings, a ledge 1-1.5 m wide at each foot with spare rails stored on it, the walls lower as the track climbs to the street, a road at street level on either side. No bank anywhere: every face is upright.",
+    "from": [
+     {
+      "photos": "raw/reference/photos/ohrada/user-2026-11-20-1..2 (SOURCES.md)"
+     },
+     {
+      "at": [
+       3396.5,
+       -9.0
+      ],
+      "what": "local metres: the footbridge over the cutting, its deck at 254.4 m"
+     }
+    ],
+    "source": "the user's two photos from the footbridge, 2026-11-20 (this session, on PR 773: \"it's a straight wall, attaching photos from the top of footwalk bridge\"; kept in raw/reference/photos/ohrada/, not published: number plates on them)",
+    "corrects": "the place's entry of 2026-11-20 (paved-bank-by-the-track) took area 1848 for a paved bank and held it to an even slope",
+    "game": "main draws both walls as the raster's banks, 2.5 m across, lumpy since the batch of #757. With the survey's strips read as wall lines (#770): a face at each strip's edge to the track, the ledges at the track's level."
+   },
+   "sections": [
+    {
+     "name": "across the west wall, 7.5 m from the road to the track",
+     "from": [
+      3393.21,
+      5.26
+     ],
+     "to": [
+      3399.75,
+      1.58
+     ],
+     "expect": {
+      "sloping m": 1.0
+     },
+     "why": "the road's edge, the wall's top, one upright face of 4.7 m at the strip's edge to the track (3396.8, 3.2), the ledge and the ballast at the track's level. The written file of 2026-11-20 has 3.25 m of the 7.5 sloping (the foot in the raster's smear), the build with the strips as wall lines 0.5 m (the top's crossfall)"
+    },
+    {
+     "name": "across the east wall, 6.5 m from the track to the wall's top",
+     "from": [
+      3402.8,
+      -0.14
+     ],
+     "to": [
+      3408.46,
+      -3.32
+     ],
+     "expect": {
+      "sloping m": 1.0
+     },
+     "why": "the ballast, the ledge at the track's level, one upright face of 5.8 m at the strip's edge to the track, the ground behind the wall's top at 249.5 m. The written file has 1.82 m of the 6.5 sloping and no step over 1.7 m; the build one step of 6.3 m and 0.78 m sloping (the top's fall to the road)"
+    },
+    {
+     "name": "along the west wall's foot, 24 m on the ledge from (3397.5, 2.9) south-west",
+     "from": [
+      3397.48,
+      2.86
+     ],
+     "to": [
+      3385.7,
+      -18.05
+     ],
+     "expect": {
+      "sloping m": 1.0
+     },
+     "why": "the ledge at the wall's foot runs with the track beside it (it climbs 1.6 m in the 24 m, under the measure's slope): the written file has 8.8 m of it sloping, spikes of 1 m every 2 m where the foot's corner on the wall's line took the top's height; the build none"
+    }
+   ]
+  },
+  "vysehrad-tunnel-mouths": {
+   "line": "17",
+   "at": [
+    -727.0,
+    -2580.0
+   ],
+   "reach": 40,
+   "issue": 771,
+   "what": "the Vyšehrad tunnel through the rock (s 11385.8-11424.0) and its two mouths: the opening clear of ground, the survey's road and walls inside it at the rails' level (193.0-193.2 m), not on the hill's lidar (203-217 m). The north gate's masonry (survey area 1237: the arch's line across the road and the wing wall along the sidewalk in one strip 0.64 m across) lies at the rails' level too: nothing draws a portal yet. No section: the hill over the tunnel is in the ground file too, and a section reads the highest surface; the lines' check surveyOverTrack and the pictures hold it",
+   "source": "found on #770 (the batch's surveyOverTrack 2 -> 3 on line 17); from the cab at s 11376 a dark spike 4 m tall stood in the south mouth on main 2a8ddf2 and 3de07bd (tools/shot.py --line 17 --s 11376 --view cab), and two grey slabs in the north mouth seen from inside (--s 11408); and on the first build of #771 a grey cone 4 m tall by the road outside the north mouth (--s 11408): the gate's wing wall, its top falling from the pier's 197.22 m to a point on the ground 12 m on",
+   "seen": {
+    "what": "The north mouth, from the road. A stone gate with battlements stands at the rock; the road through it is flat, the two tracks in its surface. On the river side a sidewalk at a kerb, parted from the road by temporary concrete dividers with a railing. On the rock side a narrow sidewalk at a kerb and, behind it, the gate's stone wing wall with battlements and turrets, about 6 m tall, running some 12 m north from the gate's pier; then a shrub and the gatehouse. Nothing stands on the road or the sidewalks.",
+    "from": [
+     {
+      "at": [
+       50.0636723,
+       14.4161176
+      ],
+      "headings": [
+       191,
+       20
+      ]
+     },
+     {
+      "at": [
+       50.0638466,
+       14.4160002
+      ],
+      "headings": [
+       146
+      ]
+     }
+    ],
+    "source": "Google Street View of September 2025 at the two viewpoints the user linked, seen 2026-11-20 (this session, on PR 772: \"There's temporary concrete dividers for the sidewalk, we don't have to include it. Otherwise there is flat road surface and kerb for the sidewalk.\"; of the rock side: \"there is better view here\")",
+    "game": "main has two slabs in the mouth; the first build of #771 a cone by the road outside it, the gate's strip stood up as a wall. With the strip at the rails' level: the flat road, the kerbs and the sidewalks. The gate, its wing wall and the dividers are not drawn."
+   }
+  },
+  "bed-in-a-sidewalk": {
+   "line": "22",
+   "at": [
+    -772.0,
+    534.5
+   ],
+   "reach": 25,
+   "issue": 696,
+   "what": "a bed of 30 m2 in a sidewalk (survey area 1973, green, on the lidar) and tree pits round it: flush with the sidewalk, no slab with dark sides",
+   "source": "the user, 2026-11-20 (session, on #696's pictures of alpha-4 against main and its two questions, tree pits and small beds flush or raised: \"696 - I will go with your recommendation there\"; the recommendation: flush, a pit's edging is level with the paving). On the written file of 2026-11-20 the bed lies -0.09 to +0.3 m off the sidewalk round it",
+   "sections": [
+    {
+     "name": "across the bed inside the sidewalk, 6.3 m along y = 534.5",
+     "from": [
+      -776.5,
+      534.5
+     ],
+     "to": [
+      -770.2,
+      534.5
+     ],
+     "expect": {
+      "largest step m": 0.03,
+      "off the chord m": 0.05
+     },
+     "why": "the sidewalk, the bed and the sidewalk again on one surface. The written file of 2026-11-20 steps 0.06 m at the bed's edge and strays 0.07 m from the line between the section's ends, 0.5 m of it sloping; the build 0.01 m, 0.02 m and none"
+    }
+   ]
+  },
+  "krejcarek-platform": {
+   "line": "37",
+   "at": [
+    3908.0,
+    318.0
+   ],
+   "reach": 35,
+   "issue": 776,
+   "what": "the Krejcárek stop's platform (s 2904-2974, the right side; the survey has it as a sidewalk, area 284): a level asphalt platform a steady height over the rails, the shelter's footprint and the grassy patch level with it, no bumps by the ramp's low walls",
+   "source": "the user, 2026-11-20 (session, on a cab picture of line 37 s 2940): \"the Krejcárek stop platform in the driven direction has uneven surface\"; and with his photo: \"there are some sloped bumps next to the wheelchair ramp too, closer to the stop sign. As well as the visible slab around the overhead wire pole. Actual pole sits in the grassy patch\"",
+   "seen": {
+    "what": "Along the platform towards the stop sign: level asphalt with a red strip at its granite edge, a drain channel along it about 2.5 m in, the shelter standing on that channel; behind the shelter a kerbed grassy patch level with the asphalt, the catenary pole in it; then the ramp rising evenly along the road's ribbed wall. Nothing bumps and no slab stands on the platform.",
+    "from": [
+     {
+      "photos": "raw/reference/photos/krejcarek/user-2026-11-20-6-platform-ramp-pole.jpg and user-2026-11-19-3, -5 (SOURCES.md)"
+     }
+    ],
+    "source": "the user's photo of 2026-11-20 from the platform's south end looking along it, and his photos of 2026-11-19 (this session; kept in raw/reference/photos/krejcarek/, not published)",
+    "game": "the written file of 2026-11-20: the ground behind the platform's edge +0.01 to +0.41 m over the rail top, a slab of terrain in the shelter's footprint 0.1-0.2 m over the platform, a mound of 0.3 m by the shelter, the sidewalk climbing the low walls by the ramp"
+   },
+   "sections": [
+    {
+     "name": "along the platform 0.7 m behind its edge, 43 m from s 2925 to s 2968",
+     "from": [
+      3882.06,
+      302.26
+     ],
+     "to": [
+      3918.04,
+      325.8
+     ],
+     "expect": {
+      "off the chord m": 0.05,
+      "largest step m": 0.02
+     },
+     "why": "the platform runs with the rails, which climb evenly here: a straight line. The written file of 2026-11-20 strays 0.17 m from it and steps 0.10 m from one sample to the next; the build 0.03 m and none"
+    },
+    {
+     "name": "across the shelter's footprint, 2.3 m from the platform's edge inward at s 2955",
+     "from": [
+      3906.89,
+      319.1
+     ],
+     "to": [
+      3908.15,
+      317.18
+     ],
+     "expect": {
+      "largest step m": 0.03
+     },
+     "why": "the hole the survey leaves for the shelter is the platform's own ground: the written file has the terrain in it over the platform, a step of 0.15 m; the build 0.01 m"
+    },
+    {
+     "name": "along the platform 3.2 m from the axis past the shelter towards the ramp, 16 m from s 2960",
+     "from": [
+      3911.68,
+      320.92
+     ],
+     "to": [
+      3925.1,
+      329.76
+     ],
+     "expect": {
+      "off the chord m": 0.2,
+      "largest step m": 0.05
+     },
+     "why": "level asphalt between the shelter and the stop sign, falling to the crossing past the platform's end: the written file has a mound there, IPR's raster's, 0.42 m off the line and steps of 0.16 m; the build 0.16 m (the platform's end) and 0.03 m"
+    }
+   ]
+  },
+  "na-vapence-garage-ramp": {
+   "line": "37",
+   "at": [
+    3871.0,
+    -24.0
+   ],
+   "reach": 20,
+   "issue": 779,
+   "what": "the garage ramp on Na Vápence by the Žižkov depot (survey road area 22): a straight ramp between upright walls down to the door, the sidewalk beside it level up to its edge",
+   "source": "the user, 2026-11-20 (session, on PR 777's picture of the place): \"the wall near the ramp at Vozovna Žižkov looks better. What still need to work is the sidewalk edge and the road ramp from underground parking\"",
+   "seen": {
+    "what": "From Na Vápence looking north-west: a straight asphalt ramp, one lane wide, falls from the street to a roller door under a slab of the office building. A wall with a railing on its top stands on either side, growing from nothing at the street to the door's height; the sidewalk along the building, left of the ramp, stays level behind its wall. Over the door a parapet with a railing, cars parked on the level behind it.",
+    "from": [
+     {
+      "at": [
+       50.0917694,
+       14.4750901
+      ],
+      "headings": [
+       320
+      ]
+     }
+    ],
+    "source": "Google Street View of August 2024 at the viewpoint the user linked, seen 2026-11-20 (this session; looked at, not copied)",
+    "game": "the written file of 2026-11-20: the sidewalk's last 1.25 m falls 2.2 m into the ramp, the ramp rises 0.76 m in its last metre before the door's wall, the road behind that wall falls 1.6 m towards it. The build: the sidewalk level to its edge over one upright face, the ramp straight to the wall's foot, the road behind level"
+   },
+   "sections": [
+    {
+     "name": "from the sidewalk across its edge onto the ramp, y = -22",
+     "from": [
+      3866.3,
+      -22.0
+     ],
+     "to": [
+      3870.5,
+      -22.0
+     ],
+     "expect": {
+      "sloping m": 0.25
+     },
+     "why": "a wall stands between the sidewalk and the ramp (the survey has the sidewalk's edge at 260.4 m and no wall area there): one step. The written file of 2026-11-20 slopes over 1.25 m of it"
+    },
+    {
+     "name": "down the ramp's middle to the foot of the door's wall",
+     "from": [
+      3871.0,
+      -30.0
+     ],
+     "to": [
+      3871.0,
+      -18.2
+     ],
+     "expect": {
+      "off the chord m": 0.2,
+      "largest step m": 0.05
+     },
+     "why": "a straight ramp (IPR's raster: 259.6 m to 257.8 m, 13.6 %; rounded at its head). The written file of 2026-11-20 rises 0.76 m in the last metre, the raster's smear of the wall: 0.67 m off the line, steps of 0.19 m; the build 0.14 m and 0.05 m"
+    },
+    {
+     "name": "from the ramp across the door's wall onto the road behind it, x = 3871",
+     "from": [
+      3871.0,
+      -20.5
+     ],
+     "to": [
+      3871.0,
+      -15.5
+     ],
+     "expect": {
+      "sloping m": 0.25
+     },
+     "why": "a wall 0.26 m across (survey area 1419), the ramp at its foot and the road behind its top: one step"
+    },
+    {
+     "name": "up Na Vápence beside the ramp to Nad Ohradou, x = 3877",
+     "from": [
+      3877.0,
+      -30.0
+     ],
+     "to": [
+      3877.0,
+      -10.0
+     ],
+     "expect": {
+      "off the lidar m": 0.5,
+      "off the chord m": 0.3
+     },
+     "why": "the street climbs evenly to the junction (IPR: 259.72 to 260.78 m). The written file of 2026-11-20 carries Nad Ohradou's crown 10 m into the mouth and stands 0.3-0.6 m over the raster for 10 m, #780"
+    }
+   ]
+  },
+  "wall-end-in-a-path": {
+   "line": "23",
+   "at": [
+    -2329.2,
+    571.0
+   ],
+   "reach": 20,
+   "issue": 770,
+   "what": "a footpath passing the end of a wall surveyed as two lines half a metre apart (its foot's at 271.18 m, its top's at 272.93 m): the path and the lawn past the wall's end lie on the ground, 272.6 m",
+   "source": "found tracing #770's sidewalk / sidewalk seams, 2026-11-20: line 23 s 892 (and line 22 s 5204), a step of 0.96 m inside survey sidewalk 3197",
+   "sections": [
+    {
+     "name": "across the path and past the wall's end onto the lawn, y = 571",
+     "from": [
+      -2332.0,
+      571.0
+     ],
+     "to": [
+      -2327.6,
+      571.0
+     ],
+     "expect": {
+      "off the lidar m": 1.0,
+      "largest step m": 0.4
+     },
+     "why": "IPR's raster has no step there (272.49 to 273.01 m). The written file of 2026-11-20 holds the path's last 0.75 m and the lawn past the wall at 271.18-271.4 m, the level of the strip between the wall's two lines carried on past its end: steps of 1.15 m and 1.74 m"
+    }
+   ]
+  },
+  "street-over-an-underpass": {
+   "line": "17",
+   "at": [
+    -1453.0,
+    -9105.0
+   ],
+   "reach": 30,
+   "issue": 783,
+   "what": "the pedestrian tunnel under the two roads and the track south of Čechova čtvrť (survey areas `underpass` 8598 and `sidewalk` 7410 at level -1, OSM's cycleway in a tunnel): the roads, their verges and the track run flat over it at 214.7-215.4 m, the stairs' wells beside the track open down to its floor at 211.1 m. The written file of 2026-11-20: the verges 3.6 m down in a slot 5 m long (IPR's raster has the tunnel's floor, 211.3 m, where the survey's level-0 outlines stand at 214.8-215.3 m), the south road 1.8 m down at its edge. The build: the roads, the verges and the track level across, the stairs' wells open; on the tag alpha-4 the roads, the verges and the track are level there",
+   "source": "the user's note fb-20261120-153903-93585637 of 2026-11-20 on the test site (batch A), line 17 s 3075: \"Looks like a ditch but OSM has pedestrian tunnel here. Both tram tracks and road should lie flat on surface and tunnel be placed under than ground level.\"",
+   "sections": [
+    {
+     "name": "along the tunnel's axis from the north road over the verges and the track to the south road",
+     "from": [
+      -1460.5,
+      -9086.0
+     ],
+     "to": [
+      -1446.0,
+      -9122.0
+     ],
+     "expect": {
+      "off the chord m": 0.5,
+      "largest step m": 0.2
+     },
+     "why": "all of it lies on the tunnel's cover: two roads, their verges and the track at 214.7-215.4 m, a kerb between them at most. The written file of 2026-11-20 follows IPR's raster into the tunnel's slot, 3.6 m down in the verges"
+    },
+    {
+     "name": "along the south road 12 m from the track's axis, over the tunnel, s 3070 to s 3100",
+     "from": [
+      -1435.2,
+      -9109.9
+     ],
+     "to": [
+      -1463.4,
+      -9120.3
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.05
+     },
+     "why": "a road at grade: the generated street surface read IPR's slot and dipped 1.8 m at its edge"
+    },
+    {
+     "name": "along the north road 12 m from the track's axis, over the tunnel, s 3070 to s 3100",
+     "from": [
+      -1443.6,
+      -9087.3
+     ],
+     "to": [
+      -1471.8,
+      -9097.7
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.05
+     },
+     "why": "as the south road"
+    }
+   ]
+  },
+  "sidewalk-under-a-road-wall": {
+   "line": "22",
+   "at": [
+    1897.5,
+    -2212.0
+   ],
+   "reach": 20,
+   "issue": 770,
+   "what": "a sidewalk at the foot of a wall with a road on its top (survey sidewalk 6183, road 6010 2.3 m higher): the sidewalk level up to the wall, one upright face",
+   "source": "found tracing #770's sidewalk / sidewalk seams, 2026-11-20: line 22 s 13636, a step of 0.21 m inside the sidewalk, one of 142",
+   "sections": [
+    {
+     "name": "from the sidewalk across its edge onto the road above, y = -2211.88",
+     "from": [
+      1895.5,
+      -2211.88
+     ],
+     "to": [
+      1899.25,
+      -2211.88
+     ],
+     "expect": {
+      "sloping m": 0.5
+     },
+     "why": "IPR has the sidewalk level at 221.2 m up to 0.75 m from its edge and the road at 223.8 m: a wall. The written file of 2026-11-20 climbs through the sidewalk's last 1.25 m (221.3 to 223.5 m)"
+    }
+   ]
+  },
+  "motol-platform": {
+   "line": "9",
+   "at": [
+    -6338.4,
+    -1328.4
+   ],
+   "reach": 30,
+   "issue": 776,
+   "what": "the Motol stop's platform between the track and Plzeňská (platform B, the survey has it as a sidewalk 2.9 m wide): level along the track, a kerb to the road behind it",
+   "source": "found in ground batch B's surfaces check, 2026-11-20: line 9 s 2892-2928, the platform flush with Plzeňská at every sample (a kerb of 0.08 m in the file published before), one of line 9's 23 platforms with new flat kerbs",
+   "sections": [
+    {
+     "name": "from Plzeňská across the kerb onto the platform, x = -6338.4",
+     "from": [
+      -6338.46,
+      -1326.4
+     ],
+     "to": [
+      -6338.36,
+      -1327.5
+     ],
+     "expect": {
+      "rise m at least": 0.05,
+      "largest step m": 0.2
+     },
+     "why": "the street surface has the platform 0.09 m over the road at this kerb (277.05 over 276.96 m); the platform's plane at the middle of its corners brought it to 276.97 m in the written file of ground batch B"
+    },
+    {
+     "name": "along the platform 0.7 m behind its edge at the track, 28 m",
+     "from": [
+      -6350.0,
+      -1328.14
+     ],
+     "to": [
+      -6322.0,
+      -1330.42
+     ],
+     "expect": {
+      "off the chord m": 0.05,
+      "largest step m": 0.02
+     },
+     "why": "the platform runs with the rails, which fall evenly here: a straight line (as at Krejcárek, krejcarek-platform)"
+    }
+   ]
+  },
+  "sidewalk-on-a-quay-wall": {
+   "line": "17",
+   "at": [
+    -761.2,
+    -1704.8
+   ],
+   "reach": 25,
+   "issue": 770,
+   "what": "a sidewalk about 1.2 m wide on the top of the quay wall, beside the road at its level (survey edge 191.90 m, road 191.87 m), the lower quay 3.8 m under it: the sidewalk level with the road up to the wall",
+   "source": "found in ground batch B's surfaces check, 2026-11-20: line 17 s 12284, the sidewalk's edge 1.54 m under the road, one of 57 such kerb sites on the five lines",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk on the wall's top, y = -1704.8",
+     "from": [
+      -758.8,
+      -1704.8
+     ],
+     "to": [
+      -762.0,
+      -1704.8
+     ],
+     "expect": {
+      "largest step m": 0.2,
+      "off the lidar m": 0.5
+     },
+     "why": "IPR has the road and the sidewalk at 191.86-191.99 m up to 1 m inside the kerb and the wall's face from 1.25 m in (190.17 m at 1.5 m). The kerb-wall rule read the walkway's level on the face and held the edge at it: the written file of ground batch B has the sidewalk at 190.31 m at its kerb"
+    }
+   ]
+  },
+  "branik-platform-ramps": {
+   "line": "17",
+   "at": [
+    -2034.0,
+    -6269.0
+   ],
+   "reach": 35,
+   "issue": 786,
+   "what": "the platform of Nádraží Braník on the top of a wall 2.6 m over a ramp of two flights that goes down beside it to the lower road: the platform level up to the wall's top, the ramp's flights straight along the walls' feet, the walls upright",
+   "source": "the user's note on the test site, 2026-11-20 (fb-20261120-154358-23100c03: \"one more test case for ramps and pedestrian underpass tunnel which should be on the left\"), on ground batch A",
+   "sections": [
+    {
+     "name": "along the platform 0.4 m inside the wall's top, 16 m",
+     "from": [
+      -2034.21,
+      -6257.27
+     ],
+     "to": [
+      -2045.21,
+      -6269.07
+     ],
+     "expect": {
+      "off the chord m": 0.1,
+      "largest step m": 0.05
+     },
+     "why": "the survey has the wall as `paved` 2605, 0.18 m across, its top's side at 197.43-197.51 m and its foot's at 194.84 m; the platform's own outline along it is the top's. The written file of 2026-11-20 has the platform's edge at 196.35 m there, on IPR's smear of the wall"
+    },
+    {
+     "name": "along the upper ramp 0.4 m from the wall's foot, 16 m",
+     "from": [
+      -2034.94,
+      -6256.59
+     ],
+     "to": [
+      -2045.94,
+      -6268.39
+     ],
+     "expect": {
+      "off the chord m": 0.2,
+      "largest step m": 0.1
+     },
+     "why": "the ramp falls evenly along the wall's foot (1.0 m in 16 m); the written file has it toothed, its corners on the wall's line read between the platform's cells and its own"
+    },
+    {
+     "name": "from the platform across the wall onto the ramp, 3 m",
+     "from": [
+      -2036.23,
+      -6261.07
+     ],
+     "to": [
+      -2038.18,
+      -6258.79
+     ],
+     "expect": {
+      "sloping m": 0.25,
+      "largest step m at least": 2.0
+     },
+     "why": "a wall: 197.43 m to 194.84 m within 0.18 m"
+    }
+   ]
+  },
+  "modranska-skola-ramp": {
+   "line": "17",
+   "at": [
+    -2482.0,
+    -8420.0
+   ],
+   "reach": 40,
+   "issue": 786,
+   "what": "the platform of Modřanská škola on the track's embankment and the ramp that climbs to it from the bus stop on Modřanská: the ramp 2.15 m wide between the wall under the track and a low parapet on the road's side (the survey's `paved` 7894 and 7924, each 0.2 m across), 196.9 to 199.8 m in 40 m; south of its top the platform level up to the parapet's line, a sidewalk 0.6 m wide between the parapet and the road at the road's kerb; the walls upright and plain",
+   "source": "the user's note on the test site, 2026-11-20 (fb-20261120-154139-ecb65c1f: \"tram stop and ramp isn't even\"), on ground batch A; the user, 2026-11-21 (session), with a Street View frame from the bus stop: \"Modřanská škola has ramp from the bus stop like this\"; the user, 2026-11-21 (session), asked whether the ramp's top 23 m are steps as OSM has them (way 186894319, `highway=steps`): \"Modřanská škola should be accessibility ramp with no steps, osm can be wrong there which I can fix later.\"",
+   "seen": {
+    "what": "From the bus stop, looking south: a ramp of paving about 2 m wide rising along a plain wall of concrete panels some 4 m high (the track above it, its masts on the wall), a low concrete parapet on the ramp's road side that rises with it, the stop's shelter and sign at the ramp's top; beside the parapet the roadside sidewalk and the bus bay. From Modřanská 26, looking west-south-west at the platform's part: the same plain upright wall, one joint along it at about two thirds of its height, a parapet over the platform.",
+    "from": [
+     {
+      "note": "the user's Street View frame, sent in the session of 2026-11-21 (not stored)"
+     },
+     {
+      "note": "Street View at Modřanská 26, image of August 2025, looked at 2026-11-21 (not stored)"
+     }
+    ],
+    "source": "Street View, looked at; the user's frame"
+   },
+   "sections": [
+    {
+     "name": "up the ramp 1.2 m from the parapet, 34 m from (-2481.6, -8396) south to the platform",
+     "from": [
+      -2481.6,
+      -8396.0
+     ],
+     "to": [
+      -2481.3,
+      -8430.0
+     ],
+     "expect": {
+      "off the chord m": 0.4,
+      "largest step m": 0.1,
+      "rise m at least": 2.2
+     },
+     "why": "IPR has the ramp at its middle rising evenly, 197.46 m to 199.9 m (6.8 %); a metre either side it reads the track's 200 m and the road's 196.1 m. The written file of 2026-11-20 has it wavy and 0.3-0.8 m low"
+    },
+    {
+     "name": "across the ramp at y = -8410, from the wall under the track to the parapet, 1.7 m",
+     "from": [
+      -2482.3,
+      -8410.0
+     ],
+     "to": [
+      -2480.6,
+      -8410.0
+     ],
+     "expect": {
+      "sloping m": 0.25,
+      "largest step m": 0.1
+     },
+     "why": "a ramp is level across; the written file falls 0.8 m across it towards the parapet, the road's level smeared in"
+    },
+    {
+     "name": "along the platform 0.4 m inside the parapet's line, 19 m",
+     "from": [
+      -2480.33,
+      -8433.0
+     ],
+     "to": [
+      -2480.02,
+      -8452.0
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.1
+     },
+     "why": "the survey has the parapet as `paved` 7924, 0.2 m across and 194 m long, its sides at 198.7 and 198.3 m: neither the platform's 199.6 m nor the road's 196.4 m. The ground steps across it, and the platform's cells along it read IPR's smear of the step"
+    },
+    {
+     "name": "along the sidewalk at the wall's foot, midway between the parapet and the kerb, 18 m",
+     "from": [
+      -2479.44,
+      -8434.0
+     ],
+     "to": [
+      -2479.12,
+      -8452.0
+     ],
+     "expect": {
+      "off the chord m": 0.1,
+      "largest step m": 0.05
+     },
+     "why": "a sidewalk 0.6 m wide between the wall and the road, at the road's kerb (196.5 m). The written file has it between 197.3 and 199.6 m by turns: its corners read the platform's cells across the parapet, and the kerb-wall rule took IPR 1.5 m in from its kerb, the platform's, for its walkway"
+    },
+    {
+     "name": "from the platform across the wall to the road, y = -8440",
+     "from": [
+      -2481.0,
+      -8440.0
+     ],
+     "to": [
+      -2478.5,
+      -8440.0
+     ],
+     "expect": {
+      "sloping m": 0.5,
+      "largest step m at least": 1.5
+     },
+     "why": "a wall: the platform at 199.6 m, the road at 196.4 m, 1 m apart"
+    }
+   ]
+  },
+  "cerny-kun-platform-wall": {
+   "line": "17",
+   "at": [
+    -2230.0,
+    -6928.0
+   ],
+   "reach": 35,
+   "issue": 786,
+   "what": "the platform of Černý kůň on the top of a wall over the ramps of the footbridge and the underpass beside it: the platform level up to the wall's top, the walls upright (the ramps themselves are level-1 areas, not the ground)",
+   "source": "the user's note on the test site, 2026-11-20 (fb-20261120-154306-c100b0e1: \"another wavy ramps\"), on ground batch A",
+   "sections": [
+    {
+     "name": "along the platform 0.4 m inside the wall's top, 41 m",
+     "from": [
+      -2243.26,
+      -6950.09
+     ],
+     "to": [
+      -2234.07,
+      -6910.09
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.05
+     },
+     "why": "the survey has the wall as `paved` 2592, 0.25 m across, its top's side at 198.33-199.05 m along the platform; the written file has the platform's edge 0.25 m off its straight line, on IPR's smear of the wall"
+    }
+   ]
+  },
+  "hlavni-nadrazi-under-the-magistrala": {
+   "line": "9",
+   "at": [
+    1075.0,
+    -338.0
+   ],
+   "reach": 45,
+   "issue": 788,
+   "what": "the track east of the Hlavní nádraží stop under the Magistrála's bridges and then under the upper street on a cover (the line's tunnel s 11801-11867): over the rails nothing but the cover to come; south of the track under the bridges a wall with a car park on its top (its height is open, #788)",
+   "source": "the user, 2026-11-20 (session): \"the road bridges over our tram track right after hlavní nádraží stop on line 9. It looks like ground isdue combined with broken bridge decks (those can be solved later). What does the survey says there?\"",
+   "seen": {
+    "what": "From the cab towards the stop (west), under the Magistrála's bridges just out of the cover: left of the track (south) a concrete wall runs beside it to the bridges' far end, tall for the first metres at the cover, then with a railing on its top about 1 m over the cab's eye line, a lorry and cars parked behind the railing at the wall's top, the bridges' piers standing up there; right of the track (north) a lower wall with a railing follows the track's curve. From the cab east of the cover, looking at its portal: the track in a cutting between concrete walls, the left one (south) about twice the right one's height with a grass bank on its top, the cover a slab with a parapet and a street's railing over it. From Bolzanova 7 looking east: the Magistrála's deck on piers over the street; under it, left of the tram track, cars parked at the street's level.",
+    "from": [
+     {
+      "note": "two frames of a cab ride video towards the stop, sent by the user 2026-11-21 (session; not stored)"
+     },
+     {
+      "note": "Street View at Bolzanova 7, looking east, looked at 2026-11-21 (not stored)"
+     }
+    ],
+    "source": "the user, 2026-11-21 (session): \"From cab ride video I attach two screenshots showing track under magistrála (direction towards hlavní nádraží stop), basically there's a wall next to tram track on the south side.\"; Street View, looked at"
+   },
+   "sections": [
+    {
+     "name": "along the axis under the cover, s 11838 to s 11862",
+     "from": [
+      1077.4,
+      -339.2
+     ],
+     "to": [
+      1100.1,
+      -331.6
+     ],
+     "expect": {
+      "off the chord m": 0.4,
+      "largest step m": 0.2
+     },
+     "why": "the rails run at 197.4 m under the upper street's cover; the tram's own area `tram` 253 took the street surface, which read the cover in IPR: the written file has the ground at 201-204.4 m on the axis, closed over the track"
+    }
+   ]
+  },
+  "hlusickova-platforms": {
+   "line": "9",
+   "at": [
+    -7826.7,
+    -1559.0
+   ],
+   "reach": 40,
+   "issue": 776,
+   "what": "the Hlušičkova stop's two platforms, each between its track and a lane of Plzeňská (the survey has them as platform areas 4.2 m wide, 68 m long, with 12 and 14 outline points): level along the track at the rails' edge and at the road's",
+   "source": "the user's report fb-20261121-093105-606267ae (line 9 s 1402, 2026-11-21, on the published ground): \"Wavy platforms that should be flat and smooth\"; and on ground batch B, 2026-11-21 (session): \"Hlušičkova looks clean from track side, a bit bumpy from road side.\"",
+   "sections": [
+    {
+     "name": "along platform B 0.5 m inside its back edge at the road, 56 m",
+     "from": [
+      -7805.7,
+      -1539.0
+     ],
+     "to": [
+      -7853.89,
+      -1567.51
+     ],
+     "expect": {
+      "off the chord m": 0.05,
+      "largest step m": 0.03
+     },
+     "why": "IPR has the platform level across, +0.21 and +0.22 m over the rail top 0.7 m and 2 m behind the edge; the plane's band ended 4 m from the axis and the back edge, 5.5 m from it, kept the survey's points: +0.02 to +0.23 m over the rail top in ground batch B"
+    },
+    {
+     "name": "along platform A 0.5 m inside its back edge at the road, 56 m",
+     "from": [
+      -7847.8,
+      -1579.05
+     ],
+     "to": [
+      -7799.6,
+      -1550.55
+     ],
+     "expect": {
+      "off the chord m": 0.05,
+      "largest step m": 0.03
+     },
+     "why": "as platform B: 0.21 m off a straight line in ground batch B"
+    },
+    {
+     "name": "along platform B 0.7 m behind its edge at the track, 56 m",
+     "from": [
+      -7804.19,
+      -1541.54
+     ],
+     "to": [
+      -7852.39,
+      -1570.05
+     ],
+     "expect": {
+      "off the chord m": 0.07,
+      "largest step m": 0.03
+     },
+     "why": "the platform runs with the rails (0.29 m off a straight line in the ground published before batch B, 0.06 m in batch B)"
+    },
+    {
+     "name": "from Plzeňská across the kerb onto platform B, s 27110",
+     "from": [
+      -7830.36,
+      -1552.3
+     ],
+     "to": [
+      -7829.85,
+      -1553.17
+     ],
+     "expect": {
+      "rise m at least": 0.08,
+      "largest step m": 0.3
+     },
+     "why": "a platform stands a kerb over the road behind it; in ground batch B its back edge lay 0.05 m under the road's kerb here and 0.16 m over it 6 m on"
+    }
+   ]
+  },
+  "vinohradska-raised-corridor": {
+   "line": "9",
+   "at": [
+    3242.04,
+    -1470.13
+   ],
+   "reach": 60,
+   "issue": 606,
+   "what": "Vinohradská between Olšanské hřbitovy and Flora: the tram's corridor stands about 0.3 m over the carriageways either side behind a kerb; a road or a footpath across it comes up to the rail top",
+   "source": "the user, 2026-11-18 (#606): \"yes it's raised\"; 2026-11-21 (session): \"Vinohradská between Želivského and Flora is mostly placed on corridor with kerb. Where roads or footpaths cross it's level crossing like usual, so the surface comes up to the rail top.\"",
+   "sections": [
+    {
+     "name": "from the south carriageway across the kerb onto the corridor, s 15359, 1.6 m",
+     "from": [
+      3242.28,
+      -1466.04
+     ],
+     "to": [
+      3242.19,
+      -1467.63
+     ],
+     "expect": {
+      "rise m at least": 0.2,
+      "largest step m at least": 0.15
+     },
+     "why": "IPR's raster is older than the corridor and has the street level across, 0.3-0.45 m under the rails; the road's corner on the corridor's edge took the tram area's height and the road ramped up over its last face"
+    },
+    {
+     "name": "from the north carriageway across the kerb onto the corridor, s 15359, 1.6 m",
+     "from": [
+      3241.78,
+      -1474.72
+     ],
+     "to": [
+      3241.87,
+      -1473.12
+     ],
+     "expect": {
+      "rise m at least": 0.2,
+      "largest step m at least": 0.15
+     },
+     "why": "as the south kerb"
+    },
+    {
+     "name": "from the south carriageway across the kerb onto the corridor, s 15339, 1.6 m",
+     "from": [
+      3262.25,
+      -1467.2
+     ],
+     "to": [
+      3262.16,
+      -1468.8
+     ],
+     "expect": {
+      "rise m at least": 0.2,
+      "largest step m at least": 0.15
+     },
+     "why": "as at s 15359, 20 m on: the kerb runs on, not only where a lattice line falls near the edge"
+    },
+    {
+     "name": "along the south carriageway 1 m from the kerb, s 15330 to s 15390",
+     "from": [
+      3271.25,
+      -1467.53
+     ],
+     "to": [
+      3211.35,
+      -1464.02
+     ],
+     "expect": {
+      "off the chord m": 0.08,
+      "largest step m": 0.03
+     },
+     "why": "the carriageway beside the corridor keeps its own level right up to the kerb: in ground batch B it rose towards the kerb where a lattice line of the road lay farther from it"
+    },
+    {
+     "name": "along the north carriageway 1 m from the kerb, s 15330 to s 15390",
+     "from": [
+      3270.72,
+      -1476.61
+     ],
+     "to": [
+      3210.82,
+      -1473.11
+     ],
+     "expect": {
+      "off the chord m": 0.08,
+      "largest step m": 0.03
+     },
+     "why": "as the south carriageway"
+    }
+   ]
+  },
+  "vinohradska-crossing": {
+   "line": "9",
+   "at": [
+    2942.54,
+    -1453.17
+   ],
+   "reach": 45,
+   "issue": 606,
+   "what": "a road across Vinohradská's raised corridor (the survey has the crossing as road right across, s 15650-15670): its surface comes up to the rail top without a kerb",
+   "source": "the user, 2026-11-21 (session): \"Where roads or footpaths cross it's level crossing like usual, so the surface comes up to the rail top.\"",
+   "sections": [
+    {
+     "name": "along the crossing road from the south carriageway to the rail, s 15659, 8 m",
+     "from": [
+      2943.02,
+      -1443.19
+     ],
+     "to": [
+      2942.62,
+      -1451.38
+     ],
+     "expect": {
+      "largest step m": 0.1,
+      "rise m at least": 0.25
+     },
+     "why": "the road climbs 0.3-0.45 m to the rails over its approach; a confirmed corridor read raised right through the crossing would leave a kerb across the road"
+    },
+    {
+     "name": "along the crossing road from the north carriageway to the rail, s 15659, 8 m",
+     "from": [
+      2941.97,
+      -1464.66
+     ],
+     "to": [
+      2942.37,
+      -1456.47
+     ],
+     "expect": {
+      "largest step m": 0.1,
+      "rise m at least": 0.2
+     },
+     "why": "as from the south"
+    }
+   ]
+  },
+  "belohorska-median": {
+   "line": "22",
+   "at": [
+    -3090.0,
+    152.0
+   ],
+   "reach": 40,
+   "issue": 548,
+   "what": "the median between Bělohorská's tracks (the survey's `median` 3968, 2.7 m across, 167 m long): level with the street, which climbs evenly here",
+   "source": "found in ground batch B's canted check, 2026-11-21: line 22's deepest sunken places beside a bed, (-3087, 153) 0.92 m and (-3105, 151) 0.76 m; the user, 2026-11-09 (report-20261109-202327, line 37): \"sunken ground around tram tracks\"",
+   "sections": [
+    {
+     "name": "along the median's middle, 40 m from (-3108, 150.4) east",
+     "from": [
+      -3108.0,
+      150.4
+     ],
+     "to": [
+      -3068.0,
+      154.6
+     ],
+     "expect": {
+      "off the chord m": 0.15,
+      "largest step m": 0.05
+     },
+     "why": "two of the median's outline points, (-3101.3, 152.5) and (-3101.2, 149.8), stand at 297.91 m, the height of its end 38 m down the street, where IPR has the street at 300.15 and 299.76 m: the strip between its neighbours lay up to 1.27 m under the street"
+    }
+   ]
+  },
+  "vinohradska-parking-bay": {
+   "line": "9",
+   "at": [
+    3211.2,
+    -1446.0
+   ],
+   "reach": 40,
+   "issue": 800,
+   "what": "a parking bay along Vinohradská's north carriageway west of Olšanské hřbitovy (line 9 s 15360-15420, 18 m off the route; the survey's parking area 3091, 97 m long and 8 m wide, with heights on its outline only): it lies a kerb under the sidewalk behind it",
+   "source": "measured 2026-11-21 on ground batch C (#800): IPR's raster rises 0.2 m from the bay onto the sidewalk; the survey's line between them (height class 5, a mean height error of 0.35 m by vyhláška 393/2020 Sb.) has a point at (3214.13, -1444.59) 0.38 m over the raster between points 31 m and 35 m away that lie on it within 0.06 and 0.31 m, and the bay, a sheet between its outline's points, rose to it",
+   "sections": [
+    {
+     "name": "from the bay across the kerb onto the sidewalk, x = 3211.2, 3.5 m",
+     "from": [
+      3211.2,
+      -1446.4
+     ],
+     "to": [
+      3211.2,
+      -1442.9
+     ],
+     "expect": {
+      "rise m at least": 0.08,
+      "largest step m": 0.3
+     },
+     "why": "IPR rises 0.21 m from the bay 2 m off the kerb to the sidewalk 1.5 m on it; the bay's edge stood over the sidewalk"
+    },
+    {
+     "name": "from the bay across the kerb onto the sidewalk, x = 3228, 3.5 m",
+     "from": [
+      3228.0,
+      -1447.2
+     ],
+     "to": [
+      3228.0,
+      -1443.7
+     ],
+     "expect": {
+      "rise m at least": 0.08,
+      "largest step m": 0.3
+     },
+     "why": "as at x = 3211.2, 17 m on, where the survey's line is 0.2 m over IPR"
+    },
+    {
+     "name": "along the bay 1.5 m from the kerb, x = 3240 to 3185",
+     "from": [
+      3240.0,
+      -1447.44
+     ],
+     "to": [
+      3185.0,
+      -1444.46
+     ],
+     "expect": {
+      "largest step m": 0.05
+     },
+     "why": "the bay lies smooth along its length, on the lidar or as a sheet"
+    }
+   ]
+  }
+ },
+ "openTrackReview": {
+  "note": "The user's answers to the open track review (reports/review/open-track-N.json, tools/open_track.py, #591): what the track is between the card's two points: `ballast`, `grass`, or `paved` (the rules decide).",
+  "answers": [
+   {
+    "id": "open-50.06536-14.32433",
+    "line": "9",
+    "place": [
+     50.065357,
+     14.324327
+    ],
+    "between": [
+     [
+      50.065212,
+      14.323564
+     ],
+     [
+      50.065579,
+      14.325043
+     ]
+    ],
+    "answer": "ballast",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07214-14.39185",
+    "line": "9",
+    "place": [
+     50.072144,
+     14.391854
+    ],
+    "between": [
+     [
+      50.071977,
+      14.390368
+     ],
+     [
+      50.072261,
+      14.393352
+     ]
+    ],
+    "answer": "paved",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07217-14.39187",
+    "line": "9",
+    "place": [
+     50.072173,
+     14.391869
+    ],
+    "between": [
+     [
+      50.072308,
+      14.393617
+     ],
+     [
+      50.071975,
+      14.390136
+     ]
+    ],
+    "answer": "paved",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07803-14.46474",
+    "line": "9",
+    "place": [
+     50.07803,
+     14.464736
+    ],
+    "between": [
+     [
+      50.078077,
+      14.465585
+     ],
+     [
+      50.077982,
+      14.463887
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07825-14.46897",
+    "line": "9",
+    "place": [
+     50.078248,
+     14.46897
+    ],
+    "between": [
+     [
+      50.078292,
+      14.469848
+     ],
+     [
+      50.078204,
+      14.468093
+     ]
+    ],
+    "answer": "grass",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.07837-14.47134",
+    "line": "9",
+    "place": [
+     50.078367,
+     14.471338
+    ],
+    "between": [
+     [
+      50.078426,
+      14.472494
+     ],
+     [
+      50.078309,
+      14.470182
+     ]
+    ],
+    "answer": "paved",
+    "source": "user, open track review (reports/review/open-track-9.json), 2026-11-14 (#591)"
+   },
+   {
+    "id": "open-50.09339-14.39906",
+    "line": "22",
+    "place": [
+     50.093388,
+     14.399058
+    ],
+    "between": [
+     [
+      50.093307,
+      14.398485
+     ],
+     [
+      50.093476,
+      14.399629
+     ]
+    ],
+    "answer": "paved",
+    "source": "user, open track review (reports/review/open-track-22.json), 2026-11-14 (#591)"
+   }
+  ]
  }
 }

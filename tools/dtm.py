@@ -33,17 +33,9 @@ SOURCES = [a for a in sys.argv[1:] if a not in ("--line", LINE)]
 import heavy  # noqa: E402
 heavy.turn(f"dtm {LINE}")  # (a heavy job run alone, ~60 s; under rebuild.py in its turn, #536)
 
-# area classes by the DTM object type code at the end of the layer name
-CLASSES = {
-    "010000000503": "road", "010000001703": "road", "010000001103": "parking", "010000000903": "cycle",
-    "010000000703": "sidewalk", "010000001303": "island", "010000002403": "tram", "010000005303": "platform",
-    "010000005803": "deck", "010000006203": "tunnel", "010000006603": "underpass", "010000031203": "rail",
-    "010000021503": "green", "010000020903": "green", "010000015203": "green", "010000018703": "paved",
-    "010000018903": "paved", "010000005503": "paved", "010000016603": "stairs", "010000031503": "roof",
-    "010000016803": "wall", "010000020303": "water",
-    # (#555: the median strip between carriageways, tools/zps_medians.py; the road's associated area, paved)
-    "010000001503": "median", "010000032003": "paved",
-}
+# area classes by the DTM object type code at the start of the layer name; a layer neither a class nor left out on
+# purpose stops the build (tools/zps_layers.py, #703)
+import zps_layers  # noqa: E402
 
 line = json.load(open(os.path.join(ROOT, "data", f"line{LINE}.json"), encoding="utf-8"))
 from geo import Frame  # noqa: E402
@@ -210,6 +202,7 @@ def fill_along(r, zs):
 # few cm, a ramp a slope; stairs and walls are their own classes)
 SMOOTH = {"road", "tram", "parking", "cycle", "sidewalk", "island", "median", "platform", "paved"}
 n_spikes = defaultdict(int)
+n_stray = defaultdict(int)
 import numpy as np  # noqa: E402
 from ipr_dtm import IprDtm  # noqa: E402
 import zps_ground  # noqa: E402
@@ -247,9 +240,16 @@ def despike(r, zs, cls):
             g = terrain(*xy[i])
             if g is not None and abs(m - g) < abs(z - g):
                 bad.append(i)
-    if not bad or len(bad) > 0.4 * n:
+    if len(bad) > 0.4 * n:
         return zs  # (most of the ring disagrees: no trend to trust)
-    n_spikes[cls] += len(bad)
+    # (a single point the survey has wrong, its neighbours on the lidar's ground and no step in it there:
+    # zps_ground.stray_points, #548)
+    stray = [i for i in zps_ground.stray_points(xy, zs, lambda x, y: _ipr.sample(np.asarray(x, float), np.asarray(y, float))) if i not in bad]
+    n_stray[cls] += len(stray)
+    bad += stray
+    if not bad:
+        return zs
+    n_spikes[cls] += len(bad) - len(stray)
     out = list(zs)
     for i in bad:
         out[i] = None
@@ -320,7 +320,10 @@ corridor = gpkg.near(cells, 40, (F.E0, F.N0))
 for package in packages:
     opl = package.opl
     for t in gpkg.layers(opl):
-        cls = CLASSES.get(t.split("#")[-1].split("_")[0])
+        try:
+            cls = zps_layers.classify(t)
+        except ValueError as e:
+            sys.exit(f"{package.district}: {e}")
         if not cls:
             continue
         for f in gpkg.features(opl, t, keep=corridor):
@@ -444,7 +447,7 @@ for _o in deck_report["openings"]:
 # with heights only on their outline take the lidar inside where they lie on IPR's ground (tools/zps_inside.py, #444)
 import zps_inside  # noqa: E402
 under_report = zps_inside.under_decks(areas, deck_opens, deck_flat, _city_ground)
-inside_report = zps_inside.inside(areas, ground_verdicts, _city_ground)
+inside_report = zps_inside.inside(areas, ground_verdicts, _city_ground, zps_ground.cover_union(areas, _osm_cover))
 print("under decks:", under_report)
 print("lidar inside:", inside_report["classes"], "their sheet fits:", inside_report["fit"], "kept their sheet:",
       inside_report["kept"])
@@ -513,19 +516,22 @@ counts = defaultdict(int)
 for a in areas:
     counts[(a["c"], a["l"])] += 1
 print("areas:", dict(sorted(counts.items())))
+classes = zps_layers.summary(areas)  # (per class, its count and m2: in the report, #703)
+print("classes:", classes)
 print(f"dropped {dropped} areas with >30 % unknown heights, {n_copies} copies of an area")
 print(f"vertex heights: {n_z} exact, {n_near} from a boundary point within 2.5 m, {n_none} missing, "
       f"{n_deck} ground-level corners on a deck's line given the ground")
 print(f"spikes along smooth outlines, taken along the ring: {sum(n_spikes.values())} {dict(sorted(n_spikes.items()))}")
+print(f"single points off the lidar's ground where it has no step, taken along the ring: {sum(n_stray.values())} {dict(sorted(n_stray.items()))}")
 out = {"areas": areas, "shelters": shelter_report["shelters"]}
 # the vertex heights within the survey: a 3D line's vertex at the same place, else a boundary point
 # within 2.5 m, else interpolated along the ring; areas with > 30 % unknown are dropped
 vertex = {"exact": n_z, "near": n_near, "missing": n_none, "deckToGround": n_deck, "droppedAreas": dropped,
-          "spikes": dict(sorted(n_spikes.items()))}
+          "spikes": dict(sorted(n_spikes.items())), "stray": dict(sorted(n_stray.items()))}
 nc = lambda f: sum(1 for a in areas if f(a["c"]))  # noqa: E731
 out["provenance"] = sources.stamp("dtm.py", {
     "areas": sources.entry("streets", [nc(lambda c: c not in ("deck", "wall")), 0, 0],
-                           checks={"vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
+                           checks={"classes": classes, "vertexHeights": vertex, "kerbs": kerb_report, "surveyGround": ground_report,
                                    "decks": deck_report, "underDecks": under_report, "inside": inside_report,
                                    "outlines": outline_report,
                                    "shelters": {k: v for k, v in shelter_report.items() if k != "shelters"}}),

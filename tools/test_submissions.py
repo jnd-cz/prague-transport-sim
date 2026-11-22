@@ -83,6 +83,11 @@ class Rules(unittest.TestCase):
                           (meta(licence=False), "licence"), (meta(url="http://example.org/t.zip"), "url"),
                           (meta(url="https://example.org/t.exe"), "url"), (meta(packages=[]), "packages")):
             self.assertEqual(submissions.meta_problem(bad, bad.get("url") is None), want, bad)
+        # (each package named as the game's check passes it: its id and version become a file's name at the review)
+        one = meta()["packages"][0]
+        for bad in ({**one, "id": "../../out"}, {**one, "id": "Sample.Box"}, {**one, "id": "sample.box\n"}, {**one, "version": "1.0/../x"},
+                    {**one, "version": 1}, {k: v for k, v in one.items() if k != "version"}, "sample.box-tram"):
+            self.assertEqual(submissions.meta_problem(meta(packages=[bad]), True), "packages", bad)
         # (one of them: the archive, or its address)
         self.assertEqual(submissions.meta_problem(meta(), False), "pack or url")
         self.assertEqual(submissions.meta_problem(meta(url="https://example.org/t.zip"), True), "pack or url")
@@ -146,6 +151,15 @@ class Store(unittest.TestCase):
         self.assertEqual([(c["id"], c["url"]) for c in got], [("sample.box-tram", "https://example.org/box/package.json"),
                                                                ("other.tram", "https://example.org/t/package.json")])
         self.assertEqual(submissions.load(os.path.join(address, "verdict.json"))["verdict"], "accepted")
+        # a stored meta whose package is not named as the check passes it is not accepted: nothing is copied or listed
+        odd = submissions.save(self.site, {**meta(host=True), "id": "sub-20261116-100004-0000000e",
+                                           "packages": [{**meta()["packages"][0], "id": "../../out"}]}, pack())
+        with self.assertRaises(SystemExit):
+            submissions.accept("sub-20261116-100004-0000000e", catalogue=cat, dest=self.tmp)
+        self.assertEqual(os.listdir(os.path.join(self.tmp, "hosted")), ["sample.box-tram-1.0.0.zip"])
+        self.assertFalse(os.path.exists(os.path.join(os.path.dirname(self.tmp), "out-1.0.0.zip")))
+        self.assertEqual(len(submissions.load(cat)["packages"]), 2)
+        shutil.rmtree(odd)
         # rejected: why, and the upload gone
         r = submissions.save(self.site, {**meta(), "id": "sub-20261116-100003-0000000d"}, pack())
         with mock.patch.object(submissions, "DEST", self.tmp), mock.patch("sys.stdout", new_callable=io.StringIO) as out:
@@ -208,6 +222,7 @@ def cases(t, url, stored):
                          ({"meta": json.dumps(meta(licence=False)), "pack": pack()}, "licence"),
                          ({"meta": json.dumps(meta()), "pack": pack(("package.json", "x.exe"))}, "type"),
                          ({"meta": json.dumps(meta()), "pack": b"MZ\x90\x00 not a zip"}, "zip"),
+                         ({"meta": json.dumps(meta(packages=[{**meta()["packages"][0], "id": "../../out"}])), "pack": pack()}, "packages"),
                          ({"meta": "{half", "pack": pack()}, "meta")):
         code, ans = post(url, fields)
         t.assertEqual((code, ans and ans.get("error")), (400, want), fields.get("meta", "")[:40])

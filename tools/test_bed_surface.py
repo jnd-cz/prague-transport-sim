@@ -81,23 +81,29 @@ class Rows(unittest.TestCase):
         self.assertTrue(np.isfinite(got).all())
         self.assertLess(np.abs(got - want).max(), 1e-9)
 
-    def test_a_cell_takes_its_first_rows_style(self):
-        # (the route's styles change at s 50, y 40; a cell between two rows, across the bed, is one style: its first row's,
-        # as the page coloured a quad between two rows. The nearest point split such a cell: a saw-tooth, #652)
+    def test_a_style_changes_where_its_section_does_not_at_a_row(self):
+        # (the route's styles change at s 50, y 40 (the path starts at y -10): on both sides of the bed, between two rows,
+        # a point takes the style at its own place along the track. A row's style held to the next row: two paired
+        # tracks' rows, offset along, left steps across the beds, #676)
         L = line([track([[0, 0], [0, 100]], 200.0)])
         L["styles"] = [{"s0": 0, "s1": 50, "style": "panels"}, {"s0": 50, "s1": 200, "style": "embedded"}]
         b = bs.Beds(L)
-        rows, want = b.rows[0], b.row_styles()[0]
-        i = next(i for i in range(1, len(want)) if want[i] != want[i - 1])  # (the first row of the new style)
-        pts, exp = [], []
-        for r in (i - 2, i - 1, i):
-            (x0, y0), (x1, y1) = rows[r][:2], rows[r + 1][:2]
-            for u in (0.1, 0.3, 0.7, 0.9):
-                for side in (-1.2, -0.3, 0.4, 1.3):
-                    pts.append((x0 + (x1 - x0) * u + side, y0 + (y1 - y0) * u))
-                    exp.append(want[r])
-        self.assertEqual(b.style_at(*np.asarray(pts).T), exp)
-        self.assertEqual(set(exp), {"panels", "embedded"})
+        cuts, sty = b.style_runs()[0]
+        self.assertEqual(sty, ["panels", "embedded"])
+        self.assertLess(abs(cuts[1] - 40), 2 * bs.STYLE_BISECT)
+        pts = [(side, y) for side in (-1.2, -0.3, 0.4, 1.3) for y in (39.6, 39.95, 40.05, 40.4)]
+        self.assertEqual(b.style_at(*np.asarray(pts).T), ["panels", "panels", "embedded", "embedded"] * 4)
+
+    def test_where_beds_overlap_the_paved_style_holds(self):
+        # (a track leaving another at a shallow angle, embedded over a junction near the route, panels beyond 6 m: where
+        # the two beds overlap, the embedded one's style; in the branch's bed alone, its own)
+        L = line([track([[0, 0], [0, 100]], 200.0), track([[0, 0], [20, 100]], 200.0)])
+        L["styles"] = [{"s0": 0, "s1": 200, "style": "embedded"}]
+        b = bs.Beds(L)
+        # (at y 40 the branch's axis lies at x 8, its bed from x 6.04: past 6 m from the route: panels)
+        self.assertEqual(b.style_at([8.0], [40.0]), ["panels"])
+        # (y 10: the branch at x 2, its bed over the route's right edge: both beds hold x 1.0)
+        self.assertEqual(b.style_at([1.0], [10.0]), ["embedded"])
 
     def test_bed_z(self):
         row = [0, 0, 1, 0, [-2, -0.72, 0.72, 2], [1, 2, 3, 4]]

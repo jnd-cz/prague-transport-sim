@@ -31,6 +31,7 @@ from shapely.geometry import LineString, Point
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing  # noqa: E402
+from step_inputs import there  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 STOP_AHEAD = 6.0     # m: without a sign in the data the front stops this far past the GTFS point (src/game.js STOP_AHEAD)
@@ -552,7 +553,7 @@ def main():
         pl_.pop('vienna', None)
     for st in data['stops']:
         st.pop('vienna', None)
-    if dtm.exists():
+    if there(dtm, ROOT):
         survey = Survey(json.loads(dtm.read_text(encoding='utf-8'))['areas'])
         plats, stops = stop_types(data, survey, stop_points(data['stops'], R.length), R, RB)
         for k, kerb in plats.items():

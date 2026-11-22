@@ -44,6 +44,9 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 CLASSES = ("survey", "street", "bed", "plot", "water", "terrain")
 LEVEL = 2.5  # m: a bed's ground this far from IPR's lies on a structure (src/world.js LEVEL, a bridge or an underpass)
+# m: near a span's end (DECK_END), a track this near the route and its height lies on the route's deck or on the ground
+# where the route does (bed_pieces; a paired track 3.5-4.4 m from the route on line 17's bridges)
+DECK_END, DECK_NEAR, DECK_LEVEL = 12.0, 6.0, 1.0
 PLOT_OUT, PLOT_STEP = 0.5, 1.0  # m: the plot height's samples, outside the footprint and along it
 PLOT_RULE = "median"  # the plot height (--calibrate on the five lines, 17,240 buildings: |error| median 0.29 m, p90 1.42;
 # the 10th percentile 0.49 / 2.13, the lowest 0.67 / 2.48)
@@ -164,14 +167,43 @@ def lift_at(L):
     return lambda s: np.interp(np.asarray(s, float) / st, np.arange(len(v)), v)
 
 
+def route_decks(L):
+    """The route's decks: its spans less their ramps (tools/line_structures.py), as [(s0, s1)]."""
+    out = []
+    for a, b in L.get("spans") or []:
+        s = a
+        for r0, r1 in sorted((max(a, r0), min(b, r1)) for r0, r1 in L.get("ramps") or [] if r0 < b and r1 > a):
+            if r0 > s:
+                out.append((s, r0))
+            s = max(s, r1)
+        if b > s:
+            out.append((s, b))
+    return out
+
+
 def bed_pieces(L, box, ipr, F, log=None):
     """The beds' union inside the box, without their samples on structures: (the union, [(track index, outline)],
     the samples on the ground and on structures). The structure test (|top of rail - lift - IPR| > LEVEL) is logged
-    against the route's spans and tunnels where a track runs along the route (log: a dict for the report)."""
+    against the route's spans and tunnels where a track runs along the route (log: a dict for the report).
+    Within DECK_END m of a span, a track along the route at its level (within DECK_NEAR m of it and DECK_LEVEL m of its
+    height) is on a structure on the route's decks (route_decks) and on the ground off them, and its bed ends at the
+    deck's end: the lidar's test and the ramps (tools/line_structures.py RAMP_GAP) parted there by a sample, and the bed
+    ended up to 2 m before the deck, the terrain or the survey falling under the rails between them (#594: line 17
+    s 4062, 5076, 6540, 0.07-1.67 m off the bed top; Krejcárek's south ramp, line 37 s 3032-3036)."""
     from track_beds import outline
     path = shapely.LineString([p[:2] for p in L["path"]])
     lift = lift_at(L)
     struct = [tuple(v) for v in (L.get("spans") or []) + (L.get("tunnels") or [])]
+    decks = route_decks(L)
+    hp = (L.get("heights") or {}).get("path")
+    deck_area = None
+    if decks and hp:
+        zp = np.asarray(hp, float)
+        zroute = lambda v: np.interp(np.asarray(v, float) / L["heights"]["step"], np.arange(len(zp)), zp)  # noqa: E731
+        from shapely.ops import substring
+        deck_area = shapely.union_all([substring(path, a, b).buffer(DECK_NEAR + 6, cap_style="flat")
+                                       for a, b in decks if b - a > 0.1])
+    n_route = 0
     outs, n_ground, n_struct = [], 0, 0
     confusion = {"structure, on a span or in a tunnel": 0, "structure, elsewhere": 0, "ground, on a span or in a tunnel": 0,
                  "ground, elsewhere": 0}
@@ -188,6 +220,18 @@ def bed_pieces(L, box, ipr, F, log=None):
         lf = np.where(d < 3.0, lift(s), 0.0)
         g = np.asarray(ipr.sample(xy[:, 0] + F.E0, xy[:, 1] + F.N0), float)
         ground = ~(np.abs(zs - lf - g) > LEVEL)  # (no lidar: on the ground)
+        keep = ground
+        if deck_area is not None:
+            near_end = np.array([any(a - DECK_END <= v <= b + DECK_END for a, b in L["spans"]) for v in s])
+            along = (d < DECK_NEAR) & (np.abs(zs - zroute(s)) < DECK_LEVEL) & near_end
+            if along.any():
+                on_deck = np.array([any(a <= v <= b for a, b in decks) for v in s])
+                n_route += int((along & (ground == on_deck)).sum())
+                ground = np.where(along, ~on_deck, ground)
+                # (the stretch across a deck's end kept whole, then cut at the deck's end below)
+                keep = ground.copy()
+                keep[1:] |= ground[:-1] & along[1:]
+                keep[:-1] |= ground[1:] & along[:-1]
         n_ground += int(ground.sum())
         n_struct += int((~ground).sum())
         on = d < 3.0
@@ -195,13 +239,16 @@ def bed_pieces(L, box, ipr, F, log=None):
         for k, (gr, ins) in enumerate(zip(ground.tolist(), in_s.tolist())):
             if on[k]:
                 confusion[f"{'ground' if gr else 'structure'}, {'on a span or in a tunnel' if ins else 'elsewhere'}"] += 1
-        o = outline(tr, tr["bed"], keep=ground.tolist())
+        o = outline(tr, tr["bed"], keep=keep.tolist())
+        if (keep & ~ground).any():  # (only round those samples: the same track elsewhere keeps its bed)
+            o = o.difference(deck_area.intersection(shapely.union_all(shapely.buffer(pts[keep & ~ground], 4.0))))
         o = polygonal(o.intersection(box))
         if o.area > SLIVER:
             outs.append((i, o))
     if log is not None:
         log.update({"samples on the ground": n_ground, "samples on structures, left out": n_struct,
-                    "along the route (within 3 m): the test against the route's spans and tunnels": confusion})
+                    "along the route (within 3 m): the test against the route's spans and tunnels": confusion,
+                    "samples near a span's end the route's decks decided against the lidar": n_route})
     union = shapely.union_all([o for _, o in outs]) if outs else shapely.Polygon()
     # (two tracks' beds that meet, paired or at a switch, leave gaps of a few mm between them: line 17 had 2,248, median
     # 3.5 mm wide; closed here, a gap under 2 * GAP wide)
@@ -571,14 +618,17 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
 
 
 # ---------------------------------------------------------------- the run
-def partition(ln, mesh=None, threads=8, windows=(), geometry=False):
-    """The partition of line ln: (the pieces per class, the report, the terrain triangles in each window)."""
+def partition(ln, mesh=None, threads=8, windows=(), geometry=False, within=None):
+    """The partition of line ln: (the pieces per class, the report, the terrain triangles in each window). within: a box
+    (x0, y0, x1, y1) the line's ground is cut to, for one place's ground (tools/ground_place.py, #757)."""
     from geo import Frame
     from ipr_dtm import IprDtm
     t0 = time.time()
     L, D = load(ln)
     F, ipr = Frame(), IprDtm()
     box = line_area(L)  # (the box within CORRIDOR of the route and tracks: `box` below is that polygon)
+    if within is not None:
+        box = polygonal(box.intersection(shapely.box(*within)))
     rep = {"line": ln, "box": [round(v, 2) for v in box.bounds], "box_km2": round(box.area / 1e6, 4),
            "corridor m": CORRIDOR, "of the box, %": round(100 * box.area / line_box(L).area, 1)}
     tm, last = {}, [time.time()]

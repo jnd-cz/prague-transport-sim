@@ -747,7 +747,7 @@ function trackRadius(g, MIN_RADIUS, EXCEPTION_RADIUS) {
 // tighter than both (Čechovo náměstí, line 22: 44 m over 5 m between halves of 125 and 250 m) and stays flagged.
 const STEP_SHORT = 2.5, STEP_LONG = 12.5, STEP_RATIO = 3, STEP_CURVE = 1500;
 const turn = (a, b, c) => Math.sign((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]));
-function steppedCurves(g) {
+export function steppedCurves(g) {
   const d = g.data, bad = new Map();
   let n = 0;
   [['our', d.path], ['opposite', d.pathBack]].forEach(([kind, p]) => {
@@ -1085,21 +1085,6 @@ function laneQuality(g) {
   return out;
 }
 
-// Synthetic retaining walls (corridor carve) standing on a surveyed street surface.
-function syntheticWallsOnStreets(g) {
-  const ground = g.route.ground, dtm = ground?.dtm, walls = ground?.walls;
-  if (!walls) return check('no-invented-walls-on-streets', 0, []);
-  const bad = [];
-  let n = 0;
-  for (const run of walls.runs) for (let i = 0; i < run.pts.length - 1; i++) {
-    n++;
-    const s = (run.pts[i].s + run.pts[i + 1].s) / 2, f = g.route.offset(s, run.side * walls.bench);
-    const t = dtm?.surfaceAt(f.x, f.y);
-    if (t) bad.push({ s: Math.round(s), x: f.x, y: f.y, mag: run.pts[i].top - ground.profile.height(s), info: `wall on ${t.c}` });
-  }
-  return check('no-invented-walls-on-streets', n, bad);
-}
-
 // traffic counts swing 20-30 % whenever trajectories change: the traffic run is repeated with these
 // seeds and the counts averaged (each run's counts kept in "runs")
 const SEEDS = [22, 7, 1234];
@@ -1152,6 +1137,8 @@ export function groundUnderDecks(g, world) {
   for (const [a, b] of pr.bridges) {
     const span = { s0: Math.round(a), s1: Math.round(b), samples: 0, ground: { over: 0, tris: 0, max: 0 }, deck: { over: 0, tris: 0, max: 0 }, kinds: {} };
     const seen = new Set();
+    const ends = [a, b, ...(pr.ramps || []).flat().filter((v) => v > a && v < b)];
+    const inDeck = (s) => ends.every((e) => Math.abs(s - e) > 8);
     const count = (what, hit, mag, s, l, p, kind) => {
       const c = span[what], id = `${hit.object.uuid}:${hit.faceIndex}`;
       c.over++;
@@ -1173,8 +1160,9 @@ export function groundUnderDecks(g, world) {
         const ours = (h) => h.object.userData.surface === 'dtm' && !surveyOf(h);
         const deck = hits.find((h) => !ours(h) && levelOf(h) > 0), ground = hits.find((h) => !ours(h) && levelOf(h) === 0);
         if (deck && deck.point.y - zt > OVER_RAILS) count('deck', deck, deck.point.y - zt, s, l, p, kind(deck));
-        // (the ground meets the deck at the abutments: counted more than 8 m inside the span, as Profile.overBridge)
-        if (ground && ground.point.y > zu && s > a + 8 && s < b - 8) count('ground', ground, ground.point.y - zu, s, l, p, kind(ground));
+        // (the ground meets the deck at the abutments: counted more than 8 m inside the deck, as Profile.overBridge; a ramp's
+        // end on the span is an abutment too, the deck beginning there, #594: line 17 s 4136, 7372, 14730, line 37 s 3036)
+        if (ground && ground.point.y > zu && inDeck(s)) count('ground', ground, ground.point.y - zu, s, l, p, kind(ground));
       }
     }
     // (the parapets flushDtm drew from the survey on a flat deck, metres per side: what of the deck's edge they cover)
@@ -1262,7 +1250,6 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     treeOverWire: treesOverTram(world, g.route.ground),
     ...Object.fromEntries(Object.entries(treeDecisions(world)).map(([k, v]) => [`tree_${k}`, v])),
     bridges: bridgesWithoutDeck(g),
-    inventedWalls: syntheticWallsOnStreets(g),
     tramEnvelope: mountedInEnvelope(g),
     gradeSeparated: crossingsOnBridges(g),
     bridgeLevels: levelsAtBridges(g),

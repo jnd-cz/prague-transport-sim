@@ -76,7 +76,7 @@ class StepCacheTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root, True)
         for d in ("tools", "data", "raw/cells", "reports/rebuild"):
             os.makedirs(os.path.join(self.root, d))
-        for f in ("atomic.py", "stepcache.py"):
+        for f in ("atomic.py", "stepcache.py", "step_inputs.py"):
             shutil.copy(os.path.join(TOOLS, f), os.path.join(self.root, "tools", f))
         self.write("tools/helper.py", "K = 1\n")
         self.write("tools/a.py", A)
@@ -116,6 +116,39 @@ class StepCacheTest(unittest.TestCase):
         self.assertEqual(first["b"], 1)
         self.assertEqual(self.build(), ["skip", "skip"])
         self.assertEqual(self.data(), first)  # (b's output put back as it was, not b run twice)
+
+    def test_a_shared_cache_holds_in_another_checkout(self):
+        # (#797: the cache beside the machine's data cache. A second checkout of the same files, with no data yet,
+        # skips every step and gets the outputs; a change there runs there and leaves the first checkout's records)
+        shared = tempfile.mkdtemp(prefix="test_rebuild_cache_")
+        self.addCleanup(shutil.rmtree, shared, True)
+        self.addCleanup(os.environ.pop, stepcache.DIR_ENV, None)
+        one = self.root
+        rebuild.CACHE = stepcache.Cache(one, shared)
+        self.assertEqual(self.build(), [0, 0])
+        first = self.data()
+        self.assertFalse(os.path.exists(os.path.join(one, "reports", "rebuild", "cache")))
+        two = tempfile.mkdtemp(prefix="test_rebuild_two_")
+        self.addCleanup(shutil.rmtree, two, True)
+        for d in ("tools", "raw"):
+            shutil.copytree(os.path.join(one, d), os.path.join(two, d), ignore=shutil.ignore_patterns("__pycache__"))
+        for d in ("data", "reports/rebuild"):
+            os.makedirs(os.path.join(two, d))
+        self.root = rebuild.ROOT = two
+        rebuild.CACHE = stepcache.Cache(two, shared)
+        self.assertEqual(self.build(), ["skip", "skip"])
+        self.assertEqual(self.data(), first)
+        self.write("raw/in.txt", "two")
+        self.assertEqual(self.build(), [0, 0])
+        self.assertEqual(self.data()["src"], "two")
+        self.root = rebuild.ROOT = one
+        rebuild.CACHE = stepcache.Cache(one, shared)
+        self.assertEqual(self.build(), ["skip", "skip"])
+        self.assertEqual(self.data(), first)
+        # (without a folder given the cache is the checkout's own again, and knows nothing of these runs)
+        rebuild.CACHE = stepcache.Cache(one)
+        self.assertNotIn(stepcache.DIR_ENV, os.environ)
+        self.assertEqual(self.build(), [0, 0])
 
     def test_changed_import_reruns(self):
         self.build()
@@ -242,12 +275,31 @@ class StepCacheTest(unittest.TestCase):
         self.assertEqual(fail, "b.py")
         self.assertEqual(rebuild.CACHE.records(rebuild.CACHE.name("line9", "b.py", ["--line", "9"])), [])
 
+    def test_a_needed_input_missing_stops_the_build(self):
+        """#701: placement read the survey only where it was there, and beside dtm.py it was not yet (or half): under
+        rebuild a step that needs a missing input stops and names it; run without needing it, it goes on."""
+        self.write("tools/n.py", "import os, sys\nROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n"
+                                 "sys.path.insert(0, os.path.join(ROOT, 'tools'))\nimport step_inputs\n"
+                                 "print('survey', step_inputs.there(os.path.join(ROOT, 'data', 's.json'), ROOT))\n")
+        log = os.path.join(self.root, "reports", "rebuild", "line9.n.log")
+        fail, _ = rebuild.run_steps("9", [["n.py"]], needs=("data/s.json",))
+        self.assertEqual(fail, "n.py")
+        self.assertIn("data/s.json: missing", open(log, encoding="utf-8").read())
+        fail, times = rebuild.run_steps("9", [["n.py"]])
+        self.assertIsNone(fail)
+        self.assertIn("survey False", open(log, encoding="utf-8").read())
+        self.write("data/s.json", "{}")
+        fail, _ = rebuild.run_steps("9", [["n.py"]], needs=("data/s.json",))
+        self.assertIsNone(fail)
+        self.assertIn("survey True", open(log, encoding="utf-8").read())
+
     def test_prune(self):
-        self.build()
-        self.write("raw/in.txt", "two")
-        self.build()
-        self.write("raw/in.txt", "three")
-        self.build()  # (KEEP records per step: the first run's outputs are named by none)
+        with mock.patch.object(stepcache, "KEEP", 2):
+            self.build()
+            self.write("raw/in.txt", "two")
+            self.build()
+            self.write("raw/in.txt", "three")
+            self.build()  # (KEEP records per step: the first run's outputs are named by none)
         n, _ = rebuild.CACHE.prune()
         self.assertGreater(n, 0)
         self.assertEqual(self.build(), ["skip", "skip"])
@@ -258,7 +310,7 @@ class StepsTest(unittest.TestCase):
         """dtm reads the platforms platforms.py writes (the shelters' stops, #617): it runs before the groups, and no
         group beside dtm's writes them."""
         with mock.patch.dict(rebuild.DTM, {"17": ["x"]}), mock.patch.object(rebuild, "select_packages", lambda *a, **k: []):
-            first, groups = rebuild.steps("17")
+            first, groups, then = rebuild.steps("17")
         self.assertEqual([st[0] for st in first], ["build_line.py", "platforms.py"])
         flat = [st[0] for g in groups for st in g]
         self.assertNotIn("platforms.py", flat)
@@ -266,6 +318,20 @@ class StepsTest(unittest.TestCase):
         self.assertEqual({st[0] for st in first} | set(flat),
                          {"build_line.py", "geoportal.py", "dtm.py", "zps_source.py"}
                          | {w[0] for w in rebuild.writers("17")})
+
+    def test_placement_after_the_survey(self):
+        """placement reads the survey for the stop types (#701): it runs after the groups, dtm's among them, and before
+        the track styles; the steps after dtm need the survey file of a line that has one, not of one that has none."""
+        with mock.patch.dict(rebuild.DTM, {"17": ["x"]}), mock.patch.object(rebuild, "select_packages", lambda *a, **k: []), \
+                mock.patch.dict(rebuild.HOLD, {}, clear=True):
+            _, groups, then = rebuild.steps("17")
+            self.assertEqual(rebuild.needs("17"), ("data/line17.dtm.json",))
+        self.assertNotIn("placement.py", [st[0] for g in groups for st in g])
+        self.assertEqual([st[0] for st in then], ["placement.py", "track_styles.py"])
+        with mock.patch.dict(rebuild.DTM, {}, clear=True):
+            self.assertEqual(rebuild.needs("17"), ())
+        self.assertIn("placement", rebuild.names())
+        self.assertIn("track_styles", rebuild.names())
 
 
 class ArgsTest(unittest.TestCase):

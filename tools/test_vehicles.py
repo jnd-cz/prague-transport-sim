@@ -175,7 +175,8 @@ def livery_problems(lv, lid, vehicles, files_on_disk=None, assets_md=""):
             kind, w, h = image_size(p)
             need(kind is not None, f"file {f['path']} is no WebP, PNG or JPEG")
             if kind:
-                need(all(0 < x <= 2048 and x & (x - 1) == 0 for x in (w, h)), f"image {f['path']} is {w} x {h} px, wants power-of-two sides up to 2048")
+                side = RULES["image"]["maxSide"]  # (the game holds an installed livery to the same: src/packages.js contentProblems)
+                need(all(0 < x <= side and x & (x - 1) == 0 for x in (w, h)), f"image {f['path']} is {w} x {h} px, wants power-of-two sides up to {side}")
             need(any(f["path"] in r for r in rows), f"file {f['path']} has no row in ASSETS.md")
     return bad
 
