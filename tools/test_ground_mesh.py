@@ -378,6 +378,26 @@ class Walls(unittest.TestCase):
         zf, _, _ = gm.weld(cx, cy, zc, prio, kind, apart=np.array([True, True, False, False]))
         self.assertEqual(np.round(zf, 2).tolist(), [208.5, 208.5, 205.3, 205.3])
 
+    def test_a_steps_walls_do_not_follow_the_order_of_its_triangles(self):
+        """#738: the two sides of a step's edge were taken in the order of their triangles, which follows the faces'
+        noding: a line added elsewhere in the tile turned the order and the wall's quad took its other split."""
+        # (two squares side by side, the right one a step higher at both corners of the edge between them)
+        V = mm([0, 0, 200000], [1000, 0, 200000], [1000, 1000, 200000], [0, 1000, 200000],
+               [1000, 0, 200300], [2000, 0, 200300], [2000, 1000, 200300], [1000, 1000, 200500])
+        F = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]])
+        def canon(W):  # (each wall by its corners in its winding, from its least one)
+            out = []
+            for w in W.tolist():
+                c = [tuple(V[i].tolist()) for i in w]
+                out.append(min(tuple(c[k:] + c[:k]) for k in range(3)))
+            return sorted(out)
+        walls = gm.step_walls(V, F)
+        self.assertEqual(len(walls), 2)
+        for order in ([0, 1, 2, 3], [2, 3, 0, 1], [3, 1, 2, 0]):
+            for k in range(3):  # (and each triangle from another corner, its winding kept)
+                G = np.array([np.roll(f, -(k * (i + 1)) % 3) for i, f in enumerate(F[order])])
+                self.assertEqual(canon(gm.step_walls(V, G)), canon(walls), (order, k))
+
     def test_step_faces_on_a_wall_line(self):
         V = np.array([[0, 0, 0], [1000, 0, 0], [1000, 0, 3000], [0, 5000, 0], [1000, 5000, 0], [1000, 5000, 2000]])
         W = np.array([[0, 1, 2], [3, 4, 5]])

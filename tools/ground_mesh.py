@@ -2439,7 +2439,11 @@ def step_walls(V, F, above=False):
     flip = ka > kb
     a = np.where(flip, e[:, 1], e[:, 0])
     b = np.where(flip, e[:, 0], e[:, 1])
-    order = np.lexsort((hi, lo))
+    # (an edge's two sides in the order of their vertices, which is their positions' (V sorted, np.unique), not the order
+    # of their triangles: that follows the faces' noding, which a line added anywhere in the tile changes, and the wall's
+    # quad took the other split: 1,896 of the middle tile's 172,748 triangles between line 23's lattice-cell built with one
+    # ring of tiles and with two, #738)
+    order = np.lexsort((b, a, hi, lo))
     lo, hi, a, b, tri = lo[order], hi[order], a[order], b[order], tri[order]
     same = (lo[1:] == lo[:-1]) & (hi[1:] == hi[:-1])
     i = np.flatnonzero(same)
