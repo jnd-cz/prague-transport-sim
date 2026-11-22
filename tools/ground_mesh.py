@@ -30,8 +30,10 @@ From the partition (tools/ground_partition.py partition(): survey, bed, plot and
 5. **The file.** data/lineN.ground.bin: vertices in mm (x, y from the box's corner, z over its base) along a Hilbert
    curve, as zigzag varint differences; per class, its triangles' indexes as differences (encode()). lineN.ground.json: the
    layout, the counts, the provenance. Decoded by decode() (and by the page, #509).
+   The file is written only when it decodes to the mesh built (round_trip: its vertices, each class's triangles with
+   their names); else the build fails (#702).
 6. **The network.** data/lineN.network.json (tools/network.py, #658): it reads the survey from this file, so it is built
-   again after it, every time.
+   again after it, every time; --no-network leaves it to tools/rebuild.py, which runs it as a step of its own (#702).
 
 The report (reports/ground-mesh/lineN.json): triangles per class against what the page draws today, the error against
 IPR's 1 m raster by distance band (with --error only: minutes a line, #704), the fallback levels, the steps by pair, the file's size raw, gzip and brotli, the
@@ -3048,10 +3050,78 @@ def weld_coincident(built):
     return int((~good).sum())
 
 
+def _first_rotation(t):
+    """Each triangle (row of three vertex ids) turned to start at the corner that makes it least (its winding kept): two
+    triangles are the same when their rows are equal whichever corner each was written from."""
+    rots = [t, t[:, [1, 2, 0]], t[:, [2, 0, 1]]]
+    best = rots[0]
+    for r in rots[1:]:
+        d = r != best
+        k = np.argmax(d, 1)
+        i = np.arange(len(t))
+        less = d.any(1) & (r[i, k] < best[i, k])
+        best = np.where(less[:, None], r, best)
+    return best
+
+
+def round_trip(built, blob, layout):
+    """None when the file decodes to the built mesh, else the first difference: the same vertices (mm; the file holds
+    each position once, decode() welds the tiles' borders) and per class the same triangles, each by its corners'
+    positions in its winding, with the same draw and area names. Until #702 the report compared two counts and failed
+    nothing: it read False for lines 17 and 22 in one of 2026-11-18's report sets, and a wrong triangle with the right
+    counts read True. Counted, a vertex no triangle uses (the file leaves it out) or two at one position (the file holds
+    it once) differ while the triangles are the same."""
+    Vd, by, draw_d, area_d = decode(blob, layout, draw=True, area=True)
+    Pd = np.round(Vd * Q).astype(np.int64)
+    V, F, cls = np.asarray(built["V"], np.int64), np.asarray(built["F"]), np.asarray(built["cls"])
+    used = np.unique(F)
+    ub, ib = np.unique(V[used], axis=0, return_inverse=True)
+    ud, idd = np.unique(Pd, axis=0, return_inverse=True)  # (decode() holds each position once: ud is Pd, sorted)
+    if ub.shape != ud.shape or not (ub == ud).all():
+        bad = len(ub) if ub.shape != ud.shape else int(np.flatnonzero((ub != ud).any(1))[0])
+        return (f"vertices: {len(ud)} decoded, {len(ub)} built" if ub.shape != ud.shape else
+                f"vertices: the {bad}th position decoded as {ud[bad].tolist()} mm, built {ub[bad].tolist()}")
+    ids = np.full(len(V), -1, np.int64)
+    ids[used] = ib.ravel()
+    idd = idd.ravel()
+    names = {"draw": built.get("draw"), "area": built.get("area")}
+    for c, i in CLASS_IDS.items():
+        m = cls == i
+        tb, td = ids[F[m]], idd[by.get(c, np.zeros((0, 3), np.int64))]
+        if len(tb) != len(td):
+            return f"{c}: {len(td)} triangles decoded, {len(tb)} built"
+        if not len(tb):
+            continue
+        tb, td = _first_rotation(tb), _first_rotation(td)
+        keys_b, keys_d = [], []
+        for name, dec in (("draw", draw_d), ("area", area_d)):
+            nb = np.asarray(names[name], dtype=object)[m].astype(str) if names[name] is not None else np.full(len(tb), "")
+            nd = np.asarray(dec[c], dtype=object).astype(str) if c in dec else np.full(len(td), "")
+            keys_b.append(nb)
+            keys_d.append(nd)
+        ob = np.lexsort((*keys_b[::-1], tb[:, 2], tb[:, 1], tb[:, 0]))
+        od = np.lexsort((*keys_d[::-1], td[:, 2], td[:, 1], td[:, 0]))
+        diff = (tb[ob] != td[od]).any(1)
+        for nb, nd in zip(keys_b, keys_d):
+            diff |= nb[ob] != nd[od]
+        if diff.any():
+            k = int(np.flatnonzero(diff)[0])
+            pos = lambda t: ud[t].tolist()  # noqa: E731
+            return (f"{c}: a triangle decoded as {pos(td[od][k])} mm ({keys_d[0][od][k]!r}, {keys_d[1][od][k]!r}), "
+                    f"built {pos(tb[ob][k])} ({keys_b[0][ob][k]!r}, {keys_b[1][ob][k]!r}); {int(diff.sum())} differ")
+    return None
+
+
 def write(ln, built, rep):
     import sources
     from atomic import replacing
     blob, layout = encode_tiles(built["V"], built["F"], built["cls"], built.get("draw"), built.get("area"))
+    # (nothing written that does not decode to what was built: the build fails, #702)
+    t0 = time.time()
+    bad = round_trip(built, blob, layout)
+    if bad:
+        raise SystemExit(f"line {ln}: the ground file does not decode to the built mesh: {bad}")
+    t_trip = time.time() - t0
     layout["provenance"] = sources.stamp("ground_mesh.py", {
         "ground": sources.single("terrain", "ipr-dtm", int(len(built["F"])), "triangles: the city mesh (IPR), the survey, "
                                  "the beds, the building plots, welded")})
@@ -3067,8 +3137,7 @@ def write(ln, built, rep):
         size["brotli MB"] = round(len(brotli.compress(blob, quality=11)) / 1e6, 2)
     except ImportError:
         pass
-    V, by = decode(blob, layout)
-    size["round trip"] = bool(len(V) == len(built["V"]) and sum(len(v) for v in by.values()) == len(built["F"]))
+    size["round trip"] = f"decodes to the built mesh ({t_trip:.1f} s): its vertices, and each class's triangles with their names"
     rep["file"] = size
 
 
@@ -3151,6 +3220,8 @@ def picture(ln, window, path, px=5, mesh=None):
 
 
 NOT_MEASURED = "not measured (tools/ground_mesh.py --error)"
+PEAK_GB = 21  # a line's build at its peak: lines 22 and 17 hold 9 M terrain triangles (its turn among the heavy jobs, and
+# tools/rebuild.py's)
 
 
 def error_report(built, ln, measure):
@@ -3172,6 +3243,8 @@ def main(argv=None):
                     help="also measure the mesh against IPR's raster for the report (raster_error: 0.6-8 minutes a line; a "
                          "checkpoint's run, or a change of the terrain's thinning)")
     ap.add_argument("--min-free", type=float, default=4.0, help="GB: the run stops itself when free memory falls under it")
+    ap.add_argument("--no-network", action="store_true",
+                    help="the ground alone: tools/rebuild.py builds the network as a step of its own after it (#702)")
     a = ap.parse_args(argv)
     lines = a.lines.split(",") if a.lines else [a.line]
     rep_dir = os.path.join(ROOT, "reports", "ground-mesh")
@@ -3187,8 +3260,8 @@ def main(argv=None):
     threading.Thread(target=guard, daemon=True).start()
     os.makedirs(rep_dir, exist_ok=True)
     from baseline_store import HeavyJob
-    # (a build: beside counts and other builds while its peak, 21 GB on lines 22 and 17, and its threads fit, #728)
-    with HeavyJob("ground_mesh", share={"gb": 21, "cores": a.threads}):
+    # (a build: beside counts and other builds while its peak and its threads fit, #728)
+    with HeavyJob("ground_mesh", share={"gb": PEAK_GB, "cores": a.threads}):
         for ln in lines:
             built = build(ln, a.mesh, a.threads)
             rep = built["rep"]
@@ -3201,6 +3274,7 @@ def main(argv=None):
                 rep["seconds"]["error"] = round(time.time() - t1, 1)
             if not a.no_write:
                 write(ln, built, rep)
+            if not (a.no_write or a.no_network):
                 # (the network reads the survey from this file: built after it, every time, #658)
                 import network
                 rep["network"] = network.write(ln, network.build(ln, log=lambda m: print(m, flush=True)))

@@ -34,6 +34,7 @@ import { loadFigureFont, signFacts } from './speedSigns.js';
 // the signs' fallback face (D-DIN) loads while the world does; the game waits for it before it draws them (#364)
 const figureFont = loadFigureFont();
 import { credits, logProvenance, fallbacks } from './provenance.js';
+import { crc32, checkBuild } from './buildId.js';
 import { initHelp } from './help.js';
 import { initPackages } from './packagesMenu.js';
 import { loadInstalled } from './packages.js';
@@ -64,7 +65,9 @@ const figures = !params.has('boxpeople');
 if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
 // (weights: the steps' usual milliseconds on line 17; the bar shares them with the downloads by time)
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
-const data = await (await load.get(`data/line${lineId}.json`)).json();
+const lineFile = await load.get(`data/line${lineId}.json`);
+const data = await lineFile.json();
+const lineBuild = crc32(lineFile.bytes); // (the line's build ID: every file of the line carries it, src/buildId.js, #702)
 data.line = String(data.line);
 checkBuiltRoute(data); // (the track as the build draws it: its curves, the run past the termini, radius and cant: #477, #478)
 const built = { [`line${lineId}.json`]: data }; // every built file, for the credits and the provenance log
@@ -125,6 +128,7 @@ const truth = await loadHeightFacts();
 // Every line has it: the layers the page built without it went, #510. ?keepgeo and ?bot keep every tile (the checks).
 const groundFile = await fetchGround(load, lineId);
 built[`line${lineId}.ground.json`] = groundFile.layout;
+checkBuild(lineId, lineBuild, built); // (a file of another build stops the load, naming the rebuild, #702)
 const groundTiles = new GroundTiles(groundFile, groundStyles(groundFile.layout), params.has('bot') || params.has('keepgeo'));
 window.groundTiles = groundTiles; // (what is held: tools/bench/tiles.js)
 const groundLookups = groundTiles.loadLookups();
