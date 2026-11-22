@@ -639,6 +639,18 @@ Sections:
   (0.29) and the walls over 0.3 m in its 80 m square fall from 99.2 to 40.3 m. The old limit's reason was the
   page's drape (a yard on its 2 m terrain in 5 m triangles: 8 cm waves the street check read); the ground file lays
   lidar ground in 5 m cells of the city mesh, and the lines' `streetWaviness` comes with the batch.
+- **A parking area is such a yard** (#800, measured 2026-11-21 on ground batch C). It has heights on its outline only,
+  from the survey's lines in height class 5 (a mean error of 0.35 m). The bay along Vinohradská's north carriageway
+  (line 9 s 15360-15420, area 3091, 822 m², 0.42 m at p95) shares one such line with the sidewalk behind it; one
+  point of it, (3214.13, -1444.59), stands 0.38 m over IPR between points 31 and 35 m away, and the bay, a sheet
+  up to it, stood 0.18 m over the sidewalk where IPR has it 0.2 m under: 15 sunk kerb samples. Held to `MISS_PAVED`
+  as paved yards are, 41 / 44 / 29 / 9 / 37 parking areas lie on the lidar (lines 9 / 17 / 22 / 23 / 37; 18.1 ha of
+  the 41 ha of parking), the large lots most of all. One with over a third of its inside under a cover keeps its
+  sheet (`zps_inside.UNDER_COVER`): `zps_ground.judge` calls an area covered only when it is off IPR at its outline,
+  and the two car parks under the Magistrála's bridges at Hlavní nádraží (areas 232 and 233, 50 % and 93 % under
+  level-1 areas) fit there while IPR inside them is the bridges: on the lidar they raised the place's steep faces
+  from 379 to 640 m². Paved yards under a cover are judged as before (34 on the five lines lie on the lidar with
+  over a third under a level-1 area, 0.8 ha).
 - **A wall the survey has only as a strip** (#770, measured 2026-11-20). The tram's cutting north of Ohrada (line 37
   (3400, 1)) runs between two upright concrete walls of 4.7 and 5.8 m with a ledge at each foot (the user's photos
   from the footbridge, 2026-11-20). The survey has no `Zeď` line, no wall area and Geoportál no wall there: only a

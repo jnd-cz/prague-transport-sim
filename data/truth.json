@@ -5848,6 +5848,66 @@
      "why": "two of the median's outline points, (-3101.3, 152.5) and (-3101.2, 149.8), stand at 297.91 m, the height of its end 38 m down the street, where IPR has the street at 300.15 and 299.76 m: the strip between its neighbours lay up to 1.27 m under the street"
     }
    ]
+  },
+  "vinohradska-parking-bay": {
+   "line": "9",
+   "at": [
+    3211.2,
+    -1446.0
+   ],
+   "reach": 40,
+   "issue": 800,
+   "what": "a parking bay along Vinohradská's north carriageway west of Olšanské hřbitovy (line 9 s 15360-15420, 18 m off the route; the survey's parking area 3091, 97 m long and 8 m wide, with heights on its outline only): it lies a kerb under the sidewalk behind it",
+   "source": "measured 2026-11-21 on ground batch C (#800): IPR's raster rises 0.2 m from the bay onto the sidewalk; the survey's line between them (height class 5, a mean height error of 0.35 m by vyhláška 393/2020 Sb.) has a point at (3214.13, -1444.59) 0.38 m over the raster between points 31 m and 35 m away that lie on it within 0.06 and 0.31 m, and the bay, a sheet between its outline's points, rose to it",
+   "sections": [
+    {
+     "name": "from the bay across the kerb onto the sidewalk, x = 3211.2, 3.5 m",
+     "from": [
+      3211.2,
+      -1446.4
+     ],
+     "to": [
+      3211.2,
+      -1442.9
+     ],
+     "expect": {
+      "rise m at least": 0.08,
+      "largest step m": 0.3
+     },
+     "why": "IPR rises 0.21 m from the bay 2 m off the kerb to the sidewalk 1.5 m on it; the bay's edge stood over the sidewalk"
+    },
+    {
+     "name": "from the bay across the kerb onto the sidewalk, x = 3228, 3.5 m",
+     "from": [
+      3228.0,
+      -1447.2
+     ],
+     "to": [
+      3228.0,
+      -1443.7
+     ],
+     "expect": {
+      "rise m at least": 0.08,
+      "largest step m": 0.3
+     },
+     "why": "as at x = 3211.2, 17 m on, where the survey's line is 0.2 m over IPR"
+    },
+    {
+     "name": "along the bay 1.5 m from the kerb, x = 3240 to 3185",
+     "from": [
+      3240.0,
+      -1447.44
+     ],
+     "to": [
+      3185.0,
+      -1444.46
+     ],
+     "expect": {
+      "largest step m": 0.05
+     },
+     "why": "the bay lies smooth along its length, on the lidar or as a sheet"
+    }
+   ]
   }
  },
  "openTrackReview": {

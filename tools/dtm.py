@@ -452,7 +452,7 @@ for _o in deck_report["openings"]:
 # with heights only on their outline take the lidar inside where they lie on IPR's ground (tools/zps_inside.py, #444)
 import zps_inside  # noqa: E402
 under_report = zps_inside.under_decks(areas, deck_opens, deck_flat, _city_ground)
-inside_report = zps_inside.inside(areas, ground_verdicts, _city_ground)
+inside_report = zps_inside.inside(areas, ground_verdicts, _city_ground, zps_ground.cover_union(areas, _osm_cover))
 print("under decks:", under_report)
 print("lidar inside:", inside_report["classes"], "their sheet fits:", inside_report["fit"], "kept their sheet:",
       inside_report["kept"])

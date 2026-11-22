@@ -13,9 +13,9 @@ survey's heights; #276's ground built offline will cut the terrain mesh by it in
 - a lawn always, as main's page draped every lawn, unless the rails, DMR 5G or the user hold it off IPR (HELD; the
   drape's points inside also let the page lay a lawn by a grass track to its bed: left a sheet, lawns covered the rails
   on line 22 and let the terrain through on line 17);
-- a railway yard or a paved yard where it lies open on IPR's ground (DRAPE: zps_ground's verdict within its OFFSET of
-  IPR, moved there, or off it unevenly along walls and slopes) and its sheet misses the ground (MISS; a paved yard's,
-  MISS_PAVED). A sheet that fits
+- a railway yard, a paved yard or a parking area where it lies open on IPR's ground (DRAPE: zps_ground's verdict within
+  its OFFSET of IPR, moved there, or off it unevenly along walls and slopes) and its sheet misses the ground (MISS; a
+  paved yard's and a parking area's, MISS_PAVED). A sheet that fits
   stays, smooth: a paved yard draped on the lidar's 2 m terrain in 5 m triangles counts as waves on a street. The
   uneven ones measured, their inside beyond 1 m of IPR as a sheet and draped: paved 46 % and 17 % (220,000 m²), rail
   30 % and 1.7 % (green 54 % and 8.7 %). One too small for the lidar to see (a planter, a raised bed: #446) or under a
@@ -33,7 +33,7 @@ the 14,235 ground-level outline vertices under level-1 areas on the five lines t
 import numpy as np
 import shapely
 
-INSIDE = {"rail", "green", "paved"}  # the classes with heights only on their outline (measured above)
+INSIDE = {"rail", "green", "paved", "parking"}  # the classes with heights only on their outline (measured above)
 DRAPE = {"fits", "lidar", "uneven"}  # zps_ground.judge's verdicts of an area lying open on IPR's ground
 HELD = {"survey", "review", "changing"}  # its verdicts holding an area off IPR (the rails, DMR 5G, the user; a building site)
 # m: the sheet misses the ground where the 95th percentile of |sheet - IPR| inside is over this (zps_ground's OFFSET);
@@ -46,6 +46,21 @@ MISS = 0.5
 # under IPR beside the sidewalk and 0.29-0.37 m under the sidewalk, a step with its wall. The waves MISS was set
 # against were the page's drape on its 2 m terrain; the ground file lays lidar ground in 5 m cells (#638)
 MISS_PAVED = 0.3
+# the classes held to MISS_PAVED: a parking area is a paved yard by a street, heights on its outline only, the
+# survey's line it shares with a sidewalk in height class 5 (a mean error of 0.35 m). Along Vinohradská's north
+# carriageway (line 9 (3214.13, -1444.59), area 3091, 822 m2, 0.42 m at the 95th percentile) one point of that line
+# stood 0.38 m over IPR between points 31 and 35 m away, and the bay, a sheet up to it, stood 0.18 m over the sidewalk
+# behind its kerb (#800). Of the five lines' parking areas 15-24 % miss the ground by over 0.3 m, 28-58 % of their m2
+# (batch C, before the verdicts: the large lots, sheets between far outline points)
+YARDS = {"paved", "parking"}
+# a parking area with over this share of its inside under a cover keeps its sheet: IPR there is the cover or is
+# interpolated under it, and an area within OFFSET of IPR at its outline is never judged "covered" (zps_ground.judge
+# asks only of those off it). The two car parks beside the track under the Magistrála's bridges at Hlavní nádraží
+# (line 9, areas 232 and 233: 50 % and 93 % under level-1 areas, their sheets -2.1 to +5.4 m off IPR) took the lidar
+# and the place's steep faces rose from 379 to 640 m2 (#800). Paved yards so placed (34 on the five lines, 0.8 ha) are
+# left as they were built.
+UNDER_COVER = 1 / 3
+COVER_KEEPS = {"parking"}
 STEP, INSET = 2.0, 0.5  # m: the lattice inside an area where its sheet is compared with IPR, and its distance off the outline
 REACH = 0.5  # m round an opening's streets: their vertices at its edge (the portals)
 # m under the deck's underside (its top less its slab `t`, else SLAB as the page draws it): a ground-level vertex this
@@ -131,9 +146,17 @@ def misses(a, ground):
     return float(np.percentile(d, 95)) if len(d) else None
 
 
-def inside(areas, verdicts, ground):
+def under_cover(a, cover):
+    """The share of an area's inside (the lattice) under a cover (`contains_xy(x, y)`: zps_ground.Covers, or any with
+    it); 0 without a lattice point."""
+    x, y = lattice(shapely.Polygon(np.asarray(a["r"], float)[:, :2]).buffer(0))
+    return float(np.mean(cover.contains_xy(x, y))) if len(x) else 0.0
+
+
+def inside(areas, verdicts, ground, cover=None):
     """The areas of INSIDE classes that take the lidar inside (in place: `g` 1): lawns unless HELD, railway and paved
-    yards open on IPR's ground whose sheet misses it. verdicts: zps_ground.judge's; ground: IPR at city-frame arrays.
+    yards and parking areas open on IPR's ground whose sheet misses it. verdicts: zps_ground.judge's; ground: IPR at
+    city-frame arrays; cover: what the lidar cannot see through (zps_ground.cover_union), for COVER_KEEPS.
     Returns {"classes": {class: {"areas", "m2"}}, "fit": {class: areas whose sheet fits}, "kept": {verdict: areas}}."""
     out = {"classes": {}, "fit": {}, "kept": {}}
     for i, a in enumerate(areas):
@@ -145,9 +168,12 @@ def inside(areas, verdicts, ground):
             k = verdict or "none"
             out["kept"][k] = out["kept"].get(k, 0) + 1
             continue
+        if a["c"] in COVER_KEEPS and cover is not None and not cover.is_empty and under_cover(a, cover) > UNDER_COVER:
+            out["kept"]["under a cover"] = out["kept"].get("under a cover", 0) + 1
+            continue
         if a["c"] != "green":
             miss = misses(a, ground)
-            if miss is None or miss <= (MISS_PAVED if a["c"] == "paved" else MISS):
+            if miss is None or miss <= (MISS_PAVED if a["c"] in YARDS else MISS):
                 out["fit"][a["c"]] = out["fit"].get(a["c"], 0) + 1
                 continue
         a["g"] = 1
