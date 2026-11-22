@@ -27,7 +27,7 @@ runs them in order; read AGENTS.md first if it is not in context yet.
    `../<repo>-$ARGUMENTS` on its branch from `origin/main`, sets the author email, fetches the built data from the
    machine cache and labels the issue `agent:claude`. Give the issue its lane label if it has none.
 5. **Plan:** say in a few lines what you will change (files, the rule, not a spot fix), and which checks
-   prove it: the issue's Checks and the tier of the change (AGENTS.md, "Which checks a change needs"),
+   prove it: the issue's Checks and the tier of the change (`python -I tools/tiers.py`),
    with `/regress` before the PR. If the issue changes built data, the plan ends with rebuild, the checks,
    `data-publish` and the manifest commit on the branch, which needs the `rebuild` label: take it if
    nobody holds it, or say whom it waits for.

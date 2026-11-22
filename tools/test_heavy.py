@@ -211,14 +211,14 @@ class Tools(unittest.TestCase):
         for name in ("build_line.py", "dtm.py", "line_heights.py", "import_track_heights.py", "test_all.py"):
             self.assertTrue(queuing(TOOLS / name), name)
 
-    def test_agents_md_names_every_tool_that_takes_its_turn(self):
-        text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        rule = re.search(r"\*\*Heavy jobs take turns:\*\*(.*?)\n- \*\*", text, re.S).group(1)
+    def test_developing_md_names_every_tool_that_takes_its_turn(self):
+        text = (ROOT / "DEVELOPING.md").read_text(encoding="utf-8")  # (moved from AGENTS.md, #727)
+        rule = re.search(r"\*\*Heavy jobs\*\* \(.*?\n- (.*?)\n- ", text, re.S).group(1)
         tools = [p.name for p in sorted(TOOLS.glob("*.py")) if not p.name.startswith("test_")
                  and p.name not in ("baseline_store.py", "heavy.py") and queuing(p)]
         self.assertIn("rebuild.py", tools)
         for name in tools:
-            self.assertIn(f"`{name}`", rule, f"{name} takes its turn: AGENTS.md's heavy jobs rule names it")
+            self.assertIn(f"`{name}`", rule, f"{name} takes its turn: DEVELOPING.md's heavy jobs paragraph names it")
 
 
 class Shell(unittest.TestCase):
