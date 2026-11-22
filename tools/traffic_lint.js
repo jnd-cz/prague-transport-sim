@@ -221,8 +221,11 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
     return { rule, count: items.length, of, kinds: byKind, ...(Object.keys(byState).length ? { states: byState } : {}), places: [...items].sort((a, b) => b.mag - a.mag).slice(0, TOP), ...placesAt(items) };
   };
   const minutes = T / 60;
+  // the walkers that had nowhere to go and left (src/traffic.js _leave, #366): how many, and the places most left at
+  const leaves = [...(tr.walkLeaves || new Map())].sort((a, b) => b[1] - a[1]);
   return {
     stats: { simSeconds: Math.round(T), samples, finished: g.finished, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, junctionCircles: tr.junctionCircles || 0, recoveredCycles: g.trafficCycles || [], carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
+      walkersLeft: leaves.reduce((n, [, c]) => n + c, 0), walkLeaves: Object.fromEntries(leaves.slice(0, TOP)),
       // (a run that did not finish: what held the tram at the end, as u3 and redruns report it)
       ...(g.finished || g.nextStop >= until ? {} : { stuckScene: stuckScene(g, tr, ap) }) },
     checks: {

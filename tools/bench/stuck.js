@@ -22,7 +22,7 @@ export function stuckWatch(game) {
 export function stuckScene(game, traffic, pilot) {
   const tr = game.tram, plan = pilot.step(game, 0) || {}, st = game.stops[game.nextStop];
   // (a walker: where it stands and why: waiting at the kerb for a car, crossing, on the pavement)
-  const walker = (w) => ({ walker: true, state: w.waitKerb ? 'waits at the kerb' : w.door ? 'at a door' : 'walking', v: +(w.v ?? 0).toFixed(1), dir: w.dir });
+  const walker = (w) => ({ walker: true, state: w.leave ? 'leaving' : w.waitKerb ? 'waits at the kerb' : w.door ? 'at a door' : 'walking', v: +(w.v ?? 0).toFixed(1), dir: w.dir, ...(w.still ? { stillFor: +w.still.t.toFixed(1) } : {}) });
   const id = (o) => !o ? null : o === tr ? 'our tram' : o.kind === 'road' ? `car${o.id}` : `${traffic.ahead.includes(o) ? 'ahead' : 'oncoming'}${o.id}`;
   const seen = (o) => !o ? null : o.car ? id(o.car) : o.tram ? id(o.tram) : o.walker ? walker(o.walker) : o.what;
   const waits = (car) => {
