@@ -96,7 +96,7 @@ GAME = r"""async ({ model, sounds, secs, stop }) => {
   g.ringBell();
   g.toggleDoors();   // (they stand open at the first stop: closing)
   g.toggleDoors();   // opening
-  const step = () => { ap.step(g, dt); g.update(dt, ap.input); a.update(g.tram, g.currentLimit, dt); const p = g.route.at(g.tram.s); tr.update(dt, { position: { x: p.x, z: -p.y } }); };
+  const step = () => { ap.step(g, dt); g.update(dt, ap.input); a.update(g.tram, g.currentLimit, dt); tr.update(dt); };
   const doors = a.trace.map((x) => [x.e, x.by]);
   // the doors shut again, then the drive: the frogs and the loops
   g.toggleDoors();

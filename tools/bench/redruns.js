@@ -78,7 +78,7 @@ export function redrunsWatch(game, traffic) {
           const line = sig.backCross - 6, d = line - t.s;
           if (sig.backState === 'stop' && d > 0 && d > (t.v * t.v) / 2.6 + t.v + 0.5) t._could.set(sig, sig.backStopSince); // (full service braking: traffic.js stopDistance)
           if (p !== undefined && p < line && t.s >= line) {
-            if (sig.backState === 'stop') R.red.push({ sigS: Math.round(sig.s), line: +line.toFixed(1), v: +t.v.toFixed(1), sinceRed: +(game.clock - sig.backStopSince).toFixed(1), avoidable: t._could.get(sig) === sig.backStopSince, tram: t.mesh.userData.line, inSet: !!t.redStops?.has(sig), platforms: traffic.backStops.filter((b) => Math.abs(b - line) < 30).map((b) => +b.toFixed(1)), hist: t._hist.slice(-16).map((q) => q.join(' ')).join(' | ') });
+            if (sig.backState === 'stop') R.red.push({ sigS: Math.round(sig.s), line: +line.toFixed(1), v: +t.v.toFixed(1), sinceRed: +(game.clock - sig.backStopSince).toFixed(1), avoidable: t._could.get(sig) === sig.backStopSince, tram: t.line, inSet: !!t.redStops?.has(sig), platforms: traffic.backStops.filter((b) => Math.abs(b - line) < 30).map((b) => +b.toFixed(1)), hist: t._hist.slice(-16).map((q) => q.join(' ')).join(' | ') });
             else if (sig.backState === 'warn') R.warnPasses++;
           }
         }

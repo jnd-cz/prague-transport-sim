@@ -53,26 +53,26 @@ SEEN = """async () => {
 AI = """async () => {
   const models = await import('/src/models.js');
   const { indicating } = await import('/src/indicators.js');
-  const tr = window.traffic, g = window.game, way = tr.lampWays.ahead, lit = %s;
+  const tr = window.traffic, view = window.run.trafficView, g = window.game, way = tr.lampWays.ahead, lit = %s;
   const m = models.makeT3({ line: '9', cars: 2, vehicle: 't3simple', variant: 'T3M', run: '801' });
-  tr.group.add(m);
+  view.group.add(m);
   const out = { turns: way.turns.length, kerb: way.kerb.length, stops: way.stops.length, ours: { turns: g.lamps.turns.length, kerb: g.lamps.kerb.length } };
   // braking 20 m before the first stop where passengers cross a car lane
   const k = way.kerb.find((x) => x > 200);
   if (k !== undefined) {
-    const t = { mesh: m, s: k - 20, v: 3, vWas: 5, id: 1 };
-    tr._placeTram(t, tr.route, t.s, () => 0, 0.1);
+    const t = { s: k - 20, v: 3, vWas: 5, id: 1, cars: 2 };
+    tr._tramState(t, tr.route, () => 0, 0.1); view.poseTram(t, m, tr.route, () => 0);
     out.kerbStop = { want: way.stops.find((st) => st.s > t.s - 2)?.name, next: m.userData.next,
       indicate: indicating(way.turns, way.kerb, t.s, t.v, true), lamps: m.userData.cars.map(lit), signals: m.userData.lampState.signals };
   }
   // running through a junction turn, 10 m before its switch
   const j = way.turns[0];
   if (j) {
-    const t = { mesh: m, s: j.s0 + 40, v: 6, vWas: 6, id: 2 };
-    tr._placeTram(t, tr.route, t.s, () => 0, 0.1);
+    const t = { s: j.s0 + 40, v: 6, vWas: 6, id: 2, cars: 2 };
+    tr._tramState(t, tr.route, () => 0, 0.1); view.poseTram(t, m, tr.route, () => 0);
     out.turn = { side: j.side, indicate: indicating(way.turns, way.kerb, t.s, t.v, false), braking: m.userData.lampState.braking };
   }
-  tr.group.remove(m);
+  view.group.remove(m);
   models.disposeModel(m);
   return out;
 }""" % LIT

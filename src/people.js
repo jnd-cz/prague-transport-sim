@@ -188,10 +188,10 @@ export class People {
     this.recs.push({ key, m: this._matrix(this.recs.length), x: p.x, y: p.y, z: p.z, shirt: g.children[1]?.material?.color || FAR_SHIRT, n, box: g });
   }
 
-  // after the game's and the traffic's step, before drawing
-  sync(camera, traffic, game) {
+  // after the game's and the traffic's step, before drawing; trafficView: the traffic as drawn (src/trafficView.js)
+  sync(camera, trafficView, game) {
     this.recs.length = 0;
-    if (traffic) this._crowd(traffic.crowd, traffic.slots || [], 'w');
+    if (trafficView) this._crowd(trafficView.crowd, trafficView.traffic.slots || [], 'w');
     if (game) {
       this._crowd(game.crowd, null, 's');
       game.runners.forEach((r, k) => this._box(r.mesh, r, 1000 + k));
