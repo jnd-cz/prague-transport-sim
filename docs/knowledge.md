@@ -966,9 +966,17 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
     five lines: within 0.75 m of a kerb the walkway lies +0.046 m over IPR (median), 1.5-3 m in -0.002 m; of the
     sidewalk cells that moved 0.3 m or more, 2,023 came nearer IPR and 1,172 went from it (1 m or more: 470 and 196).
     Those that went from it lie where a sidewalk spans two levels and a few seeds (a kerb's plane, a wall's hold)
-    set it: at Výtoň (line 17 (-763.3, -2212.2)) a wedge at the foot of a wall whose hold is its top, 192.38 m, IPR
-    1.5 m in reads the wall's smear and makes a wall's top of every kerb point but the corner's (already on main),
-    and the corner's normal, turned 30°, reads it too: the wedge, 188.7 m at the kerb, fills at 192.4 m.
+    set it. The wall test reads across each point's own edge, not along the run's normal: at Výtoň (line 17
+    (-763.3, -2212.2)), a wedge at the foot of a wall whose hold is its top, 192.38 m, the corner's normal turned 30°
+    read IPR into the wall's smear, and the wedge, 188.7 m at the kerb, filled at 192.4 m.
+  - **A kerb at the road's level under a rise is a wall's foot** (#800, the user, 2026-11-23). On about 520 m of
+    kerb on the five lines the survey has the edge at the road's level plus a kerb and IPR rises 0.8-4 m within
+    1.5 m behind it; `wall_tops` holds the walkway there at IPR's level 1.5 m in, a wall at the kerb. Asked at three
+    such places, the user found a wall between the road (or a ramp) and a raised sidewalk at each: "a straight up
+    wall between road and sidewalk" (Motol, line 9 (-6418.8, -1518.4)); "not vertical but still steep wall down from
+    street level to the ramp going down to the river" (under Vyšehrad, line 17 (-764.1, -2356.4)); "a wall next to
+    sidewalk" (Žižkov, line 9 (2217.7, -671.0)). A rule taking such an edge's own height as the walkway's was tried
+    and dropped; the three are places in `data/truth.json`.
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
