@@ -29,8 +29,11 @@ START = """async () => {
     lk[k] = function (x, y, ...a) { reads[k] = (reads[k] || 0) + 1; if (!lk._at(x, y)) missed[k] = (missed[k] || 0) + 1; return f.call(this, x, y, ...a); };
     return () => { delete lk[k]; };
   });
+  // (Start asks for no ground once a tile comes for our stops' signs, shelters and stand-in platforms, #694)
+  const gl = lk.g, later = gl.later, stopLater = [];
+  gl.later = function (x, y, fn) { if (/buildStop/.test(new Error().stack)) stopLater.push([x, y]); return later.call(this, x, y, fn); };
   const { startShift } = await import('/tools/bench/shift.js');
-  try { await startShift({ timeout: 300 }); } finally { for (const u of undo) u(); }
+  try { await startShift({ timeout: 300 }); } finally { for (const u of undo) u(); gl.later = later; }
   const T = window.traffic, mm = (v) => Math.round(v * 1000);
   return { reads, missed, held: window.groundTiles.lookups.size, tiles: window.groundTiles.tiles.size,
     n: { roads: T.roads.length, lanes: T.laneList.length, walks: T.walks.length, doors: T.doors.length, lights: T.lightLanes.length,
@@ -38,7 +41,8 @@ START = """async () => {
     lanes: T.laneList.map((l) => [l.k, l.dir, l.sel, mm(l.path.p[0][0]), mm(l.path.p[0][1]), l.path.p.length]),
     poles: [T.lights, T.pedLights].map((L) => { const pole = L.group.children[0], M = new pole.matrix.constructor(), out = [];
       for (let i = 0; i < L.count; i++) { pole.getMatrixAt(i, M); out.push(M.elements[13]); } return out; }),
-    ways: window.game.route.ground.wayEnds.size };
+    ways: window.game.route.ground.wayEnds.size, stopLater,
+    stops: window.game.stops.map((st) => ({ target: st.target, vienna: st.vienna, sign: st.sign.position.y })) };
 }"""
 
 
@@ -88,6 +92,16 @@ class StartReadsNoSurvey(unittest.TestCase):
             worst = max((abs(y - h["z"] / 100) for y, h in zip(poles, self.net[key])), default=0)
             self.assertLess(worst, 0.001, key)
         self.assertEqual(self.r["ways"], len(self.net["ways"]))
+
+    def test_our_stops_stand_on_the_files(self):
+        """Our stops' signs and shelters stand where the build put them, on its heights: Start calls ground.later for
+        none of them, and a Vienna-type stop's sign stands on the stored zs (#694)."""
+        self.assertEqual(self.r["stopLater"], [])
+        self.assertEqual(len(self.r["stops"]), len(self.net["stops"]))
+        vienna = [(st, N) for st, N in zip(self.r["stops"], self.net["stops"]) if st["vienna"]]
+        self.assertTrue(vienna)  # (line 17 has two)
+        for st, N in vienna:
+            self.assertLess(abs(st["sign"] - N["zs"] / 100), 0.001)
 
     def test_no_page_errors(self):
         self.assertEqual(self.errors, [])

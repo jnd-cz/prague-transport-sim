@@ -23,8 +23,8 @@ the page's went its network and this one were the same to the cm on lines 9, 17,
   data/lineN.signals.json has one, else the junction's edge, never on a zebra) and its head; the pedestrian heads at
   OSM's signalled crossings;
 - src/platforms.js `buildPlatforms`, `buildStop`: whether the survey draws each OSM platform, and for each of our stops
-  with each set's stop point (src/game.js `_stopZone`) whether it draws the stand-in platform and where its platform's
-  edge holds the shelter.
+  at its stop point, the sign for every set (src/game.js `_stopZone`, #694), whether it draws the stand-in platform and
+  where its platform's edge holds the shelter.
 
 The survey is read as the page reads it: the ground file's triangles (data/lineN.ground.*, tools/ground_mesh.py), the
 highest holding the point and the survey's class under it (src/groundFile.js GroundLookup.survey), the 10 m cells the
@@ -48,8 +48,9 @@ The file, data/lineN.network.json, positions in cm, a path's points `p` in mm (f
 - `overBridge`: the signals (data.signals' indexes) over a bridge, on the road under it: the game leaves them out;
 - `platforms`: each placed OSM platform's index `i` in data.platforms, its `name` and whether the survey draws it
   (`surveyed`: no strip of the page's);
-- `stops`: each of our stops (data.stops), by the set (1 car, 2 cars): `stand`, whether its stand-in platform is drawn,
-  and `outer`, the shelter's outer edge (cm right of the track) where our OSM platform stands, else null.
+- `stops`: each of our stops (data.stops): `stand`, whether its stand-in platform is drawn, and `outer`, the shelter's
+  outer edge (cm right of the track) where our OSM platform stands, else null; the heights it stands on (heights(), cm):
+  a Vienna-type stop's sign `zs` and shelter `zh` on the sidewalk, a stand-in platform's outer kerb `zo`.
 
 No heights: what Start places stands on the drawn ground, the page reading it at load while every tile's lookup is held
 (src/main.js settleNetwork), or once its tile's lookup comes (ground.later). The ground file is not yet the settled
@@ -69,7 +70,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-VERSION = 2  # (2: the heights Start stands things on, #682)
+VERSION = 3  # (2: the heights Start stands things on, #682; 3: our stops' one record each, with their heights, #694)
 
 
 # ---------------------------------------------------------------- the page's arithmetic
@@ -1541,15 +1542,8 @@ class Signals:
 
 
 # ---------------------------------------------------------------- the platforms and our stops
-def set_lengths():
-    """{cars: the set's length over couplers} as src/tram.js gives it (Tram.length: T3.length a car, COUPLING_GAP =
-    -T3.couplerOverlap between them), for the consists the menu offers (index.html optCars)."""
-    import re
-    with open(os.path.join(ROOT, "src", "tram.js"), encoding="utf-8") as f:
-        js = f.read()
-    length = float(re.search(r"^\s*length:\s*([\d.]+),", js, re.M).group(1))
-    overlap = float(re.search(r"^\s*couplerOverlap:\s*([\d.]+),", js, re.M).group(1))
-    return {cars: length * cars + (-overlap) * (cars - 1) for cars in (1, 2)}
+STAND_LEN = 30  # m: a stand-in platform's length, ending 1 m before the stop point (src/platforms.js buildStop)
+SHELTER_BACK = 12  # m: our shelter's middle behind the stop point (src/platforms.js buildStop)
 
 
 SURVEYED = {"platform", "island", "sidewalk"}  # (where the survey draws the platform: no strip of the page's)
@@ -1557,9 +1551,9 @@ SURVEYED = {"platform", "island", "sidewalk"}  # (where the survey draws the pla
 
 class Stops:
     """What src/platforms.js reads of the survey (buildPlatforms, buildStop): whether the survey draws each OSM platform
-    off the doors' kerb (its middle a platform, island or sidewalk), and for each of our stops, with the stop point each
-    set gives it (src/game.js _stopZone), whether the survey draws its stand-in platform and how far out the shelter
-    stands (no further than the surveyed platform's edge)."""
+    off the doors' kerb (its middle a platform, island or sidewalk), and for each of our stops, at its stop point (its
+    sign for every set, src/game.js _stopZone, #694), whether the survey draws its stand-in platform and how far out the
+    shelter stands (no further than the surveyed platform's edge)."""
 
     def __init__(self, data, survey, route, back):
         self.data, self.survey, self.route, self.back = data, survey, route, back
@@ -1608,37 +1602,31 @@ class Stops:
         return self.survey.class_at(np.array([x]), np.array([y]))[0]
 
     def stop(self, i, st):
-        """buildStop()'s survey reads for each set: {"stand": whether the survey draws the stand-in platform (none of
-        ours there, no Vienna type), "outer": the shelter's outer edge (m right of the track) where our OSM platform
-        stands, else None}, lists by cars."""
-        out = {"stand": [], "outer": []}
-        for cars, L in set_lengths().items():
-            target = min(st["sign"] if st.get("sign") is not None else st["s"] + 6, self.route.length - 2)
-            if "p0" in st and st["p1"] - st["p0"] >= 15:
-                hi = st["p1"] + 4
-                lo = min(hi - 8, st["p0"] + L - 3 if st["p1"] - st["p0"] + 3 >= L else st["p1"] - 8)
-                target = max(lo + 2.5, min(target, hi - 3))
-            osm = next((p for p in self.platforms if not p["back"] and p["side"] < 0 and p["s0"] < target - 8
-                        and p["s1"] > target - 20), None) or \
-                next((p for p in self.platforms if p["back"] and p["ours"] and p["ours"]["s0"] < target - 8
-                      and p["ours"]["s1"] > target - 20), None)
-            kerb = osm["kerb"] if osm else st["vienna"]
-            ax, ay = self.offset(self.route, target - 30 / 2 - 1, -2.8)
-            out["stand"].append(not osm and kerb is None and self.class_at(ax, ay) not in SURVEYED)
-            outer = osm["outer"] if osm else None
-            if osm:
-                lat, last = osm["inner"] + 0.5, None
-                while lat <= osm["outer"] + 0.01:
-                    ox, oy = self.offset(self.route, target - 12, -lat)
-                    if self.class_at(ox, oy) == "platform":
-                        last = lat
-                    elif last is not None:
-                        break
-                    lat += 0.25
-                if last is not None:
-                    outer = min(outer, last + 0.25)
-            out["outer"].append(outer)
-        return out
+        """buildStop()'s survey reads: {"target": the stop point, "stand": whether the survey draws the stand-in
+        platform (none of ours there, no Vienna type), "outer": the shelter's outer edge (m right of the track) where our
+        OSM platform stands, else None, "kerb": a Vienna-type stop's kerb offset, else None}. One for every set: the stop
+        point is the sign (src/game.js _initStops, #694; before it each set had its own, 9.5 m apart at Královka)."""
+        target = min(st["sign"] if st.get("sign") is not None else st["s"] + 6, self.route.length - 2)
+        osm = next((p for p in self.platforms if not p["back"] and p["side"] < 0 and p["s0"] < target - 8
+                    and p["s1"] > target - 20), None) or \
+            next((p for p in self.platforms if p["back"] and p["ours"] and p["ours"]["s0"] < target - 8
+                  and p["ours"]["s1"] > target - 20), None)
+        kerb = osm["kerb"] if osm else st["vienna"]
+        ax, ay = self.offset(self.route, target - STAND_LEN / 2 - 1, -2.8)
+        outer = osm["outer"] if osm else None
+        if osm:
+            lat, last = osm["inner"] + 0.5, None
+            while lat <= osm["outer"] + 0.01:
+                ox, oy = self.offset(self.route, target - SHELTER_BACK, -lat)
+                if self.class_at(ox, oy) == "platform":
+                    last = lat
+                elif last is not None:
+                    break
+                lat += 0.25
+            if last is not None:
+                outer = min(outer, last + 0.25)
+        return {"target": target, "stand": not osm and kerb is None and self.class_at(ax, ay) not in SURVEYED,
+                "outer": outer, "kerb": kerb}
 
 
 # ---------------------------------------------------------------- the heights
@@ -1651,10 +1639,11 @@ def sections(s0, s1):
 def heights(g, data, sg, st):
     """The heights Start stands things on (#682), from the ground file as the page reads it (tools/ground_at.py), so
     that Start reads no ground: {"ways": [[a way of each bridge's and road tunnel's chain (data.roads' index), the
-    heights at the chain's two ends]], "heads", "pedHeads": each head's street surface, "platforms": {i: zo, zs, zh}}.
-    The platforms' as src/platforms.js settlePlatforms read them until #682: the street's surface at the outer kerb of each
-    cross-section of a strip the survey does not draw (zo), under a Vienna-type platform's sign on the opposite path (zs)
-    and the track's height under an opposite platform's shelter (zh)."""
+    heights at the chain's two ends]], "heads", "pedHeads": each head's street surface, "platforms": {i: zo, zs, zh},
+    "stops": [{zo, zs, zh}]}. The platforms' as src/platforms.js settlePlatforms read them until #682: the street's surface
+    at the outer kerb of each cross-section of a strip the survey does not draw (zo), under a Vienna-type platform's sign
+    on the opposite path (zs) and the track's height under an opposite platform's shelter (zh). Our stops' as buildStop
+    read them once their tile came until #694 (stop_heights)."""
     ends, done, ways = g.way_ends(), set(), []
     for k in sorted(ends):
         c = g.way_of[k]
@@ -1680,7 +1669,24 @@ def heights(g, data, sg, st):
         if z:
             plats[p["i"]] = z
     out["platforms"] = plats
+    out["stops"] = [stop_heights(g, data["stops"][i], s, st.route) for i, s in enumerate(st.stops)]
     return out
+
+
+def stop_heights(g, d, s, route):
+    """One of our stops' heights (src/platforms.js buildStop): {zs, zh} where it is Vienna-type, on the sidewalk's
+    surface (the sign at its pole, data.stops' sign and signOff, else half a metre past the stop point 0.6 m past the
+    kerb; the shelter 12 m behind the stop point, 2.4 m past the kerb), {zo} where the stand-in platform is drawn (the
+    street's surface at its outer kerb, 4.1 m right, from 31 to 1 m before the stop point)."""
+    z, t = {}, s["target"]
+    if s["kerb"] is not None:
+        at, off = (d["sign"], d["signOff"]) if d.get("signOff") is not None else (t + 0.5, -(s["kerb"] + 0.6))
+        z["zs"] = g.surface(*Stops.offset(route, at, off))
+        z["zh"] = g.surface(*Stops.offset(route, t - SHELTER_BACK, -(s["kerb"] + 2.4)))
+    if s["stand"]:
+        pts = [Stops.offset(route, q, -4.1) for q in sections(t - STAND_LEN - 1, t - 1)]
+        z["zo"] = g.surface_many([q[0] for q in pts], [q[1] for q in pts])
+    return z
 
 
 # ---------------------------------------------------------------- the file
@@ -1689,6 +1695,14 @@ def platform_record(p, z=None):
     stands on (heights(), cm)."""
     out = {"i": p["i"], "name": p["name"], "surveyed": p["surveyed"]}
     for k, v in (z or {}).items():
+        out[k] = [cm(a) for a in v] if isinstance(v, list) else cm(v)
+    return out
+
+
+def stop_record(s, z):
+    """One of our stops: `stand`, `outer` (cm or null) and the heights it stands on (stop_heights(), cm)."""
+    out = {"stand": s["stand"], "outer": None if s["outer"] is None else cm(s["outer"])}
+    for k, v in z.items():
         out[k] = [cm(a) for a in v] if isinstance(v, list) else cm(v)
     return out
 
@@ -1767,7 +1781,7 @@ def build(ln, log=print):
                          for (x, y, f), h in zip(sg.ped_heads, z["pedHeads"])],
             "overBridge": sg.over,
             "platforms": [platform_record(p, z["platforms"].get(p["i"])) for p in st.platforms if not p.get("shared")],
-            "stops": [{"stand": s["stand"], "outer": [None if o is None else cm(o) for o in s["outer"]]} for s in st.stops],
+            "stops": [stop_record(s, h) for s, h in zip(st.stops, z["stops"])],
             "fitted": fitted}
 
 

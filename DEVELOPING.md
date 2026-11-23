@@ -562,6 +562,13 @@ architecture review at a world checkpoint ([docs/housekeeping.md](docs/housekeep
 the pinned #291 and only proposes.
 
 **Heavy jobs** (`baseline_store.HeavyJob`, first come first served; #280, #536, #728):
+- Every job that keeps several cores or GBs busy for over a minute waits for the machine's other heavy jobs and
+  holds its turn, so that it does not spoil another's measurement (the user, 2026-11-12, #516). These take their
+  turn themselves: `headless.py`, `rebuild.py`, `frametime.py`, `city_terrain.py`, `ground_mesh.py`;
+  `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py`, `street_profile.py` and
+  `ground_partition.py` when run alone; `ground_place.py` for several places or `--rings` (one place runs as it
+  is); `test_all.py` for the whole suite (`tools/test_heavy.py` holds this list to the code). Anything else runs
+  through `heavy.py`.
 - Two kinds. A job alone (a timing, or one of unknown size: every tool that does not say otherwise, plain
   `heavy.py`) waits for every job before it and every job running, and holds those after it. A shared job (a count
   run or a build: its result is the same beside another job, only later) declares its peak memory and its cores:

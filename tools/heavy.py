@@ -15,7 +15,7 @@ is for a command whose result does not depend on what runs beside it (pictures, 
 the cores it keeps busy, by which it runs beside the other shared jobs while they fit (HeavyJob has the rule).
 What the command starts (rebuild.py, headless.py, a heavy step) runs in its turn and does not wait again. On Windows a
 plain `bash` or `sh` runs Git Bash's, next to git (Windows finds WSL's bash.exe in System32 before it reads PATH, #645).
-A tool that is a heavy job when run alone calls turn(what) at its start (AGENTS.md lists them). tools/board.py shows the
+A tool that is a heavy job when run alone calls turn(what) at its start (DEVELOPING.md, Heavy jobs, lists them). tools/board.py shows the
 queue; TRAM_HEAVY_NOWAIT=1 runs a job at once beside the others (it slows both).
 
 The job watches itself (#815, HeavyJob.verdict has the rules): past 2× its expected time it warns; over its --shared
