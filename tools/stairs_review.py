@@ -5,8 +5,9 @@
     python -P -E tools/stairs_review.py --table [--lines ...]           # the table alone
     python -P -E tools/stairs_review.py --import [--reviews reports/reviews]
 
-- **The table** (per line): the level-0 stairs areas with a height at every outline point; those that are one flight
-  (ground_mesh.flight, #762); the rest, drawn on their outline's triangles (ground_mesh.SurveySurface); the plan area
+- **The table** (per line): the level-0 stairs areas with a height at every outline point; those on the stairs' own
+  heights (ground_mesh.StairsHeights); those that are one flight (ground_mesh.flight, #762, on those heights); the rest,
+  drawn on their outline's triangles (ground_mesh.SurveySurface); the plan area
   of the rest steeper than 1:1 on a STEP grid (no stair is: 17 / 29 cm is 0.59); the areas with ODD m² or more of it.
   It measures each area's own surface, before the ground fuses it with its neighbours.
 - **The cards** (reports/review/stairs-N.json): the WORST places with the most steep area, and the places the issue's
@@ -83,13 +84,14 @@ def steep(z):
     return float(np.count_nonzero(np.isfinite(s) & (s > 1.0)) * STEP * STEP)
 
 
-def measure(D):
-    """(counts, rows) of a survey file's stairs: the counts for the table, a row for each area that is not one flight."""
+def measure(D, own=None):
+    """(counts, rows) of a survey file's stairs as the ground draws them (ground_mesh.SurveySurface, on the stairs' own
+    heights where `own` is a ground_mesh.StairsHeights): the counts for the table, a row for each that is not one flight."""
     ids = stairs(D)
-    rest = [i for i in ids if gm.flight(D["areas"][i]) is None]
-    S = gm.SurveySurface(D, rest)
+    S = gm.SurveySurface(D, ids, own)
+    rest = [i for i in ids if i not in S.flights]
     n = {"stairs": len(ids), "m2": sum(outline(D["areas"][i]).area for i in ids), "flight": len(ids) - len(rest),
-         "rest": len(rest), "rest m2": 0.0, "steep": 0.0, "odd": 0, "tall": 0}
+         "own": own.areas if own else 0, "rest": len(rest), "rest m2": 0.0, "steep": 0.0, "odd": 0, "tall": 0}
     rows = []
     for i in rest:
         a = D["areas"][i]
@@ -115,10 +117,10 @@ def measure(D):
 
 
 def table(counts):
-    out = ["| line | stairs (level 0) | m² | one flight | the rest | their m² | steeper than 1:1, m² | "
-           f"areas with {ODD} m² or more of it | the rest rising over 10 m |", "|---|---|---|---|---|---|---|---|---|"]
+    out = ["| line | stairs (level 0) | m² | on their own heights | one flight | the rest | their m² | steeper than 1:1, m² | "
+           f"areas with {ODD} m² or more of it | the rest rising over 10 m |", "|---|---|---|---|---|---|---|---|---|---|"]
     for ln, n in counts.items():
-        out.append(f"| {ln} | {n['stairs']:,} | {n['m2']:,.0f} | {n['flight']:,} | {n['rest']:,} | {n['rest m2']:,.0f} | "
+        out.append(f"| {ln} | {n['stairs']:,} | {n['m2']:,.0f} | {n['own']:,} | {n['flight']:,} | {n['rest']:,} | {n['rest m2']:,.0f} | "
                    f"{n['steep']:,.0f} | {n['odd']} | {n['tall']} |")
     return "\n".join(out)
 
@@ -182,10 +184,12 @@ def card(p, why=None):
 
 
 def load(lines):
+    import wall_lines
+    lidar = wall_lines.ipr_lidar()
     counts, rows = {}, {}
     for ln in lines:
         D = json.loads((ROOT / "data" / f"line{ln}.dtm.json").read_text(encoding="utf-8"))
-        counts[ln], rows[ln] = measure(D)
+        counts[ln], rows[ln] = measure(D, gm.StairsHeights(D, gm.survey_edges(ln), lidar))
     return counts, rows
 
 

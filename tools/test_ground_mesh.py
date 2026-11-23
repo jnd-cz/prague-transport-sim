@@ -240,6 +240,46 @@ class Stairs(unittest.TestCase):
         self.assertEqual(s.flights, {})
         self.assertAlmostEqual(float(s.at(0, np.array([1.0]), np.array([0.0]))[0]), 200.0)
 
+    # (#447, StairsHeights: a flight 2 m wide rising 0.5 m a metre along x = 0, beside a building's wall at x = 2 whose
+    # line the survey gives the building's foot, level at 98.5 m: line 9 area 5662's building side at 224.1 m)
+    BESIDE = {"c": "stairs", "l": 0, "r": [[0, 0, 100.0], [2, 0, 98.5], [2, 5, 98.5], [2, 10, 98.5], [0, 10, 105.0], [0, 5, 102.5]]}
+    LINES = [("other", np.array([[2, -1, 98.5], [2, 11, 98.5]])), ("stairs", np.array([[0, 0, 100.0], [0, 10, 105.0]])),
+             ("stairs", np.array([[0, 0, 100.0], [2, 0, 100.0]])), ("stairs", np.array([[0, 10, 105.0], [2, 10, 105.0]]))]
+
+    @staticmethod
+    def flight_lidar(x, y):
+        return 100.0 + 0.5 * np.asarray(y, float)
+
+    def test_a_side_on_a_buildings_line_takes_the_stairs_heights_across(self):
+        sh = gm.StairsHeights({"areas": [self.BESIDE]}, self.LINES, self.flight_lidar)
+        r = sh.outline(self.BESIDE)
+        self.assertEqual([q[2] for q in r], [100.0, 100.0, 102.5, 105.0, 105.0, 102.5])
+        self.assertEqual((sh.areas, sh.points), (1, 3))
+        s = gm.SurveySurface({"areas": [self.BESIDE]}, [0], gm.StairsHeights({"areas": [self.BESIDE]}, self.LINES, self.flight_lidar))
+        self.assertIn(0, s.flights)   # (one flight now: across it level)
+        np.testing.assert_allclose(s.at(0, np.array([0.5, 1.5]), np.array([4.0, 4.0])), [102.0, 102.0], atol=1e-9)
+        self.assertNotIn(0, gm.SurveySurface({"areas": [self.BESIDE]}, [0]).flights)   # (without: the outline's triangles)
+
+    def test_the_stairs_own_side_keeps_its_heights_where_the_lidar_misses_the_flight(self):
+        # (the raster level at the building's foot over a narrow flight: the user, 2026-11-23, "the narrow places can't be
+        # properly seen by the lidar sampling")
+        sh = gm.StairsHeights({"areas": [self.BESIDE]}, self.LINES, lambda x, y: np.full(len(x), 98.5))
+        self.assertIsNone(sh.outline(self.BESIDE))
+
+    def test_a_point_under_a_deck_is_not_judged(self):
+        deck = {"c": "road", "l": 1, "r": [[1.5, 4, 106.0], [3, 4, 106.0], [3, 11, 106.0], [1.5, 11, 106.0]]}
+        sh = gm.StairsHeights({"areas": [self.BESIDE, deck]}, self.LINES, self.flight_lidar)
+        self.assertEqual([q[2] for q in sh.outline(self.BESIDE)], [100.0, 100.0, 98.5, 98.5, 105.0, 102.5])
+
+    def test_a_walls_top_between_two_jumps_takes_the_stairs_heights(self):
+        # (line 9 area 5615: the foot's edge at the top's height after a jump of 6.5 m within 0.4 m, a reversed ramp)
+        ramp = {"c": "stairs", "l": 0, "r": [[0, 0, 100.0], [0, 10, 105.0], [4, 10, 105.0], [4, 0, 100.0], [3.8, 0, 105.0],
+                                             [0.2, 0, 105.0]]}
+        self.assertIsNone(gm.flight(ramp))
+        s = gm.SurveySurface({"areas": [ramp]}, [0], gm.StairsHeights({"areas": [ramp]}, [], self.flight_lidar))
+        self.assertIn(0, s.flights)
+        np.testing.assert_allclose(s.at(0, np.array([2.0, 2.0]), np.array([0.5, 9.5])), [100.25, 104.75], atol=1e-9)
+
     def test_a_point_a_hair_off_a_long_edge_takes_the_edges_height_there(self):
         # (#548: a strip 44 m long and 2.7 m across that falls 2.2 m along; a lattice point on its long edge, 1 mm
         # outside it, lies in none of its triangles. It took the nearest vertex's height, 0.75 m off at 15 m along)

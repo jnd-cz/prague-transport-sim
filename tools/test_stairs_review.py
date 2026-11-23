@@ -32,7 +32,7 @@ class Measure(unittest.TestCase):
         (r,) = rows
         self.assertEqual((r["area"], r["foot"][2], r["top"][2]), (1, 0, 3))
         self.assertTrue(r["g"].contains(R.shapely.Point(r["x"], r["y"])))
-        self.assertIn("| 9 | 2 | 28 | 1 | 1 | 16 |", R.table({"9": n}))
+        self.assertIn("| 9 | 2 | 28 | 0 | 1 | 1 | 16 |", R.table({"9": n}))
 
     def test_an_area_on_two_lines_is_one_place(self):
         _, a = R.measure(survey(FOLD))

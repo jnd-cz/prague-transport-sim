@@ -6031,6 +6031,109 @@
      "why": "IPR rises 0.21 m from the track to the platform"
     }
    ]
+  },
+  "stairs-reversed-ramp": {
+   "line": "9",
+   "at": [
+    -4107.6,
+    -1464.0
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a flight 4.5 m wide rising 6 m over 17 m, foot to the south (survey area 5615 of line 9 on main e79f44c): its long sides rise 236.0 -> 241.9 m, but the foot's edge runs at 242.3 m, the top's height, after a jump of 6.5 m within 0.4 m: a wall's top. Triangulated, the foot is tipped up into a reversed ramp, 34 m² steeper than 1:1",
+   "said": "one flight, or flights in a straight line with landings; note: there's kind of reversed ramp now",
+   "source": "the user's answer in the stairs review (reports/review/stairs-9.json, data/truth.json stairsReview), 2026-11-22, #447",
+   "sections": [
+    {
+     "name": "up the flight's middle, foot to top",
+     "from": [
+      -4107.6,
+      -1456.2
+     ],
+     "to": [
+      -4107.8,
+      -1472.4
+     ],
+     "expect": {
+      "off the chord m": 0.3
+     },
+     "why": "one even flight from 236 to 242 m; the foot's edge at 242.3 m is a wall's top (StairsHeights)"
+    }
+   ]
+  },
+  "stairs-beside-a-building": {
+   "line": "9",
+   "at": [
+    -2815.0,
+    -1389.5
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a flight 2 m wide along a building's wall, rising 222.8 -> 227.4 m over 25 m (survey area 5662 of line 9 on main e79f44c). The outline's side on the building's line carries the building's foot, level at 224.1 m, so the triangles leant across the flight: 11.5 m² steeper than 1:1",
+   "said": "one flight, or flights in a straight line with landings",
+   "source": "the user's answer in the stairs review (reports/review/stairs-9.json, data/truth.json stairsReview), 2026-11-22, #447",
+   "sections": [
+    {
+     "name": "up the flight's middle, foot to top",
+     "from": [
+      -2814.2,
+      -1401.0
+     ],
+     "to": [
+      -2815.8,
+      -1378.5
+     ],
+     "expect": {
+      "off the chord m": 0.3
+     },
+     "why": "one even flight from 222.8 to 227.4 m along the stairs' own side (StairsHeights)"
+    },
+    {
+     "name": "across the flight at y = -1390",
+     "from": [
+      -2815.7,
+      -1390.0
+     ],
+     "to": [
+      -2814.1,
+      -1390.0
+     ],
+     "expect": {
+      "sloping m": 0.5
+     },
+     "why": "steps are level across; the building's side at 224.05 m stood 1 m under the stairs' 225.1 m there"
+    }
+   ]
+  },
+  "stairs-not-there": {
+   "line": "37",
+   "at": [
+    4001.4,
+    1411.9
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a survey stairs area 1.5 m by 13 m in a sidewalk along a building (area 2169 of line 37 on main e79f44c): its west side, on the building's line, has 14 step noses down to 182.7 m, 4 m under the sidewalk; its east side the sidewalk's level, 186.4-186.9 m. IPR's raster is level at the sidewalk's height over it. Triangulated, 10 m² steeper than 1:1",
+   "said": "no stairs here; note: no visible stairs",
+   "source": "the user's answer in the stairs review (reports/review/stairs-37.json, data/truth.json stairsReview), 2026-11-22, #447",
+   "sections": [
+    {
+     "name": "along the area's middle, south to north",
+     "from": [
+      4001.4,
+      1406.5
+     ],
+     "to": [
+      4001.4,
+      1417.5
+     ],
+     "expect": {
+      "off the lidar m": 1.0,
+      "sloping m": 1.0
+     },
+     "why": "the sidewalk's level, as the raster has it and the user sees it; the noses on the building's line are not the ground's (StairsHeights)"
+    }
+   ]
   }
  },
  "openTrackReview": {
