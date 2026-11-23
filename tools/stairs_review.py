@@ -278,6 +278,8 @@ def main():
     if a.imp:
         do_import(lines, a.reviews)
         return
+    import snapshot
+    snapshot.require_current_data()  # (#835)
     t0 = time.time()
     counts, rows = load(lines)
     print(table(counts))

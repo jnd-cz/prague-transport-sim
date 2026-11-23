@@ -81,7 +81,10 @@ changed files are downloaded, or linked from the machine cache). Merging main in
 git moves only the manifests, the files stay the old ones, and a tool run there measures the old data (#447,
 2026-11-23: a ground-places comparison ran a branch on the data from before ground batch D and was rerun). Fetch both
 there before measuring, until `status` lists no file as missing or changed; a `new` file is one the manifests don't
-name, a tool's own output or an input not yet in a snapshot.
+name, a tool's own output or an input not yet in a snapshot. `status` calls a file `stale` when an earlier
+`data/MANIFEST.json` in git names it (the build before the merge) and `changed` when none does (the branch's own
+build). `headless.py`, `ground_place.py`, `stairs_review.py` and `shot.py` stop on a stale file before
+they start (#835); `TRAM_STALE_DATA=1` runs them anyway with a warning.
 
 Tools write `data/` and `raw/` files whole, via `tools/atomic.py` (`with replacing(path, "w") as fh:`),
 never in place: a file there may be a protected link into the machine cache.

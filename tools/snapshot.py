@@ -673,21 +673,71 @@ def verify(store, sid, base="main"):
     print(f"snapshot {sid} and data/MANIFEST.json: in the store, new files intact")
 
 
-def data_status():
-    if not os.path.exists(DATA_MANIFEST):
-        print("data: no MANIFEST.json")
-        return
-    man = json.load(open(DATA_MANIFEST, encoding="utf-8"))
-    diff = []
-    for f in sorted(set(man["files"]) | set(data_files())):
-        p = os.path.join(ROOT, "data", f)
+def earlier_builds(root, versions=40):
+    """{file: hashes} of the last `versions` data/MANIFEST.json in the checkout's git history."""
+    def git(*a):
+        return subprocess.run(["git", *a], cwd=root, capture_output=True, text=True, encoding="utf-8").stdout
+    seen = {}
+    for c in git("log", "--format=%H", f"-{versions}", "--", "data/MANIFEST.json").split():
+        try:
+            files = json.loads(git("show", f"{c}:data/MANIFEST.json"))["files"]
+        except ValueError:
+            continue
+        for f, m in files.items():
+            seen.setdefault(f, set()).add(m["sha256"])
+    return seen
+
+
+def data_diff(root=ROOT):
+    """data/ against the checkout's MANIFEST (#835): (kind, file), kind new, missing, changed (the branch's own
+    build) or stale (a build an earlier manifest names: git moved the manifest, the file stayed, as after a merge)."""
+    with open(os.path.join(root, "data", "MANIFEST.json"), encoding="utf-8") as fh:
+        man = json.load(fh)
+    d = os.path.join(root, "data")
+    here = sorted(f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f)) and f not in DATA_KEEP)
+    diff, earlier = [], None
+    for f in sorted(set(man["files"]) | set(here)):
+        p = os.path.join(d, f)
         m = man["files"].get(f)
         if not m:
             diff.append(("new", f))
         elif not os.path.exists(p):
             diff.append(("missing", f))
         elif os.path.getsize(p) != m["size"] or sha256(p) != m["sha256"]:
-            diff.append(("changed", f))
+            if earlier is None:
+                earlier = earlier_builds(root)
+            diff.append(("stale" if sha256(p) in earlier.get(f, ()) else "changed", f))
+    return diff
+
+
+def stale_data(root=ROOT):
+    """The files a tool must not measure on: those of an earlier build (#835). A missing file is not one: it fails where
+    it is read, and a checkout without data (CI) runs the tools' tests on mocks."""
+    if not os.path.exists(os.path.join(root, "data", "MANIFEST.json")):
+        return []
+    return [(k, f) for k, f in data_diff(root) if k == "stale"]
+
+
+def require_current_data(root=ROOT):
+    """Stop a measuring tool on data older than its commit (#835; #447 reran a 2 h comparison measured on the data
+    from before a batch). TRAM_STALE_DATA=1 runs on it with a warning."""
+    bad = stale_data(root)
+    if not bad:
+        return
+    msg = (f"{os.path.join(root, 'data')} is older than its MANIFEST.json ({len(bad)} files):\n"
+           + "".join(f"  {k:8} data/{f}\n" for k, f in bad[:12]) + (f"  … and {len(bad) - 12} more\n" if len(bad) > 12 else "")
+           + f"fetch them: python -I tools/snapshot.py data-fetch (in {root}); TRAM_STALE_DATA=1 runs on them anyway")
+    if os.environ.get("TRAM_STALE_DATA") == "1":
+        print("warning: " + msg, file=sys.stderr)
+        return
+    raise SystemExit(msg)
+
+
+def data_status():
+    if not os.path.exists(DATA_MANIFEST):
+        print("data: no MANIFEST.json")
+        return
+    diff = data_diff()
     for k, f in diff:
         print(f"{k:8} data/{f}")
     print(f"data: {len(diff)} differences to data/MANIFEST.json" + ("" if diff else ": matches"))
