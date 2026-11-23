@@ -646,6 +646,22 @@ class Older(unittest.TestCase):
         c, _ = self.hump(top=-0.4, year=2024)
         self.assertEqual(ha.archive_before_lidar([c]), 0)
 
+    def test_under_the_lidar_by_less_where_the_survey_keeps_to_the_record(self):
+        # (#539: on paved track 0.10-0.20 m under the lidar, where the survey lies within 5 cm of the record, DI sides
+        # with the lidar at 668 of 686 samples; without the survey alongside at 89 %, and the record stays)
+        for survey, kind, moved in ((0.02, 'paved', True), (0.10, 'paved', False), (None, 'paved', False),
+                                    (0.02, 'unknown', False)):
+            c, ground = self.hump(top=-0.2)   # (0.15 m under at most, s 175 to 225 more than SOURCES_EDGE under)
+            for x in c.bins:
+                x['kind'] = kind
+                x['survey'] = None if survey is None else x['archive'] + survey
+            ha.archive_before_lidar([c])
+            taken = [x for x in c.bins if x['src'] == 'lidar']
+            self.assertEqual(bool(taken), moved, (survey, kind))
+            if moved:
+                self.assertTrue(all(x['src'] == 'lidar' for x in c.bins if 177 < x['s'] < 223))
+                self.assertTrue(all(abs(x['z'] - ground(x['s']) - ha.LIDAR_OFFSET) < 1e-9 for x in taken))
+
     def test_a_track_beside_a_stretch_taken_goes_with_it(self):
         # (ground batch D, Sokolovská's junction on line 37: tracks 0.2 m under the lidar taken, the short ones beside them
         # 0.11-0.22 m under it left, their rails 11-15 cm under their neighbours' beds)

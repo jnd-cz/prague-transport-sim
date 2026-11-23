@@ -6030,6 +6030,35 @@
      "why": "IPR rises 0.21 m from the track to the platform"
     }
    ]
+  },
+  "marianske-hradby-upper-track": {
+   "line": "22",
+   "at": [
+    -1030.0,
+    919.0
+   ],
+   "reach": 30,
+   "issue": 539,
+   "what": "Mariánské hradby (lines 22 and 23, s 6686-6808 on line 22): the south (uphill) track and the north one 0.7 m apart in height on the hillside, a median between them",
+   "source": "measured 2026-11-23 on ground batch D: the archive's record of 1999 has the south track 0.20-0.36 m under IPR's 2023 lidar for 50 m, the north one on it; built, the south track lay 0.33-0.39 m under IPR between the lawn south of it and the median, both on IPR within 0.07 m. The lidar rule (height_answers.archive_before_lidar) left it: two of its samples 8 m apart, 5 m apart in their bins, made the 6.8 % grade a step of 11 %",
+   "sections": [
+    {
+     "name": "from the lawn south of the upper track across it to the median, x = -1030, 5.5 m",
+     "from": [
+      -1030.0,
+      916.0
+     ],
+     "to": [
+      -1030.0,
+      921.5
+     ],
+     "expect": {
+      "off the chord m": 0.12,
+      "largest step m": 0.2
+     },
+     "why": "IPR lies level across the track (243.14 m on the lawn, 243.01 m on the track and on the median); built, the track lay 0.33 m under it in a trough"
+    }
+   ]
   }
  },
  "openTrackReview": {
