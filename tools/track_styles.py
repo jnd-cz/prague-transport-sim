@@ -51,6 +51,7 @@ page reads with the sections. Where ground-level areas overlap at a point, the h
 one whose surface lay nearest the lidar ground, then the rank (src/terrain.js DtmSurface._hitTri): on all five lines
 the two agree at every sample (21,641, #479).
 """
+from collections import ChainMap
 import json
 import math
 from pathlib import Path
@@ -482,8 +483,10 @@ def answer_states(data, truth, survey, opens=()):
     track list) give the answer's style over STYLE_MATCH of its stretch (a junction answer: of its place), else holds,
     with what lays it there most (a rule's or the user's own count for `by`, not for a match) (#670). {truth.json
     section: [state entry]}."""
-    bare = {**truth, "grassReview": {**truth.get("grassReview", {}), "answers": []},
-            "trackSurfaceReview": {**truth.get("trackSurfaceReview", {}), "answers": []}}
+    # (the two sections without their answers over the rest, not a copy of it: the step cache keys this step by the
+    # sections of truth.json it reads, and a copy reads every one, #816)
+    bare = ChainMap({"grassReview": {**truth.get("grassReview", {}), "answers": []},
+                     "trackSurfaceReview": {**truth.get("trackSurfaceReview", {}), "answers": []}}, truth)
     without = sections(data, bare, survey, opens)
 
     def entry(i, style, s0, s1):

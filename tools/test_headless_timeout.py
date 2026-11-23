@@ -21,9 +21,9 @@ HTML = """<!doctype html><title>9</title><div id="loading" class="hidden"></div>
 const mode = location.pathname.split('/')[1];
 if (mode === 'loading') document.getElementById('loading').className = '';
 // (as the real page: Start makes a new game, after an await, #400)
-document.getElementById('btnStart').onclick = async () => {
+const start = async () => {
   await null;
-  window.traffic = {oncoming: [], ahead: [], backStops: [], cars: [], update() {}};
+  window.traffic = {oncoming: [], ahead: [], backStops: [], cars: [], focus: () => [0, 0], update() {}};
   window.camera = {position: {set() {}}};
   window.game = {
     clock: 0, tram: {s: 11221, v: 0}, route: {length: 20000, at: () => ({x: 0, y: 0})},
@@ -31,6 +31,13 @@ document.getElementById('btnStart').onclick = async () => {
     stops: mode === 'scheduled' ? [{arrived: true, sched: 1800}] : [], _atStop: () => true,
     update(h) { this.clock += h; if (mode === 'finish') this.tram.s += 100; }
   };
+};
+document.getElementById('btnStart').onclick = start;
+// (the benches start their run as the real page's window.startRun does, src/run.js, #226)
+window.startRun = async () => {
+  await start();
+  const { game, traffic } = window, pilot = {input: {}, step() {}};
+  return { game, traffic, pilot, step(h) { game.update(h); traffic.update(h); } };
 };
 </script>"""
 
