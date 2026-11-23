@@ -92,6 +92,9 @@ materials are this model's own.
 - **Spawn weights:** illustrative, not measured.
 - **Status:** A02, appearance accepted by the user 2026-10-26; the final device review is open.
 - **Source:** "original parametric study assets prepared offline for this project". The recipe is `tools/prepare-traffic-assets.mjs` (Node with three r160).
+- **In the repo** since #250 (2026-11-23): the ten GLBs unchanged as `assets/cars/<type>-near.glb` and `-far.glb`, AGPL-3.0;
+  their sizes in `src/carTypes.js`, checked against the files by `tools/test_cartypes.py`. W above is over the mirrors;
+  over the tyres, which stand 6.5 cm out from the sills on every type, it is 1.89, 1.97, 1.97, 2.21 and 2.43 m.
 
 ### Pedestrians (`dist/traffic/assets/`)
 
@@ -199,7 +202,7 @@ simulation's state (#228).
 | hybrid T3: GLB, textures, `rig.json` | CC BY-NC 4.0 (combined) | copy, adapt and share; **non-commercial only** | both credits, licence links, the modification notice; accepted (Q1) |
 | SimonStrikesBack's T3 (Sketchfab `2c08e2e3…`): `tatra_t3-SimonStrikesBack/`, `tatra-t3-simplified/` | CC BY 4.0 | any use, including commercial | the credit, the licence link, a note of the changes |
 | conflig's T3 (Sketchfab `76aa08d7…`), already `assets/t3/` | CC BY-NC 4.0 | non-commercial | in `ASSETS.md` |
-| 13 car, van, truck and person GLBs, `catalog.json`; the older made-up furniture (`assets.js`) | the project's own work, made by agents (the catalog: "original parametric study assets … for this project") | **AGPL-3.0**, like the code (Q3) | an `ASSETS.md` entry when it enters the repo |
+| 13 car, van, truck and person GLBs, `catalog.json`; the older made-up furniture (`assets.js`) | the project's own work, made by agents (the catalog: "original parametric study assets … for this project") | **AGPL-3.0**, like the code (Q3; the cars again on 2026-11-23, #250) | an `ASSETS.md` entry when it enters the repo (the people: `assets/people/`, #251; the cars: `assets/cars/`, #250) |
 | lab code: presentation, passenger core, `t3-controller.js`, furniture factories, the patch | the project's own work, no licence stated | AGPL-3.0 once in the repo | — |
 | converted IPR furniture GLBs | **none stated.** Neither IPR's archive nor its pages (iprpraha.cz/mobiliar, /stranka/3413/3d-vykresy-mobiliare) give terms. The first names the design's author, Olgoj Chorchoj (with Aleš Kachlík), and says the City of Prague holds the licence | unknown: the user asks IPR (Q2) | references only |
 | procedural furniture and shelters after IPR's drawings | own code; the shapes follow IPR's designs | unknown for the shapes (Q2) | development only until IPR answers |
