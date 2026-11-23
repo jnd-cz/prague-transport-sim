@@ -45,6 +45,7 @@ class Board(unittest.TestCase):
         self.assertIn("tools/build_line.py", tools)
         self.assertEqual(board.rebuilds(["tools/heavy.py", "tools/baseline_store.py", "tools/board.py",
                                          "tools/stepcache.py", "tools/sysinfo.py"], tools), [])
+        self.assertNotIn("tools/snapshot.py", tools)  # (imported by baseline_store.py alone, for the store)
 
     def test_rebuilds_by_tool_manifest_or_snapshot_not_by_facts(self):
         tools = {"tools/build_line.py"}

@@ -110,6 +110,8 @@ def build_tools(tools=TOOLS):
         if n in seen or not os.path.exists(p):
             continue
         seen.add(n)
+        if f"tools/{n}" in NOT_OUTPUT:  # (nor what they import for themselves: baseline_store.py the store's snapshot.py)
+            continue
         try:
             tree = ast.parse(open(p, encoding="utf-8").read(), p)
         except SyntaxError:
