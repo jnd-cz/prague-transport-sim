@@ -66,9 +66,6 @@ KINDS = [
      "test_electric, test_drives", "the geometry checks"),
     ("tool", ("tools/*",), "the changed tools' tests (tools/test_<tool>.py); the whole suite before the PR is ready", ""),
 ]
-# (tools a rebuild imports that shape no step's output: the queue's turn and the step cache; they change a step's key,
-# so the next rebuild runs it once again with the same output, #817)
-NOT_OUTPUT = ("tools/heavy.py", "tools/baseline_store.py", "tools/sysinfo.py", "tools/stepcache.py")
 TRAM = ("src/tram.js", "src/tr37.js", "src/electric.js", "src/autopilot.js", "src/consist.js", "tools/autopilot.js")
 
 
@@ -82,7 +79,7 @@ def lines(root=ROOT):
 
 
 def world_tools(root=ROOT):
-    """The tools a rebuild runs, and what they import (board.build_tools)."""
+    """The tools a rebuild runs, and what they import, but the queue's and the cache's (board.build_tools)."""
     import board
     return board.build_tools(os.path.join(root, "tools"))
 
@@ -93,7 +90,7 @@ def kinds(paths, build=None):
     out = {}
     for p in sorted(set(paths)):
         got = [k for k, pats, *_ in KINDS[:-1] if any(fnmatch.fnmatch(p, pat) for pat in pats)]
-        if p in build and p not in NOT_OUTPUT and "ground rule" not in got:
+        if p in build and "ground rule" not in got:
             got.append("world")
         if not got and p.startswith("tools/") and not p.startswith("tools/bench/"):
             got = ["tool"]
