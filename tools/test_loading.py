@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import threading
+import zlib
 
 import brotli
 from playwright.sync_api import sync_playwright
@@ -25,6 +26,7 @@ MANIFEST = json.dumps({"files": {"packed.bin": {"size": len(BODY), "sha256": "0"
 release = threading.Event()
 NAME = "loading.test"  # plain http at a name that is not this machine: not a secure context
 LINE_FILE = "**/data/line23.json"
+CRC_TEXT = '{"line":"9","stops":["Anděl","Újezd"]}' * 1000  # (UTF-8 past ASCII, and longer than the CRC's table)
 SHOT = os.environ.get("TRAM_LOADING_SHOT")  # (a picture of the https message goes here, for a PR)
 
 
@@ -117,6 +119,17 @@ def messages(pw, check):
         check("Czech: the file", s["title"] == "Nelze spustit" and "Soubor data/line23.json nejde přečíst" in s["message"] and "Otevřít přes https" in s["message"])
         s = stopped({"**/src/report.js": refused}, locale="cs-CZ")
         check("Czech: the module", s["title"] == "Nelze spustit" and "Kód hry se nenačetl" in s["message"])
+        if os.path.exists(os.path.join(ROOT, "data/line23.network.json")):
+            def other_build(route):  # (the network file as another build left it, #702)
+                resp = route.fetch()
+                d = json.loads(resp.body())
+                d.setdefault("provenance", {})["build"] = "deadbeef"
+                route.fulfill(response=resp, body=json.dumps(d))
+            s = stopped({"**/data/line23.network.json": other_build})
+            check("a network file of another build stops the load", s["title"] == "Cannot start" and "data/line23.network.json is of build deadbeef" in s["message"])
+            check("and names the command that rebuilds the line", "python -P -E tools/rebuild.py 23" in s["message"])
+        else:
+            print("skip a network file of another build: needs data/line23.* (python -I tools/snapshot.py data-fetch)")
         if os.path.exists(os.path.join(ROOT, "data/line23.json")):
             page = b.new_page()
             errors = []
@@ -185,6 +198,23 @@ def main():
         check("the bar has a number before the first byte", got["waiting"] == 0)
         check("and when no file arrived", abs(got["nothing"] - 0.05) < 1e-9)
         check("a browser's notice stops nothing", not got["failed"])
+        # (the line's build ID, #702: the line file's CRC-32 as tools/build_id.py computes it, and the set held to it)
+        got = page.evaluate("""async (body) => {
+          const { crc32, checkBuild } = await import('/src/buildId.js');
+          const bytes = new TextEncoder().encode(body), id = crc32(bytes);
+          const of = (b) => ({ provenance: b === undefined ? {} : { build: b } });
+          const tried = (files) => { try { return checkBuild('9', id, { 'line9.json': {}, ...files }); } catch (e) { return e.message; } };
+          return { id, empty: crc32(new Uint8Array(0)), none: tried({ 'line9.network.json': of(), 'line9.geo.json': {} }),
+                   same: tried({ 'line9.network.json': of(id), 'line9.ground.json': of(id) }),
+                   other: tried({ 'line9.network.json': of('deadbeef'), 'line9.ground.json': of(id) }),
+                   missing: tried({ 'line9.network.json': of(), 'line9.ground.json': of(id) }) };
+        }""", CRC_TEXT)
+        check("the page's CRC-32 is zlib's", got["id"] == f"{zlib.crc32(CRC_TEXT.encode()):08x}" and got["empty"] == "00000000")
+        check("a set of no build IDs loads (built before #702)", got["none"] == "none")
+        check("a set of the line file's ID loads", got["same"] == "same")
+        check("a file of another build stops it", got["other"] == "line 9: data/line9.network.json is of build deadbeef, not "
+              f"data/line9.json's {got['id']}: python -P -E tools/rebuild.py 9")
+        check("so does one with none beside one with it", got["missing"].startswith("line 9: data/line9.network.json carries no build, not"))
         b.close()
         messages(p, check)
     server.shutdown()

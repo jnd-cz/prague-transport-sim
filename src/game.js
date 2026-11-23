@@ -1634,6 +1634,17 @@ export class Game {
   }
 
   // ------------------------------------------------------------------ visuals
+  // what the steps move, for the page to draw between the last two (src/between.js): the cross streets' cars at the
+  // signalled crossings, the late passengers running for the doors, the obstacles, the driver with the switch iron
+  movers() {
+    const out = [];
+    for (const sig of this.signals) for (const c of sig.cars || []) out.push(c.mesh);
+    for (const r of this.runners) out.push(r.mesh);
+    for (const ob of this.obstacles) if (ob.state !== 'gone') out.push(ob.mesh);
+    if (this.action?.driver) out.push(this.action.driver);
+    return out;
+  }
+
   updateVisuals() {
     // crowd at the next stop platform
     const st = this.stops[this.nextStop];

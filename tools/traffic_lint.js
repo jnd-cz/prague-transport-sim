@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Dev tool: run the real game and traffic headless along the line (the autopilot drives, fixed
-// time step, the camera follows the tram as in play) and watch what the player would see. Every
-// `sample` seconds the pose of each visible car, walker, AI tram and our tram is recorded:
+// Dev tool: watch what the player would see while the autopilot drives the whole line headless with the real traffic
+// (a watcher on the u3 drive, tools/bench/u3.js, fixed time step; #722). Every `sample` seconds the pose of each
+// visible car, walker, AI tram and our tram is recorded:
 //   slide  - a car or walker moving sideways against its heading (wrong path, lane jump)
 //   jump   - a visible car or walker that teleports between two samples
 //   overlap- two vehicles intersecting (car/car, car/tram, tram/tram), once per episode
 //   walker - a walker inside a vehicle
 // Used by tools/lint.js ({ traffic: true }); returns checks in the same shape.
-import { Autopilot } from '../src/autopilot.js';
 import { CAR_PITCH } from '../src/tram.js';
-import { stuckScene } from './bench/stuck.js';
-import { startShift } from './bench/shift.js';
 
 const CAR = [4.3, 1.8], TRAM = [14.0, 2.5];
 const TOP = 12;
@@ -77,36 +74,18 @@ function snapshot(g, tr) {
   return out;
 }
 
-// stopAt: end the run when our tram reaches this route s (a replay of the moment, ?seed=N&at=S in src/main.js)
-export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 / 30, maxT = 7200, seed = 22, stopAt = Infinity, progress = () => {} } = {}) {
-  const $ = (id) => document.getElementById(id);
-  window.runSeed = seed; // the run's seeded stream (src/random.js): the same run every time; cleared below
-  $('menu').classList.remove('hidden');
-  $('selStop').value = String(from);
-  $('selStop').dispatchEvent(new Event('change'));
-  // nothing from the real clock or weather: the first trip of the day, autumn, dry, default set
-  $('selTrip').value = '0';
-  $('optTemp').value = 'autumn';
-  $('optWeather').value = 'dry';
-  $('optCars').value = 'auto';
-  $('optObst').value = 'off';
-  $('optAuto').checked = false;
-  window.headless = true; // the page's frame loop must not step the game between our chunks
-  const g = await startShift(), tr = window.traffic;
-  g.audio.setMuted(true);
-  const ap = new Autopilot();
+// The traffic check as a watcher on a whole-line drive (tools/bench/u3.js run, opts.also; #722, the user's "agree" on
+// #708): it rides on the one drive of a line and seed that u3, redruns and stops share, so the tier drives each line
+// and seed once. It only reads. Every `sample` s of game time it records what the player would see (snapshot).
+export function trafficWatch(g, tr, { sample = 0.2, dt = 1 / 30 } = {}) {
   const slides = [], jumps = [], overlaps = [], hits = [], knobs = [], redRuns = [];
   const lastS = new Map(); // oncoming tram -> its position at the previous step
   let heat = null; // last heating setting: saloon / cab / flap, to count the autopilot's knob changes
   const prev = new Map(), open = new Map(); // id -> last sample; pair -> open overlap episode
   let T = 0, nextSample = 0, samples = 0, seenVeh = 0, seenWalk = 0;
-  const camera = { position: { x: 0, z: 0 } };
   const step = sample;
-  try {
-  while (T < maxT && g.nextStop < until && !g.finished && g.tram.s < stopAt) {
-    for (let k = 0; k < 600 && T < maxT && !g.finished && g.tram.s < stopAt; k++) {
-      ap.step(g, dt);
-      g.update(dt, ap.input);
+  return { before: () => null, after() {
+      T += dt;
       // oncoming trams crossing a junction's stop line on red (B10: they share the straight phase)
       for (const t of tr.oncoming) {
         const s0 = lastS.get(t);
@@ -125,12 +104,8 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
       const c = g.climate, h = c && `${c.saloon}/${c.cab}/${c.flap}`;
       if (heat !== null && h !== heat) { const p = g.route.at(g.tram.s); knobs.push({ kind: 'heating', x: p.x, y: p.y, mag: 1, s: Math.round(g.tram.s), info: `${heat} → ${h} at ${Math.round(T)} s` }); }
       heat = h;
-      const p = g.route.at(g.tram.s);
-      camera.position.x = p.x; camera.position.z = -p.y;
-      tr.update(dt, camera);
-      T += dt;
       window.trafficWatch?.(g, tr, T); // (a dev probe of one moment: the cars around a stuck scene)
-      if (T < nextSample || stopAt !== Infinity) continue; // (a replay: the samples only read, they are skipped)
+      if (T < nextSample) return;
       nextSample = T + step;
       samples++;
       const snap = snapshot(g, tr);
@@ -182,30 +157,42 @@ export async function trafficRun({ from = 0, until = 999, sample = 0.2, dt = 1 /
         break;
       }
       for (const k of [...open.keys()]) if (!live.has(k)) open.delete(k);
-    }
-    progress(`traffic run: ${Math.round(T)} s, stop ${g.nextStop}`);
-    await new Promise((r) => setTimeout(r, 0));
-  }
-  } finally { window.headless = false; delete window.runSeed; }
-  const pick = (rule, items, of) => {
-    const byKind = {};
-    for (const it of items) byKind[it.kind] = (byKind[it.kind] || 0) + 1;
-    const byState = {};
-    for (const it of items) if (it.states) byState[it.states] = (byState[it.states] || 0) + 1;
-    return { rule, count: items.length, of, kinds: byKind, ...(Object.keys(byState).length ? { states: byState } : {}), places: [...items].sort((a, b) => b.mag - a.mag).slice(0, TOP), ...placesAt(items) };
-  };
-  const minutes = T / 60;
-  return {
-    stats: { simSeconds: Math.round(T), samples, finished: g.finished, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, junctionCircles: tr.junctionCircles || 0, recoveredCycles: g.trafficCycles || [], carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
-      // (a run that did not finish: what held the tram at the end, as u3 and redruns report it)
-      ...(g.finished || g.nextStop >= until ? {} : { stuckScene: stuckScene(g, tr, ap) }) },
-    checks: {
-      slide: pick('traffic-no-sideways-motion', slides, samples),
-      jump: pick('traffic-no-teleport', jumps, samples),
-      overlap: pick('traffic-no-overlap', overlaps, Math.round(minutes)),
-      walkerHit: pick('traffic-walkers-clear-of-vehicles', hits, Math.round(minutes)),
-      heatingKnobs: pick('autopilot-calm-heating', knobs, Math.round(minutes)),
-      redRuns: pick('trams-obey-junction-signals', redRuns, Math.round(minutes)),
+    },
+    // stuck: where the drive's stuck watch stopped it (null: it got through), scene: what held the tram then
+    result(seed, stuck, scene) {
+      const pick = (rule, items, of) => {
+        const byKind = {};
+        for (const it of items) byKind[it.kind] = (byKind[it.kind] || 0) + 1;
+        const byState = {};
+        for (const it of items) if (it.states) byState[it.states] = (byState[it.states] || 0) + 1;
+        return { rule, count: items.length, of, kinds: byKind, ...(Object.keys(byState).length ? { states: byState } : {}), places: [...items].sort((a, b) => b.mag - a.mag).slice(0, TOP), ...placesAt(items) };
+      };
+      const minutes = T / 60;
+      return {
+        stats: { simSeconds: Math.round(T), samples, finished: stuck === null, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, junctionCircles: tr.junctionCircles || 0, recoveredCycles: g.trafficCycles || [], carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
+          // (a run that did not get through: what held the tram at the end, as u3 and redruns report it)
+          ...(stuck === null ? {} : { stuck, stuckScene: scene }) },
+        checks: {
+          slide: pick('traffic-no-sideways-motion', slides, samples),
+          jump: pick('traffic-no-teleport', jumps, samples),
+          overlap: pick('traffic-no-overlap', overlaps, Math.round(minutes)),
+          walkerHit: pick('traffic-walkers-clear-of-vehicles', hits, Math.round(minutes)),
+          heatingKnobs: pick('autopilot-calm-heating', knobs, Math.round(minutes)),
+          redRuns: pick('trams-obey-junction-signals', redRuns, Math.round(minutes)),
+        },
+      };
     },
   };
+}
+
+// The traffic check alone: the u3 drive (trip 40, obstacles normal, autumn, dry) with this watcher only, so its counts
+// are those it reports riding on the shared drive. Before #722 it drove its own run: trip 0, no obstacles.
+// stopAt: end the drive when our tram reaches this route s (a replay of the moment, ?seed=N&at=S in src/main.js; it
+// watches nothing then); progress: called once per chunk of steps with a line to show.
+export async function trafficRun({ seed = 22, stopAt = Infinity, progress = () => {} } = {}) {
+  const { run } = await import('./bench/u3.js');
+  try {
+    const r = await run(seed, { also: stopAt === Infinity ? [trafficWatch] : [], stopAt, progress });
+    return r.also[0] ?? r;
+  } finally { window.headless = false; delete window.runSeed; }
 }

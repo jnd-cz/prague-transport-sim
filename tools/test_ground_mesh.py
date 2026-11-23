@@ -37,6 +37,43 @@ class File(unittest.TestCase):
         self.assertEqual(got, want)
         self.assertEqual({c: len(t) for c, t in by.items()}, {"terrain": 1, "survey": 2, "bed": 0, "plot": 1, "wall": 0})
 
+    def test_the_round_trip_compares_the_triangles_and_their_names(self):
+        """#702: the file decodes to the built mesh, else round_trip names the difference. Counting alone read False
+        where two vertices stand at one position (once in the file) and True for a wrong triangle with the right counts."""
+        V = mm([300000, 0, 200000], [306000, 0, 200100], [306000, -1000, 199900], [300000, -1000, 200000],
+               [312000, 0, 200300], [312000, -1000, 200200], [306000, 0, 200100])  # (the last: the second at one position)
+        F = np.array([[0, 1, 2], [0, 2, 3], [6, 4, 5], [1, 5, 2]])
+        built = {"V": V, "F": F, "cls": np.array([0, 1, 1, 0]), "draw": np.array(["grass", "road", "sidewalk", ""], dtype=object),
+                 "area": np.array(["", "road", "sidewalk", ""], dtype=object)}
+        blob, layout = gm.encode_tiles(V, F, built["cls"], built["draw"], built["area"])
+        self.assertIsNone(gm.round_trip(built, blob, layout))
+        self.assertIsNone(gm.round_trip({**built, "F": F[:, [1, 2, 0]]}, blob, layout))  # (from another corner: the same)
+        wrong = gm.round_trip({**built, "F": F[:, [0, 2, 1]]}, blob, layout)  # (turned over: the same counts)
+        self.assertRegex(wrong, r"^terrain: a triangle decoded as .* 2 differ$")
+        moved = V.copy()
+        moved[3, 2] += 1
+        self.assertRegex(gm.round_trip({**built, "V": moved}, blob, layout), r"^vertices: the \dth position decoded as \[300000, -1000, 200000\]")
+        self.assertRegex(gm.round_trip({**built, "draw": np.array(["grass", "road", "road", ""], dtype=object)}, blob, layout),
+                         r"^survey: a triangle decoded as .*'sidewalk'.*'road'")
+        self.assertEqual(gm.round_trip({**built, "cls": np.array([0, 1, 1, 1])}, blob, layout), "terrain: 2 triangles decoded, 1 built")
+
+    def test_a_file_that_does_not_decode_to_the_mesh_is_not_written(self):
+        import tempfile
+        root = tempfile.mkdtemp(prefix="test_ground_mesh_")
+        os.makedirs(os.path.join(root, "data"))
+        V = mm([0, 0, 200000], [1000, 0, 200100], [1000, -1000, 199900])
+        built = {"V": V, "F": np.array([[0, 1, 2]]), "cls": np.array([0])}
+        keep = gm.ROOT, gm.round_trip
+        gm.ROOT, gm.round_trip = root, lambda *a: "vertices: 2 decoded, 3 built"
+        try:
+            with self.assertRaisesRegex(SystemExit, "line t: the ground file does not decode to the built mesh: vertices"):
+                gm.write("t", built, {})
+            self.assertEqual(os.listdir(os.path.join(root, "data")), [])
+        finally:
+            gm.ROOT, gm.round_trip = keep
+            import shutil
+            shutil.rmtree(root, True)
+
     def test_the_raster_error_is_measured_on_request(self):
         # (#704: a plain build's report says it was not measured; --error measures it)
         asked = []
@@ -377,6 +414,26 @@ class Walls(unittest.TestCase):
         self.assertEqual(np.round(zf, 2).tolist(), [205.3, 205.3, 205.3, 205.3])
         zf, _, _ = gm.weld(cx, cy, zc, prio, kind, apart=np.array([True, True, False, False]))
         self.assertEqual(np.round(zf, 2).tolist(), [208.5, 208.5, 205.3, 205.3])
+
+    def test_a_steps_walls_do_not_follow_the_order_of_its_triangles(self):
+        """#738: the two sides of a step's edge were taken in the order of their triangles, which follows the faces'
+        noding: a line added elsewhere in the tile turned the order and the wall's quad took its other split."""
+        # (two squares side by side, the right one a step higher at both corners of the edge between them)
+        V = mm([0, 0, 200000], [1000, 0, 200000], [1000, 1000, 200000], [0, 1000, 200000],
+               [1000, 0, 200300], [2000, 0, 200300], [2000, 1000, 200300], [1000, 1000, 200500])
+        F = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]])
+        def canon(W):  # (each wall by its corners in its winding, from its least one)
+            out = []
+            for w in W.tolist():
+                c = [tuple(V[i].tolist()) for i in w]
+                out.append(min(tuple(c[k:] + c[:k]) for k in range(3)))
+            return sorted(out)
+        walls = gm.step_walls(V, F)
+        self.assertEqual(len(walls), 2)
+        for order in ([0, 1, 2, 3], [2, 3, 0, 1], [3, 1, 2, 0]):
+            for k in range(3):  # (and each triangle from another corner, its winding kept)
+                G = np.array([np.roll(f, -(k * (i + 1)) % 3) for i, f in enumerate(F[order])])
+                self.assertEqual(canon(gm.step_walls(V, G)), canon(walls), (order, k))
 
     def test_step_faces_on_a_wall_line(self):
         V = np.array([[0, 0, 0], [1000, 0, 0], [1000, 0, 3000], [0, 5000, 0], [1000, 5000, 0], [1000, 5000, 2000]])
@@ -1000,6 +1057,27 @@ class Border(unittest.TestCase):
 
 
 class Faces(unittest.TestCase):
+    def test_distant_line_keeps_the_diagonal_and_height_of_a_lattice_face(self):
+        # A 5 m cell with four heights like the lidar green on line 23. Two entries per tree node reproduce
+        # the changed order of a real tile's spatial query with only one line outside this cell.
+        a, b, c, d = (5, 5), (10, 5), (10, 10), (5, 10)
+        sides = [shapely.LineString(edge) for edge in [(c, b), (b, a), (d, a), (c, d)]]
+        heights = {a: 207.07, b: 209.15, c: 212.81, d: 213.63}
+        centre = shapely.Point(7.5, 7.5)
+
+        def diagonal(extra):
+            lines = np.asarray(sides + extra, dtype=object)
+            tree = shapely.STRtree(lines, node_capacity=2)
+            faces = gm.tile_faces((0, 0, 40, 40), tree, lines, None, None)
+            cell = next(face for face in faces if face.contains(centre))
+            first, second = shapely.get_parts(shapely.constrained_delaunay_triangles(cell))
+            return frozenset(first.intersection(second).coords)
+
+        before = diagonal([])
+        after = diagonal([shapely.LineString([(1, 11), (2, 12)])])
+        self.assertEqual(sum(heights[p] for p in before) / 2, sum(heights[p] for p in after) / 2)
+        self.assertEqual(before, after)
+
     def test_neighbouring_squares_share_the_border_vertices(self):
         lines = np.asarray([shapely.box(0.3, 0.3, 1.7, 0.9).boundary, shapely.LineString([(0.1, 0.5), (1.9, 0.45)])], dtype=object)
         tree = shapely.STRtree(lines)
