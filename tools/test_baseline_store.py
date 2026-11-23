@@ -559,14 +559,17 @@ class Watch(unittest.TestCase):
         self.wait_for(lambda: not baseline_store.alive(kid), 5)
 
     def test_a_job_at_work_within_its_limits_runs_to_its_end_and_is_recorded(self):
-        # (work and pauses: a look's process reads wait for the GIL, ~5 ms each, behind a main thread that never pauses)
-        p = self.watched("fine", "H.RECORD, H.IDLE, H.IDLE_CPU = 0.0, 1.0, 0.1\nshare = {'gb': 1, 'cores': 1}\n"
-                                 "def body():\n    t = time.time()\n"
-                                 "    while time.time() - t < 2: sum(range(99999)); time.sleep(0.005)\n")
-        self.assertEqual(p.wait(20), 0)
+        # (the work in a child, which the watch counts as the job's, and the main thread waiting: the watch's looks
+        # never wait for the GIL. The idle limit at 5 % of a core, the real one 0.3 %: the job ended as idle at 10 %
+        # with its work and pauses in one thread on a busy machine, 0 of 5 pass on two cores beside 4 busy, #829)
+        p = self.watched("fine", "H.RECORD, H.IDLE, H.IDLE_CPU = 0.0, 2.0, 0.1\nshare = {'gb': 1, 'cores': 1}\n"
+                                 "def body():\n    subprocess.run([sys.executable, '-I', '-c', "
+                                 "'import time\\nt = time.time()\\nwhile time.time() - t < 3: pass'], check=True)\n")
+        rc = p.wait(30)
+        self.assertEqual(rc, 0, p.stderr.read())  # (the watch's reason when it ended the job)
         rec, = baseline_store.history()
         self.assertEqual((rec["what"], rec["kind"], rec["rc"], rec["ended"]), ("fine", "-c", 0, None))
-        self.assertGreater(rec["wall"], 1.9)
+        self.assertGreater(rec["wall"], 2.9)
         self.assertGreater(rec["gb"], 0)
 
     @unittest.skipUnless(os.name == "nt", "a Job Object: Windows")
