@@ -88,7 +88,7 @@ materials are this model's own.
 - **Files:** near GLBs are 140–144 kB, far ones 33–35 kB, made by `THREE.GLTFExporter` with no textures.
 - **Near:** wheel and steering nodes, and materials for paint, brake, headlamp, both indicators and the plate. The plate is a 512 × 128 canvas per close car.
 - **Far:** one primitive with the colours baked in, no moving parts.
-- **Detail switch:** in the lab, near → far beyond 55 m and back inside 43 m. In the handoff, at most 8 near cars, within 65 m (out at 73 m). The far cars are instanced. The game (#250, `src/cars.js`) takes the handoff's.
+- **Detail switch:** in the lab, near → far beyond 55 m and back inside 43 m. In the handoff, at most 8 near cars, within 65 m (out at 73 m); each near car was its own copy (about 14 draw calls), the far cars instanced. The game (#250, `src/cars.js`) takes the handoff's distances from the camera, but every car in its view within them is near (64 at most): near cars are instanced too, so one costs no draw call, about 2,000 triangles more than the far model.
 - **Spawn weights:** illustrative, not measured.
 - **Status:** A02, appearance accepted by the user 2026-10-26; the final device review is open.
 - **Source:** "original parametric study assets prepared offline for this project". The recipe is `tools/prepare-traffic-assets.mjs` (Node with three r160).

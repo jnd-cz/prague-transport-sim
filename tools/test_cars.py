@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The street vehicles as drawn (#250, #723): python -P -E tools/test_cars.py [--line 17] [--synthetic]
 (its own server on a free port). Part 1, without world data: the five types' models (src/cars.js, assets/cars/) load;
-on synthetic box cars (src/models.js makeCar, sized by fitCar) the nearest are drawn as the near model (at most 8, in
-within 65 m, out beyond 73 m) and the rest as the far one, in 21 draw calls however many; the box cars are on the hidden
+on synthetic box cars (src/models.js makeCar, sized by fitCar) every one in the camera's view within 65 m (out beyond
+73 m) is drawn as the near model, the nearest 64 at most, and the rest as the far one, in 21 draw calls however many; a
+queue of 40 ahead all near, 6 behind the camera far; turned around the other way, and back with the same plate cells,
+no plate drawn again; the box cars are on the hidden
 layer; each car's paint is its box car's colour, near and far; its lamps by its state (the indicator it shows, the brake
 lamps while it slows or stands, none on a parked car); its front wheels steered to the curve it drives (atan of the
 wheelbase by the curvature, to its left in a left turn), the rear ones not, the wheels on the ground and rolled by the
@@ -58,8 +60,6 @@ SYNTHETIC = """async () => {
     hex(k.far, 0) === made[5 + i].children[0].material.color.getHexString()]);
   out.farPaintVertices = [...cars.types.values()].map((k) => k.far.geometry.attributes.paint.array.reduce((s, v) => s + v, 0));
   out.cells = [cars.cell.size, new Set(cars.cell.values()).size];
-  // the 20 in reach: 8 near, the rest far; the first five beyond 65 m
-  look(0, -100); sync(); out.cap = { ...cars.stats, cells: cars.cell.size };
   // near until 73 m, in again within 65 m (the hatchback at x -6.8, z 0)
   const near = () => cars.near.has('t1');
   look(0, 10); sync(); const a = near();
@@ -104,6 +104,33 @@ SYNTHETIC = """async () => {
   out.wheelFades = Array.from(cars.wheels.geometry.attributes.instanceFade.array.slice(0, cars.wheels.count)).filter((f) => Math.abs(f - 0.4) < 1e-6).length;
   const before = cars.stats.cars;
   made[1].userData.alpha = 0; sync(); out.gone = [sedan.body.count, before - cars.stats.cars];
+  // a queue (another traffic: the cars above gone, their cells freed): 40 in four lanes 10 to 64 m ahead of the camera,
+  // 6 behind it 8 and 14 m away
+  const view2 = { cars: new Map() };
+  const put = (i, x, z) => view2.cars.set({ id: 1000 + i }, box(100 + i, CAR_TYPES[i % 5], x, z));
+  for (let k = 0; k < 40; k++) put(k, (k % 4 - 1.5) * 3.5, -10 - 6 * Math.floor(k / 4));
+  for (let k = 0; k < 6; k++) put(40 + k, (k % 3 - 1) * 3.5, 8 + 6 * Math.floor(k / 3));
+  const key = (i) => `t${1000 + i}`, ids = (a, b) => Array.from({ length: b - a }, (_, i) => a + i);
+  let plates = 0;
+  const draw = cars._plate.bind(cars);
+  cars._plate = (c, t) => { plates++; draw(c, t); };
+  const turn = (y) => { cam.position.set(0, 1.6, 0); cam.rotation.set(0, y, 0); cam.updateMatrixWorld(); game.clock += 1 / 30; cars.sync(cam, view2, game); };
+  turn(0);
+  out.queue = { ...cars.stats, cells: cars.cell.size, behindNear: ids(40, 46).filter((i) => cars.near.has(key(i))).length, plates };
+  const cellsOf = () => ids(0, 40).map((i) => cars.cell.get(key(i)));
+  const kept = cellsOf();
+  let had = plates;
+  turn(Math.PI);
+  out.turned = { ...cars.stats, behindNear: ids(40, 46).filter((i) => cars.near.has(key(i))).length, plates: plates - had };
+  had = plates;
+  turn(0);
+  out.back = { ...cars.stats, plates: plates - had, sameCells: cellsOf().every((c, i) => c === kept[i]) };
+  // the bound: 30 more in two outer lanes 14 to 62 m ahead, 70 in view: the nearest 64 near, a cell each (the cells of
+  // the 6 behind taken back), still 21 draw calls
+  for (let k = 0; k < 30; k++) put(46 + k, (k % 2 ? 1 : -1) * 8.75, -14 - 3.4 * Math.floor(k / 2));
+  turn(0);
+  out.bound = { ...cars.stats, cells: cars.cell.size, distinct: new Set([...cars.near].map((k) => cars.cell.get(k))).size };
+  r.info.reset(); r.render(scene, cam); out.bound.calls = r.info.render.calls; out.bound.triangles = r.info.render.triangles;
   return out;
 }"""
 
@@ -161,7 +188,15 @@ def main():
                 "the paint: the box cars' colours, near and far": all(a and b for a, b in s["paint"]),
                 "the far models' paint found": all(n > 100 for n in s["farPaintVertices"]),
                 "a plate cell each": s["cells"] == [5, 5],
-                "at most 8 near (17 far), a cell each": (s["cap"]["near"], s["cap"]["far"], s["cap"]["cells"]) == (8, 17, 8),
+                "a queue of 40 in view near, the 6 behind the camera far, a plate each": (s["queue"]["near"], s["queue"]["far"],
+                    s["queue"]["behindNear"], s["queue"]["cells"], s["queue"]["plates"]) == (40, 6, 0, 40, 40),
+                "turned around: the 6 near, the queue far": (s["turned"]["near"], s["turned"]["far"], s["turned"]["behindNear"],
+                    s["turned"]["plates"]) == (6, 40, 6, 6),
+                "turned back: the queue near with its plates' cells, none drawn again": (s["back"]["near"], s["back"]["plates"],
+                    s["back"]["sameCells"]) == (40, 0, True),
+                f"70 in view: the nearest {s['nearMax']} near, a cell each, 21 draw calls": s["nearMax"] == 64
+                and (s["bound"]["near"], s["bound"]["far"], s["bound"]["cells"], s["bound"]["distinct"], s["bound"]["calls"])
+                == (64, 12, 64, 64, 21),
                 "near at 12 m, kept to 73 m, far beyond, near again within 65 m": s["hysteresis"] == [True, True, False, False, True],
                 # (the hatchback's lamps, then the parked one's: [head, brake, left, right])
                 "indicating left, daytime headlamps; a parked car unlit": sorted(round(x, 3) for x in s["lampsIndicating"])
@@ -194,7 +229,7 @@ def main():
                         fails.append(f"game: {gm['shown']} cars in view, {gm['cars']} drawn as models")
                     if gm["hidden"] != gm["shown"]:
                         fails.append(f"game: {gm['shown'] - gm['hidden']} box cars not on the hidden layer")
-                    if gm["near"] > 8:
+                    if gm["near"] > 64:
                         fails.append(f"game: {gm['near']} near cars")
             elif not args.synthetic:
                 print(f"(part 2 skipped: no data/line{args.line}.json; python -I tools/snapshot.py data-fetch)")
@@ -207,8 +242,8 @@ def main():
     print(json.dumps(r))
     if fails:
         sys.exit("; ".join(fails))
-    print("street vehicles: five types near and far (8, 65 / 73 m) in 21 draw calls, paint, lamps, steering, roll, fade, "
-          "plates, box cars hidden: pass")
+    print("street vehicles: five types near (in view within 65 / 73 m, 64 at most) and far in 21 draw calls, paint, "
+          "lamps, steering, roll, fade, plates kept, box cars hidden: pass")
 
 
 if __name__ == "__main__":

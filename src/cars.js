@@ -2,8 +2,8 @@
 // The street vehicles as drawn (#250, #723): the five types' models (src/carTypes.js, assets/cars/) where the box cars
 // stand. As with the walkers' figures (src/people.js), the rules and the checks keep the box cars (src/models.js makeCar,
 // sized to their type by fitCar), posed by the steps and between them (src/between.js); before a draw this moves them
-// to a camera layer no camera draws and draws each type's models instanced at their poses. The nearest NEAR_MAX within
-// NEAR_IN m (until NEAR_OUT) are the near model: its wheels rolling by the distance and the front ones steering by the
+// to a camera layer no camera draws and draws each type's models instanced at their poses. Every car in the camera's view
+// within NEAR_IN m of it (until NEAR_OUT) is the near model: its wheels rolling by the distance and the front ones steering by the
 // curve driven, its lamps lit by its state (the headlamps as daytime lights, the brake lamps while it slows or stands,
 // its indicators), its plates; the rest the far model, one primitive. A car's paint is its box car's colour, on the far
 // model too (its baked paint, the near model's colour, takes it); its fade is one value, a dissolve (no sorting).
@@ -15,15 +15,19 @@ import { CAR_TYPES, carFiles } from './carTypes.js';
 
 export const CAR_FILES = CAR_TYPES.flatMap((t) => { const f = carFiles(t); return [f.near, f.far]; });
 const HIDDEN = 1; // (src/people.js: the camera layer of the box figures, which no camera draws)
-// near: the nearest within 65 m, out beyond 73 m, 8 at most (the asset lab's handoff: "at most 8 near within 65 m (out at
-// 73 m)", docs/assets-inventory.md); FAR_MAX far ones of a type
-export const NEAR_MAX = 8, NEAR_IN = 65, NEAR_OUT = 73;
+// the plates' atlas: COLS × ROWS plates of PW × PH px; a car keeps its plate's cell while it is about (a cell is taken
+// back from one no longer near, the longest gone first, when none is free)
+const COLS = 4, ROWS = 16, PW = 256, PH = 64;
+// near: within 65 m of the camera (out beyond 73 m; the asset lab's handoff's distances, docs/assets-inventory.md) and in
+// its view (a sphere of the car's half length and VIEW_IN m, kept to VIEW_OUT m: wider than the car, so it changes
+// models off the picture): cars behind it or beside it take no place. NEAR_MAX, the atlas's cells, is only a bound: a near car costs no draw call, about 2,000 triangles more than
+// the far model (the handoff's 8 were for near cars drawn each as its own copy, about 14 draw calls a car). FAR_MAX far
+// ones of a type
+export const NEAR_MAX = COLS * ROWS, NEAR_IN = 65, NEAR_OUT = 73, VIEW_IN = 3, VIEW_OUT = 4;
 const FAR_MAX = 64;
 const BODY = new Set(['paint', 'glass', 'trim', 'alloy', 'cargo_door']);
 const LAMPS = ['headlamp', 'brake', 'indicator_left', 'indicator_right'];
 const TURN = new THREE.Matrix4().makeRotationY(-Math.PI / 2); // the models face +X (right +Z), the game's cars +Z (right -X)
-// the plates' atlas: COLS × ROWS plates of PW × PH px; a near car keeps its plate's cell while near
-const COLS = 4, ROWS = 16, PW = 256, PH = 64;
 // the lamps as lit (linear): headlamps warm white, brake lamps red, indicators amber; the headlamps by day as daytime
 // running lamps
 const LIT = { head: 0.45 };
@@ -185,6 +189,7 @@ export class Cars {
     this._m = new THREE.Matrix4(); this._w = new THREE.Matrix4(); this._q = new THREE.Quaternion();
     this._p = new THREE.Vector3(); this._s = new THREE.Vector3(); this._e = new THREE.Euler(0, 0, 0, 'YXZ');
     this._c = new THREE.Color(); this._cam = new THREE.Vector3();
+    this._f = new THREE.Frustum(); this._pv = new THREE.Matrix4(); this._sp = new THREE.Sphere();
   }
 
   // a box car to draw: `key` its identity (a plate and a wheel's roll belong to it), `n` its number (its plate)
@@ -236,16 +241,34 @@ export class Cars {
       s.x = r.x; s.z = r.z; s.yaw = r.yaw; s.t = t; s.seen = sweep;
       r.s = s;
     }
-    for (const [k, s] of this.track) if (s.seen !== sweep) this.track.delete(k);
-    // the nearest ones (a near one keeps its place until NEAR_OUT): the near model; the rest: the far one
-    const c = camera.getWorldPosition(this._cam);
-    for (const r of this.recs) {
-      r.raw = Math.hypot(r.x - c.x, r.y - c.y, r.z - c.z);
-      r.d = r.raw - (this.near.has(r.key) ? NEAR_OUT - NEAR_IN : 0);
+    for (const [k, s] of this.track) {
+      if (s.seen === sweep) continue;
+      this.track.delete(k);
+      const i = this.cell.get(k);
+      if (i !== undefined) { this.free.push(i); this.cell.delete(k); }
     }
-    const near = this.recs.filter((r) => r.d < NEAR_IN).sort((a, b) => a.d - b.d).slice(0, NEAR_MAX);
+    // the ones in view within NEAR_IN (a near one keeps its place until NEAR_OUT and VIEW_OUT): the near model, the
+    // nearest NEAR_MAX; the rest: the far one
+    const c = camera.getWorldPosition(this._cam);
+    camera.updateMatrixWorld();
+    this._f.setFromProjectionMatrix(this._pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    for (const r of this.recs) {
+      const was = this.near.has(r.key);
+      r.raw = Math.hypot(r.x - c.x, r.y - c.y, r.z - c.z);
+      r.d = r.raw - (was ? NEAR_OUT - NEAR_IN : 0);
+      this._sp.center.set(r.x, r.y, r.z);
+      this._sp.radius = r.type.length / 2 + (was ? VIEW_OUT : VIEW_IN);
+      r.view = r.d < NEAR_IN && this._f.intersectsSphere(this._sp);
+    }
+    const near = this.recs.filter((r) => r.view).sort((a, b) => a.d - b.d).slice(0, NEAR_MAX);
     const keep = new Set(near.map((r) => r.key));
-    for (const k of this.near) if (!keep.has(k)) { this.near.delete(k); const i = this.cell.get(k); if (i !== undefined) { this.free.push(i); this.cell.delete(k); } }
+    // (one no longer near keeps its plate's cell, moved to the end of the order: the cells are taken back first-gone first)
+    for (const k of this.near) {
+      if (keep.has(k)) continue;
+      this.near.delete(k);
+      const i = this.cell.get(k);
+      if (i !== undefined) { this.cell.delete(k); this.cell.set(k, i); }
+    }
     for (const k of this.types.values()) { k.body.count = k.lamps.count = k.plates.count = k.far.count = 0; }
     let wheels = 0;
     const clock = t;
@@ -260,7 +283,12 @@ export class Cars {
       k.lamps.geometry.attributes.instanceLamps.setXYZW(i, r.parked ? 0 : LIT.head, r.parked ? 0 : r.s.brake > 0 ? 1 : 0,
         on && r.signal === 'left' ? 1 : 0, on && r.signal === 'right' ? 1 : 0);
       let cell = this.cell.get(r.key);
-      if (cell === undefined) { cell = this.free.pop() ?? 0; this.cell.set(r.key, cell); this._plate(cell, registration(r.n)); }
+      if (cell === undefined) {
+        cell = this.free.pop();
+        if (cell === undefined) for (const [k, i] of this.cell) if (!keep.has(k)) { cell = i; this.cell.delete(k); break; }
+        this.cell.set(r.key, cell ??= 0);
+        this._plate(cell, registration(r.n));
+      }
       k.plates.geometry.attributes.instancePlate.setXY(i, cell % COLS, ROWS - 1 - Math.floor(cell / COLS));
       for (const w of k.wheels) {
         const rad = r.type.wheelRadius;
