@@ -870,11 +870,15 @@ Sections:
     tree moves, and `query_nearest(all_matches=False)` takes the first of the equally near. A sidewalk corner on
     the vertex two wall edges share read the surface on one side or the other, 230.21 or 230.37 m; a lidar corner
     0.343 m from two stretches laid over one wall in opposite directions 228.78 or 228.81 m. Ten picks settle a tie
-    by place now (`tools/ties.py`); the wall rules (`own_side`, `off_the_smear`, `hold_at_walls`) first by meaning: of
-    edges equally near (both at the vertex they share), the one whose line runs nearest the corner's triangle. By
-    place alone a sidewalk corner under Letná's wall read the sidewalk on the wall's top, 6.8 m up, and a corner at a
-    stairwell by street-over-an-underpass took a stretch's spiked first level, 4.9 m over the floor: main's tree order
-    had happened to pick the edge the triangle lies along.
+    by place now (`tools/ties.py`), the wall rules first by meaning: of edges as near, the one whose line runs
+    nearest the corner's triangle. Settled by place, two ties showed defects that main's tree order had happened to
+    step round, fixed in their rules:
+    - Past a wall's corner, `own_side` and `off_the_smear` read square to one of the two edges at the vertex. A
+      sidewalk corner under Letná's wall read the sidewalk on the wall's top that way, 6.8 m up. They read from the
+      vertex towards the corner now (`out_of`).
+    - `wall_lines` read the first point of a piece after a turn along the wall before it. By
+      street-over-an-underpass the stairwell's floor was 216.76 m there for 210.50, and a corner stood 4.9 m over
+      the floor.
   - `meet_raised` weighed the edge per corner: its 8 nearest were copies of one point (12 corners, 1 mm apart),
     which by the KD tree's order. It weighs points now.
   Still box-wide: the covers over passages (`covers.Covers`: a passage merges with those the box holds, its cut
