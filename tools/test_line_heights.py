@@ -646,6 +646,21 @@ class Older(unittest.TestCase):
         c, _ = self.hump(top=-0.4, year=2024)
         self.assertEqual(ha.archive_before_lidar([c]), 0)
 
+    def test_a_track_beside_a_stretch_taken_goes_with_it(self):
+        # (ground batch D, Sokolovská's junction on line 37: tracks 0.2 m under the lidar taken, the short ones beside them
+        # 0.11-0.22 m under it left, their rails 11-15 cm under their neighbours' beds)
+        a, ground = self.hump(top=-0.4)
+        b, _ = self.hump(top=-0.2)    # (0.15 m under at most: alone it stays, test_an_older_record_under_...)
+        far, _ = self.hump(top=-0.2)
+        for c, y in ((b, 3.0), (far, 20.0)):
+            for x in c.bins:
+                x['xy'] = (x['xy'][0], y)
+        ha.archive_before_lidar([a, b, far])
+        # (b under the lidar by more than SOURCES_EDGE from s 175 to 225, 3 m beside a's stretch)
+        self.assertTrue(all(x['src'] == 'lidar' for x in b.bins if 177 < x['s'] < 223))
+        self.assertTrue(all(x['src'] != 'lidar' for x in b.bins if x['s'] < 170 or x['s'] > 230))
+        self.assertTrue(all(x['src'] != 'lidar' for x in far.bins))
+
     def test_a_held_height_in_the_stretch_takes_it_too(self):
         # (with the style marked paved, the survey 0.4 m under the archive holds the hump's top: #591's mark at Bertramka)
         c, _ = self.hump(held=range(36, 44))
