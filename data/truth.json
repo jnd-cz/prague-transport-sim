@@ -6166,6 +6166,96 @@
     }
    ]
   },
+  "zizkov-wall-at-the-kerb": {
+   "line": "9",
+   "at": [
+    2217.7,
+    -671.0
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a sidewalk 1.5 m over the road beside it (line 9, 50.0841, 14.4534): the survey's kerb edge at the road's level (238.73 m by the road at 238.57 m), IPR rising to 240.1 m 1.25 m in and level beyond, the sidewalk's far side at 240.07 m",
+   "said": "50.0841, 14.4534 has a wall next to sidewalk.",
+   "source": "the user, answering PR #834's question 1 (a sidewalk at road level under a rise, or a raised one with a wall at its kerb?), 2026-11-23, #800",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk, 3 m",
+     "from": [
+      2218.02,
+      -670.02
+     ],
+     "to": [
+      2217.02,
+      -672.85
+     ],
+     "expect": {
+      "rise m at least": 1.0,
+      "largest step m at least": 1.0
+     },
+     "why": "a wall between the road and the raised sidewalk (IPR 238.54 m 1 m out, 240.08 m 2 m in): the walkway is not at the road's level at the kerb (ground batch D: a step of 1.55 m)"
+    }
+   ]
+  },
+  "vysehrad-wall-over-the-ramp": {
+   "line": "17",
+   "at": [
+    -764.1,
+    -2356.4
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "the sidewalk at the street's level over the ramp down to the river under Vyšehrad (line 17, 50.0654, 14.4152): the survey's kerb edge at the ramp's level (190.34 m by the ramp at 189.96 m), IPR rising to 192.58 m 2 m in, a green in the sidewalk at 192.57 m",
+   "said": "50.0654, 14.4152 has not vertical but still steep wall down from street level to the ramp going down to the river.",
+   "source": "the user, answering PR #834's question 1 (a sidewalk at road level under a rise, or a raised one with a wall at its kerb?), 2026-11-23, #800",
+   "sections": [
+    {
+     "name": "from the ramp across its edge onto the sidewalk, 3 m",
+     "from": [
+      -765.1,
+      -2356.45
+     ],
+     "to": [
+      -762.1,
+      -2356.38
+     ],
+     "expect": {
+      "rise m at least": 1.5,
+      "largest step m at least": 1.5
+     },
+     "why": "a steep wall from the street's level down to the ramp (IPR 189.97 m 1 m out, 192.58 m 2 m in): the walkway is not at the ramp's level at its edge (ground batch D: a step of 2.25 m)"
+    }
+   ]
+  },
+  "motol-wall-at-the-kerb": {
+   "line": "9",
+   "at": [
+    -6418.8,
+    -1518.4
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a sidewalk 3 m over the road beside it in Motol (line 9, 50.0660, 14.3354): the survey's kerb edge at the road's level (290.38 m by the road at 290.30 m), IPR rising to 293.7 m 2 m in",
+   "said": "50.0660, 14.3354 again there is a straight up wall between road and sidewalk",
+   "source": "the user, answering PR #834's question 1 (a sidewalk at road level under a rise, or a raised one with a wall at its kerb?), 2026-11-23, #800",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk, 3 m",
+     "from": [
+      -6419.74,
+      -1518.2
+     ],
+     "to": [
+      -6416.81,
+      -1518.86
+     ],
+     "expect": {
+      "rise m at least": 2.0,
+      "largest step m at least": 2.0
+     },
+     "why": "a straight up wall between the road and the sidewalk (IPR 290.27 m 1 m out, 293.74 m 2 m in): the walkway is not at the road's level at the kerb (ground batch D: a step of 3.24 m)"
+    }
+   ]
+  },
   "stairs-reversed-ramp": {
    "line": "9",
    "at": [
