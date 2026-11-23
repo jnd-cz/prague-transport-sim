@@ -412,8 +412,11 @@ def publish(store, sid, note):
     os.makedirs(SNAPDIR, exist_ok=True)
     snap = {"id": sid, "created": time.strftime("%Y-%m-%d %H:%M"), "note": note, "groups": groups,
             "files": sum(len(g["files"]) for g in groups), "bytes": sum(f["size"] for g in groups for f in g["files"])}
-    json.dump(snap, open(os.path.join(SNAPDIR, f"{sid}.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    open(os.path.join(SNAPDIR, "CURRENT"), "w", encoding="utf-8").write(sid + "\n")
+    # (committed text: LF on Windows too, as .gitattributes commits it, so the working copy matches the commit, #829)
+    with replacing(os.path.join(SNAPDIR, f"{sid}.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(snap, f, ensure_ascii=False, indent=1)
+    with replacing(os.path.join(SNAPDIR, "CURRENT"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(sid + "\n")
     print(f"snapshot {sid}: {snap['files']} files, {snap['bytes'] / 1e6:.0f} MB ({len(todo)} new in the store); "
           f"snapshots/{sid}.json and CURRENT written: commit them")
 
@@ -575,7 +578,7 @@ def data_publish(store, note, sid=None, cache=None, allow_drift=False):
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
     man = {"snapshot": sid or (current_id() if os.path.exists(os.path.join(SNAPDIR, "CURRENT")) else None),
            "built_at_commit": head, "published": time.strftime("%Y-%m-%d %H:%M"), "note": note, "files": files}
-    with replacing(DATA_MANIFEST, "w", encoding="utf-8") as f:
+    with replacing(DATA_MANIFEST, "w", encoding="utf-8", newline="\n") as f:  # (LF, as committed: #829)
         json.dump(man, f, ensure_ascii=False, indent=1)
     print(f"data: {len(files)} files, {sum(m['size'] for m in files.values()) / 1e6:.0f} MB; data/MANIFEST.json written: commit it")
 
