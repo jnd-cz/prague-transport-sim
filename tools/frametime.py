@@ -78,14 +78,16 @@ def measure(line, models, frames, headless, warm=120, fovs=(None,), traffic=0, s
 
 
 def table(rows):
-    lines = ["| model | field (°) | frame median / p95 (ms) | fps | render CPU median / p95 (ms) | of it matrices (ms) | draw calls | triangles | nodes (scene / our set) | AI sets (m: level) | cars (drawn near / far) |",
-             "|---|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| model | field (°) | frame median / p95 (ms) | fps | render CPU median / p95 (ms) | of it matrices (ms) | draw calls | triangles | nodes (scene / our set) | AI sets (m: level) | cars (drawn near / far) | people (animated: full + middle / far) |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         sets = ", ".join(f"{s['far']}: {s['level']}" for s in r["sets"])
         c = r.get("cars")
         cars = f"{r.get('trafficCars')} ({c['near']} / {c['far']})" if c else f"{r.get('trafficCars')} (boxes)"
+        p = r.get("people")
+        people = f"{p.get('people')} ({p.get('full', 0)} + {p.get('middle', 0)} / {p.get('far')})" if p else "boxes"
         lines.append(f"| {r['model']} ({r['kind']}) | {r.get('fov')} | {r['frameMedian']} / {r['frameP95']} | {r['fps']} | {r['renderMedian']} / {r['renderP95']} | "
-                     f"{r.get('matrixMedian')} | {r.get('calls')} | {r.get('triangles'):,} | {r.get('nodes'):,} / {r.get('tramNodes')} | {sets} | {cars} |")
+                     f"{r.get('matrixMedian')} | {r.get('calls')} | {r.get('triangles'):,} | {r.get('nodes'):,} / {r.get('tramNodes')} | {sets} | {cars} | {people} |")
     return "\n".join(lines)
 
 

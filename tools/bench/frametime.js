@@ -99,5 +99,7 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
     viewport: [innerWidth, innerHeight, devicePixelRatio],
     // the traffic's cars in the streets, and as drawn (src/cars.js: near and far models; none with ?boxcars)
     trafficCars: window.traffic.cars.filter((c) => c.active).length, cars: window.cars ? { ...window.cars.stats } : null,
+    // the people as drawn (src/people.js: animated figures, full and middle, each its own skinned copy; the far batch)
+    people: window.people ? { ...window.people.stats } : null,
   };
 }
