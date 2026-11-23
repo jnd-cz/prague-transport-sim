@@ -45,7 +45,7 @@ KINDS = [
      "also heights", ""),
     ("drawn geometry", ("src/terrain.js", "src/world.js", "src/worldMesh.js", "src/groundDraw.js", "src/streets.js",
                         "src/heights.js", "src/platforms.js", "src/pedestrianCrossings.js", "src/structures.js",
-                        "tools/lint.js"),
+                        "src/gameView.js", "src/platformRules.js", "tools/lint.js"),
      f"--checks {DRAWN} on every line; every seedless move needs a reason", "seeded checks"),
     ("drawing", ("src/models.js", "src/buildings.js", "src/trees.js", "src/lamps.js", "src/figures.js", "src/rigged.js",
                  "src/vehicles.js", "src/t3simple.js", "src/t3photo.js", "src/cabframe.js", "src/mirror.js", "src/weather.js",
@@ -61,7 +61,7 @@ KINDS = [
     ("simulation", ("src/traffic.js", "src/autopilot.js", "src/tram.js", "src/tr37.js", "src/electric.js",
                     "src/game.js", "src/people.js", "src/streetbot.js", "src/route.js", "src/speedRules.js",
                     "src/consist.js", "src/articulated.js", "src/random.js", "src/geo.js", "src/main.js", "src/run.js",
-                    "tools/traffic_lint.js", "tools/autopilot.js", "tools/bench/*", "src/trafficView.js"),
+                    "tools/traffic_lint.js", "tools/autopilot.js", "tools/bench/*", "src/trafficView.js", "src/platformRules.js"),
      f"--checks {SEEDED} on every line, seeds 1-5, --compare; the tram or the autopilot: also test_traction, "
      "test_electric, test_drives", "the geometry checks"),
     ("tool", ("tools/*",), "the changed tools' tests (tools/test_<tool>.py); the whole suite before the PR is ready", ""),

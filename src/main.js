@@ -601,8 +601,7 @@ async function start(extra = {}, o = menuOpts()) {
     tramModel = makeT3({ line: data.line, cars, vehicle, dest: lastStop, run: runNumber(0), dealt: ours });
     scene.add(tramModel);
   }
-  if (game) { scene.remove(game.objects); disposeModel(game.objects); }
-  if (run) run.trafficView.dispose();
+  if (run) { run.gameView.dispose(); run.trafficView.dispose(); }
   applyWeather(o.weather);
   sWas = null; carry = 0; between.clear(); // (the steps start afresh with the shift: fixedSteps, drawnS, src/between.js)
   run = createRun({ scene, data, route, ground, audio }, {
@@ -631,7 +630,7 @@ async function start(extra = {}, o = menuOpts()) {
   window.traffic = traffic;
   // the compiled world as GeoJSON (docs/architecture.md §10.4), for the annotation editor
   window.exportBuiltGeoJSON = (save = true) => {
-    const fc = builtGeoJSON(game, traffic);
+    const fc = builtGeoJSON(game, traffic, run.gameView);
     if (save) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(fc)], { type: 'application/geo+json' })); a.download = `data-line${game.data.line}.built.geojson`; a.click(); }
     return fc;
   };
@@ -644,7 +643,7 @@ async function start(extra = {}, o = menuOpts()) {
   game.msg(t('msg.shiftStart', { stop: game.stops[game.nextStop].name, time: fmtTime(game.stops[game.nextStop].sched).slice(0, 5) }), 'info', 7);
   if (params.has('bot')) streetBot();
   if (params.has('inspect')) inspect.toggle(true);
-  if (params.has('debug')) debugOverlay.toggle(game, traffic);
+  if (params.has('debug')) debugOverlay.toggle(game, traffic, run.gameView);
 }
 
 // debugging (?bot): drive and walk every street in the surveyed DTM areas, list what looks wrong
@@ -842,7 +841,7 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (k === 'f9' && !e.repeat) { e.preventDefault(); reporter.open(); return; }
   // dev overlay of signals, stop lines, conflicts and platforms (src/debugOverlay.js; ?debug shows it at the start)
-  if (k === 'f8' && !e.repeat) { e.preventDefault(); debugOverlay.toggle(game, traffic); return; }
+  if (k === 'f8' && !e.repeat) { e.preventDefault(); debugOverlay.toggle(game, traffic, run.gameView); return; }
   // dev inspect mode (src/inspect.js): its keys first
   if (inspect.active ? inspect.key(e) : k === 'i' && !e.repeat && (inspect.toggle(true), true)) return;
   if (k === 'o' && !e.repeat) {
@@ -1133,7 +1132,7 @@ window.between = between; // (tools/test_frame_rate.py)
 // after a step the page draws from: where what it moved stands (a step the traffic did not take, paused or the shift
 // over, moved none of it)
 function recordStep(moved) {
-  if (moved) between.record([...run.trafficView.movers(), ...game.movers()]);
+  if (moved) between.record([...run.trafficView.movers(), ...run.gameView.movers()]);
   else between.hold();
 }
 function fixedSteps(span) {
@@ -1189,7 +1188,7 @@ function frame(now) {
         if (!inspect.active && drawn) recordStep(step.go);
       }
     });
-    game.updateVisuals();
+    run.gameView.syncCrowd();
     updateCamera(dt, now / 1000);
     if (inspect.active) inspect.update(dt);
     updateRain(dt);
@@ -1221,7 +1220,7 @@ function frame(now) {
   if (draw) {
     // (the movers between the last two steps, as our tram; back where the steps left them after the draw, below)
     if (game && !inspect.active && !window.headless) between.show(Math.min(1, carry / STEP));
-    if (people && game) people.sync(camera, run.trafficView, game);
+    if (people && game) people.sync(camera, run.trafficView, run.gameView);
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }

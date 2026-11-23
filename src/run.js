@@ -6,6 +6,7 @@
 // Nothing here reads the page: what the page draws of a run (our tram's model, the sound, the HUD) stays in main.js.
 import { Tram } from './tram.js';
 import { Game } from './game.js';
+import { GameView } from './gameView.js';
 import { Traffic } from './traffic.js';
 import { TrafficView } from './trafficView.js';
 import { Autopilot } from './autopilot.js';
@@ -21,7 +22,7 @@ export function createRun({ scene, data, route, ground, audio }, o) {
   tram.eq.mode = o.controls;
   // one seeded stream for the whole run (rules and traffic), apart from Math.random
   const random = rng(o.seed);
-  const game = new Game(scene, data, route, tram, audio, {
+  const game = new Game(data, route, tram, audio, {
     weather: o.weather,
     tripIndex: o.trip,
     startStop: o.startStop,
@@ -39,13 +40,15 @@ export function createRun({ scene, data, route, ground, audio }, o) {
     ...o.extra,
   });
   game.runSeed = o.seed; // (replay: ?seed=N)
+  // (the game as drawn, #228: its furniture built, what moves in it posed after a step that is drawn)
+  const gameView = new GameView(scene, game);
   const traffic = new Traffic(data, route, ground, game, random);
   // (the traffic as drawn, #228: posed from the traffic's state after a step that is drawn; the rules read none of it)
   const trafficView = new TrafficView(scene, traffic);
   const pilot = o.autopilot ? new Autopilot() : null;
   game.autopilot = !!pilot;
   const run = {
-    game, traffic, trafficView, pilot, tram,
+    game, gameView, traffic, trafficView, pilot, tram,
     // the game's half of a step: the autopilot (`driver`: the page's, which a key turns on and off; else the run's),
     // the tram and the rules. The traffic's focus is taken first, where the step begins (src/traffic.js update).
     // go: whether the traffic steps with it (not while paused, nor once the shift ended before this step)
@@ -55,11 +58,12 @@ export function createRun({ scene, data, route, ground, audio }, o) {
       game.update(h, driver ? driver.input : input);
       return { h, focus, go: !game.paused && !ended };
     },
-    // the traffic's half; draw: the models posed for drawing after it (`view` the camera, for what only drawing reads)
+    // the traffic's half; draw: the game's and the traffic's models posed for drawing after it (`view` the camera, for
+    // what only drawing reads)
     stepTraffic(s, view = null, draw = true) {
       if (!s.go) return;
       traffic.update(s.h, s.focus);
-      if (draw) trafficView.sync(view);
+      if (draw) { gameView.sync(); trafficView.sync(view); }
     },
     step(h, input = null, view = null, draw = true) {
       const s = run.stepGame(h, input);

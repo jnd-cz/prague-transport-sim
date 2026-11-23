@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Tram platforms and stop furniture (#419): the OSM platforms of both directions where the build placed them
-// (tools/placement.py `place_platform`: the path, s0, s1, side, far and `ours`), our stops' signs, shelters and stand-in
-// platforms, the opposite direction's signs and shelters. World furniture: the game's rules read `game.platforms`.
+// Tram platforms and stop furniture as drawn (#419, #228): the OSM platforms of both directions where the build placed
+// them, our stops' signs, shelters and stand-in platforms, the opposite direction's signs and shelters. Where they are
+// and what kind each stop is: src/platformRules.js (game.platforms, stop.vienna, standIn, shelterOuter); this draws it
+// (src/gameView.js).
 import * as THREE from 'three';
 import { makeStopSign } from './models.js';
 
@@ -89,53 +90,21 @@ function platformMesh(pos, col) {
   return m;
 }
 
-// An OSM platform's strip across its track: from 1.5 m off its centre out to its width (an OSM line usually runs along
-// its middle, 2-3.5 m wide unless tagged: it reached over the car lane at Trojská, 5.1 m; an area gives its outer edge)
-function across(pl) {
-  const inner = 1.5, far = pl.far;
-  return { inner, outer: pl.area ? Math.min(inner + 6, Math.max(inner + 2, far)) : inner + (pl.w || Math.max(2.4, Math.min(3.5, pl.gtfs ? far + 1 - inner : 2 * far - 2 * inner))) };
-}
 
-// Tram platforms of both directions from OSM (tools/platforms.py), each along the path the build put it on, built as a
-// strip curved along it from 1.5 m off the track centre out to its width, 0.18 m over top of rail (src/heights.js), kerb
-// faces on both sides. Where the surveyed streets (DTM) have a platform, island or sidewalk there, the survey draws it.
-// The opposite direction's platforms get a stop sign at their head and a shelter where OSM has one. The stop type
-// (Vienna: the kerb's offset) is the build's (tools/placement.py vienna), and whether the survey draws a platform too
-// (data/lineN.network.json, tools/network.py Stops); so are the heights the strip's outer kerb, a Vienna-type one's sign
-// and a shelter stand on (its record's zo, zs, zh in cm, tools/network.py heights, #682): Start reads no ground (#658).
-// Returns game.platforms ({ rt, back, s0, s1, side, inner, outer, ours, kerb, surveyed, ... }: src/traffic.js reads it);
-// `log` collects the strips left out over tracks (platformGaps).
-export function buildPlatforms({ data, route, backRoute, group, log }) {
-  const ground = route.ground, net = new Map((data.network?.platforms || []).map((r) => [r.i, r]));
-  const pos = [], col = [];
+// Tram platforms of both directions (src/platformRules.js platformsOf), each along the path the build put it on, drawn
+// as a strip curved along it from 1.5 m off the track centre out to its width, 0.18 m over top of rail (src/heights.js),
+// kerb faces on both sides: not where the survey draws a platform, island or sidewalk there, nor a Vienna-type stop's (the
+// sidewalk is its platform), nor one drawn for the other path already (`shared`). The opposite direction's platforms get
+// a stop sign at their head and a shelter where OSM has one. The heights the strip's outer kerb, a Vienna-type one's sign
+// and a shelter stand on are the build's (zo, zs, zh, tools/network.py heights, #682): Start reads no ground (#658).
+// Into `group`; `log.platformGaps` collects the strips left out over tracks.
+export function buildPlatforms({ data, route, platforms, group, log }) {
+  const ground = route.ground, pos = [], col = [];
   const cTop = new THREE.Color(TOP), cKerb = new THREE.Color(KERB);
-  const platforms = [], also = [];
-  for (const [i, pl] of (data.platforms || []).entries()) {
-    if (!('path' in pl)) throw new Error(`line ${data.line} data has platforms without their placement: built before #419, rebuild it (tools/rebuild.py)`);
-    if (!pl.path) continue;
-    const rt = pl.path === 'back' ? backRoute : route;
-    if (!rt) continue;
-    const { s0, s1, side } = pl, { inner, outer } = across(pl);
-    const ours = pl.ours ? { s0: pl.ours[0], s1: pl.ours[1] } : null;
-    const N = net.get(i);
-    if (!N) throw new Error(`line ${data.line}: platform ${pl.name} is not in the network (python -P -E tools/network.py --lines ${data.line})`);
-    const plat = { rt, back: rt !== route, s0, s1, side, inner, outer, name: pl.name, code: pl.code, lines: pl.lines, stop: pl.stop, shelter: pl.shelter, ours, twin: !!pl.twin, unused: !!pl.unused, zs: N.zs / 100, zh: N.zh / 100 };
-    platforms.push(plat);
-    if (pl.also) also.push([plat, pl.also]);
-    // (a Vienna-type stop on the doors' side: no platform on the road, the sidewalk is the platform)
-    plat.kerb = side < 0 ? pl.vienna ?? null : null;
-    if (plat.kerb !== null) { plat.inner = plat.kerb; plat.outer = plat.kerb + 2; plat.surveyed = true; continue; }
-    plat.surveyed = N.surveyed; // (its middle a platform, island or sidewalk of the survey)
-    if (plat.surveyed) continue;
-    const left = platformStrip(rt, s0, s1, side, inner, outer, ground, pos, col, cTop, cKerb, N.zo?.map((v) => v / 100));
-    if (left) log.platformGaps.push(`${pl.name} ${pl.code ?? ''}: ${left.toFixed(0)} m over a track left out`);
-  }
-  // A platform both paths tie on (they run over its track the same way: line 9 from Řepy to Motol) serves both: the
-  // other path gets it along its own s, not drawn again and without a sign of its own, its kerb and survey the drawn
-  // one's (the user, 2026-11-14, #419: platforms belong to the track, docs/architecture.md)
-  for (const [plat, list] of also) for (const a of list) {
-    const art = a.path === 'back' ? backRoute : route;
-    if (art) platforms.push({ ...plat, rt: art, back: art !== route, s0: a.s0, s1: a.s1, side: a.side, ours: null, twin: true, shared: true });
+  for (const p of platforms) {
+    if (p.shared || p.kerb !== null || p.surveyed) continue;
+    const left = platformStrip(p.rt, p.s0, p.s1, p.side, p.inner, p.outer, ground, pos, col, cTop, cKerb, p.zo?.map((v) => v / 100));
+    if (left) log.platformGaps.push(`${p.name} ${p.code ?? ''}: ${left.toFixed(0)} m over a track left out`);
   }
   if (pos.length) group.add(platformMesh(pos, col));
   // the opposite direction's stops: sign where PID has the stop (GTFS position, name and lines;
@@ -161,29 +130,18 @@ export function buildPlatforms({ data, route, backRoute, group, log }) {
       group.add(sh);
     }
   }
-  return platforms;
 }
 
-// One of our stops: its platform, sign and shelter, into `group`, placed once from its stop point, the sign for every set
-// (src/game.js _stopZone, #694: before it they moved with the stop point each set and the signals gave it). Sets
-// stop.vienna and stop.sign. What it reads of the survey and the ground is the build's (data/lineN.network.json `stops`,
-// tools/network.py Stops and heights: whether the survey draws the stand-in platform, how far out the shelter stands, the
-// heights a Vienna-type stop's sign and shelter and a stand-in platform stand on): Start reads no ground (#658).
-export function buildStop({ stop, data, route, platforms, group, log }) {
+// One of our stops (src/platformRules.js stopOf): its stand-in platform, sign and shelter, into `group`, placed once from
+// its stop point, the sign for every set (src/game.js _stopZone, #694). The heights a Vienna-type stop's sign and shelter
+// and a stand-in platform stand on are the build's (data/lineN.network.json `stops`, tools/network.py Stops and heights):
+// Start reads no ground (#658). Returns the sign.
+export function buildStop({ stop, data, route, group, log }) {
   const g = new THREE.Group(), ground = route.ground, N = data.network.stops[stop.i], cm = (v) => (v === undefined ? null : v / 100);
-  // our platform: the OSM one (built with both directions' platforms) where it covers the stop zone, also one the
-  // back path took that the route passes on its doors' side (`ours`), else a 30 m box on the right (T3 doors are on
-  // the right side only)
-  const osm = platforms.find((p) => !p.back && p.side < 0 && p.s0 < stop.target - 8 && p.s1 > stop.target - 20)
-    || platforms.find((p) => p.back && p.ours && p.ours.s0 < stop.target - 8 && p.ours.s1 > stop.target - 20);
   const len = 30;
-  // (a Vienna-type stop: boarding from the sidewalk; sign and shelter stand at the kerb, on the sidewalk's height)
-  const kerb = osm ? osm.kerb : data.stops[stop.i].vienna ?? null;
-  stop.vienna = kerb !== null;
   // (a strip along the route as the OSM platforms, 1.5-4.1 m to the right, 0.18 m over the top of rail; before #581 a
   // straight box along the chord, its top 0.44 m over the rails, which at a first stop in a loop (Bílá Hora) ran
   // across the loop's tracks; not where the survey draws a platform, an island or a sidewalk there, as the OSM ones)
-  stop.standIn = N.stand;
   if (stop.standIn) {
     const pos = [], col = [];
     const left = platformStrip(route, stop.target - len - 1, stop.target - 1, -1, 1.5, 4.1, ground, pos, col, new THREE.Color(TOP), new THREE.Color(KERB), N.zo.map((v) => v / 100));
@@ -191,21 +149,17 @@ export function buildStop({ stop, data, route, platforms, group, log }) {
     if (pos.length) g.add(platformMesh(pos, col));
   }
   // the classic red Prague stop sign (zastávkový označník) where the tram front stops: at its pole where the build
-  // knows it on our side, the user's placed sign or the DTM's (#685), else half a metre past the stop point
+  // knows it on our side, the user's placed sign or the DTM's (#685), else half a metre past the stop point (a
+  // Vienna-type stop's at the kerb, on the sidewalk's height)
   const sign = makeStopSign(stop.name, stop.request, data.stops[stop.i].lines || [String(data.line)]);
   const { sign: at, signOff: off } = data.stops[stop.i];
   if (off !== undefined) place(sign, route, at, off, 0.18, true, cm(N.zs));
-  else place(sign, route, stop.target + 0.5, stop.vienna ? -(kerb + 0.6) : -2.3, 0.18, true, cm(N.zs));
+  else place(sign, route, stop.target + 0.5, stop.vienna ? -(stop.kerb + 0.6) : -2.3, 0.18, true, cm(N.zs));
   g.add(sign);
-  stop.sign = sign;
-  // the shelter's outer edge: the OSM platform's, but no further than the surveyed one where the DTM
-  // draws the platform (OSM's island at Palackého náměstí is 6.2 m out, the survey's 4.5 m: the
-  // shelter stood on the road)
-  const outer = osm ? N.outer / 100 : null;
-  stop.shelterOuter = outer;
-  // shelter (at the back of the OSM platform where there is one)
+  // the shelter: at the back of the OSM platform where there is one (stop.shelterOuter)
   const shelter = makeShelter();
-  place(shelter, route, stop.target - 12, stop.vienna ? -(kerb + 2.4) : osm ? -(outer - 0.6) : -3.4, 0.18, false, cm(N.zh));
+  place(shelter, route, stop.target - 12, stop.vienna ? -(stop.kerb + 2.4) : stop.shelterOuter !== null ? -(stop.shelterOuter - 0.6) : -3.4, 0.18, false, cm(N.zh));
   g.add(shelter);
   group.add(g);
+  return sign;
 }

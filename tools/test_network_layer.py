@@ -51,7 +51,7 @@ START = """async (seed) => {
     lanes: T.laneList.map((l) => [l.k, l.dir, l.sel, mm(l.path.p[0][0]), mm(l.path.p[0][1]), l.path.p.length]),
     poles: [T.heads, T.pedHeads].map((H) => H.map((h) => h.h)), // (the heights the heads' poles stand at, #228: the traffic's)
     ways: window.game.route.ground.wayEnds.size, stopLater,
-    stops: window.game.stops.map((st) => ({ target: st.target, vienna: st.vienna, sign: st.sign.position.y })), inSpan };
+    stops: window.game.stops.map((st) => ({ target: st.target, vienna: st.vienna, sign: window.run.gameView.meshOf(st).position.y })), inSpan };
 }"""
 
 
