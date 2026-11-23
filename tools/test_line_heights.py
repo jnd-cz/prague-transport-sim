@@ -607,14 +607,14 @@ class Sources(unittest.TestCase):
 class Older(unittest.TestCase):
     def hump(self, year=1999, top=0.9, flags=(), held=()):
         # (#539, line 9 at Bertramka: the archive's records of 1999 humped up to 0.83 and 0.92 m over the 2023 lidar for
-        # 200 m on both tracks, no numeric DI; around it the archive 5 cm over the lidar, and DI 4 cm over it from s 340)
+        # 200 m on both tracks, no numeric DI; around it the archive 5 cm over the lidar, and DI 20 cm over it from s 340)
         ground = lambda s: 200 - .025 * s
         bump = lambda s: top * max(0.0, 1 - abs(s - 200) / 100)
         c = chain([(0, 0), (400, 0)], lambda s: ground(s) + .05 + bump(s), terrain=ground)
         for k, x in enumerate(c.bins):
             x['archive'], x['survey'], x['year'], x['flags'] = x['z'], None, year, list(flags)
             if x['s'] > 340:
-                x['src'], x['z'] = 'di', ground(x['s']) + .04
+                x['src'], x['z'] = 'di', ground(x['s']) + .2
             if k in held:
                 x['z'], x['w'], x['src'] = None, 0.0, None
         return c, ground
@@ -625,9 +625,10 @@ class Older(unittest.TestCase):
         self.assertEqual(n, sum(x['src'] == 'lidar' for x in c.bins))
         # (the whole stretch over SOURCES_EDGE goes, not only the part over SOURCES_OFF)
         self.assertTrue(all(x['src'] == 'lidar' for x in c.bins if 115 < x['s'] < 285))
-        self.assertLess(max(abs(x['z'] - ground(x['s']) - .05) for x in c.bins), ha.SOURCES_EDGE + 1e-9)
-        # (the rail's offset over the lidar is DI's within LIDAR_AROUND, not the archive's around it)
-        self.assertTrue(all(abs(x['z'] - ground(x['s']) - .04) < 1e-9 for x in c.bins if x['src'] == 'lidar'))
+        self.assertLess(max(abs(x['z'] - ground(x['s']) - .05) for x in c.bins if x['src'] != 'di'), ha.SOURCES_EDGE + 1e-9)
+        # (the rail's offset over the lidar is the network's: not the archive's around the stretch, nor DI's, which
+        # stands 0.2 m over the lidar here as at Sokolovská's junction)
+        self.assertTrue(all(abs(x['z'] - ground(x['s']) - ha.LIDAR_OFFSET) < 1e-9 for x in c.bins if x['src'] == 'lidar'))
         self.assertTrue(all(x['src'] == 'dtmp' for x in c.bins if x['s'] < 80 or 320 < x['s'] < 340))
 
     def test_an_older_record_under_the_lidar_takes_it_too(self):
@@ -639,16 +640,26 @@ class Older(unittest.TestCase):
         # (the record lies 0.05 m over the lidar round the dip: under it by more than SOURCES_EDGE from s 140 to 260)
         self.assertTrue(all(x['src'] == 'lidar' for x in c.bins if 140 < x['s'] < 260))
         self.assertGreater(min(x['z'] - ground(x['s']) for x in c.bins), -ha.SOURCES_EDGE - 1e-9)
-        self.assertTrue(all(abs(x['z'] - ground(x['s']) - .04) < 1e-9 for x in c.bins if x['src'] == 'lidar'))
-        c, ground = self.hump(top=-0.4)   # (no DI within LIDAR_AROUND: the network's offset)
-        for x in c.bins:
-            x['src'] = 'dtmp' if x['src'] == 'di' else x['src']
-        ha.archive_before_lidar([c])
         self.assertTrue(all(abs(x['z'] - ground(x['s']) - ha.LIDAR_OFFSET) < 1e-9 for x in c.bins if x['src'] == 'lidar'))
         c, _ = self.hump(top=-0.2)   # (0.15 m under at most: within what the rails and the lidar differ by)
         self.assertEqual(ha.archive_before_lidar([c]), 0)
         c, _ = self.hump(top=-0.4, year=2024)
         self.assertEqual(ha.archive_before_lidar([c]), 0)
+
+    def test_a_track_beside_a_stretch_taken_goes_with_it(self):
+        # (ground batch D, Sokolovská's junction on line 37: tracks 0.2 m under the lidar taken, the short ones beside them
+        # 0.11-0.22 m under it left, their rails 11-15 cm under their neighbours' beds)
+        a, ground = self.hump(top=-0.4)
+        b, _ = self.hump(top=-0.2)    # (0.15 m under at most: alone it stays, test_an_older_record_under_...)
+        far, _ = self.hump(top=-0.2)
+        for c, y in ((b, 3.0), (far, 20.0)):
+            for x in c.bins:
+                x['xy'] = (x['xy'][0], y)
+        ha.archive_before_lidar([a, b, far])
+        # (b under the lidar by more than SOURCES_EDGE from s 175 to 225, 3 m beside a's stretch)
+        self.assertTrue(all(x['src'] == 'lidar' for x in b.bins if 177 < x['s'] < 223))
+        self.assertTrue(all(x['src'] != 'lidar' for x in b.bins if x['s'] < 170 or x['s'] > 230))
+        self.assertTrue(all(x['src'] != 'lidar' for x in far.bins))
 
     def test_a_held_height_in_the_stretch_takes_it_too(self):
         # (with the style marked paved, the survey 0.4 m under the archive holds the hump's top: #591's mark at Bertramka)

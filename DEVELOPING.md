@@ -358,8 +358,10 @@ drives the whole line from the first stop with a fixed time step, trip 40, obsta
 only draws meanwhile (`window.headless`). Before #722 it drove its own run (trip 0, no obstacles), so no traffic
 count is read across that change. Every 0.2 s it records every visible car, walker and tram and counts: cars or
 walkers moving sideways
-(`slide`), teleporting (`jump`), vehicles intersecting (`overlap`, once per episode) and walkers inside
-a vehicle (`walkerHit`), each with its cause where known (next road, lane beside the tram, …). It is
+(`slide`), teleporting (`jump`), vehicles intersecting (`overlap`, once per episode), walkers inside
+a vehicle (`walkerHit`), each with its cause where known (next road, lane beside the tram, …), and
+walkers that keep within 2 m of one place for 30 s while not waiting at a kerb or in a door
+(`walkerStuck`: turning, round a loop of walks, or still; #366). It is
 seeded and uses autumn and dry weather, so a run on a **freshly loaded page** gives
 the same counts every time (a second run in the same page differs slightly).
 
@@ -441,6 +443,18 @@ lines, the issues' titles and states, the PRs' questions) is built at each deplo
 lines in the file (`issue`, `line`, or per finding `line` / `lines_near`); `KNOWN` there covers the
 tools that do not write them yet. The kerb review lists are listed there too, under #142, though they lie in each
 line's survey data, not in a file.
+
+**The project overview** (`overview.html`, test site only; #826) is for the phone: what waits for the user (PRs ready
+to merge, the PRs' questions, issues labelled `needs-user`, the review sets' unanswered findings counted as the review
+directory counts them), the heavy queue with estimated starts and finishes, the agents' sessions of the last 48 h and
+the board. `tools/overview.py` writes `overview.json` from `board.py`'s functions, the heavy queue and the session logs
+(Claude Code's and Codex's, `LOGS` there: only the folder a session works in and the PR its harness linked are read,
+from the log's end, never a message), and uploads it to the test site over `deploy.py`'s connection when it changed or
+9 min went by; the page turns red at 15 min. `python -I tools/overview.py --install` runs it every 5 min as a
+scheduled task (pythonw, `--uninstall`), in the deploy checkout (`../tg-deploy`, which has `deploy.local.json`); a run
+takes ~3 s of CPU (the board's git answers cached by commit in `reports/overview-cache.json`). A deploy never deletes
+`overview.json` (`deploy.py` `KEPT`). `--print` prints the snapshot; locally `python -I tools/overview.py --print >
+overview.json` and the dev server show the page.
 
 **Review mode** (the checks' findings on the map, desktop or phone; #129): open
 `index.html?line=17&review`, no shift needed. The panel lists findings worst first:
@@ -548,6 +562,13 @@ architecture review at a world checkpoint ([docs/housekeeping.md](docs/housekeep
 the pinned #291 and only proposes.
 
 **Heavy jobs** (`baseline_store.HeavyJob`, first come first served; #280, #536, #728):
+- Every job that keeps several cores or GBs busy for over a minute waits for the machine's other heavy jobs and
+  holds its turn, so that it does not spoil another's measurement (the user, 2026-11-12, #516). These take their
+  turn themselves: `headless.py`, `rebuild.py`, `frametime.py`, `city_terrain.py`, `ground_mesh.py`;
+  `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py`, `street_profile.py` and
+  `ground_partition.py` when run alone; `ground_place.py` for several places or `--rings` (one place runs as it
+  is); `test_all.py` for the whole suite (`tools/test_heavy.py` holds this list to the code). Anything else runs
+  through `heavy.py`.
 - Two kinds. A job alone (a timing, or one of unknown size: every tool that does not say otherwise, plain
   `heavy.py`) waits for every job before it and every job running, and holds those after it. A shared job (a count
   run or a build: its result is the same beside another job, only later) declares its peak memory and its cores:
@@ -580,6 +601,9 @@ the pinned #291 and only proposes.
   `headless.py` plans from its runs' times, or the median of the same kind's last full runs (a command's script
   and its option names) in `history.jsonl` beside the tickets. `--no-limit` (`TRAM_HEAVY_NOLIMIT=1`) keeps the
   warnings and ends nothing. A job waiting behind one that watches itself gives it 20 min before calling it stuck.
+  The board and the overview add each job's estimated start and finish (`baseline_store.schedule`, #826): the
+  ticket's expected time, else its kind's median in the history (one full run is enough there), the jobs started in
+  queue order as their turns allow (alone after everything, shared while cores and GB fit).
 - A stopped background task can leave its job running: when the command ended in a Git Bash program (`bash
   chain.sh`), bash handed its process over to it, and the stop kills a pid that is gone (measured 2026-11-22: the
   chain's shells and its python ran on, their parents unchanged; with the outer shell alive the stop ends the

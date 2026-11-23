@@ -934,6 +934,66 @@ def describe(j, now=None):
             + (f": {j['warn']}" if j.get("warn") else ""))
 
 
+def schedule(jobs, now=None, records=None, free=None, cores=None, keep=None):
+    """The queue's expected times and estimated starts and finishes (#826), as queue()'s dicts (in its order) with
+    expect (s or None), expectFrom ("ticket", "history" or None), start and finish (epoch s; None: not known) and late
+    (a running job past its expected time: its finish is taken as now).
+
+    A job's expected time is its ticket's (the job stated it, or its run took it from the history), else the history's
+    median of its kind over its runs to their end (expected() with a single run enough: an estimate, not a watch's
+    limit). The jobs start as HeavyJob.ahead() lets them, in queue order: a job alone once nothing runs; a shared one
+    once no job alone runs and its cores and GB fit beside the shared ones running. The memory to share is the free
+    memory now (`free` GB, None: unknown, no limit) plus what the running jobs hold now (their tickets' gb), less KEEP;
+    a running shared job takes the larger of its share and its hold. A job after one with no known end has none."""
+    now = time.time() if now is None else now
+    records = history() if records is None else records
+    cores = HeavyJob.CORES if cores is None else cores
+    keep = HeavyJob.KEEP if keep is None else keep
+    inf = float("inf")
+    run = [j for j in jobs if j["state"] == "running"]
+    room = (inf if free is None else free + sum(j.get("gb") or 0.0 for j in run)) - keep
+    out, ivals = [], []  # (ivals: [start, end, its share or None (alone), GB it takes])
+
+    def est(j):
+        if j.get("expect"):
+            return float(j["expect"]), "ticket"
+        e = expected(j.get("kind"), records, least=1) if j.get("kind") else None
+        return e, "history" if e else None
+
+    def fits(j, t):
+        on = [iv for iv in ivals if iv[0] <= t < iv[1]]
+        if not j.get("share"):
+            return not on
+        if any(iv[2] is None for iv in on):
+            return False
+        return not on or (sum(iv[2]["cores"] for iv in on) + j["share"]["cores"] <= cores
+                          and sum(iv[3] for iv in on) + j["share"]["gb"] <= room)
+
+    for j in run:
+        e, src = est(j)
+        start = j.get("since") or j.get("t") or now
+        end = start + e if e else inf
+        late = end < now
+        s = j.get("share")
+        ivals.append([start, now if late else end, s, max(s["gb"], j.get("gb") or 0.0) if s else 0.0])
+        out.append({**j, "expect": e, "expectFrom": src, "start": start, "finish": None if end == inf else max(end, now),
+                    "late": late})
+    after = now
+    for j in jobs:
+        if j["state"] == "running":
+            continue
+        e, src = est(j)
+        start = next((t for t in sorted({after} | {iv[1] for iv in ivals if after < iv[1] < inf}) if fits(j, t)), inf)
+        end = start + e if e and start < inf else inf
+        after = start
+        s = j.get("share")
+        ivals.append([start, end, s, s["gb"] if s else 0.0])
+        out.append({**j, "expect": e, "expectFrom": src, "start": None if start == inf else start,
+                    "finish": None if end == inf else end, "late": False})
+    order = {j["pid"]: i for i, j in enumerate(jobs)}
+    return sorted(out, key=lambda j: order[j["pid"]])
+
+
 def busy():
     """The other heavy jobs on this machine now, waiting or running, as 'what root' (the nightly
     measurement does not start while there are any)."""

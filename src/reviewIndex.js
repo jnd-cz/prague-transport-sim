@@ -115,4 +115,5 @@ export async function main() {
   window.reviewIndex = { index, sets, old: old.map((s) => s.file) }; // (for the page test, tools/test_review_index.py)
 }
 
-main();
+// (imported by the overview, src/overview.js, for answers() and count(): only reviews.html runs the directory)
+if (document.getElementById('waiting') && document.getElementById('answered')) main();

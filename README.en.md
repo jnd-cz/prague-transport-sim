@@ -31,10 +31,11 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   - **At a platform at least 15 m long,** where the data has one: the whole set stands alongside it, its rear
     at most 3 m short of the platform's start and its front at most 4 m past its end. A second set can serve
     the stop behind the first, on a longer platform even two 2×T3 sets in a row (about three stops in four).
-    At a platform shorter than the set, the front between 8 m before its end and 4 m past it is enough.
+    At a platform shorter than the set, the front between 8 m before its end and 4 m past it is enough. The front at
+    the stop sign (2.5 m before it to 3 m past it) always serves the stop, even where a longer set's rear stands off
+    the platform: passengers board through the doors along the platform.
   - **Elsewhere:** the front between 20 m before and 12 m past the stop sign.
-  - **A signal right after the stop:** the front at most 0.5 m before it.
-- The stopping point is the stop sign: within 3 m of it earns a precision bonus of 15 points. Stopping a little
+- The stopping point is the stop sign, for every set and whatever the signals: within 3 m of it earns a precision bonus of 15 points. Stopping a little
   past it happens in reality too and people still get on and off, so up to 4 m past the sign costs nothing;
   more than 4 m costs 20 points, even though the stop is served. Stopping further back in the allowed place costs
   nothing.
