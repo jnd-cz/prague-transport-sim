@@ -954,6 +954,19 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
     sidewalks steeper than they are.
   - **Today's survey surface at Hartigova falls away from the kerb** (median −2.2 %): `kerbs.py`'s +0.10 m may land on
     a line that is already the kerb's top there.
+  - **A kerb drawn in short edges** (#800, measured 2026-11-23). Round a corner or along a bend the survey draws a
+    kerb in edges of 0.2-1.5 m. Until #800 an edge 3 m or longer was a kerb and a shorter one none, its walkway on
+    the fill following IPR, whose raster rounds the kerb away: 182 of the 202 sidewalk|road samples with a flat kerb
+    on ground batch D lay on such an edge. A run of consecutive kerb edges 0.5 m or longer is now sampled every
+    0.25 m, its normals read over 0.5 m either way along it (`street_profile.kerb_edges`). An edge under 3 m is no
+    wall's top (`WALL_EDGE_MIN`): read as one, a 2 m edge at the road's level by Palackého náměstí (line 9 (-708.4,
+    -1186.4)) held its sidewalk 1.9 m under the road, the quay 1.5 m behind. Against batch D's street surfaces on the
+    five lines: within 0.75 m of a kerb the walkway lies +0.046 m over IPR (median), 1.5-3 m in -0.002 m; of the
+    sidewalk cells that moved 0.3 m or more, 2,023 came nearer IPR and 1,172 went from it (1 m or more: 470 and 196).
+    Those that went from it lie where a sidewalk spans two levels and a few seeds (a kerb's plane, a wall's hold)
+    set it: at Výtoň (line 17 (-763.3, -2212.2)) a wedge at the foot of a wall whose hold is its top, 192.38 m, IPR
+    1.5 m in reads the wall's smear and makes a wall's top of every kerb point but the corner's (already on main),
+    and the corner's normal, turned 30°, reads it too: the wedge, 188.7 m at the kerb, fills at 192.4 m.
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
