@@ -33,3 +33,5 @@ reports/review/*
 !reports/review/*.json
 !reports/review/*.md
 reports/review/index.json
+# tools/overview.py's snapshot, served beside overview.html (#826)
+/overview.json

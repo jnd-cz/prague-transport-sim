@@ -444,6 +444,18 @@ lines in the file (`issue`, `line`, or per finding `line` / `lines_near`); `KNOW
 tools that do not write them yet. The kerb review lists are listed there too, under #142, though they lie in each
 line's survey data, not in a file.
 
+**The project overview** (`overview.html`, test site only; #826) is for the phone: what waits for the user (PRs ready
+to merge, the PRs' questions, issues labelled `needs-user`, the review sets' unanswered findings counted as the review
+directory counts them), the heavy queue with estimated starts and finishes, the agents' sessions of the last 48 h and
+the board. `tools/overview.py` writes `overview.json` from `board.py`'s functions, the heavy queue and the session logs
+(Claude Code's and Codex's, `LOGS` there: only the folder a session works in and the PR its harness linked are read,
+from the log's end, never a message), and uploads it to the test site over `deploy.py`'s connection when it changed or
+10 min went by; the page turns red at 15 min. `python -I tools/overview.py --install` runs it every 2 min as a
+scheduled task (pythonw, `--uninstall`), in the deploy checkout (`../tg-deploy`, which has `deploy.local.json`); a run
+takes ~3 s of CPU (the board's git answers cached by commit in `reports/overview-cache.json`). A deploy never deletes
+`overview.json` (`deploy.py` `KEPT`). `--print` prints the snapshot; locally `python -I tools/overview.py --print >
+overview.json` and the dev server show the page.
+
 **Review mode** (the checks' findings on the map, desktop or phone; #129): open
 `index.html?line=17&review`, no shift needed. The panel lists findings worst first:
 - the kerb review list from the survey's provenance (`tools/kerbs.py`);
@@ -582,6 +594,9 @@ the pinned #291 and only proposes.
   `headless.py` plans from its runs' times, or the median of the same kind's last full runs (a command's script
   and its option names) in `history.jsonl` beside the tickets. `--no-limit` (`TRAM_HEAVY_NOLIMIT=1`) keeps the
   warnings and ends nothing. A job waiting behind one that watches itself gives it 20 min before calling it stuck.
+  The board and the overview add each job's estimated start and finish (`baseline_store.schedule`, #826): the
+  ticket's expected time, else its kind's median in the history (one full run is enough there), the jobs started in
+  queue order as their turns allow (alone after everything, shared while cores and GB fit).
 - A stopped background task can leave its job running: when the command ended in a Git Bash program (`bash
   chain.sh`), bash handed its process over to it, and the stop kills a pid that is gone (measured 2026-11-22: the
   chain's shells and its python ran on, their parents unchanged; with the outer shell alive the stop ends the

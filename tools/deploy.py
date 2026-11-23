@@ -12,7 +12,7 @@ Password: TRAM_DEPLOY_PASSWORD, else ~/.netrc (machine <netrc or host> login <us
 stored by this tool.
 The test site's access protection is the web host's (Plesk: Password-Protected Directories); after a deploy
 the URL is checked to answer 401 without a login.
-A "public" target (the closed alpha, #350) has no login: no review tools go up (review.php, reviews.html,
+A "public" target (the closed alpha, #350) has no login: no review tools go up (review.php, reviews.html, overview.html,
 reports/review/), search engines are asked not to index it, it is deployed only from a tagged commit (the
 version testers name), and after a deploy the URL is checked to serve the page and none of the review tools.
 Player feedback (src/report.js): tools/feedback.php goes up as feedback.php on every target and stores notes in
@@ -91,7 +91,10 @@ NOINDEX = """<IfModule mod_headers.c>
 """
 ROBOTS = b"User-agent: *\nDisallow: /\n"
 # what serves review mode and its answers: never on a public target (#350)
-REVIEW_TOOLS = ("review.php", "reviews.html", "reviews/", "reports/review/")
+REVIEW_TOOLS = ("review.php", "reviews.html", "reviews/", "reports/review/", "overview.html", "src/overview.js")
+# files other tools upload beside the site, never deleted by a deploy (they are not in its manifest either): the
+# project's overview, tools/overview.py, every few minutes (#826)
+KEPT = ("overview.json",)
 
 
 def git(*args):
@@ -215,7 +218,7 @@ def order(rel):
 def plan(local, remote):
     """(paths to upload, paths to delete) from {path: sha256} here and on the server."""
     up = sorted((r for r, h in local.items() if remote.get(r) != h), key=order)
-    gone = sorted(r for r in remote if r not in local)
+    gone = sorted(r for r in remote if r not in local and r not in KEPT)
     return up, gone
 
 
@@ -402,7 +405,7 @@ def status(url, path=""):
 def public_ok(url, get=status):
     """A public target's answers without a login: the page and version.json served, every review tool and
     the stored notes not ([] when all is as it should be, else what is wrong)."""
-    want = {"": 200, "version.json": 200, "feedback/": 403, "submissions/": 403, **{p: 404 for p in ("review.php", "reviews.html", "reports/review/index.json")}}
+    want = {"": 200, "version.json": 200, "feedback/": 403, "submissions/": 403, **{p: 404 for p in ("review.php", "reviews.html", "reports/review/index.json", "overview.html", "overview.json")}}
     bad = []
     for p, w in want.items():
         got = get(url, p)
