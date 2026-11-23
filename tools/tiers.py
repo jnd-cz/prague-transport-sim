@@ -22,7 +22,7 @@ TOOLS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(TOOLS)
 sys.path.insert(0, TOOLS)
 
-SEEDED = "u3,redruns,stops,traffic,lint"  # (stops rides on the u3 drive, #708)
+SEEDED = "u3,redruns,stops,traffic,lint,giveway"  # (stops rides on the u3 drive, #708; giveway is static, #602)
 STATIC = "lint,surfaces,canted,crossing,spacing,heights"
 DRAWN = "lint,surfaces,crossing,canted"
 
