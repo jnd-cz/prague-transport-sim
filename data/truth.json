@@ -1,6 +1,7 @@
 {
  "note": "Facts from the user and from sources, each citing where it came from: what checks score the game against and what the build obeys. Add facts here, not special cases in code. Every section has a reader, or says in `readers` that it is reference only (AGENTS.md, #224).",
  "readers": {
+  "t3PhotoModel": "reference: user appearance requirements for src/t3photo.js (#437); not simulation or world-build inputs",
   "contactorSound": "reference: user listening observations for src/audio.js and src/tr37.js, #590",
   "stops": "tools/lint.js stopFacts: the stop detector (src/game.js _vienna) scored against the facts of the loaded line",
   "stopTypes": "reference: what the types in stops mean",
@@ -29,6 +30,79 @@
   "groundPlaces": "tools/ground_place.py: the places a ground change is built and measured at (#757)",
   "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)"
  },
+ "t3PhotoModel": [
+  {
+   "id": "bogie-wheel-faces-and-track-brake",
+   "source": "user, bogie review on 2026-11-22, #437, photos 18347.jpg and 18348.jpg",
+   "quote": "wheel is full without holes, has one large hex nut, the track brake is the lowest rectangle close to the rail, has I think one hinge and couple springs on each side. In between there's couple large parts and shouldn't be visible through.",
+   "implementation": "The two 8053 views guide the side silhouette. The pivot and spring arrangement is a visual estimate."
+  },
+  {
+   "id": "6892-front-and-hand-operated-rear-wipers",
+   "source": "user, 6892 model review, 2026-11-20, #437",
+   "quote": "the front ones are mounted under the window and the motion should sweep more of the glass - meet in the middle and go towards the glass metal divider. The back wiper looks better but should swing to both sides and can be left no animated as it's for hand operation only, not usually used, only when backing up by the driver from the rear control panel."
+  },
+  {
+   "id": "entry-and-folding-doors",
+   "source": "user, model review in session 2026-11-16, #437",
+   "quote": "the entry stair shouldn't be see through ... The door should end with the first stair floor and not extend further, wide open just a bit less than completely folded 90 degrees",
+   "implementation": "Closed stair risers; door bottom at the first tread with seal clearance; 84 degrees is the modelling choice for slightly below 90, not a measured factory angle."
+  },
+  {
+   "id": "rounded-ends-and-running-gear",
+   "source": "user, model review in session 2026-11-16, #437",
+   "quote": "The front and back are too wide and flat. Try to make it more tapered and round ... Wheels should be full without hole, more towards dirty brown. Magnetic break could be moddeled more accurately than a thin strip close to rails."
+  },
+  {
+   "id": "markings-indicators-collector",
+   "source": "user, model review in session 2026-11-16, #437; supplied photos 17823.jpg, 17824.jpg, 16806.jpg, 16447.jpg, 16191.jpg",
+   "quote": "Fleet numbers should be larger, more consistent height around the sides, check position against real photos. Don't forget to put turn indicator on the sides too. And the current collector has only one diagonal rod",
+   "implementation": "Single diagonal per articulated collector frame; the front and rear frames can overlap in a head-on view."
+  },
+  {
+   "id": "twenty-four-early-cushioned-seats",
+   "source": "user answer in session 2026-11-16, #437",
+   "quote": "i would go with 24 places and the simplified cushion style early T3 like in 6312, 6102 cars",
+   "passengerSeats": 24,
+   "style": "Early padded T3 seats; requested custom interior under 6892 exterior markings."
+  },
+  {
+   "id": "saloon-reference-6312",
+   "source": "user, session 2026-11-23, #437, photos 18530.jpg, 18531.jpg, 18532.jpg, 18535.jpg and 18536.jpg",
+   "quote": "the interion is the older 6312 style, so we should later split the model into two",
+   "reference": "18532 identifies the car at the cab partition. The aisle views show single upholstered chairs, a facing pair with a box-base chair, tapered pedestals and an open central aisle."
+  },
+  {
+   "id": "shared-end-bow-and-entry",
+   "source": "user, 2026-11-23, #437, 20261122_121753.jpg and 20261121_124445.jpg",
+   "quote": "the rear isn't completely flat (the front isn't either), but has larger radius before meeting the rounded corner",
+   "reference": "Both cars share the bowed ends, clipped stair corners and door tops aligned to the saloon window frames."
+  },
+  {
+   "id": "6892-plastic-seat-finish",
+   "source": "user, 2026-11-23, #437, 20261121_123814.jpg, 20261121_123807.jpg and 20261121_123838.jpg",
+   "quote": "just to match the general shape and have both red and grey colors.",
+   "reference": "6892 has dished plastic shells with a slot above the pan and a tubular grip above the back."
+  },
+  {
+   "id": "6312-exterior-variant",
+   "source": "user, 2026-11-23, #437, photos 20261122_120509.jpg, 20261122_120525.jpg, 20261122_120722.jpg and 20261122_120531.jpg",
+   "quote": "use them to model the car, separately from 6892.",
+   "reference": "6312 has a front brow route board, a rear window route board, horizontal combined rear lamps and red-insert aluminium mouldings. The rear photograph shows an unobstructed pane."
+  },
+  {
+   "id": "end-contours-brow-and-coupler",
+   "source": "user follow-up in session 2026-11-16, #437; supplied 6312 photos 15611.jpg, 15609.jpg, 15606.jpg and 7000 detail 17884.jpg",
+   "quote": "model the front and back according to these photos. Pay attention to the shape, lines, contours, window, top brow with a bit of overhang and tge line plate alignment. Try to model the coupler too.",
+   "reference": "The earlier photo 17824.jpg of 6892 remains the rear lamp/window reference."
+  },
+  {
+   "id": "interior-photo-character",
+   "source": "user follow-up in session 2026-11-16, #437; supplied interior photos 17398.jpg, 17399.jpg, 17402.jpg and 17400.jpg",
+   "quote": "Interior with the chairs and doors if that helps you with the design. It doesn't need to be super detailed but to capture tge general gist of it.",
+   "reference": "Red upholstered pads, silver loop frames, round and electrical-box pedestals, pink-beige wall panels, dark ribbed rubber floor, silver inner door faces and long handles. Seat count and simplified layout remain the earlier 24-place choice."
+  }
+ ],
  "contactorSound": [
  {
   "id": "tr37-6004-contactor-sound",
