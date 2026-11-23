@@ -143,7 +143,7 @@ def climbs(a):
     return False
 
 
-STAIRS_OFF = 1.0     # m: an outline point this far off the lidar inside the stairs carries another height (StairsHeights)
+STAIRS_OFF = 0.75    # m: an outline point this far off the lidar inside the stairs carries another height (StairsHeights)
 STAIRS_INSET = 0.5   # m: how far inside the stairs the lidar is read for an outline point
 STAIRS_ON = 0.05     # m: an outline edge whose middle lies this near a survey line lies on it
 STAIRS_EDGES = {"Hranice_budovy": "other", "Hranice_stavby": "other", "Zeď": "other", "Hranice_zdi": "other",
@@ -187,8 +187,9 @@ class StairsHeights:
     height, tipped the foot up). Triangulated, they fold: 1,223 m² of the five lines' stairs steeper than 1:1, 947 m² of
     it on stairs with such edges or jumps (2026-11-22).
 
-    An outline point on another feature's edge on both sides (a building's, a structure's or a wall's line, not the
-    stairs' own boundary, STAIRS_EDGES), or on an outline with two jumps or more, that stands STAIRS_OFF or more off the
+    An outline point on another feature's edge (a building's, a structure's or a wall's line, not the stairs' own
+    boundary, STAIRS_EDGES: either edge, so a corner where the stairs meet a building is judged), or on an outline with
+    two jumps or more, that stands STAIRS_OFF or more off the
     lidar STAIRS_INSET inside the area takes the height of the nearest outline point that does not: steps are level
     across a flight. The lidar only picks which of the survey's heights are the stairs'. A point under a level-1 survey
     area (a deck, a bridge) is not judged: the raster reads the deck there (the stairs under the bridge on line 17 at
@@ -197,8 +198,10 @@ class StairsHeights:
     can't be properly seen by the lidar sampling").
 
     Judged on the user's 24 answers (data/truth.json stairsReview): one flight 5615 34 -> 0 m² steeper than 1:1 (one
-    plane now), 5663 22 -> 4, 582 11 -> 0; flights that turn 1998 20 -> 4; no stairs, line 37 (4001, 1412), 10 -> 0 (the
-    sidewalk's level). The lines' stairs: 1,223 -> 852 m² (126 areas better, 29 worse by 0.5 m²)."""
+    plane now), 5662 11.5 -> 0, 5663 22 -> 0.6, 582 11 -> 0; flights that turn 1998 20 -> 0.8; no stairs, line 37
+    (4001, 1412), 10 -> 0 (the sidewalk's level). The lines' stairs: 1,223 -> 709 m² (183 areas better, 25 worse by
+    0.5 m²). STAIRS_OFF 1.0 left 745 m² (154 / 24): a building's foot 0.9 m under a flight 2 m wide kept its height and
+    the flight leant across (groundPlaces stairs-beside-a-building); 0.5 left 694 m² but 41 worse."""
 
     def __init__(self, D, lines, lidar):
         self.lidar = lidar
@@ -219,13 +222,12 @@ class StairsHeights:
         Q = np.roll(P, -1, 0)
         run = np.hypot(Q[:, 0] - P[:, 0], Q[:, 1] - P[:, 1])
         jumps = int(((run <= RISER_RUN) & (np.abs(Q[:, 2] - P[:, 2]) >= RISER)).sum())
-        other = np.zeros(len(P), bool)   # (the edge from each point on another feature's line, not the stairs')
+        on = collections.defaultdict(set)   # (the lines each edge, from its point to the next, lies on)
         if self.tree is not None:
             pi, si = self.tree.query(shapely.points((P[:, :2] + Q[:, :2]) / 2), predicate="dwithin", distance=STAIRS_ON)
-            on = collections.defaultdict(set)
             for p, s in zip(pi, si):
                 on[int(p)].add(self.kind[s])
-            other = np.array([on[k] == {"other"} for k in range(len(P))])
+        other = np.array([on[k] == {"other"} for k in range(len(P))], bool)
         judged = (other | np.roll(other, 1)) | (jumps >= 2)
         if not judged.any():
             return None
