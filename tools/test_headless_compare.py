@@ -196,5 +196,29 @@ class Places(unittest.TestCase):
         self.assertEqual(headless.place_rows(stored, {(17, "lint", 0): {"railSupport": [[1, 2, 3]]}}), [])
 
 
+class Player(unittest.TestCase):
+    """--player (#710): the checks' world beside a player's, run by run."""
+    U3 = {"stuck": None, "hits": 0, "signalPenalty": 0, "yielded": 4, "closeCuts": 1,
+          "carsIntoJunctions": {"red": 0, "green": 30, "amber": 2}}
+
+    def table(self, streamed):
+        kept = {("17", "u3", 1): headless.counts("u3", self.U3)}
+        rows, bad = headless.player_rows(kept, {("17", "u3", 1): streamed})
+        return [c.strip() for c in rows[2].strip("|").split("|")], bad
+
+    def test_the_same_counts_pass(self):
+        cells, bad = self.table(dict(self.U3, farGround={"reads": 0, "tiles": 0, "at": []}))
+        self.assertEqual((cells[3], cells[4], cells[5], bad), ("same", "none", "same", 0))
+
+    def test_a_move_with_grid_reads_has_its_reason(self):
+        cells, bad = self.table(dict(self.U3, yielded=5, farGround={"reads": 120, "tiles": 2, "at": [[10, 20]]}))
+        self.assertEqual((cells[3], cells[4], cells[5], bad),
+                         ("yielded 4 → 5", "120 reads on 2 tiles, first at [10, 20]", "moved: heights from the grid", 0))
+
+    def test_a_move_without_a_grid_read_fails(self):
+        cells, bad = self.table(dict(self.U3, hits=1))
+        self.assertEqual((cells[3], cells[5], bad), ("hits 0 → 1", "moved without a grid read: FAIL", 1))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

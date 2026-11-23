@@ -19,7 +19,9 @@ run). `--against W1` names a checkpoint instead.
    given ($ARGUMENTS) replace the lines it chose.
 2. **Why each row runs what it does:** the simulation's seeded checks (`stops` rides on the `u3` drive, #708); a
    world change runs no traffic or redruns, which measure traffic reshuffled by the new data (#156), and its smoke
-   drive only has to reach the last stop unstuck (its counts are not compared).
+   drive only has to reach the last stop unstuck (its counts are not compared). A change of the loaders (the
+   `loading` row) loads each line as a player does beside the checks' world (`--player`, #710): its table in
+   reports/headless/player.md, every move explained by its heights from the 10 m grid or a failure.
 3. **Run** in the background. Heavy jobs take turns (AGENTS.md): the run waits its turn and says whom it
    waits for, so start it and let it wait rather than starting a second one beside it. Every check on
    every line takes 27 minutes with 4 pages at once (#205), the geometry checks a few minutes a line.
