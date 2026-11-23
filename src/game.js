@@ -9,7 +9,7 @@ import { toLatLon } from './geo.js';
 import { t } from './i18n.js';
 import { leafTexture } from './weather.js';
 import {
-  makeCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
+  makeCar, fitCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
   makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeSpeedBoard, disposeModel,
   makeSpeedSwitchSignal, makeSwitchNumberPlate, makeCallSignal, makeEntrySignal,
 } from './models.js';
@@ -22,6 +22,7 @@ const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
 const PHASE_HOLD = 10;        // s: the most a junction holds its phase for each tram committed to it (_runController)
 
 import { rng } from './random.js';
+import { carTypeOf } from './carTypes.js';
 import { Feeding } from './electric.js';
 import { buildPlatforms, buildStop, place } from './platforms.js';
 
@@ -816,6 +817,8 @@ export class Game {
       const type = this.rand() < 0.5 ? 'parked' : 'pedestrian';
       const mesh = type === 'parked' ? makeCar(Math.floor(this.rand() * 8)) : makePerson(Math.floor(this.rand() * 8));
       const ob = { type, s, lat: type === 'parked' ? -1.5 : -6, mesh, state: 'idle', timer: 0, rung: false, speed: 1.3 };
+      // a parked car's type (#250): its half length and width, numbered past the traffic's ids and the signal scenes'
+      if (type === 'parked') { ob.carType = carTypeOf(0x50000000 + i); ob.half = ob.carType.length / 2; ob.halfW = ob.carType.width / 2; fitCar(mesh, ob.carType); }
       place(mesh, this.route, s, ob.lat, 0, false);
       if (type === 'pedestrian') mesh.visible = false;
       this.objects.add(mesh);
@@ -1415,10 +1418,12 @@ export class Game {
         const dir = X.oneway || (this.rand() < 0.5 ? 1 : -1);
         const start = dir > 0 ? 0 : X.length;
         if (!sig.cars.some((c) => c.dir === dir && Math.abs(c.s - start) < 9)) {
-          const mesh = makeCar(sig.seed++);
+          // its type (#250): numbered by the scene's seed, past the traffic's ids
+          const type = carTypeOf(0x40000000 + sig.seed), mesh = makeCar(sig.seed++);
+          fitCar(mesh, type);
           mesh.rotation.order = 'YXZ';
           this.objects.add(mesh);
-          sig.cars.push({ s: start, dir, mesh, v: 0 });
+          sig.cars.push({ s: start, dir, mesh, v: 0, type, half: type.length / 2 });
         }
       }
     }
@@ -1433,21 +1438,22 @@ export class Game {
       const waiting = toX > 3.5 && toX < 12 && (red || tramComing);
       // queue behind the car in front
       let gap = Infinity;
-      for (const o of sig.cars) if (o !== car && o.dir === car.dir && (o.s - car.s) * car.dir > 0) gap = Math.min(gap, (o.s - car.s) * car.dir - 4.4);
+      for (const o of sig.cars) if (o !== car && o.dir === car.dir && (o.s - car.s) * car.dir > 0) gap = Math.min(gap, (o.s - car.s) * car.dir - o.half - car.half);
       const vt = waiting ? 0 : Math.min(9, Math.max(0, (gap - 3) * 0.9));
       car.v = vt > car.v ? Math.min(vt, car.v + dt * 2.5) : Math.max(vt, car.v - dt * 6);
       car.s += car.dir * car.v * dt;
       const p = X.at(car.s), hx = p.hx * car.dir, hy = p.hy * car.dir;
       const lane = X.oneway ? 0 : Math.max(1.5, X.w / 4); // right-hand traffic
       const x = p.x + hy * lane, y = p.y - hx * lane;
-      const zf = ground.at(x + hx * 1.6, y + hy * 1.6), zb = ground.at(x - hx * 1.6, y - hy * 1.6);
+      const a = car.type.wheelbase / 2, zf = ground.at(x + hx * a, y + hy * a), zb = ground.at(x - hx * a, y - hy * a);
       car.mesh.position.set(x, (zf + zb) / 2 + 0.1, -y);
       car.mesh.rotation.y = Math.atan2(hx, -hy);
-      car.mesh.rotation.x = -Math.atan2(zf - zb, 3.2);
+      car.mesh.rotation.x = -Math.atan2(zf - zb, 2 * a);
       // a hit: the car inside the tram's body on the crossing (its front plus the car's half width), not
-      // the 4 m ahead in which drivers see it coming (a car 4 m ahead counted, line 9 seed 7, #268)
+      // the 4 m ahead in which drivers see it coming (a car 4 m ahead counted, line 9 seed 7, #268); within its half
+      // length and 0.1 m of the crossing point (2.3 m for every car before #250)
       const inBody = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 1;
-      if (Math.abs(toX) < 2.3 && inBody && tram.v > 0.2 && !car.hit) {
+      if (Math.abs(toX) < car.half + 0.1 && inBody && tram.v > 0.2 && !car.hit) {
         car.hit = true;
         this._collision(t('obj.crossingCar'));
       }
@@ -1496,8 +1502,11 @@ export class Game {
           if (Math.abs(ob.lat) > 7) { ob.state = 'gone'; ob.mesh.visible = false; }
         }
       }
-      // collision with tram body
-      if (ob.state !== 'gone' && Math.abs(ob.lat) < 1.55 && ob.s <= tram.s + 0.2 && ob.s >= tram.s - tram.length) {
+      // collision with tram body (a parked car: from its rear to its front, its middle within 0.65 m and its half width of
+      // the track centre, 1.55 m for the 1.8 m box car; a walker: where it is. Before #250 only a car's middle counted: the
+      // tram ran 2.2 m into it without a collision)
+      const hl = ob.half ?? 0, hw = ob.halfW !== undefined ? 0.65 + ob.halfW : 1.55;
+      if (ob.state !== 'gone' && Math.abs(ob.lat) < hw && ob.s - hl <= tram.s + 0.2 && ob.s + hl >= tram.s - tram.length) {
         if (tram.v > 0.15 || ob.type === 'pedestrian') {
           ob.state = 'gone';
           ob.mesh.visible = false;

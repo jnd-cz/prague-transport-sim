@@ -8,7 +8,6 @@
 // bells = the autopilot's bell; hits = collisions with crossing cars.
 import { stuckWatch, stuckScene } from './stuck.js';
 
-const CAR_FRONT = 2.2; // a car's front bumper ahead of its position (its middle), as traffic.js CAR_HALF
 // #602: a car's body (src/models.js: 1.8 x 4.3 m) against both tracks. FOUL: a tram's half width (1.25 m) with its swing in a
 // tight curve's overhang (about 0.45 m) and 0.3 m; a body corner nearer a track's centre fouls the tram passing there
 const CAR_HW = 0.9, CAR_HL = 2.15, FOUL = 2.0;
@@ -55,7 +54,7 @@ export async function run(seed = 1, opts = {}) {
   game._collision = (what, pts) => {
     // (the scene: the crossing cars at the tram's front)
     const tr = game.tram;
-    const cars = (game.carsCrossing || []).filter((x) => Math.abs(x.s - tr.s) < 6).map((x) => ({ d: +(x.s - tr.s).toFixed(1), onTrack: x.onTrack, v: +(x.car.vNow ?? 0).toFixed(1), front: x.car.xing && +(x.car.xing.dC - 2.2).toFixed(1), bold: !!x.car.bold, light: x.car.lane?.light ? traffic.lightAspect(x.car.lane.light) : null, conn: !!x.car.conn, lightGo: !!x.car.lightGo }));
+    const cars = (game.carsCrossing || []).filter((x) => Math.abs(x.s - tr.s) < 6).map((x) => ({ d: +(x.s - tr.s).toFixed(1), onTrack: x.onTrack, v: +(x.car.vNow ?? 0).toFixed(1), front: x.car.xing && +(x.car.xing.dC - x.car.half).toFixed(1), bold: !!x.car.bold, light: x.car.lane?.light ? traffic.lightAspect(x.car.lane.light) : null, conn: !!x.car.conn, lightGo: !!x.car.lightGo }));
     R.hits.push({ what, s: Math.round(tr.s), v: +(tr.v * 3.6).toFixed(0), notch: tr.notch, cars, trail: (R.ctrail || []).slice(-10).join(' | ') });
     coll(what, pts);
   };
@@ -94,13 +93,13 @@ export async function run(seed = 1, opts = {}) {
             if (!c.active) continue;
             const p = c.path.at(c.s);
             if (Math.hypot(p.x - W.x, p.y - W.y) > 40) continue;
-            (R.watch ||= []).push(`${(game.clock % 1000).toFixed(1)} tram${Math.round(opts.watch - tr.s)} #${c.id} ${c.conn ? 'conn' : 'lane' + c.lane.id} toEnd${(c.toEnd ?? 0).toFixed(1)} next${c.next ? c.next.id : '-'} v${(c.vNow ?? 0).toFixed(1)} xing${c.xing ? `${Math.round(c.xing.sx)}@${(c.xing.dC - 2.2).toFixed(1)}` : '-'}${c.yielding ? ' Y' : ''} why${c.why ?? '-'}${c.jBlock != null ? ' jb' + c.jBlock : ''} lead${c.lead?.id ?? '-'}`);
+            (R.watch ||= []).push(`${(game.clock % 1000).toFixed(1)} tram${Math.round(opts.watch - tr.s)} #${c.id} ${c.conn ? 'conn' : 'lane' + c.lane.id} toEnd${(c.toEnd ?? 0).toFixed(1)} next${c.next ? c.next.id : '-'} v${(c.vNow ?? 0).toFixed(1)} xing${c.xing ? `${Math.round(c.xing.sx)}@${(c.xing.dC - c.half).toFixed(1)}` : '-'}${c.yielding ? ' Y' : ''} why${c.why ?? '-'}${c.jBlock != null ? ' jb' + c.jBlock : ''} lead${c.lead?.id ?? '-'}`);
           }
         }
         // (a trail of crossing cars ahead of the tram, every 0.5 s: for the collision scene)
         if (R.steps % 15 === 0) {
           const cc = traffic.cars.filter((c) => c.active && c.xing && c.xing.sx > tr.s - 2 && c.xing.sx - tr.s < 40)
-            .map((c) => `#${c.id} x${Math.round(c.xing.sx - tr.s)}m front${(c.xing.dC - 2.2).toFixed(1)} v${(c.vNow ?? 0).toFixed(1)}${c.yielding ? ' YIELD' : ''}${c.bold ? ' bold' : ''}${c.conn ? ' conn' : ''}`);
+            .map((c) => `#${c.id} x${Math.round(c.xing.sx - tr.s)}m front${(c.xing.dC - c.half).toFixed(1)} v${(c.vNow ?? 0).toFixed(1)}${c.yielding ? ' YIELD' : ''}${c.bold ? ' bold' : ''}${c.conn ? ' conn' : ''}`);
           (R.ctrail ||= []).push(`${Math.round(game.clock)} tram ${(tr.v * 3.6).toFixed(0)}km/h n${tr.notch} [${cc.join(', ')}]`);
           if (R.ctrail.length > 30) R.ctrail.shift();
         }
@@ -133,10 +132,10 @@ export async function run(seed = 1, opts = {}) {
         }
         for (const c of traffic.cars) if (c.active && c.yielding && c.xing && Math.abs(c.xing.sx - tr.s) < 150) {
           yielded.add(c.id);
-          // where a yielding car stands: its front bumper's distance from the track centre line
+          // where a yielding car stands: its front bumper's (half its length ahead of its middle) distance from the track centre line
           if ((c.vNow ?? 1) < 0.05 && !(R.bumper ||= new Map()).has(c.id)) {
             const seq = traffic._seq(c); let fp = null;
-            for (const [path, off] of seq) { const s = CAR_FRONT - off; if (s <= path.length) { fp = path.at(s); break; } }
+            for (const [path, off] of seq) { const s = c.half - off; if (s <= path.length) { fp = path.at(s); break; } }
             const n = fp && game.route.nearest(fp.x, fp.y);
             if (n) R.bumper.set(c.id, n.d);
           }

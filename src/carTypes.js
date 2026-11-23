@@ -23,3 +23,14 @@ export function pickCarType(u) {
   for (const t of CAR_TYPES) if ((w -= t.weight) < 0) return t;
   return CAR_TYPES[CAR_TYPES.length - 1];
 }
+
+// the type of car number n (a car's id, a parked car's or a signal scene's number): from a hash of n, as a driver's
+// boldness comes from the id (src/traffic.js), not a draw from the run's stream: adding the types left every seeded
+// run's draws where they were. (Each caller numbers its cars in its own range.)
+export function carTypeOf(n) {
+  let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return pickCarType((h >>> 0) / 4294967296);
+}
