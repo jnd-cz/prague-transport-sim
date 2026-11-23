@@ -212,6 +212,37 @@ class Signals(unittest.TestCase):
         s.jpos = {"100,0": [46, 0]}
         self.assertIsNone(s.osm_stop(lane, 60, 0))  # (on the junction's own node: no stop line)
 
+    def test_over_bridge(self):
+        """profile.overBridge(): more than 8 m inside a span and over 3 m above the ground under it, the survey's, past
+        its tiles the terrain grid (the signals and pedestrian crossings on the road under a bridge, #823)."""
+        class Survey:
+            def __init__(self, z, grid=None):
+                self.z, self.grid = z, grid
+
+            def survey(self, xs, ys):
+                return None, np.array([self.z])
+
+        class Grid:
+            def height(self, xs, ys):
+                return np.array([4.0])
+
+        class P:
+            bridges = [(100, 200)]
+
+            def height(self, s):
+                return 10.0
+
+        class R:
+            def at(self, s):
+                return s, 0, 1, 0
+        s = self.sig(profile=P(), route=R())
+        s.survey = Survey(5.0)
+        self.assertEqual([s.over_bridge(x) for x in (50, 105, 150, 195)], [False, False, True, False])
+        s.survey = Survey(7.5)
+        self.assertFalse(s.over_bridge(150))  # (2.5 m above the road)
+        s.survey = Survey(np.nan, Grid())
+        self.assertTrue(s.over_bridge(150))  # (no survey there: the grid's 4 m)
+
 
 class Heights(unittest.TestCase):
     def test_terrain_grid_on_the_cells_triangles(self):  # (what the over-bridge test reads past the ground's tiles)
