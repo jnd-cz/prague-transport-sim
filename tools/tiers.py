@@ -48,7 +48,7 @@ KINDS = [
                         "tools/lint.js"),
      f"--checks {DRAWN} on every line; every seedless move needs a reason", "seeded checks"),
     ("drawing", ("src/models.js", "src/buildings.js", "src/trees.js", "src/lamps.js", "src/figures.js", "src/rigged.js",
-                 "src/vehicles.js", "src/t3simple.js", "src/cabframe.js", "src/mirror.js", "src/weather.js",
+                 "src/vehicles.js", "src/t3simple.js", "src/t3photo.js", "src/cabframe.js", "src/mirror.js", "src/weather.js",
                  "src/landmarks.js", "src/ledPanels.js", "src/indicators.js", "src/boxes.js", "src/nearbatch.js",
                  "src/catenary.js", "src/speedSigns.js", "src/packages.js", "src/packageRules.json", "src/audio.js",
                  "src/perf.js", "src/between.js", "src/groundFile.js", "src/groundWorker.js", "src/loading.js", "src/hud.js",
