@@ -308,6 +308,11 @@ Sections:
   set the junction's moved tracks 0.15-0.24 m over their neighbours. A track within 7 m of a stretch taken goes with
   it where its own record lies over 0.1 m off the lidar the same way: left behind, three short tracks of that junction
   had their rails 11-15 cm under their neighbours' beds (ground batch D, 2026-11-23).
+  Between 0.10 and 0.20 m under the lidar (staged 2026-11-23, 3,797 samples with DI, paved and unknown) DI sides
+  with the lidar at 89 %, and the street beside the track does not sharpen it (level with the track's lidar 241 of
+  272 paved, falling away across it 1,743 of 1,927): no rule there. Where the survey lies within 5 cm of the record,
+  DI sides with the lidar at 668 of 686 paved samples: the survey there is the same old street level, not a second
+  witness, and the rule takes that case (`SURVEY_WITH`).
 - **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
   user's photos show the paving following the slope. Held at 500 m, Malovanka's curves lay up to 40 cm off the 1 m lidar
   and its junction still needed 355 m (meeting points metres apart). The archive put Královka's arms 15-78 cm above the
