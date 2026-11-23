@@ -358,8 +358,10 @@ drives the whole line from the first stop with a fixed time step, trip 40, obsta
 only draws meanwhile (`window.headless`). Before #722 it drove its own run (trip 0, no obstacles), so no traffic
 count is read across that change. Every 0.2 s it records every visible car, walker and tram and counts: cars or
 walkers moving sideways
-(`slide`), teleporting (`jump`), vehicles intersecting (`overlap`, once per episode) and walkers inside
-a vehicle (`walkerHit`), each with its cause where known (next road, lane beside the tram, …). It is
+(`slide`), teleporting (`jump`), vehicles intersecting (`overlap`, once per episode), walkers inside
+a vehicle (`walkerHit`), each with its cause where known (next road, lane beside the tram, …), and
+walkers that keep within 2 m of one place for 30 s while not waiting at a kerb or in a door
+(`walkerStuck`: turning, round a loop of walks, or still; #366). It is
 seeded and uses autumn and dry weather, so a run on a **freshly loaded page** gives
 the same counts every time (a second run in the same page differs slightly).
 

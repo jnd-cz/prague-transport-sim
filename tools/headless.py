@@ -287,6 +287,7 @@ def counts(check, r):
         out["finished"] = int(bool((r.get("stats") or {}).get("finished")))
         out["cyclesBroken"] = (r.get("stats") or {}).get("cyclesBroken", 0)  # (#154: a car on the track left a deadlock)
         out["junctionCircles"] = (r.get("stats") or {}).get("junctionCircles", 0)  # (#607: a car let through a junction whose holds ran in a circle)
+        out["walkersLeft"] = (r.get("stats") or {}).get("walkersLeft", 0)  # (#366: walkers with nowhere to go that left)
     return out
 
 
