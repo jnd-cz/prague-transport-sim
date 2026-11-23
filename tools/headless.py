@@ -985,8 +985,8 @@ def main():
         pages = min(a.jobs, len(batches))  # (what the queue keeps for this run: the pages it opens, #728)
         heavy.claim(gb=PAGE_GB * pages, cores=PAGE_CORES * pages)
         dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
-        if a.player:  # (the player's pages draw and stream: taken as three times the run, a guess until timed)
-            dur += [3 * d for d in dur]
+        if a.player:  # (a player's page takes as long as the checks' one: 418 s against 406 s on the five lines, #710)
+            dur += dur
         heavy.expect(finish(dur, a.jobs))  # (its watch's time, #815)
         print(f"{len(runs)} runs in {len(batches)} batches on {min(a.jobs, len(batches))} pages, longest first; "
               f"expected {finish(dur, a.jobs):.0f} s from {len(t['runs'])} timed runs", flush=True)
