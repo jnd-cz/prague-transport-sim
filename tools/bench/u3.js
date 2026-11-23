@@ -8,14 +8,15 @@
 // bells = the autopilot's bell; hits = collisions with crossing cars.
 import { stuckWatch, stuckScene } from './stuck.js';
 
-// #602: a car's body (src/models.js: 1.8 x 4.3 m) against both tracks. FOUL: a tram's half width (1.25 m) with its swing in a
-// tight curve's overhang (about 0.45 m) and 0.3 m; a body corner nearer a track's centre fouls the tram passing there
-const CAR_HW = 0.9, CAR_HL = 2.15, FOUL = 2.0;
+// #602: a car's body (its type's half length and half width over the tyres, src/carTypes.js) against both tracks. FOUL: a
+// tram's half width (1.25 m) with its swing in a tight curve's overhang (about 0.45 m) and 0.3 m; a body corner nearer a
+// track's centre fouls the tram passing there
+const FOUL = 2.0;
 // the car's corners' least distance to a route's centre line, and the route position there: { d, s } or null
-function bodyTo(route, p) {
+function bodyTo(route, p, c) {
   let best = null;
-  const nx = -p.hy, ny = p.hx;
-  for (const [a, b] of [[CAR_HL, CAR_HW], [CAR_HL, -CAR_HW], [-CAR_HL, CAR_HW], [-CAR_HL, -CAR_HW]]) {
+  const nx = -p.hy, ny = p.hx, hl = c.half, hw = c.halfW;
+  for (const [a, b] of [[hl, hw], [hl, -hw], [-hl, hw], [-hl, -hw]]) {
     const n = route.nearest(p.x + p.hx * a + nx * b, p.y + p.hy * a + ny * b);
     if (n && (!best || n.d < best.d)) best = { d: n.d, s: n.s };
   }
@@ -118,7 +119,7 @@ export async function run(seed = 1, opts = {}) {
             const p = c.path.at(c.s);
             for (const [route, trams, k] of tracks) {
               if (!route) continue;
-              const b = bodyTo(route, p);
+              const b = bodyTo(route, p, c);
               if (!b || b.d > 8) continue;
               const h = route.at(b.s);
               if (Math.abs(p.hx * h.hx + p.hy * h.hy) > 0.7) continue;
