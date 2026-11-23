@@ -1321,7 +1321,9 @@ def kerb_walls(D, road_at, lidar):
     import street_profile
     segs = []
     edges, walk = street_profile.kerb_edges(D)
-    for q, n, own in edges:
+    for q, n, own, wall_ok in edges:
+        if not wall_ok:   # (an edge too short for a wall's: street_profile.WALL_EDGE_MIN)
+            continue
         top, e = street_profile.wall_tops(q, n, own, road_at(*(q - n * 0.5).T), lidar(*(q + n * street_profile.SW_KERB_SMEAR).T),
                                           street_profile.runs_in(walk, q, n, street_profile.SW_KERB_SMEAR + 0.5),
                                           np.column_stack([lidar(*(q + n * v).T) for v in street_profile.KERB_NEAR]))

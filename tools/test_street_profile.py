@@ -178,8 +178,10 @@ class Sidewalks(unittest.TestCase):
         dtm = {"areas": [{"c": "sidewalk", "l": 0, "r": [list(p) for p in ring], "k": [k]},
                          {"c": "sidewalk", "l": 0, "r": jog, "k": [[True, False, False, False]]}]}
         edges, walk = sp.kerb_edges(dtm)
-        self.assertEqual(len(edges), 1)
-        q, n, own = edges[0]
+        self.assertEqual(len(edges), 8)   # (one run, given edge by edge: wall_tops judges each edge on its own)
+        self.assertEqual([len(e[0]) for e in edges][6], 40)   # (the 10 m edge, every 0.25 m)
+        self.assertEqual([e[3] for e in edges], [False] * 6 + [True, False])   # (only the 10 m edge may be a wall's top)
+        q, n, own = (np.concatenate([e[i] for e in edges]) for i in range(3))
         self.assertAlmostEqual(len(q) * 0.25, 2 * math.pi + 10.3, delta=0.3)  # (the arc 2 pi m, then 10.3 m)
         self.assertTrue(shapely.contains_xy(walk, *(q + n * 0.2).T).all())   # (every normal into the sidewalk)
         mid = np.argmin(np.hypot(*(q - (4 - 4 * math.sqrt(0.5), 4 - 4 * math.sqrt(0.5))).T))
@@ -286,6 +288,12 @@ class Sidewalks(unittest.TestCase):
         self.assertAlmostEqual(z[0], 200.4, delta=0.03)
         self.assertAlmostEqual(z[1], 200.4, delta=0.03)
         self.assertAlmostEqual(z[2], 200.3, delta=0.05)  # (the head: the ramp at 200.2 m and a kerb)
+        # (the same edge too short for a wall's, street_profile.WALL_EDGE_MIN: where it is no plain kerb it is held at
+        # nothing, its walkway on the fill; at the head still a kerb's plane, #800)
+        ctx["kerb_edges"] = [edge + (np.full(len(u), 200.4), False)]
+        zs = sp.bilinear(sp.sidewalks(ctx, ramp, [(0, 0), (20, 4)]), np.array([15.0, 1.0]), np.array([0.25, 0.25]))
+        self.assertLess(zs[0], 200.0)
+        self.assertAlmostEqual(zs[1], 200.3, delta=0.05)
         top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.4), ramp(u, 0 * u))
         self.assertEqual((int(top.argmax()), segs.shape, segs[0, :, 2].tolist()), (12, (68, 2, 3), [200.4, 200.4]))
         self.assertFalse(sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.4), np.full(len(u), 199.9))[0].any())

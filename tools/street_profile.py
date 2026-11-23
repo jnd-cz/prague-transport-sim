@@ -1276,6 +1276,11 @@ def pilot_report(at, radius, ln, out_dir):
 
 KERB_RUN_MIN = 0.5  # m: a run of kerb edges shorter than this is a jog where two outlines meet, not a kerb
 KERB_TURN = 0.5     # m either side of a point along a run over which its direction (and so its normal) is read
+# m: an edge this long or longer may be a wall's top (wall_tops); a shorter one, round a corner or a bend, is a kerb
+# where it is a plain one and nothing where it is not, its walkway on the fill as before #800. Read as a wall's top,
+# a 2 m edge at the road's level by Palackého náměstí (line 9 (-708.4, -1186.4)), the sidewalk behind it falling 1.9 m
+# to the quay within 1.5 m, held its walkway 1.9 m under the road: 0.69 m off IPR where the fill had 0.02 m
+WALL_EDGE_MIN = 3.0
 
 
 def kerb_runs(ks):
@@ -1302,9 +1307,10 @@ def kerb_runs(ks):
 
 def kerb_edges(dtm):
     """The survey's level-0 sidewalks' kerbs: each run of consecutive outline edges flagged `k` (shared with a
-    carriageway), KERB_RUN_MIN or longer, as (points every 0.25 m along it, unit normals into the sidewalk read over
-    ±KERB_TURN m along the run, the sidewalk's own surveyed height at each point, NaN along an edge an end of which
-    has none), and the sidewalks as one geometry. (Until #800 each edge 3 m or longer was a kerb of its own and a
+    carriageway), KERB_RUN_MIN or longer, sampled every 0.25 m along it, edge by edge as (the points on one edge, unit
+    normals into the sidewalk read over ±KERB_TURN m along the run, the sidewalk's own surveyed height at each point,
+    NaN along an edge an end of which has none, whether the edge may be a wall's top: WALL_EDGE_MIN), and the
+    sidewalks as one geometry. (Until #800 each edge 3 m or longer was a kerb of its own and a
     shorter one none: a kerb round a corner or along a bend is drawn in edges of 0.2-1.5 m, and its walkway had no
     plane, the fill following IPR's raster, which rounds the kerb away: 182 of the 202 sidewalk|road samples whose
     street surface had a flat kerb on ground batch D lay on such an edge.)"""
@@ -1344,7 +1350,15 @@ def kerb_edges(dtm):
                 # (the sidewalk lies on one side of a run: the side most of its points find it on)
                 if shapely.contains_xy(g, *(q + n * 0.25).T).sum() < shapely.contains_xy(g, *(q - n * 0.25).T).sum():
                     n = -n
-                out.append((q, n, np.interp(u, cum, zv[vs])))
+                own = np.interp(u, cum, zv[vs])
+                # (edge by edge, as the survey drew it: wall_tops judges an edge by whether it stands KERB_WALL off its
+                # road somewhere along it, and a run round a whole sidewalk would make a wall's top of every kerb
+                # 0.3 m off its road on it: Václavské náměstí's 813 m ring, line 9 (375, -725), its walkway held at
+                # its edge's own height 0.4 m over IPR)
+                e = np.searchsorted(cum, u, side="right") - 1
+                for j in np.unique(e):
+                    k = e == j
+                    out.append((q[k], n[k], own[k], bool(cum[j + 1] - cum[j] >= WALL_EDGE_MIN)))
     walk = shapely.union_all(polys) if polys else None
     if walk is not None:
         shapely.prepare(walk)
@@ -1645,13 +1659,15 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
     lo, hi = SW_FALL
     tops = []
     for q, n, *own in ctx["kerb_edges"]:
+        wall_ok = own[1] if len(own) > 1 else True   # (kerb_edges: whether the edge may be a wall's top, WALL_EDGE_MIN)
         ok = (q[:, 0] >= box[0][0] - SW_WALK) & (q[:, 0] <= box[1][0] + SW_WALK) \
             & (q[:, 1] >= box[0][1] - SW_WALK) & (q[:, 1] <= box[1][1] + SW_WALK)
         if not ok.any():
             continue
         q, n = q[ok], n[ok]
         zr = np.asarray(road_z(*(q - n * 0.5).T), float)
-        # (an edge standing over or under the road beyond it is a wall's, held below as a wall's edge: wall_tops, #779)
+        # (an edge standing over or under the road beyond it is a wall's, held below as a wall's edge: wall_tops, #779;
+        # on an edge too short for a wall's, such a point has neither a kerb's plane nor a wall's hold)
         if own:
             g = q + n * SW_KERB_SMEAR
             g1 = [q + n * v for v in KERB_NEAR]
@@ -1659,7 +1675,8 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
                                   runs_in(walk, q, n, SW_KERB_SMEAR + 0.5),
                                   np.column_stack([np.asarray(ipr.sample(v[:, 0] + F.E0, v[:, 1] + F.N0), float) for v in g1]))
             if top.any():
-                tops.append(segs)
+                if wall_ok:
+                    tops.append(segs)
                 q, n, zr = q[~top], n[~top], zr[~top]
                 if not len(q):
                     continue
