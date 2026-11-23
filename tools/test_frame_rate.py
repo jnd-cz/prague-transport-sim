@@ -81,7 +81,7 @@ GLIDE = """async ({ seed, steps, frames }) => {
   $('selTrip').value = '0'; $('optWeather').value = 'dry'; $('optTemp').value = 'autumn'; $('optObst').value = 'normal';
   $('optAuto').checked = true;
   const { startShift } = await import('/tools/bench/shift.js');
-  const g = await startShift(), tr = window.traffic, b = window.between;
+  const g = await startShift(), tr = window.traffic, view = window.run.trafficView, b = window.between;
   g.audio.setMuted?.(true);
   let n = 0;
   const update = g.update.bind(g);
@@ -97,9 +97,9 @@ GLIDE = """async ({ seed, steps, frames }) => {
     show(u);
     const d = new Map(), l = new Map();
     for (const c of tr.cars) {
-      const e = b.poses.get(c.mesh);
+      const m = view.meshOf(c), e = m && b.poses.get(m);
       if (!c.active || c.alpha < 1 || !e) continue;
-      d.set(c, [c.mesh.position.x, c.mesh.position.z]);
+      d.set(c, [m.position.x, m.position.z]);
       l.set(c, [e.now[0], e.now[2]]);
     }
     drawn.push(d); left.push(l);
@@ -107,7 +107,7 @@ GLIDE = """async ({ seed, steps, frames }) => {
   let bad = 0;
   for (let k = 0; k < frames; k++) {
     window.__frame(ms);
-    if (tr.cars.some((c) => { const e = b.poses.get(c.mesh); return e && (c.mesh.position.x !== e.now[0] || c.mesh.position.y !== e.now[1] || c.mesh.position.z !== e.now[2]); })) bad++;
+    if (tr.cars.some((c) => { const m = view.meshOf(c), e = m && b.poses.get(m); return e && (m.position.x !== e.now[0] || m.position.y !== e.now[1] || m.position.z !== e.now[2]); })) bad++;
   }
   b.show = show;
   const uneven = (seq) => {

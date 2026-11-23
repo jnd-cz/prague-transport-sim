@@ -4,9 +4,10 @@
 // cars, the other trams and the game's own movers are drawn the same way here, so that at 60 frames a second they
 // glide beside our tram instead of standing still every other frame (the user, 2026-11-22, the question on PR #809:
 // "go with option a"). After a step the page draws from, their poses are recorded; before a draw each is put between
-// its last two; after the draw it is put back where the step left it. The steps read some of these poses
-// (src/traffic.js _pathObstacles: the other trams' cars; a car's height for its level), so a drawn pose never
-// outlives its draw and a run stays the same at any frame rate (tools/test_frame_rate.py). openOMSI draws its
+// its last two; after the draw it is put back where the step left it, so a drawn pose never outlives its draw: the
+// traffic's steps read none of these (src/traffic.js keeps its own poses, #228), and the game's movers are posed by
+// its steps, which may read them back (src/game.js until #228's second half). A run stays the same at any frame rate
+// (tools/test_frame_rate.py). openOMSI draws its
 // traffic the same way (crates/omsi-sim/src/ai_traffic/fixed_step.rs, show_between / show_actual).
 import * as THREE from 'three';
 
@@ -16,7 +17,7 @@ const JUMP = 5;
 const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), ea = new THREE.Euler(), eb = new THREE.Euler();
 
 // an object's pose: its position and its rotation's angles (the steps set the angles: src/consist.js poseSection,
-// src/traffic.js _poseCar), so that putting them back gives the very quaternion the step left
+// src/trafficView.js _car), so that putting them back gives the very quaternion the step left
 function write(o, a) {
   a[0] = o.position.x; a[1] = o.position.y; a[2] = o.position.z;
   a[3] = o.rotation.x; a[4] = o.rotation.y; a[5] = o.rotation.z;

@@ -44,8 +44,7 @@ export function builtGeoJSON(game, traffic) {
       const q = l.path.at(l.path.length - l.light.back), a = ll(q.x + q.hy * 1.5, q.y - q.hx * 1.5), b = ll(q.x - q.hy * 1.5, q.y + q.hx * 1.5);
       feat({ type: 'LineString', coordinates: [a, b] }, { id: `car_stop_line:${line}:lane${l.id}`, type: 'car_stop_line', heading: Math.round((Math.atan2(q.hx, q.hy) * 180) / Math.PI + 360) % 360, junction: `sig@${Math.round(l.light.sig.cross)}`, source: l.light.src, rule: l.light.src === 'osm' ? 'osmNode' : l.light.src });
     }
-    const heads = traffic.lights?.group.children[0], M = new THREE.Matrix4();
-    for (let i = 0; heads && i < heads.count; i++) { heads.getMatrixAt(i, M); v.setFromMatrixPosition(M); feat(pt(v.x, -v.z), { id: `car_signal_head:${line}:${i}`, type: 'car_signal_head' }); }
+    (traffic.heads || []).forEach((h, i) => feat(pt(h.x, -h.z), { id: `car_signal_head:${line}:${i}`, type: 'car_signal_head' }));
   }
   return { type: 'FeatureCollection', crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:EPSG::5514' } }, properties: { line, build: `runtime ${new Date().toISOString().slice(0, 10)}`, origin: [e0, n0] }, features: out };
 }
@@ -105,8 +104,7 @@ export function createDebugOverlay(scene) {
         const q = l.path.at(l.path.length - l.light.back);
         add('bar', l.light.src === 'osm' ? 0x00ffff : l.light.src === 'short' ? 0xffffff : 0xffee00, q.x, surf(q.x, q.y) + 0.3, -q.y, Math.atan2(-q.hx, q.hy));
       }
-      const heads = traffic.lights?.group.children[0], M = new THREE.Matrix4(), v = new THREE.Vector3();
-      for (let i = 0; heads && i < heads.count; i++) { heads.getMatrixAt(i, M); v.setFromMatrixPosition(M); add('ball', 0xffee00, v.x, v.y + 3.2, v.z); }
+      for (const h of traffic.heads || []) add('ball', 0xffee00, h.x, h.h + 3.2, h.z);
       for (const o of game.data.osmSignals?.stop || []) add('dot', 0xff2020, o.x, surf(o.x, o.y) + 1, -o.y);
       // the lowered kerbs and where their height came from (the survey's kerb report, tools/kerbs.py)
       const LOW = { crossing: 0x00e5ff, 'osm kerb=lowered': 0x22cc55, 'osm kerb=rolled': 0x22cc55, 'osm kerb=flush': 0x3a6cff,

@@ -77,10 +77,10 @@ def site(root, overlay=None):
 
 
 HIDE = 'body > :not(#view):not(#gl):not(#cab) { display:none !important }'
-# The game internals this tool drives (src/main.js, traffic.js, review.js); a renamed one fails here
+# The game internals this tool drives (src/main.js, run.js, review.js); a renamed one fails here
 # by name instead of as a timeout or a blank picture.
 HOOKS = {'game': ['window.game.route.at', 'window.game.route.heading', 'window.game.tram',
-                  'window.traffic.dispose', 'window.drawCount'],
+                  'window.run.trafficView.dispose', 'window.drawCount'],
          'review': ['window.review.ready', 'window.review.T', 'window.review._render', 'window.review.camera']}
 BAR = 36  # label strip above the pair
 
@@ -140,7 +140,7 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
               const g = window.game;
               if (s < 0 || s > g.route.length) throw new Error(`s ${s} outside route 0..${g.route.length}`);
               g.tram.s = s; g.tram.v = 0; g.tram.a = 0; g.paused = true;
-              window.traffic.dispose(); window.traffic.update = () => {};
+              window.run.trafficView.dispose(); window.traffic.update = () => {};
               const p = g.route.at(s), h = g.route.heading(s);
               return {x: p.x, y: p.y, yaw: Math.atan2(h.hx, h.hy) * 180 / Math.PI};
             }''', s)

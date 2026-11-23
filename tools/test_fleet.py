@@ -95,7 +95,7 @@ GAME = r"""async ({ secs, seed }) => {
   $('optCars').value = 'auto'; $('optObst').value = 'off'; $('optAuto').checked = false;
   const out = { menu: $('optFleet').value, menuRow: !$('fleetRow').hidden };
   window.headless = true;
-  const g = await startShift(), tr = window.traffic, ap = new Autopilot(), dt = 1 / 30;
+  const g = await startShift(), tr = window.traffic, view = window.run.trafficView, ap = new Autopilot(), dt = 1 / 30;
   g.audio.setMuted(true);
   out.ours = window.tramModel.userData.fleet;
   const order = [], seen = new Set(), twice = [];
@@ -104,8 +104,8 @@ GAME = r"""async ({ secs, seed }) => {
   while (T < secs && !g.finished) {
     ap.step(g, dt); g.update(dt, ap.input);
     const p = g.route.at(g.tram.s); camera.position.x = p.x; camera.position.z = -p.y;
-    tr.update(dt, camera); T += dt;
-    const sets = [...tr.ahead, ...tr.oncoming].map((t) => t.mesh.userData.fleet);
+    tr.update(dt); view.sync(camera); T += dt;
+    const sets = [...tr.ahead, ...tr.oncoming].map((t) => view.meshOf(t).userData.fleet);
     for (const s of sets) { const k = s.join('+'); if (!seen.has(s)) { seen.add(s); order.push(k); } }
     const on = sets.flat();
     maxOn = Math.max(maxOn, sets.length);

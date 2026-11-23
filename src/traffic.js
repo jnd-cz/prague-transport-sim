@@ -3,16 +3,18 @@
 // connector curves through the junctions), pedestrians on footways and sidewalks, and other trams
 // (ahead of us on our track, and oncoming on the opposite track). Everything fades in and out
 // instead of popping.
-import * as THREE from 'three';
-import { makeCar, makeCrowd, makeT3, placeConsist, poseT3, setNextStop, makeTrafficLights, makePedLights, disposeModel } from './models.js';
+// Only the rules and their state live here (#228): plain objects, no meshes. src/trafficView.js draws them: a car's
+// pose (c.pose), an AI tram's set (t.line, t.cars, t.dealt, t.alpha, its lamps' and doors' state), the walkers'
+// places (slot.x, y, z, hx, hy), the lights' aspects. Nothing here reads what is drawn.
 import { T3, COUPLING_GAP, CAR_PITCH } from './tram.js';
-import { setRiggedLevel, FULL_IN, FULL_OUT } from './rigged.js';
-import { junctionTurns, indicating } from './indicators.js';
+import { placeUnit } from './articulated.js';
+import { junctionTurns } from './indicators.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
 import { aiLineCurrent } from './electric.js';
 
 const OTHER_LINES = ['9', '15', '23', '2', '18', '13', '7', '4'];
-const MAX_CARS = 30, MAX_WALKERS = 90, FADE = 1.2;
+const MAX_CARS = 30, FADE = 1.2;
+export const MAX_WALKERS = 90;
 const TRACK_CLEAR = 2.8; // pedestrians and cars keep this far from a track centre line
 // a walker that turns back twice within TURN_ROOM m of walking, or keeps within STILL_R m of a place for STILL_T s
 // while not waiting at a kerb, has nowhere to go and leaves (_turnBack, _leave; #366, #269, #393)
@@ -52,7 +54,6 @@ class Path {
   }
 }
 
-// Fade a model in/out by its materials' opacity (each model owns its materials).
 // How far an AI tram needs to stop before a signal that is no longer GO. When the GO starts blinking
 // a driver stops if it is comfortable (0.9 m/s2 after ~2 s), else goes on (the dilemma zone: the
 // controller holds the phase); facing a red a driver stops whenever full service braking allows it
@@ -81,23 +82,6 @@ function limitSpeed(lim, s, len) {
   let v = Math.min(lim.at(s), lim.at(s - len)) / 3.6;
   for (let d = 5; d < 300; d += 5) v = Math.min(v, Math.sqrt((lim.at(s + d) / 3.6) ** 2 + 2 * 0.7 * Math.max(0, d - 5)));
   return v;
-}
-
-export function setOpacity(obj, a) {
-  obj.visible = a > 0.01;
-  obj.traverse((o) => {
-    const m = o.material;
-    if (!m) return;
-    // (glass keeps its own opacity: userData.opacity, src/rigged.js. A material blended from the start
-    // stays blended: the hybrid's fleet numbers are a decal on a clear canvas, whose clear pixels drew
-    // black once the faded-in tram went opaque)
-    const base = m.userData.opacity ?? 1;
-    m.userData.blend ??= m.transparent;
-    m.userData.fade = a;
-    m.transparent = a < 0.999 || base < 1 || m.userData.blend;
-    m.opacity = a * base;
-    m.depthWrite = a > 0.5 && base === 1 && !m.userData.blend;
-  });
 }
 
 const key = (p) => `${Math.round(p[0])},${Math.round(p[1])}`;
@@ -136,16 +120,26 @@ export function carPose(hf, x, y, hx, hy) {
 // they never meet
 const LEVEL_APART = 2.5;
 
+// An AI tram's cars as boxes for the rules (#228): each car where the running gear puts it on the track (src/articulated.js
+// placeUnit, the front of car k at sFront - k CAR_PITCH; `at(s)` -> [x, y, track bed height, roll]), its middle, height
+// and heading. The drawn set stands its first car there too; a car hung on the coupling stands a few cm closer in a curve.
+// (Before, the boxes were read back from the drawn model's cars: they moved with the model picked in the menu.)
+export function tramBoxes(sFront, cars, at) {
+  const out = [];
+  for (let k = 0; k < cars; k++) {
+    const p = placeUnit(T3, sFront - k * CAR_PITCH, at).sections[0];
+    out.push({ x: p.p[0], y: p.p[1], z: p.p[2], hx: Math.sin(p.yaw), hy: -Math.cos(p.yaw) });
+  }
+  return out;
+}
+
 export class Traffic {
-  constructor(scene, data, route, ground, game, rand) {
-    this.scene = scene;
+  constructor(data, route, ground, game, rand) {
     this.route = route;
     this.ground = ground;
     this.game = game;
     this.rand = rand;
     this.back = game.backRoute;
-    this.group = new THREE.Group();
-    scene.add(this.group);
 
     // distance to the nearest tram track centre (ours or the opposite direction)
     this.trackDist = (x, y) => {
@@ -206,8 +200,6 @@ export class Traffic {
     this.walkers = [];
     this.walkLoops = new Map(); // place "x,y" -> times a walker turned back there rather than round a loop (#496)
     this.walkLeaves = new Map(); // "why x,y" -> times a walker with nowhere to go left there (_leave, #366)
-    this.crowd = makeCrowd(MAX_WALKERS);
-    this.group.add(this.crowd);
 
     // where oncoming trams stop: the front at the far end of their own platform (game.platforms of the
     // back route: OSM shapes, GTFS positions). Mapped from our stop point they stopped 8 m into theirs:
@@ -385,8 +377,6 @@ export class Traffic {
     return hit;
   }
 
-  dispose() { this.scene.remove(this.group); disposeModel(this.group); }
-
   // The point the traffic lives round (#722): our tram's front, whatever the camera shows. Cars and walkers appear in a
   // ring round it and go to sleep by their distance from it. Before, the camera's place: the cab and the chase view, or
   // a free camera, gave different runs of one seed, and the benches put the camera at the cab to get this point.
@@ -395,41 +385,28 @@ export class Traffic {
     return [p.x, p.y];
   }
 
-  // draw: false for a step whose result is not shown (inspect mode runs several steps per frame):
-  // cars and walkers move but are not posed (their height and matrices wait for the drawn step). `view`: the camera,
-  // for what only the drawing reads (an AI tram's detailed model near it); nothing the run does depends on it.
-  // `focus`: the focus where the step began, taken before the game's step (the page and the benches do: they set the
-  // camera at the cab before it, and a focus after it, 0.3 m on at 10 m/s, gave another run of the seed).
-  update(dt, view, draw = true, focus = this.focus()) {
+  // One step of the traffic. `focus`: the focus where the step began, taken before the game's step (the page and the
+  // benches do: they set the camera at the cab before it, and a focus after it, 0.3 m on at 10 m/s, gave another run of
+  // the seed). Every step leaves the cars posed and the walkers at their heights (#228: before, only a step that was
+  // drawn did, and a car's height for its level tests was its mesh's, stale after a step that was not).
+  update(dt, focus = this.focus()) {
     const tram = this.game.tram;
     const [cx, cy] = focus;
-    this.cam = view ? [view.position.x, -view.position.z] : [cx, cy];
     this._carsOnTracks();
-    this._updateRoadCars(dt, cx, cy, draw);
-    this._updateWalkers(dt, cx, cy, draw);
+    this._updateRoadCars(dt, cx, cy);
+    this._updateWalkers(dt, cx, cy);
     this._updateAhead(dt, tram);
     this._updateOncoming(dt, tram);
     this._wireLoads(dt);
     this._clearAiTramCycles(dt);
   }
 
-  // what the steps move, for the page to draw between the last two (src/between.js): the cars in sight (posed on a
-  // drawn step: update's draw) and the other trams' cars (placed every step). The walkers (1.1-1.6 m/s, 5 cm a step)
-  // stay where the step left them.
-  movers() {
-    const out = [];
-    for (const c of this.cars) if (c.alpha > 0) out.push(c.mesh);
-    for (const t of this.ahead) out.push(...t.mesh.userData.cars);
-    for (const t of this.oncoming) out.push(...t.mesh.userData.cars);
-    return out;
-  }
-
+  // a car slot (reused once its car has faded out); its model, one of ten looks, drawn from the run's stream when the
+  // slot is made, as when the slot was the car's mesh (the seeded runs stay as they were)
   _carSlot() {
     let c = this.cars.find((x) => !x.active && x.alpha <= 0);
     if (!c && this.cars.length < MAX_CARS) {
-      c = { mesh: makeCar(Math.floor(this.rand() * 10)), active: false, alpha: 0 };
-      setOpacity(c.mesh, 0);
-      this.group.add(c.mesh);
+      c = { model: Math.floor(this.rand() * 10), active: false, alpha: 0 };
       this.cars.push(c);
     }
     return c || null;
@@ -439,7 +416,6 @@ export class Traffic {
     const target = c.active ? 1 : 0;
     if (c.alpha === target) return;
     c.alpha = Math.max(0, Math.min(1, c.alpha + (target ? dt : -dt) / FADE));
-    setOpacity(c.mesh, c.alpha);
   }
 
   // speed change with car-like acceleration (2 m/s2) and braking (up to 5 m/s2)
@@ -447,24 +423,20 @@ export class Traffic {
     return vt > v ? Math.min(vt, v + 2 * dt) : Math.max(vt, v - 5 * dt);
   }
 
-  _poseCar(mesh, x, y, hx, hy, hf) {
+  // where a car stands: c.pose { x, y, hx, hy, hf, z, pitch, roll } on the surface hf (ground level without one)
+  _poseCar(c, x, y, hx, hy, hf) {
     // a car standing still keeps its pose (the pose asks the ground height at several points)
-    const last = mesh.userData.pose;
-    if (last && last[0] === x && last[1] === y && last[2] === hx && last[3] === hy && last[4] === hf) return;
-    mesh.userData.pose = [x, y, hx, hy, hf];
+    const last = c.pose;
+    if (last && last.x === x && last.y === y && last.hx === hx && last.hy === hy && last.hf === hf) return;
     const p = carPose(hf || ((u, v) => this.ground.surface(u, v)), x, y, hx, hy);
-    mesh.rotation.order = 'YXZ';
-    mesh.position.set(x, p.z, -y);
-    mesh.rotation.y = Math.atan2(hx, -hy);
-    mesh.rotation.x = -p.pitch;
-    mesh.rotation.z = p.roll;
+    c.pose = { x, y, hx, hy, hf, z: p.z, pitch: p.pitch, roll: p.roll };
   }
 
   // Cars on the lane graph: along a lane, through a junction on a connector, on along the next
   // lane. They keep their distance to the car ahead (also across the junction), give way at
   // junctions to cars on crossing connectors (the nearest first) and to the tram where the road
   // crosses its track, and roll on while fading out where the data ends.
-  _updateRoadCars(dt, cx, cy, draw = true) {
+  _updateRoadCars(dt, cx, cy) {
     const cars = this.cars.filter((c) => c.kind === 'road' && (c.active || c.alpha > 0));
     if (cars.filter((c) => c.active).length < 22 && this.rand() < dt * 4) {
       const near = this._ringIndex(cx, cy, 'r', 60, 360);
@@ -714,20 +686,17 @@ export class Traffic {
       if (!c.active && c.coast) {
         const k = c.coast;
         k.d += (c.vNow || 6) * dt;
-        if (draw) this._poseCar(c.mesh, k.x + k.hx * k.d, k.y + k.hy * k.d, k.hx, k.hy, c.lane.road.hf);
+        this._poseCar(c, k.x + k.hx * k.d, k.y + k.hy * k.d, k.hx, k.hy, c.lane.road.hf);
         continue;
       }
       const p = c.path.at(c.s);
       if (Math.hypot(p.x - cx, p.y - cy) > 420) c.active = false;
-      if (!draw) continue; // (c.z stays from the last drawn step: it only tells levels metres apart)
-      this._poseCar(c.mesh, p.x, p.y, p.hx, p.hy, c.conn ? c.conn.hf : c.lane.road.hf);
-      c.z = c.mesh.position.y;
-      // the indicator: from 35 m before a junction where the car turns, and through it
+      this._poseCar(c, p.x, p.y, p.hx, p.hy, c.conn ? c.conn.hf : c.lane.road.hf);
+      c.z = c.pose.z; // (its level: things more than LEVEL_APART above or below it are on another level)
+      // the indicator: from 35 m before a junction where the car turns, and through it ('left', 'right' or null)
       const J = c.conn || (c.plan && c.toEnd < 35 ? c.plan : null);
-      c.mesh.userData.blink?.(J ? turnOf(J) : null, Math.floor(this.game.clock * 2.6) % 2 === 0);
+      c.blink = J ? turnOf(J) : null;
     }
-    if (draw) for (const lane of this.lightLanes) this.lights.set(lane.light.head, this.lightAspect(lane.light));
-    if (draw) this.pedCross.forEach((x) => { const a = this._pedAspect(x); for (const i of x.heads) this.pedLights.set(i, a); });
     // the tram's driver sees these (autopilot: the bell, stopping short of one on the track); a car on
     // the crossing where the tram's front is: a collision (once per car)
     this.game.carsCrossing = crossing;
@@ -887,11 +856,8 @@ export class Traffic {
       out.push({ x: p.x, y: p.y, z: this.ground.profile.height(s), hx: h.hx, hy: h.hy, l: 7.2, w: 1.3, vx: h.hx * tram.v, vy: h.hy * tram.v, what: 'our tram' });
     }
     for (const t of [...this.ahead, ...this.oncoming]) {
-      if ((t.alpha ?? 0) < 0.3) continue;
-      for (const m of t.mesh.userData.cars) {
-        const hx = Math.sin(m.rotation.y), hy = -Math.cos(m.rotation.y);
-        out.push({ x: m.position.x, y: -m.position.z, z: m.position.y, hx, hy, l: 7.2, w: 1.3, vx: hx * t.v, vy: hy * t.v, what: 'tram', tram: t });
-      }
+      if ((t.alpha ?? 0) < 0.3 || !t.boxes) continue;
+      for (const b of t.boxes) out.push({ x: b.x, y: b.y, z: b.z, hx: b.hx, hy: b.hy, l: 7.2, w: 1.3, vx: b.hx * t.v, vy: b.hy * t.v, what: 'tram', tram: t });
     }
     for (const w of this.slots || []) {
       if (w && w.alpha > 0.5 && w.x !== undefined) out.push({ x: w.x, y: w.y, z: w.z, hx: 1, hy: 0, l: 0.4, w: 0.4, vx: 0, vy: 0, walker: w, what: 'walker' });
@@ -996,6 +962,7 @@ export class Traffic {
       return s;
     };
     // (each head on the street's surface, the build's: tools/network.py heights, #682)
+    // (the heads for the drawing, src/trafficView.js: world x, z, the street's height h, the turn `face` about the vertical)
     const head = (h) => ({ x: h.p[0] / 100, z: -h.p[1] / 100, h: h.z / 100, face: h.face / 1000 });
     this.lightLanes = [];
     this.lightSigs = [];
@@ -1008,11 +975,9 @@ export class Traffic {
       const s = sig(i), P = this.route.at(s.cross), h = this.route.heading(s.cross, 6);
       this.lightSigs.push({ sig: s, x: P.x, y: P.y, hx: h.hx, hy: h.hy });
     }
-    this.lights = makeTrafficLights(N.heads.map(head));
-    this.group.add(this.lights.group);
+    this.heads = N.heads.map(head);
     this.pedCross = N.pedCross.map((c) => ({ x: c.p[0] / 100, y: c.p[1] / 100, cx: c.c[0] / 1e4, cy: c.c[1] / 1e4, sig: sig(c.sig), along: c.along, heads: c.heads }));
-    this.pedLights = makePedLights(N.pedHeads.map(head));
-    this.group.add(this.pedLights.group);
+    this.pedHeads = N.pedHeads.map(head);
     const osm = this.lightLanes.filter((l) => l.light.src === 'osm').length;
     console.log(`traffic lights: ${N.heads.length} car heads at ${this.lightSigs.length} junctions (stop lines: ${osm} from OSM, ${this.lightLanes.length - osm} at the junction edge); pedestrian signals: ${N.pedHeads.length} heads at ${this.pedCross.length} crossings`);
   }
@@ -1027,7 +992,7 @@ export class Traffic {
   }
 
   // a crossing's pedestrian aspect (green while its walkers may go)
-  _pedAspect(x) {
+  pedAspect(x) {
     const sig = x.sig, Y = sig.cycle, t = sig.t;
     return (x.along ? sig.backState === 'go' : t >= Y.cross && t < Y.C - 6) ? 'green' : 'red';
   }
@@ -1037,7 +1002,7 @@ export class Traffic {
   // (At a crossing with pedestrian heads, those decide: within 6 m of its node, walking along it.)
   _pedRed(x, y, hx, hy) {
     for (const c of this.pedCross || []) {
-      if (Math.hypot(x - c.x, y - c.y) < 6 && Math.abs(hx * c.cx + hy * c.cy) > 0.7) return this._pedAspect(c) === 'red';
+      if (Math.hypot(x - c.x, y - c.y) < 6 && Math.abs(hx * c.cx + hy * c.cy) > 0.7) return this.pedAspect(c) === 'red';
     }
     for (const L of this.lightSigs) {
       if (Math.hypot(x - L.x, y - L.y) > 30) continue;
@@ -1089,7 +1054,8 @@ export class Traffic {
   // At the end of a walk they go on along one of its links (not straight back where they came from if
   // there is another way), turning back only at a dead end; they turn back before the tracks. One with nowhere to go
   // (turned back twice within a few metres, or held in one place) leaves, fading where it stands.
-  _updateWalkers(dt, cx, cy, draw = true) {
+  // Each walker's place for the drawing (src/trafficView.js): x, y, its heading hx, hy and the height z under it.
+  _updateWalkers(dt, cx, cy) {
     if (!this.slots) this.slots = new Array(MAX_WALKERS).fill(null);
     const free = this.slots.indexOf(null);
     if (free >= 0 && this.rand() < dt * 8) {
@@ -1106,10 +1072,9 @@ export class Traffic {
         }
       }
     }
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p3 = new THREE.Vector3(), e = new THREE.Euler();
     for (let i = 0; i < MAX_WALKERS; i++) {
       const w = this.slots[i];
-      if (!w) { if (draw) { m.makeScale(0, 0, 0); this.crowd.setMatrixAt(i, m); } continue; }
+      if (!w) continue;
       const pos = (s) => {
         const p = w.walk.path.at(s), off = w.walk.off + w.side;
         return { x: p.x + p.hy * off, y: p.y - p.hx * off, p };
@@ -1123,7 +1088,7 @@ export class Traffic {
         x = d.x + (f.x - d.x) * u; y = d.y + (f.y - d.y) * u;
         hx = ((f.x - d.x) / L) * (d.out ? 1 : -1); hy = ((f.y - d.y) / L) * (d.out ? 1 : -1);
         if (d.t >= 1) {
-          if (!d.out) { this.slots[i] = null; m.makeScale(0, 0, 0); this.crowd.setMatrixAt(i, m); continue; }
+          if (!d.out) { this.slots[i] = null; continue; }
           w.door = null;
         }
       } else {
@@ -1202,29 +1167,17 @@ export class Traffic {
         const pp = pos(w.s);
         x = pp.x; y = pp.y; hx = pp.p.hx * w.dir; hy = pp.p.hy * w.dir;
       }
-      w.x = x; w.y = y;
+      w.x = x; w.y = y; w.hx = hx; w.hy = hy;
       const going = w.leave || Math.hypot(x - cx, y - cy) > 260; // (far off, or leaving)
       w.alpha = Math.max(0, Math.min(1, w.alpha + (going ? -dt : dt) / FADE));
-      if (going && w.alpha <= 0) { this.slots[i] = null; m.makeScale(0, 0, 0); this.crowd.setMatrixAt(i, m); continue; }
-      if (!draw) continue;
-      // fade by growing out of / sinking into the ground (instances share one material)
-      const k = w.alpha;
+      if (going && w.alpha <= 0) { this.slots[i] = null; continue; }
       // the ground height again only after 0.3 m (a lookup costs ~7 us; walkers go 1.1-1.6 m/s, so
-      // most frames reuse it: the step it makes is a few mm on a sloping footway)
+      // most steps reuse it: the step it makes is a few mm on a sloping footway)
       if (w.zx === undefined || Math.abs(x - w.zx) + Math.abs(y - w.zy) > 0.3) {
         w.z = w.walk.hf ? w.walk.hf(x, y) : this.ground.surface(x, y);
         w.zx = x; w.zy = y;
       }
-      p3.set(x, w.z - (1 - k) * 1.8, -y);
-      e.set(0, Math.atan2(hx, -hy), 0);
-      q.setFromEuler(e);
-      sc.set(1, 1, 1);
-      m.compose(p3, q, sc);
-      this.crowd.setMatrixAt(i, m);
     }
-    if (!draw) return;
-    this.crowd.count = MAX_WALKERS;
-    this.crowd.instanceMatrix.needsUpdate = true;
   }
 
   // A walker turns back (a dead end, a loop, the tracks ahead). One that turned back less than TURN_ROOM of walking ago
@@ -1247,26 +1200,14 @@ export class Traffic {
   }
 
   // --------------------------------------------------------------------- other trams
-  _placeTram(t, route, s, profileZ, dt = 0) {
-    placeConsist(t.mesh, s, (q) => { const p = route.at(q); return [p.x, p.y, profileZ(q, p), route.rollAt(q)]; });
-    const u = t.mesh.userData;
-    // the lamps (#436): the brake lamps while it slows or stands, the indicators at junction turns and stops where
-    // passengers cross a car lane (blinking out of step with the others'); a T3M's side display its next stop
-    const braking = t.v < 0.05 || t.v < (t.vWas ?? t.v) - 0.2 * dt;
+  // An AI tram after its step, on `route` (`trackZ(s, p)` the track bed's height there): its brake lamps' state (#436:
+  // lit while it slows or stands), its doors (t.doorU 0..1: open while it dwells at a stop, shut 2 s before it leaves, 2 s
+  // to move) and its cars' boxes for the rules (tramBoxes; only while it is solid enough to be in a car's way)
+  _tramState(t, route, trackZ, dt = 0) {
+    t.braking = t.v < 0.05 || t.v < (t.vWas ?? t.v) - 0.2 * dt;
     t.vWas = t.v;
-    const way = this.lampWays[route === this.route ? 'ahead' : 'back'];
-    const lamps = { braking, indicate: indicating(way.turns, way.kerb, s, t.v, braking), clock: this.game.clock + 0.17 * (t.id % 4) };
-    if (u.kind === 'simple') {
-      poseT3(t.mesh, lamps);
-      if (u.variant === 'T3M') setNextStop(t.mesh, way.stops.find((st) => st.s > s - 2)?.name ?? null);
-    }
-    if (!u.rigged) return;
-    // the detailed model: its full level near the camera; the doors open while it dwells at a stop (shut
-    // 2 s before it leaves, 2 s to move); its lamps as above (posed on the full level only)
-    const c = u.cars[0].position, d = this.cam ? Math.hypot(c.x - this.cam[0], -c.z - this.cam[1]) : 0;
-    setRiggedLevel(t.mesh, d < (u.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'light');
     t.doorU = Math.max(0, Math.min(1, (t.doorU ?? 0) + ((t.dwell ?? 0) > 2 ? dt : -dt) / 2));
-    if (u.level === 'full') poseT3(t.mesh, { doors: t.doorU, ...lamps });
+    t.boxes = (t.alpha ?? 0) < 0.3 ? null : tramBoxes(t.s, t.cars, (q) => { const p = route.at(q); return [p.x, p.y, trackZ(q, p), route.rollAt(q)]; });
   }
 
   // Another line serving our stop i (GTFS), and how far it shares our route: from stop i it
@@ -1290,21 +1231,17 @@ export class Traffic {
     // destination card: where another line's tram goes is not in our data)
     this.tramCount = (this.tramCount || 0) + 1;
     // (its type and fleet numbers dealt from the run's fleet, src/vehicles.js FleetDealer: none twice on the street)
-    const mesh = makeT3({ line, cars, vehicle: this.game.opts.vehicle, run: `8${String(1 + ((this.tramCount * 17) % 40)).padStart(2, '0')}`,
-      dealt: this.game.opts.dealer?.deal(cars) });
-    setOpacity(mesh, 0);
-    this.group.add(mesh);
-    return { id: this.tramCount, mesh, length: T3.length * cars + COUPLING_GAP * (cars - 1) };
+    return { id: this.tramCount, line, cars, run: `8${String(1 + ((this.tramCount * 17) % 40)).padStart(2, '0')}`, dealt: this.game.opts.dealer?.deal(cars),
+      alpha: 0, length: T3.length * cars + COUPLING_GAP * (cars - 1) };
   }
 
+  // (its fleet numbers back to the dealer; the drawing drops its model once it is in neither list)
   _tramGone(t) {
-    this.game.opts.dealer?.give(t.mesh.userData.fleet);
-    this.group.remove(t.mesh); disposeModel(t.mesh);
+    this.game.opts.dealer?.give(t.dealt?.numbers);
   }
 
   _tramFade(t, dt, leaving) {
     t.alpha = Math.max(0, Math.min(1, (t.alpha ?? 0) + (leaving ? -dt : dt) / FADE));
-    setOpacity(t.mesh, t.alpha);
   }
 
   // The #154 recovery only sees a car immediately in front of our tram. At Balabenka (#168)
@@ -1415,7 +1352,7 @@ export class Traffic {
       t.s += t.v * dt;
       t.leaving = t.s - tram.s > 1000 || t.s > this.route.length - 20 || (t.endS !== null && t.s > t.endS);
       this._tramFade(t, dt, t.leaving);
-      this._placeTram(t, this.route, t.s, (s) => profile.height(s), dt);
+      this._tramState(t, this.route, (s) => profile.height(s), dt);
     }
     this.ahead = this.ahead.filter((t) => {
       if (t.leaving && t.alpha <= 0) { this._tramGone(t); return false; }
@@ -1518,7 +1455,7 @@ export class Traffic {
       const ourS = t.endS !== null ? this.route.nearestOnHeading(p.x, p.y, -p.hx, -p.hy)?.s : null;
       t.leaving = (p.x - me.x) * me.hx + (p.y - me.y) * me.hy < -150 || t.s > br.length - 20 || (ourS != null && ourS < t.endS);
       this._tramFade(t, dt, t.leaving);
-      this._placeTram(t, br, t.s, (s, q) => ground.trackAt(q.x, q.y), dt);
+      this._tramState(t, br, (s, q) => ground.trackAt(q.x, q.y), dt);
     }
     this.oncoming = this.oncoming.filter((t) => {
       if (t.leaving && t.alpha <= 0) { this._tramGone(t); return false; }
