@@ -6313,6 +6313,36 @@
     }
    ]
   },
+  "verge-by-a-car-park-no-wall": {
+   "line": "22",
+   "at": [
+    3449.4,
+    -2602.0
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a survey sidewalk between a side road and a parking area (line 22, 50.0684, 14.4740; sidewalk area 6119 and parking area 6549 of line 22 on main 6415834): the survey has the sidewalk's edge at the parking area at 211.38 m, level with the road's kerb (road 211.23 m); IPR rises 0.7 m across the sidewalk to 212.06 m at that edge and falls on into the parking area (212.05 m 0.5 m out, 2.3 m lower 6 m out)",
+   "said": "the road from main street through ypur gps point is sloping down gently, there's some grass and bushes on what would otherwise be sidewalk. There's further wild greenery between that and the car park which seems to be lying on a lower level overall",
+   "source": "the user's answer to PR #834's question 1, 2026-11-23: no wall between the sidewalk and the car park. Built with #800's parking rule (c7a9551) the walkway lay level at the survey's 211.4 m with a 0.65 m wall's hold up to the parking area; batch D had the parking area on its outline 0.4 m under IPR",
+   "sections": [
+    {
+     "name": "from the verge 2.5 m in across its edge 2 m into the parking area, 4.5 m",
+     "from": [
+      3451.82,
+      -2601.53
+     ],
+     "to": [
+      3447.37,
+      -2602.25
+     ],
+     "expect": {
+      "largest step m": 0.2,
+      "off the lidar m": 0.2
+     },
+     "why": "grass and bushes rising from the road to wild greenery that falls to the car park: no wall at the edge, the ground on IPR"
+    }
+   ]
+  },
   "stairs-reversed-ramp": {
    "line": "9",
    "at": [
