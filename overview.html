@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview · Tatra T3 Prague</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/icon-32.png">
+<!-- The project's overview (#826): what waits for the user, the heavy queue, the agents' sessions and the board, from
+     overview.json, which tools/overview.py uploads every few minutes from the build PC (src/overview.js) -->
+<style>
+  :root { --bg: #1d2520; --panel: #2f3a33; --edge: #435146; --ink: #e9e4d4; --dim: #a9b2a3; --wait: #ffb02e;
+          --done: #6fcf8a; --info: #8db4f2; --bad: #ff8a7a; }
+  * { box-sizing: border-box }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 20px max(16px, env(safe-area-inset-left)) 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 30px 0 8px; padding-top: 10px; border-top: 1px solid var(--edge); }
+  h3 { font-size: .95rem; margin: 16px 0 6px; color: var(--dim); font-weight: 600; }
+  a { color: #ffd27a; }
+  ul { margin: 4px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+  .dim { color: var(--dim); font-size: .88rem; }
+  .card { background: var(--panel); border: 1px solid var(--edge); border-radius: 8px; padding: 10px 12px; margin: 8px 0; overflow-wrap: anywhere; }
+  .card .top { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+  .card .top b { font-weight: 600; }
+  .chip { display: inline-block; font-size: .75rem; padding: 0 7px; border-radius: 9px; background: var(--edge); margin: 1px 3px 1px 0; white-space: nowrap; }
+  .chip.bad, .bad { color: var(--bad); } .chip.wait, .wait { color: var(--wait); } .chip.done, .done { color: var(--done); }
+  .chip.info, .info { color: var(--info); }
+  .chip.bad { background: #5a3a35; }
+  .facts { display: flex; flex-wrap: wrap; gap: 0 14px; font-size: .88rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .facts b { color: var(--ink); font-weight: 500; }
+  #status { margin: 8px 0 0; }
+  #status.old { color: var(--bad); font-weight: 600; }
+  details summary { cursor: pointer; color: var(--dim); margin: 6px 0; }
+  .none { color: var(--dim); font-style: italic; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Project overview</h1>
+  <div class="dim">What waits for you, the heavy jobs on the build PC, the agents' sessions and the work in flight. Refreshed from the build PC every few minutes. <a href="reviews.html">Review sets</a> · <a href="index.html">The game</a></div>
+  <div id="status" class="dim">loading…</div>
+  <section id="ov-waiting"></section>
+  <section id="ov-heavy"></section>
+  <section id="ov-sessions"></section>
+  <section id="ov-board"></section>
+</main>
+<script type="module" src="src/overview.js"></script>
+</body>
+</html>

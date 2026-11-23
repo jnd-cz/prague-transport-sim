@@ -212,12 +212,36 @@ class Signals(unittest.TestCase):
         s.jpos = {"100,0": [46, 0]}
         self.assertIsNone(s.osm_stop(lane, 60, 0))  # (on the junction's own node: no stop line)
 
+    def test_over_bridge(self):
+        """profile.overBridge(): more than 8 m inside a span and over 3 m above the ground under it, the survey's, past
+        its tiles the terrain grid (the signals and pedestrian crossings on the road under a bridge, #823)."""
+        class Survey:
+            def __init__(self, z, grid=None):
+                self.z, self.grid = z, grid
 
-class Stops(unittest.TestCase):
-    def test_set_lengths_from_the_page(self):
-        L = nw.set_lengths()
-        self.assertEqual(L[1], 15.2)
-        self.assertAlmostEqual(L[2], 30.24)  # (two cars, the couplers overlapping 0.16 m)
+            def survey(self, xs, ys):
+                return None, np.array([self.z])
+
+        class Grid:
+            def height(self, xs, ys):
+                return np.array([4.0])
+
+        class P:
+            bridges = [(100, 200)]
+
+            def height(self, s):
+                return 10.0
+
+        class R:
+            def at(self, s):
+                return s, 0, 1, 0
+        s = self.sig(profile=P(), route=R())
+        s.survey = Survey(5.0)
+        self.assertEqual([s.over_bridge(x) for x in (50, 105, 150, 195)], [False, False, True, False])
+        s.survey = Survey(7.5)
+        self.assertFalse(s.over_bridge(150))  # (2.5 m above the road)
+        s.survey = Survey(np.nan, Grid())
+        self.assertTrue(s.over_bridge(150))  # (no survey there: the grid's 4 m)
 
 
 class Heights(unittest.TestCase):
@@ -263,7 +287,8 @@ class Heights(unittest.TestCase):
                 {"i": 2, "rt": back, "back": True, "s0": 20, "s1": 40, "side": -1, "outer": 5.0, "kerb": 3.0, "surveyed": True},
                 {"i": 3, "rt": back, "back": True, "s0": 20, "s1": 40, "side": -1, "outer": 5.0, "kerb": 3.0, "surveyed": True,
                  "shared": True}]
-        data = {"platforms": [{}, {}, {"stop": [70, 10], "shelter": 1}, {}]}
+            stops = []
+        data = {"platforms": [{}, {}, {"stop": [70, 10], "shelter": 1}, {}], "stops": []}
         z = nw.heights(G(), data, SG, ST)
         self.assertEqual(z["ways"], [[3, 1.0, 2.0], [7, 3.0, 4.0]])
         self.assertAlmostEqual(z["heads"][0], 1.23)
@@ -272,6 +297,28 @@ class Heights(unittest.TestCase):
         # (the back path runs west: 3.8 m right of it is north, at the stop's s 30)
         self.assertAlmostEqual(z["platforms"][2]["zs"], 70 + 13.8 / 100)
         self.assertAlmostEqual(z["platforms"][2]["zh"], 1000 + 70)
+
+
+    def test_our_stop_once_for_every_set(self):
+        """stop_heights(): a Vienna-type stop's sign (at its pole where the build knows it) and shelter on the sidewalk,
+        a stand-in platform's outer kerb; nothing for one on an OSM platform (#694: one record whatever the set)."""
+        class G:
+            def surface(self, x, y):
+                return x + y / 100
+
+            def surface_many(self, xs, ys):
+                return [x + y / 100 for x, y in zip(xs, ys)]
+        route = nw.Route([[0, 0], [100, 0]])
+        z = nw.stop_heights(G(), {"sign": 52, "signOff": -4}, {"target": 50, "kerb": 3.0, "stand": False}, route)
+        self.assertAlmostEqual(z["zs"], 52 - 4 / 100)                  # (the pole: 4 m right of the route, south)
+        self.assertAlmostEqual(z["zh"], 38 - 5.4 / 100)                # (12 m back, 2.4 m past the 3 m kerb)
+        z = nw.stop_heights(G(), {"sign": 50}, {"target": 50, "kerb": 3.0, "stand": False}, route)
+        self.assertAlmostEqual(z["zs"], 50.5 - 3.6 / 100)              # (no pole known: half a metre on, 0.6 m past the kerb)
+        z = nw.stop_heights(G(), {}, {"target": 50, "kerb": None, "stand": True}, route)
+        self.assertEqual(sorted(z), ["zo"])
+        self.assertEqual(len(z["zo"]), len(nw.sections(19, 49)))
+        self.assertAlmostEqual(z["zo"][0], 19 - 4.1 / 100)
+        self.assertEqual(nw.stop_heights(G(), {}, {"target": 50, "kerb": None, "stand": False}, route), {})
 
 
 if __name__ == "__main__":

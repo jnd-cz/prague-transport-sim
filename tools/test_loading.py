@@ -210,7 +210,9 @@ def main():
                    missing: tried({ 'line9.network.json': of(), 'line9.ground.json': of(id) }) };
         }""", CRC_TEXT)
         check("the page's CRC-32 is zlib's", got["id"] == f"{zlib.crc32(CRC_TEXT.encode()):08x}" and got["empty"] == "00000000")
-        check("a set of no build IDs loads (built before #702)", got["none"] == "none")
+        check("a set of no build IDs stops it (built before #702; every line stamped since batch D, #829)",
+              got["none"] == "line 9: data/line9.network.json carries no build, data/line9.geo.json carries no build, "
+              f"not data/line9.json's {got['id']}: python -P -E tools/rebuild.py 9")
         check("a set of the line file's ID loads", got["same"] == "same")
         check("a file of another build stops it", got["other"] == "line 9: data/line9.network.json is of build deadbeef, not "
               f"data/line9.json's {got['id']}: python -P -E tools/rebuild.py 9")

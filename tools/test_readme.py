@@ -62,5 +62,16 @@ class Guide(unittest.TestCase):
                     self.assertIn(frag, [anchor(h[1]) for h in headings(read(path or name))], f"{name}: {target}")
 
 
+class Knowledge(unittest.TestCase):
+    def test_the_index_lists_every_section_in_order(self):
+        """docs/knowledge.md's index at its top: every ## and ### heading, in order, by its anchor (#727)."""
+        text = read(os.path.join("docs", "knowledge.md"))
+        top, _, body = text.partition("\n## ")
+        want = [anchor(h) for lvl, h in headings("## " + body) if lvl in ("##", "###")]
+        got = re.findall(r"\]\(#([^)]+)\)", top.split("Sections", 1)[1])
+        self.assertEqual(got, want, "docs/knowledge.md: the index at its top lists every ## and ### heading")
+        self.assertLess(len(top.splitlines()), 40, "the index and what to read first fit on one screen")
+
+
 if __name__ == "__main__":
     unittest.main()

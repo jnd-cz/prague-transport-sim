@@ -53,14 +53,18 @@ SHOW = 6  # ready issues printed per lane
 REBUILD = "rebuild"  # the label: the one issue whose branch may rebuild and publish data
 
 
+# (under pythonw, tools/overview.py's scheduled task, a console child would open a window of its own on every run)
+QUIET = {"creationflags": subprocess.CREATE_NO_WINDOW, "stdin": subprocess.DEVNULL} if os.name == "nt" else {}
+
+
 def git(*a, cwd=ROOT, strip=True):
-    r = subprocess.run(["git", "-C", cwd, *a], capture_output=True, text=True, encoding="utf-8")
+    r = subprocess.run(["git", "-C", cwd, *a], capture_output=True, text=True, encoding="utf-8", **QUIET)
     return (r.stdout.strip() if strip else r.stdout) if r.returncode == 0 else None
 
 
 def gh(*a):
     try:
-        r = subprocess.run(["gh", *a], cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+        r = subprocess.run(["gh", *a], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", **QUIET)
     except OSError:
         return None
     return json.loads(r.stdout) if r.returncode == 0 and r.stdout else None
@@ -88,8 +92,14 @@ def milestone_order(title):
     return (4, 0) if title == "Backlog" else (3, 0) if not title else (2, 0)
 
 
+# Tools a rebuild imports that shape no step's output: the queue's turn, the step cache and the rebuild label's check
+# (rebuild.py imports board.py for it). They change a step's key, so the next rebuild runs it once again with the
+# same output (#817); a branch changing only these is no rebuild (#829). tools/tiers.py reads this list too.
+NOT_OUTPUT = ("tools/heavy.py", "tools/baseline_store.py", "tools/sysinfo.py", "tools/stepcache.py", "tools/board.py")
+
+
 def build_tools(tools=TOOLS):
-    """tools/ files a rebuild runs: rebuild.py's steps and what they import from tools/, transitively.
+    """tools/ files a rebuild runs: rebuild.py's steps and what they import from tools/, transitively, but NOT_OUTPUT.
     Read from rebuild.py, so a new step counts without a list here."""
     src = open(os.path.join(tools, "rebuild.py"), encoding="utf-8").read()
     todo = {"rebuild.py", *re.findall(r'"(\w+\.py)"', src)}
@@ -100,6 +110,8 @@ def build_tools(tools=TOOLS):
         if n in seen or not os.path.exists(p):
             continue
         seen.add(n)
+        if f"tools/{n}" in NOT_OUTPUT:  # (nor what they import for themselves: baseline_store.py the store's snapshot.py)
+            continue
         try:
             tree = ast.parse(open(p, encoding="utf-8").read(), p)
         except SyntaxError:
@@ -108,7 +120,7 @@ def build_tools(tools=TOOLS):
             names = [a.name for a in node.names] if isinstance(node, ast.Import) else \
                 [node.module] if isinstance(node, ast.ImportFrom) and node.module and not node.level else []
             todo.update(f"{m.split('.')[0]}.py" for m in names)
-    return {f"tools/{n}" for n in seen if not n.startswith("test_")}
+    return {f"tools/{n}" for n in seen if not n.startswith("test_")} - set(NOT_OUTPUT)
 
 
 def rebuilds(files, tools):
@@ -228,9 +240,18 @@ def fetch_github():
             ("issue", "list", "--state", "open", "--limit", "400", "--json", "number,title,labels,blockedBy,milestone")]))
 
 
-def rows(prs_open, prs_all, issues, now=None):
+def rows(prs_open, prs_all, issues, now=None, cache=None):
+    """The board's rows. cache: a dict kept between calls (tools/overview.py keeps it on disk, #826): what a branch's
+    commit and main's give (its files, main's, behind and ahead, its commit time), keyed by both commits, so a branch
+    that did not move costs no git call but its worktree's status (a call takes ~45 ms on Windows: 22 rows took 7.6 s
+    of CPU, 2026-11-23)."""
     now = now or time.time()
     main = "origin/main"
+    shas, used = {}, {}
+    if cache is not None:
+        for line in (git("for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/remotes/origin") or "").splitlines():
+            n, _, h = line.partition(" ")
+            shas[n] = h
     tools = build_tools()
     by_issue = {i["number"]: i for i in issues or []}
     last_pr = {}
@@ -249,7 +270,10 @@ def rows(prs_open, prs_all, issues, now=None):
 
     for r in out:
         b = r["branch"]
-        ref = (b if git("rev-parse", "--verify", "--quiet", b) else f"origin/{b}") if b else r["head"]
+        if cache is None:
+            ref = (b if git("rev-parse", "--verify", "--quiet", b) else f"origin/{b}") if b else r["head"]
+        else:
+            ref = (shas.get(f"refs/heads/{b}") or shas.get(f"refs/remotes/origin/{b}") or f"origin/{b}") if b else r["head"]
         r["issue"] = branch_issue(b)
         iss = by_issue.get(r["issue"])
         r["issueTitle"] = iss["title"] if iss else None
@@ -261,18 +285,25 @@ def rows(prs_open, prs_all, issues, now=None):
                           "mergeable": pr.get("mergeable"), "title": pr.get("title"),
                           "updated": pr.get("updatedAt")}
         r["asks"] = questions(open_pr[b]["body"]) if b in open_pr else []
-        base = git("merge-base", main, ref)
-        files = (git("diff", "--name-only", f"{base}..{ref}") or "").split() if base else []
-        main_files = set((git("diff", "--name-only", f"{base}..{main}") or "").split()) if base else set()
-        lr = (git("rev-list", "--left-right", "--count", f"{main}...{ref}") or "0 0").split()
-        r["behind"], r["ahead"] = int(lr[0]), int(lr[1])
+        key = f"{ref} {shas.get('refs/remotes/origin/main')}"
+        if cache is not None and key in cache:
+            files, main_files, r["behind"], r["ahead"], ct = cache[key]
+            main_files = set(main_files)
+        else:
+            base = git("merge-base", main, ref)
+            files = (git("diff", "--name-only", f"{base}..{ref}") or "").split() if base else []
+            main_files = set((git("diff", "--name-only", f"{base}..{main}") or "").split()) if base else set()
+            lr = (git("rev-list", "--left-right", "--count", f"{main}...{ref}") or "0 0").split()
+            r["behind"], r["ahead"] = int(lr[0]), int(lr[1])
+            ct = int(git("log", "-1", "--format=%ct", ref) or 0)
+        if cache is not None and len(ref) == 40:  # (a commit: a ref that git did not resolve is asked again)
+            used[key] = [files, sorted(main_files), r["behind"], r["ahead"], ct]
         r["files"] = files
         r["rebuilds"] = rebuilds(files, tools)
         recheck = set(files) & main_files
         if "data/MANIFEST.json" in main_files and any(kind(f) in ("game", "checks") or f in tools for f in files):
             recheck.add("data/MANIFEST.json")  # main published new data under the branch's checks
         r["recheck"] = sorted(recheck)
-        ct = int(git("log", "-1", "--format=%ct", ref) or 0)
         dirty, t = touched(r["worktree"]) if r["worktree"] and not r["missing"] else ([], 0)
         r["dirty"] = dirty
         r["touched"] = max(ct, t)
@@ -297,6 +328,9 @@ def rows(prs_open, prs_all, issues, now=None):
         if b in open_pr and not open_pr[b].get("isDraft"):
             fl.append("ready")  # (waits for the user's merge: no session works on it)
         r["flags"] = fl
+    if cache is not None:  # (only what this call used: the cache does not grow)
+        cache.clear()
+        cache.update(used)
     return out
 
 
@@ -364,6 +398,23 @@ def ago(t, now):
     return f"{s / 60:.0f} min" if s < 3600 else f"{s / 3600:.0f} h" if s < 172800 else f"{s / 86400:.0f} d"
 
 
+def clock(t):
+    return time.strftime("%H:%M", time.localtime(t)) if t else "?"
+
+
+def eta(j, now):
+    """A scheduled job's expected time and estimated finish (baseline_store.schedule), after describe()'s text:
+    ', ends ~14:20'; ', starts ~14:20, ends ~14:45 (expected 25 min from history)'."""
+    exp = f"expected {j['expect'] / 60:.0f} min" + (" from history" if j["expectFrom"] == "history" else "") if j["expect"] else ""
+    if j["state"] == "running":  # (describe() names its expected time)
+        src = " (expected from history)" if j["expectFrom"] == "history" else ""
+        return (", past its expected time" if j["late"] else f", ends ~{clock(j['finish'])}" if j["finish"] else "") + src
+    if not j["start"]:
+        return ", start not known" + (f" ({exp})" if exp else "")
+    return (f", starts ~{clock(j['start'])}" + (f", ends ~{clock(j['finish'])}" if j["finish"] else "")
+            + f" ({exp or 'its time not known'})")
+
+
 def name(r):
     return f"#{r['issue']}" if r["issue"] else (r["branch"] or f"@{(r['head'] or '')[:7]}")
 
@@ -378,7 +429,9 @@ def summary(files):
 def show(rs, issues, jobs, now):
     head = git("log", "-1", "--format=%h %s", "origin/main") or "?"
     print(f"origin/main {head[:90]}")
-    print("Heavy jobs: " + ("; ".join(baseline_store.describe(j, now) for j in jobs) if jobs else "none"))
+    print("Heavy jobs: " + ("; ".join(baseline_store.describe(j, now) + eta(j, now)
+                                      for j in baseline_store.schedule(jobs, now, free=baseline_store._free_gb()))
+                            if jobs else "none"))
     if ends := baseline_store.recent_ends(now):  # (#815: what a job's watch ended in the last hour, and why)
         print("Ended by their watch (1 h): " + "; ".join(
             f"{r['what']} in {os.path.basename(os.path.normpath(r['root']))}, {ago(r['t'] + r['wall'], now)} ago "

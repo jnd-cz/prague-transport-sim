@@ -455,6 +455,8 @@ def main(argv=None):
         todo[k] = dict(known[k], **({"reach": a.reach} if a.reach else {}))
     if not todo:
         ap.error("a place's name, --all, --list, or --line with --at")
+    import snapshot
+    snapshot.require_current_data(ROOT)  # (#835)
     if a.written or (len(todo) == 1 and not a.rings):
         for k, v in todo.items():
             run(k, v, a.ring, a.mesh, a.threads, build=not a.written, over=a.overlay)
