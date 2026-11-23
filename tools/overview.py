@@ -4,7 +4,7 @@ the agents' sessions and the board, as overview.json, which overview.html shows 
 
     python -I tools/overview.py --print          # the snapshot to stdout, nothing written or uploaded
     python -P -E tools/overview.py               # writes overview.json in the checkout, uploads it when it changed
-    python -I tools/overview.py --install [MIN]  # a scheduled task: every MIN minutes (default 2), with pythonw
+    python -I tools/overview.py --install [MIN]  # a scheduled task: every MIN minutes (default 5), with pythonw
     python -I tools/overview.py --uninstall
 
 The snapshot:
@@ -20,8 +20,8 @@ The snapshot:
 The upload goes to the test target of deploy.local.json only (never a public one), over tools/deploy.py's FTPS
 connection, when the snapshot changed or HEARTBEAT s after the last one (the page turns red after 15 min without
 one). tools/deploy.py never deletes overview.json (KEPT). A failed login is not tried again for RETRY s: the host bans
-repeated failed logins. Its own task, every 2 min, not a step of tools/autodeploy.py's: that one runs every 10 min and
-waits for a deploy or a data fetch. It never waits for the heavy queue (it is no heavy job). Log and state:
+repeated failed logins. Its own task, every 5 min (the user, 2026-11-23: "I would pick every 5 minutes"), not a step
+of tools/autodeploy.py's: that one runs every 10 min and waits for a deploy or a data fetch. It never waits for the heavy queue (it is no heavy job). Log and state:
 reports/overview.log, reports/overview-state.json, reports/overview-cache.json (git-ignored).
 """
 import argparse
@@ -50,7 +50,9 @@ TASK = "tram-overview"
 REPO = "jnd-cz/prague-transport-sim"
 RECENT = 48 * 3600  # (sessions whose log changed within this)
 ENDS = 24 * 3600  # (jobs a watch ended within this)
-HEARTBEAT = 600  # (s: an unchanged snapshot goes up again after this, so the page's age says the PC is on)
+# (s: an unchanged snapshot goes up again after this, so the page's age says the PC is on: every second run of 5 min,
+# also when the task fires a little early; the page stays under ~11 min old, red past 15)
+HEARTBEAT = 540
 RETRY = 3600  # (s after a failed login)
 FETCH = 600  # (s between git fetches: the remote branches' diffs)
 READY = 10  # (ready issues listed per lane)
@@ -336,8 +338,8 @@ def install(minutes):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--print", action="store_true", help="the snapshot to stdout; nothing written or uploaded")
-    ap.add_argument("--install", nargs="?", type=int, const=2, metavar="MIN",
-                    help="register the scheduled task (every MIN minutes, default 2)")
+    ap.add_argument("--install", nargs="?", type=int, const=5, metavar="MIN",
+                    help="register the scheduled task (every MIN minutes, default 5)")
     ap.add_argument("--uninstall", action="store_true", help="remove the scheduled task")
     a = ap.parse_args(argv)
     if a.install:

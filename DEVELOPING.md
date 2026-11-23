@@ -450,7 +450,7 @@ directory counts them), the heavy queue with estimated starts and finishes, the 
 the board. `tools/overview.py` writes `overview.json` from `board.py`'s functions, the heavy queue and the session logs
 (Claude Code's and Codex's, `LOGS` there: only the folder a session works in and the PR its harness linked are read,
 from the log's end, never a message), and uploads it to the test site over `deploy.py`'s connection when it changed or
-10 min went by; the page turns red at 15 min. `python -I tools/overview.py --install` runs it every 2 min as a
+9 min went by; the page turns red at 15 min. `python -I tools/overview.py --install` runs it every 5 min as a
 scheduled task (pythonw, `--uninstall`), in the deploy checkout (`../tg-deploy`, which has `deploy.local.json`); a run
 takes ~3 s of CPU (the board's git answers cached by commit in `reports/overview-cache.json`). A deploy never deletes
 `overview.json` (`deploy.py` `KEPT`). `--print` prints the snapshot; locally `python -I tools/overview.py --print >
