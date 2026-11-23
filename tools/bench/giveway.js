@@ -6,8 +6,8 @@
 // Counts, each with its places [x, y, s on our route]:
 //   waitInBody    a spot where a car gives way (as src/traffic.js's give-way loop places it) that a passing body overlaps
 //   letGoInBody   the body still over the car's way within LET_GO m of that spot when the loop lets the car go
-//   skippedCross  a way that comes into a track's band shallow (the loop skips it: driving along) and then crosses it
-//   skippedReach  a way that comes in shallow and passes within the body's reach: neither crosses nor runs on the rails
+//   skippedCross  a way that crosses a track where the loop gives way nowhere (before #602: one coming in at 45° or less)
+//   skippedReach  a way within a passing body's reach, beside the track, where the loop gives way nowhere
 // and as context: the waits, the band entries by kind and how many the give-way covers, and the let-gos further on.
 // The give-way spots and the let-go read the loop's rule (YIELD_GAP before the band, the group of tracks, the spot
 // before a junction): a change of that rule changes them here too. The entries' kinds are geometry only.
@@ -23,7 +23,7 @@ const RAILS = 1.6;       // m: a car's middle this near a track's centre is on t
 const RAILS_RUN = 12;    // m: a way on the rails this far is a lane along them (the loop's `along`)
 const CROSSES = 0.3;     // m: a way this near the centre line, or over to its other side, crosses the track
 const LET_GO = 2;        // m: a conflict this near the waiting spot when let go is the car's first metres
-const ALONG = 0.7;       // |cos| at the band's edge from which the loop takes a way for driving along the track
+const NEAR = 3.6;        // m: a way that stays out of the band but within this may bring a car's corner into the body
 
 const box = (x, y, hx, hy, l, w) => ({ x, y, hx, hy, l, w });
 
@@ -58,29 +58,32 @@ function side(rt, n, q) {
   return p.hx * (q.y - p.y) - p.hy * (q.x - p.x);
 }
 
-// where a path is in a track's band, per track: [{ rt, sIn, sOut, sxIn, cosIn, minD, sides: [first, last], flips,
-// startsIn, endsIn }] (cached on the path)
+// where a path comes near a track, per track: one stretch per approach within NEAR of its centre, [{ rt, sIn, sOut, sxIn,
+// sxOut, bIn (where it first comes within the band, or null), railsLen (metres within RAILS), minD, sides: [first, last],
+// flips, startsIn, endsIn }] (cached on the path)
 export function stretches(path, tracks) {
   if (path._gwStretches) return path._gwStretches;
   const out = [];
   for (const rt of tracks) {
-    let cur = null;
+    let cur = null, last = 0;
     for (let s = 0; ; s = Math.min(path.length, s + STEP)) {
-      const q = path.at(s), n = rt.nearest(q.x, q.y), inBand = !!n && n.d < BAND;
-      if (inBand) {
+      const q = path.at(s), n = rt.nearest(q.x, q.y);
+      if (n && n.d < NEAR) {
         const sd = Math.sign(side(rt, n, q)) || 1;
         if (!cur) {
-          const h = rt.at(n.s);
-          cur = { rt, sIn: s, sOut: path.length, sxIn: n.s, sxOut: n.s, cosIn: Math.abs(q.hx * h.hx + q.hy * h.hy), minD: n.d, sides: [sd, sd], flips: 0, startsIn: s === 0, endsIn: true, at: [q.x, q.y] };
+          cur = { rt, sIn: s, sOut: path.length, sxIn: n.s, sxOut: n.s, bIn: null, railsLen: 0, minD: n.d, sides: [sd, sd], flips: 0, startsIn: s === 0, endsIn: true };
           out.push(cur);
         }
         if (sd !== cur.sides[1] && n.d > 0.05) cur.flips++;
         if (n.d > 0.05) cur.sides[1] = sd;
         cur.minD = Math.min(cur.minD, n.d);
         cur.sxOut = n.s;
+        if (n.d < BAND && cur.bIn === null) cur.bIn = s;
+        if (n.d < RAILS) cur.railsLen += s - last;
       } else if (cur) {
         cur.sOut = s; cur.endsIn = false; cur = null;
       }
+      last = s;
       if (s >= path.length) break;
     }
   }
@@ -97,7 +100,9 @@ export function wayAt(seq, d) {
   return null;
 }
 
-// a way's band stretches (pieces of consecutive paths joined), each with its kind: cross, rails, reach or clear
+// a way's approaches (pieces of consecutive paths joined), each with its kind: rails (RAILS_RUN m or more within RAILS: a
+// lane on them, also where the way leaves on the other side), cross (in the band and out on its other side, or over the
+// centre line and back), or null: judged by the body's reach (reach(): 'reach' or 'clear')
 export function wayStretches(seq, tracks) {
   const out = [];
   for (const piece of seq) {
@@ -107,18 +112,16 @@ export function wayStretches(seq, tracks) {
       if (prev && prev.endsIn && st.startsIn && Math.abs(prev.dOut - dIn) < 1e-6) {
         prev.flips += st.flips + (prev.sides[1] !== st.sides[0] ? 1 : 0);
         prev.sides[1] = st.sides[1]; prev.dOut = dOut; prev.endsIn = st.endsIn; prev.sxOut = st.sxOut;
-        prev.minD = Math.min(prev.minD, st.minD);
+        prev.minD = Math.min(prev.minD, st.minD); prev.railsLen += st.railsLen;
+        if (prev.dBand === null && st.bIn !== null) prev.dBand = piece.off + st.bIn;
         continue;
       }
-      out.push({ ...st, sides: [...st.sides], dIn, dOut, k: seq.indexOf(piece) });
+      out.push({ ...st, sides: [...st.sides], dIn, dOut, dBand: st.bIn === null ? null : piece.off + st.bIn, k: seq.indexOf(piece) });
     }
   }
-  // (leaving the band on the other side: across; along the rails RAILS_RUN m or more: on them, also where the way ends
-  // there; over to the centre line and back to the same side: across it too, the tram's way is driven over. The rest
-  // is judged by the body's reach, reach())
   for (const w of out) {
-    const long = w.dOut - w.dIn >= RAILS_RUN && w.minD < RAILS, over = w.flips > 0 || w.minD < CROSSES;
-    w.kind = !w.endsIn && w.sides[0] !== w.sides[1] ? 'cross' : long ? 'rails' : over ? 'cross' : null;
+    w.kind = w.dBand === null ? null : w.railsLen >= RAILS_RUN ? 'rails'
+      : (!w.endsIn && w.sides[0] !== w.sides[1]) || w.flips > 0 || w.minD < CROSSES ? 'cross' : null;
   }
   return out;
 }
@@ -126,7 +129,7 @@ export function wayStretches(seq, tracks) {
 // least separation between a car on the way in [dIn, dOut] and a tram's body passing there (centred about each point)
 export function reach(seq, w) {
   let least = Infinity, where = null;
-  for (let d = w.dIn; d <= w.dOut + 1e-6; d += 1) {
+  for (let d = w.dIn; d <= w.dOut + 1e-6; d += STEP) {
     const q = wayAt(seq, d), n = w.rt.nearest(q.x, q.y);
     if (!n) continue;
     const car = carBox(q);
@@ -182,14 +185,20 @@ export function run(traffic = window.run.traffic, game = window.run.game) {
   let waits = 0, letGoLater = 0;
   const seenEntry = new Set(), seenWait = new Set();
   for (const { seq, tag, inJunction } of ways) {
-    // the loop's crossings on this way (src/traffic.js: _trackCrossings per path, one copy of each, groups)
-    const xs = [];
-    seq.forEach((piece, k) => { for (const x of T._trackCrossings(piece.path)) xs.push({ dC: piece.off + x.sIn, dOut: piece.off + x.sOut, sx: x.sx, rt: x.rt, k }); });
-    xs.sort((a, b) => a.dC - b.dC);
-    for (let i = xs.length - 1; i > 0; i--) if (xs.slice(0, i).some((o) => o.rt === xs[i].rt && Math.abs(o.sx - xs[i].sx) < 4)) xs.splice(i, 1);
-    for (let i = 0; i < xs.length; i++) {
-      const g = i > 0 && xs[i].dC - xs[i - 1].g.dOut < 2 * CAR_HALF + 2 * YIELD_GAP ? xs[i - 1].g : { dC: xs[i].dC, dOut: xs[i].dOut, k: xs[i].k };
-      g.dOut = Math.max(g.dOut, xs[i].dOut); xs[i].g = g;
+    // the loop's places on this way, as it reads them for a car at the way's start (src/traffic.js _wayCrossings; before
+    // #602 _trackCrossings per path, one copy of each, groups, as below)
+    let xs;
+    if (T._wayCrossings) {
+      xs = T._wayCrossings(seq.map((p) => [p.path, p.off, p.conn]), Infinity);
+    } else {
+      xs = [];
+      seq.forEach((piece, k) => { for (const x of T._trackCrossings(piece.path)) xs.push({ dC: piece.off + x.sIn, dOut: piece.off + x.sOut, sx: x.sx, rt: x.rt, k }); });
+      xs.sort((a, b) => a.dC - b.dC);
+      for (let i = xs.length - 1; i > 0; i--) if (xs.slice(0, i).some((o) => o.rt === xs[i].rt && Math.abs(o.sx - xs[i].sx) < 4)) xs.splice(i, 1);
+      for (let i = 0; i < xs.length; i++) {
+        const g = i > 0 && xs[i].dC - xs[i - 1].g.dOut < 2 * CAR_HALF + 2 * YIELD_GAP ? xs[i - 1].g : { dC: xs[i].dC, dOut: xs[i].dOut, k: xs[i].k };
+        g.dOut = Math.max(g.dOut, xs[i].dOut); xs[i].g = g;
+      }
     }
 
     // the entries into a band, by kind, and whether the loop gives way there
@@ -206,16 +215,21 @@ export function run(traffic = window.run.traffic, game = window.run.game) {
         kinds[kind]++;
         const cov = xs.some((x) => x.rt === w.rt && x.dC >= w.dIn - 1 && x.dC <= w.dOut);
         if (cov) covered[kind]++;
-        if (!cov && w.cosIn >= ALONG && kind === 'cross') { checks.skippedCross.count++; checks.skippedCross.at.push(place(q0.x, q0.y)); }
-        if (!cov && w.cosIn >= ALONG && kind === 'reach') { checks.skippedReach.count++; checks.skippedReach.at.push(place(rr.where.x, rr.where.y)); checks.skippedReach.depth.push(r2(-rr.least)); }
+        if (!cov && kind === 'cross') { checks.skippedCross.count++; checks.skippedCross.at.push(place(q0.x, q0.y)); }
+        if (!cov && kind === 'reach') { checks.skippedReach.count++; checks.skippedReach.at.push(place(rr.where.x, rr.where.y)); checks.skippedReach.depth.push(r2(-rr.least)); }
       }
     }
 
     // where the loop has the car wait, against the passing body; and the body when it lets the car go
     for (const x of xs) {
       let front = x.g.dC - YIELD_GAP, rule = inJunction ? 'inJunction' : 'band';
+      // (the spot before the junction: since #602 the loop takes the nearer of the two, and that one only with the car's
+      // tail clear of the places before it on its way)
       const k = x.g.k, J = seq[k - 1];
-      if (J && J.conn && J.off > 0 && front - 2 * CAR_HALF < seq[k].off) { front = J.off - 1; rule = 'junction'; }
+      if (J && J.conn && J.off > 0 && front - 2 * CAR_HALF < seq[k].off) {
+        const toJ = J.off - 1, clear = xs.every((o) => o.g === x.g || o.dC >= x.g.dC || toJ - 2 * CAR_HALF >= o.dOut);
+        if (!T._wayCrossings || (toJ < front && clear)) { front = toJ; rule = 'junction'; }
+      }
       // (on the first lane, not wholly on it: a car there is on the way of the lane before)
       if (!inJunction && k === 0 && front - 2 * CAR_HALF < 0) continue;
       if (inJunction && front - CAR_HALF < 0) continue;
@@ -233,8 +247,9 @@ export function run(traffic = window.run.traffic, game = window.run.game) {
         checks.waitInBody.count++; checks.waitInBody.at.push(place(car.x, car.y)); checks.waitInBody.depth.push(r2(-wait));
         checks.waitInBody.byRule[rule] = (checks.waitInBody.byRule[rule] || 0) + 1;
       }
-      // (let go once the tram's front is its length and 2 m past the crossing: the loop's onBody)
-      const tb = bodies(x.rt, x.sx + len + 2, cars);
+      // (let go once the tram's front is its length and 2 m past the crossing, past the far end of the stretch of track
+      // it takes up since #602: the loop's onBody)
+      const tb = bodies(x.rt, (x.hi ?? x.sx) + len + 2, cars);
       let rel = Infinity, relAt = null;
       for (let d = front - CAR_HALF; d <= x.g.dOut + CAR_HALF + 0.5; d += 0.5) {
         const cb = carBox(wayAt(seq, d));

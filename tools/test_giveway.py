@@ -27,12 +27,13 @@ SCENE = r"""async () => {
     alongsideNear: [straight, way([[60, 3], [95, 1.7], [140, 1.7], [175, 3]])],
     alongsideClear: [straight, way([[60, -3], [95, -2.4], [140, -2.4], [175, -3]])],
     ontoRails: [straight, way([[160, 8], [170, 0.3], [199, 0.3]])],
+    cornerNear: [straight, way([[100, 12], [120, 2.65], [140, 12]])],
     curveOutside: [curve, way([...arc(27, -80, -62, 6), ...arc(22.4, -60, 60), ...arc(27, 62, 80, 6)])],
   };
   const out = {};
   for (const [name, [track, seq]] of Object.entries(ways)) {
     const ws = wayStretches(seq, [track]);
-    out[name] = ws.map((w) => { const r = w.kind ? null : reach(seq, w); return { kind: w.kind || (r.least < 0 ? 'reach' : 'clear'), least: r && Math.round(r.least * 100) / 100, cosIn: Math.round(w.cosIn * 100) / 100, minD: Math.round(w.minD * 100) / 100 }; });
+    out[name] = ws.map((w) => { const r = w.kind ? null : reach(seq, w); return { kind: w.kind || (r.least < 0 ? 'reach' : 'clear'), least: r && Math.round(r.least * 100) / 100, minD: Math.round(w.minD * 100) / 100 }; });
   }
   return out;
 }"""
@@ -55,9 +56,8 @@ class GiveWay(unittest.TestCase):
             faulthandler.cancel_dump_traceback_later()
         kinds = {k: [w['kind'] for w in v] for k, v in r.items()}
         self.assertEqual(kinds['across'], ['cross'])
-        # (30° to the track: the give-way loop takes it for driving along, |cos| 0.87; it crosses all the same)
+        # (30° to the track: the give-way loop took it for driving along before #602, |cos| 0.87; it crosses all the same)
         self.assertEqual(kinds['shallowAcross'], ['cross'])
-        self.assertGreaterEqual(r['shallowAcross'][0]['cosIn'], 0.7)
         # (a car's middle 1.7 m from the centre: its side 0.8 m, inside the body's 1.25 m by 0.45 m; at the bend into it,
         # turned 2°, its corner 0.08 m deeper)
         self.assertEqual(kinds['alongsideNear'], ['reach'])
@@ -66,6 +66,10 @@ class GiveWay(unittest.TestCase):
         self.assertEqual(kinds['alongsideClear'], ['clear'])
         self.assertAlmostEqual(r['alongsideClear'][0]['least'], 0.2, delta=0.06)
         self.assertEqual(kinds['ontoRails'], ['rails'])
+        # (never in the band, its middle 2.65 m from the centre at the nearest, but turned 25° there: its corner 0.9 m from it)
+        self.assertEqual(kinds['cornerNear'], ['reach'])
+        self.assertGreater(r['cornerNear'][0]['minD'], 2.6)
+        self.assertLess(r['cornerNear'][0]['least'], -0.05)
         # (the same 2.4 m outside a 20 m curve: the body's ends swing out about 0.9 m over it)
         self.assertEqual(kinds['curveOutside'], ['reach'])
         self.assertLess(r['curveOutside'][0]['least'], -0.4)
