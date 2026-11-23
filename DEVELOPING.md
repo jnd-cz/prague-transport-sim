@@ -497,6 +497,10 @@ disagreements (`track-z.json`, `tools/dtmp_tracks.py --findings`) went that way.
 `?line=17&review=reports/review/grass-track-17.json` lists where OSM maps grass over the track and nothing we know
 says so (#503, `python -P -E tools/grass_review.py`, which also prints how near the built grass's holes come to OSM's
 edges); `--import` takes the answers into `data/truth.json` `grassReview`, and grass answered lays grass track.
+`?line=9&review=reports/review/stairs-9.json` asks what kind of stairs stand where the ground draws a survey stairs area
+steeper than 1:1, and at the places #447's thread named (`python -P -E tools/stairs_review.py`, which prints the stairs
+per line, one flight or not and how steep; `--table` alone); `--import` takes the kinds into `data/truth.json`
+`stairsReview`, keyed by a point inside the area.
 `?line=17&review=reports/review/track-sources-17.json` lists where the track is not from DI and where DI and
 OSM disagree on a switch (#20, `tools/track_sources.py`); "matches reality" recorded in `data/truth.json`
 (`trackSources.reviewAnswers`) takes a finding off the list, anything else goes in a note.

@@ -28,7 +28,8 @@
   "bedTroughReview": "tools/bed_troughs.py (an answered place gets no card); reference for the walls step (`wall`) until an issue reads it",
   "groundRules": "reference: the rules tools/ground_mesh.py holds (crossing_pieces, rail_band, on_rails) and checks (heads_check)",
   "groundPlaces": "tools/ground_place.py: the places a ground change is built and measured at (#757)",
-  "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)"
+  "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)",
+  "stairsReview": "tools/stairs_review.py (an answered place gets no card); reference for the stairs rules of #447 in tools/ground_mesh.py until they read it"
  },
  "t3PhotoModel": [
   {
@@ -6104,6 +6105,109 @@
      "why": "IPR rises 0.21 m from the track to the platform"
     }
    ]
+  },
+  "stairs-reversed-ramp": {
+   "line": "9",
+   "at": [
+    -4107.6,
+    -1464.0
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a flight 4.5 m wide rising 6 m over 17 m, foot to the south (survey area 5615 of line 9 on main e79f44c): its long sides rise 236.0 -> 241.9 m, but the foot's edge runs at 242.3 m, the top's height, after a jump of 6.5 m within 0.4 m: a wall's top. Triangulated, the foot is tipped up into a reversed ramp, 34 m² steeper than 1:1",
+   "said": "one flight, or flights in a straight line with landings; note: there's kind of reversed ramp now",
+   "source": "the user's answer in the stairs review (reports/review/stairs-9.json, data/truth.json stairsReview), 2026-11-22, #447",
+   "sections": [
+    {
+     "name": "up the flight's middle, foot to top",
+     "from": [
+      -4107.6,
+      -1456.2
+     ],
+     "to": [
+      -4107.8,
+      -1472.4
+     ],
+     "expect": {
+      "off the chord m": 0.3
+     },
+     "why": "one even flight from 236 to 242 m; the foot's edge at 242.3 m is a wall's top (StairsHeights)"
+    }
+   ]
+  },
+  "stairs-beside-a-building": {
+   "line": "9",
+   "at": [
+    -2815.0,
+    -1389.5
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a flight 2 m wide along a building's wall, rising 222.8 -> 227.4 m over 25 m (survey area 5662 of line 9 on main e79f44c). The outline's side on the building's line carries the building's foot, level at 224.1 m, so the triangles leant across the flight: 11.5 m² steeper than 1:1",
+   "said": "one flight, or flights in a straight line with landings",
+   "source": "the user's answer in the stairs review (reports/review/stairs-9.json, data/truth.json stairsReview), 2026-11-22, #447",
+   "sections": [
+    {
+     "name": "up the flight's middle, foot to top",
+     "from": [
+      -2814.2,
+      -1401.0
+     ],
+     "to": [
+      -2815.8,
+      -1378.5
+     ],
+     "expect": {
+      "off the chord m": 0.3
+     },
+     "why": "one even flight from 222.8 to 227.4 m along the stairs' own side (StairsHeights)"
+    },
+    {
+     "name": "across the flight at y = -1390",
+     "from": [
+      -2815.7,
+      -1390.0
+     ],
+     "to": [
+      -2814.1,
+      -1390.0
+     ],
+     "expect": {
+      "sloping m": 0.5
+     },
+     "why": "steps are level across; the building's side at 224.05 m stood 1 m under the stairs' 225.1 m there"
+    }
+   ]
+  },
+  "stairs-not-there": {
+   "line": "37",
+   "at": [
+    4001.4,
+    1411.9
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a survey stairs area 1.5 m by 13 m in a sidewalk along a building (area 2169 of line 37 on main e79f44c): its west side, on the building's line, has 14 step noses down to 182.7 m, 4 m under the sidewalk; its east side the sidewalk's level, 186.4-186.9 m. IPR's raster is level at the sidewalk's height over it. Triangulated, 10 m² steeper than 1:1",
+   "said": "no stairs here; note: no visible stairs",
+   "source": "the user's answer in the stairs review (reports/review/stairs-37.json, data/truth.json stairsReview), 2026-11-22, #447",
+   "sections": [
+    {
+     "name": "along the area's middle, south to north",
+     "from": [
+      4001.4,
+      1406.5
+     ],
+     "to": [
+      4001.4,
+      1417.5
+     ],
+     "expect": {
+      "off the lidar m": 1.0,
+      "sloping m": 1.0
+     },
+     "why": "the sidewalk's level, as the raster has it and the user sees it; the noses on the building's line are not the ground's (StairsHeights)"
+    }
+   ]
   }
  },
  "openTrackReview": {
@@ -6248,6 +6352,314 @@
     ],
     "answer": "paved",
     "source": "user, open track review (reports/review/open-track-22.json), 2026-11-14 (#591)"
+   }
+  ]
+ },
+ "stairsReview": {
+  "note": "The user's answers to the stairs review (reports/review/stairs-N.json, tools/stairs_review.py, #447): what kind of stairs stand at a place, for the rules that draw the ground under the survey's stairs. `place` is a point inside the survey's stairs area (lat, lon); `kind` is one of flight, turning, sunk, two levels, more than stairs, structure, not stairs, or unsure (the imagery does not show them; no rule reads it).",
+  "answers": [
+   {
+    "id": "stairs-50.00443-14.41557",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0044254,
+     14.4155719
+    ],
+    "kind": "unsure",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.02676-14.40432",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.026763,
+     14.4043171
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06570-14.41520",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0656959,
+     14.4152018
+    ],
+    "kind": "more than stairs",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06599-14.41619",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.065988,
+     14.4161886
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06680-14.41670",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0668011,
+     14.4166981
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06838-14.32993",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0683791,
+     14.3299341
+    ],
+    "kind": "structure",
+    "note": "stairs leading to path in the air around the building",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06929-14.36727",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0692863,
+     14.3672681
+    ],
+    "kind": "flight",
+    "note": "there's kind of reversed ramp now",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07014-14.41433",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0701359,
+     14.4143308
+    ],
+    "kind": "more than stairs",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07042-14.37345",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0704199,
+     14.3734526
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07071-14.36760",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0707132,
+     14.3676
+    ],
+    "kind": "unsure",
+    "note": "private house",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07154-14.38501",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0715424,
+     14.3850108
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07156-14.38515",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0715575,
+     14.3851453
+    ],
+    "kind": "flight",
+    "note": "kind of long stairs with less steep underlying slope",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07253-14.41665",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0725311,
+     14.4166518
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07274-14.38679",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0727407,
+     14.3867864
+    ],
+    "kind": "unsure",
+    "note": "private house",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.08051-14.40827",
+    "lines": [
+     "9",
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0805085,
+     14.4082696
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.08158-14.41382",
+    "lines": [
+     "9",
+     "17",
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0815809,
+     14.4138204
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.08559-14.38592",
+    "lines": [
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0855856,
+     14.3859235
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-22.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.09234-14.41913",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0923419,
+     14.419129
+    ],
+    "kind": "unsure",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.09338-14.40508",
+    "lines": [
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0933808,
+     14.4050847
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-22.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.09469-14.41610",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.094689,
+     14.4161049
+    ],
+    "kind": "more than stairs",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.10481-14.47405",
+    "lines": [
+     "37"
+    ],
+    "place": [
+     50.1048146,
+     14.4740539
+    ],
+    "kind": "not stairs",
+    "note": "no visible stairs",
+    "source": "user, stairs review (reports/review/stairs-37.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.11135-14.43622",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.1113451,
+     14.4362203
+    ],
+    "kind": "more than stairs",
+    "note": "stairs partially under a bridge",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.11145-14.43674",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.1114494,
+     14.4367372
+    ],
+    "kind": "more than stairs",
+    "note": "stairs partially under a bridge",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.12006-14.43862",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.1200588,
+     14.4386204
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
    }
   ]
  }

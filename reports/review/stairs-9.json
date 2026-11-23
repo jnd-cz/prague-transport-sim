@@ -1,0 +1,423 @@
+{
+ "schema": 1,
+ "issue": 447,
+ "line": "9",
+ "title": "Stairs: what kind stands here",
+ "findings": [
+  {
+   "kind": "stairs",
+   "id": "stairs-50.06929-14.36727",
+   "line": "9",
+   "lines": [
+    "9"
+   ],
+   "x": -4107.6,
+   "y": -1463.7,
+   "mag": 34.1,
+   "status": "review",
+   "place": [
+    50.0692863,
+    14.3672681
+   ],
+   "marks": [
+    {
+     "x": -4104.7,
+     "y": -1455.2,
+     "label": "lowest 235.84 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -4105.7,
+     "y": -1473.1,
+     "label": "highest 242.35 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 88 m², its outline from 235.84 m to 242.35 m (16 points; area 5615 of line 9 in this build). The game draws it on the outline's triangles, 34.1 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points."
+  },
+  {
+   "kind": "stairs",
+   "id": "stairs-50.06838-14.32993",
+   "line": "9",
+   "lines": [
+    "9"
+   ],
+   "x": -6768.7,
+   "y": -1196.7,
+   "mag": 29.7,
+   "status": "review",
+   "place": [
+    50.0683791,
+    14.3299341
+   ],
+   "marks": [
+    {
+     "x": -6771.7,
+     "y": -1209.6,
+     "label": "lowest 292.35 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -6769.4,
+     "y": -1195.0,
+     "label": "highest 297.13 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 68 m², its outline from 292.35 m to 297.13 m (10 points; area 5782 of line 9 in this build). The game draws it on the outline's triangles, 29.7 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points."
+  },
+  {
+   "kind": "stairs",
+   "id": "stairs-50.07156-14.38515",
+   "line": "9",
+   "lines": [
+    "9"
+   ],
+   "x": -2805.3,
+   "y": -1388.7,
+   "mag": 22.3,
+   "status": "review",
+   "place": [
+    50.0715575,
+    14.3851453
+   ],
+   "marks": [
+    {
+     "x": -2803.7,
+     "y": -1402.0,
+     "label": "lowest 222.38 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2807.1,
+     "y": -1376.1,
+     "label": "highest 227.70 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 52 m², its outline from 222.38 m to 227.70 m (38 points; area 5663 of line 9 in this build). The game draws it on the outline's triangles, 22.3 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points."
+  },
+  {
+   "kind": "stairs",
+   "id": "stairs-50.07274-14.38679",
+   "line": "9",
+   "lines": [
+    "9"
+   ],
+   "x": -2670.9,
+   "y": -1274.4,
+   "mag": 22.0,
+   "status": "review",
+   "place": [
+    50.0727407,
+    14.3867864
+   ],
+   "marks": [
+    {
+     "x": -2669.3,
+     "y": -1280.4,
+     "label": "lowest 243.28 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2692.0,
+     "y": -1265.2,
+     "label": "highest 250.75 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 115 m², its outline from 243.28 m to 250.75 m (80 points; area 5700 of line 9 in this build). The game draws it on the outline's triangles, 22.0 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points."
+  },
+  {
+   "kind": "stairs",
+   "id": "stairs-50.07253-14.41665",
+   "line": "9",
+   "lines": [
+    "9"
+   ],
+   "x": -556.4,
+   "y": -1589.5,
+   "mag": 19.9,
+   "status": "review",
+   "place": [
+    50.0725311,
+    14.4166518
+   ],
+   "marks": [
+    {
+     "x": -555.9,
+     "y": -1584.7,
+     "label": "lowest 194.68 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -553.2,
+     "y": -1597.1,
+     "label": "highest 200.89 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 36 m², its outline from 194.68 m to 200.89 m (18 points; area 1998 of line 9 in this build). The game draws it on the outline's triangles, 19.9 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points."
+  },
+  {
+   "kind": "stairs",
+   "id": "stairs-50.08051-14.40827",
+   "line": "9",
+   "lines": [
+    "9",
+    "22",
+    "23"
+   ],
+   "x": -1029.6,
+   "y": -628.7,
+   "mag": 14.4,
+   "status": "review",
+   "place": [
+    50.0805085,
+    14.4082696
+   ],
+   "marks": [
+    {
+     "x": -1026.0,
+     "y": -635.4,
+     "label": "lowest 185.48 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -1033.7,
+     "y": -628.0,
+     "label": "highest 189.12 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 26 m², its outline from 185.48 m to 189.12 m (31 points; area 5501 of line 9 in this build). The game draws it on the outline's triangles, 14.4 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points."
+  },
+  {
+   "kind": "stairs",
+   "id": "stairs-50.07154-14.38501",
+   "line": "9",
+   "lines": [
+    "9"
+   ],
+   "x": -2815.1,
+   "y": -1389.0,
+   "mag": 11.5,
+   "status": "review",
+   "place": [
+    50.0715424,
+    14.3850108
+   ],
+   "marks": [
+    {
+     "x": -2813.1,
+     "y": -1401.9,
+     "label": "lowest 222.82 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2814.9,
+     "y": -1377.0,
+     "label": "highest 227.43 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 54 m², its outline from 222.82 m to 227.43 m (38 points; area 5662 of line 9 in this build). The game draws it on the outline's triangles, 11.5 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points."
+  },
+  {
+   "kind": "stairs",
+   "id": "stairs-50.07071-14.36760",
+   "line": "9",
+   "lines": [
+    "9"
+   ],
+   "x": -4062.3,
+   "y": -1309.7,
+   "mag": 9.1,
+   "status": "review",
+   "place": [
+    50.0707132,
+    14.3676
+   ],
+   "marks": [
+    {
+     "x": -4061.1,
+     "y": -1310.8,
+     "label": "lowest 240.04 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -4068.3,
+     "y": -1311.2,
+     "label": "highest 242.58 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 19 m², its outline from 240.04 m to 242.58 m (45 points; area 5557 of line 9 in this build). The game draws it on the outline's triangles, 9.1 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points."
+  },
+  {
+   "kind": "stairs",
+   "id": "stairs-50.07042-14.37345",
+   "line": "9",
+   "lines": [
+    "9"
+   ],
+   "x": -3651.7,
+   "y": -1399.4,
+   "mag": 8.9,
+   "status": "review",
+   "place": [
+    50.0704199,
+    14.3734526
+   ],
+   "marks": [
+    {
+     "x": -3651.6,
+     "y": -1404.3,
+     "label": "lowest 237.93 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -3655.1,
+     "y": -1391.3,
+     "label": "highest 244.33 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 33 m², its outline from 237.93 m to 244.33 m (25 points; area 5633 of line 9 in this build). The game draws it on the outline's triangles, 8.9 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points."
+  },
+  {
+   "kind": "stairs",
+   "id": "stairs-50.08158-14.41382",
+   "line": "9",
+   "lines": [
+    "9",
+    "17",
+    "22",
+    "23"
+   ],
+   "x": -619.8,
+   "y": -564.7,
+   "mag": 0.2,
+   "status": "review",
+   "place": [
+    50.0815809,
+    14.4138204
+   ],
+   "marks": [
+    {
+     "x": -621.6,
+     "y": -566.0,
+     "label": "lowest 187.98 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -622.1,
+     "y": -571.0,
+     "label": "highest 193.44 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 34 m², its outline from 187.98 m to 193.44 m (18 points; area 296 of line 9 in this build). The game draws it on the outline's triangles, none of it steeper than 1:1. What stands here? The pins are the outline's lowest and highest points. Asked in #447: beside the National Theatre, near the Divadelní underpass, where the user first asked for stairs' own rule (2026-11-10)."
+  }
+ ]
+}
