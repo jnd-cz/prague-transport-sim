@@ -281,11 +281,12 @@ class DeployTest(unittest.TestCase):
             deploy.checks(True, public=True)
 
     def test_public_ok(self):
-        right = {"": 200, "version.json": 200, "feedback/": 403, "submissions/": 403, "review.php": 404, "reviews.html": 404, "reports/review/index.json": 404}
+        right = {"": 200, "version.json": 200, "feedback/": 403, "submissions/": 403, "review.php": 404, "reviews.html": 404, "reports/review/index.json": 404,
+                 "overview.html": 404, "overview.json": 404}
         self.assertEqual(deploy.public_ok("https://sim", lambda u, p: right[p]), [])
         self.assertEqual(deploy.public_ok("https://sim", lambda u, p: 404 if p == "feedback/" else right[p]), [])
         bad = deploy.public_ok("https://sim", lambda u, p: 200)
-        self.assertEqual(len(bad), 5)
+        self.assertEqual(len(bad), 7)
         self.assertIn("/review.php answers 200, wants 404", bad)
 
     def test_pull_moves_the_notes_off_the_host(self):

@@ -1,6 +1,7 @@
 {
  "note": "Facts from the user and from sources, each citing where it came from: what checks score the game against and what the build obeys. Add facts here, not special cases in code. Every section has a reader, or says in `readers` that it is reference only (AGENTS.md, #224).",
  "readers": {
+  "t3PhotoModel": "reference: user appearance requirements for src/t3photo.js (#437); not simulation or world-build inputs",
   "contactorSound": "reference: user listening observations for src/audio.js and src/tr37.js, #590",
   "stops": "tools/lint.js stopFacts: the stop detector (src/game.js _vienna) scored against the facts of the loaded line",
   "stopTypes": "reference: what the types in stops mean",
@@ -27,8 +28,82 @@
   "bedTroughReview": "tools/bed_troughs.py (an answered place gets no card); reference for the walls step (`wall`) until an issue reads it",
   "groundRules": "reference: the rules tools/ground_mesh.py holds (crossing_pieces, rail_band, on_rails) and checks (heads_check)",
   "groundPlaces": "tools/ground_place.py: the places a ground change is built and measured at (#757)",
-  "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)"
+  "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)",
+  "stairsReview": "tools/stairs_review.py (an answered place gets no card); reference for the stairs rules of #447 in tools/ground_mesh.py until they read it"
  },
+ "t3PhotoModel": [
+  {
+   "id": "bogie-wheel-faces-and-track-brake",
+   "source": "user, bogie review on 2026-11-22, #437, photos 18347.jpg and 18348.jpg",
+   "quote": "wheel is full without holes, has one large hex nut, the track brake is the lowest rectangle close to the rail, has I think one hinge and couple springs on each side. In between there's couple large parts and shouldn't be visible through.",
+   "implementation": "The two 8053 views guide the side silhouette. The pivot and spring arrangement is a visual estimate."
+  },
+  {
+   "id": "6892-front-and-hand-operated-rear-wipers",
+   "source": "user, 6892 model review, 2026-11-20, #437",
+   "quote": "the front ones are mounted under the window and the motion should sweep more of the glass - meet in the middle and go towards the glass metal divider. The back wiper looks better but should swing to both sides and can be left no animated as it's for hand operation only, not usually used, only when backing up by the driver from the rear control panel."
+  },
+  {
+   "id": "entry-and-folding-doors",
+   "source": "user, model review in session 2026-11-16, #437",
+   "quote": "the entry stair shouldn't be see through ... The door should end with the first stair floor and not extend further, wide open just a bit less than completely folded 90 degrees",
+   "implementation": "Closed stair risers; door bottom at the first tread with seal clearance; 84 degrees is the modelling choice for slightly below 90, not a measured factory angle."
+  },
+  {
+   "id": "rounded-ends-and-running-gear",
+   "source": "user, model review in session 2026-11-16, #437",
+   "quote": "The front and back are too wide and flat. Try to make it more tapered and round ... Wheels should be full without hole, more towards dirty brown. Magnetic break could be moddeled more accurately than a thin strip close to rails."
+  },
+  {
+   "id": "markings-indicators-collector",
+   "source": "user, model review in session 2026-11-16, #437; supplied photos 17823.jpg, 17824.jpg, 16806.jpg, 16447.jpg, 16191.jpg",
+   "quote": "Fleet numbers should be larger, more consistent height around the sides, check position against real photos. Don't forget to put turn indicator on the sides too. And the current collector has only one diagonal rod",
+   "implementation": "Single diagonal per articulated collector frame; the front and rear frames can overlap in a head-on view."
+  },
+  {
+   "id": "twenty-four-early-cushioned-seats",
+   "source": "user answer in session 2026-11-16, #437",
+   "quote": "i would go with 24 places and the simplified cushion style early T3 like in 6312, 6102 cars",
+   "passengerSeats": 24,
+   "style": "Early padded T3 seats; requested custom interior under 6892 exterior markings."
+  },
+  {
+   "id": "saloon-reference-6312",
+   "source": "user, session 2026-11-23, #437, photos 18530.jpg, 18531.jpg, 18532.jpg, 18535.jpg and 18536.jpg",
+   "quote": "the interion is the older 6312 style, so we should later split the model into two",
+   "reference": "18532 identifies the car at the cab partition. The aisle views show single upholstered chairs, a facing pair with a box-base chair, tapered pedestals and an open central aisle."
+  },
+  {
+   "id": "shared-end-bow-and-entry",
+   "source": "user, 2026-11-23, #437, 20261122_121753.jpg and 20261121_124445.jpg",
+   "quote": "the rear isn't completely flat (the front isn't either), but has larger radius before meeting the rounded corner",
+   "reference": "Both cars share the bowed ends, clipped stair corners and door tops aligned to the saloon window frames."
+  },
+  {
+   "id": "6892-plastic-seat-finish",
+   "source": "user, 2026-11-23, #437, 20261121_123814.jpg, 20261121_123807.jpg and 20261121_123838.jpg",
+   "quote": "just to match the general shape and have both red and grey colors.",
+   "reference": "6892 has dished plastic shells with a slot above the pan and a tubular grip above the back."
+  },
+  {
+   "id": "6312-exterior-variant",
+   "source": "user, 2026-11-23, #437, photos 20261122_120509.jpg, 20261122_120525.jpg, 20261122_120722.jpg and 20261122_120531.jpg",
+   "quote": "use them to model the car, separately from 6892.",
+   "reference": "6312 has a front brow route board, a rear window route board, horizontal combined rear lamps and red-insert aluminium mouldings. The rear photograph shows an unobstructed pane."
+  },
+  {
+   "id": "end-contours-brow-and-coupler",
+   "source": "user follow-up in session 2026-11-16, #437; supplied 6312 photos 15611.jpg, 15609.jpg, 15606.jpg and 7000 detail 17884.jpg",
+   "quote": "model the front and back according to these photos. Pay attention to the shape, lines, contours, window, top brow with a bit of overhang and tge line plate alignment. Try to model the coupler too.",
+   "reference": "The earlier photo 17824.jpg of 6892 remains the rear lamp/window reference."
+  },
+  {
+   "id": "interior-photo-character",
+   "source": "user follow-up in session 2026-11-16, #437; supplied interior photos 17398.jpg, 17399.jpg, 17402.jpg and 17400.jpg",
+   "quote": "Interior with the chairs and doors if that helps you with the design. It doesn't need to be super detailed but to capture tge general gist of it.",
+   "reference": "Red upholstered pads, silver loop frames, round and electrical-box pedestals, pink-beige wall panels, dark ribbed rubber floor, silver inner door faces and long handles. Seat count and simplified layout remain the earlier 24-place choice."
+  }
+ ],
  "contactorSound": [
  {
   "id": "tr37-6004-contactor-sound",
@@ -6090,6 +6165,109 @@
      "why": "a kerb stands along the bend as along the street (IPR 0.15 m over 4 m)"
     }
    ]
+  },
+  "stairs-reversed-ramp": {
+   "line": "9",
+   "at": [
+    -4107.6,
+    -1464.0
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a flight 4.5 m wide rising 6 m over 17 m, foot to the south (survey area 5615 of line 9 on main e79f44c): its long sides rise 236.0 -> 241.9 m, but the foot's edge runs at 242.3 m, the top's height, after a jump of 6.5 m within 0.4 m: a wall's top. Triangulated, the foot is tipped up into a reversed ramp, 34 m² steeper than 1:1",
+   "said": "one flight, or flights in a straight line with landings; note: there's kind of reversed ramp now",
+   "source": "the user's answer in the stairs review (reports/review/stairs-9.json, data/truth.json stairsReview), 2026-11-22, #447",
+   "sections": [
+    {
+     "name": "up the flight's middle, foot to top",
+     "from": [
+      -4107.6,
+      -1456.2
+     ],
+     "to": [
+      -4107.8,
+      -1472.4
+     ],
+     "expect": {
+      "off the chord m": 0.3
+     },
+     "why": "one even flight from 236 to 242 m; the foot's edge at 242.3 m is a wall's top (StairsHeights)"
+    }
+   ]
+  },
+  "stairs-beside-a-building": {
+   "line": "9",
+   "at": [
+    -2815.0,
+    -1389.5
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a flight 2 m wide along a building's wall, rising 222.8 -> 227.4 m over 25 m (survey area 5662 of line 9 on main e79f44c). The outline's side on the building's line carries the building's foot, level at 224.1 m, so the triangles leant across the flight: 11.5 m² steeper than 1:1",
+   "said": "one flight, or flights in a straight line with landings",
+   "source": "the user's answer in the stairs review (reports/review/stairs-9.json, data/truth.json stairsReview), 2026-11-22, #447",
+   "sections": [
+    {
+     "name": "up the flight's middle, foot to top",
+     "from": [
+      -2814.2,
+      -1401.0
+     ],
+     "to": [
+      -2815.8,
+      -1378.5
+     ],
+     "expect": {
+      "off the chord m": 0.3
+     },
+     "why": "one even flight from 222.8 to 227.4 m along the stairs' own side (StairsHeights)"
+    },
+    {
+     "name": "across the flight at y = -1390",
+     "from": [
+      -2815.7,
+      -1390.0
+     ],
+     "to": [
+      -2814.1,
+      -1390.0
+     ],
+     "expect": {
+      "sloping m": 0.5
+     },
+     "why": "steps are level across; the building's side at 224.05 m stood 1 m under the stairs' 225.1 m there"
+    }
+   ]
+  },
+  "stairs-not-there": {
+   "line": "37",
+   "at": [
+    4001.4,
+    1411.9
+   ],
+   "reach": 30,
+   "issue": 447,
+   "what": "a survey stairs area 1.5 m by 13 m in a sidewalk along a building (area 2169 of line 37 on main e79f44c): its west side, on the building's line, has 14 step noses down to 182.7 m, 4 m under the sidewalk; its east side the sidewalk's level, 186.4-186.9 m. IPR's raster is level at the sidewalk's height over it. Triangulated, 10 m² steeper than 1:1",
+   "said": "no stairs here; note: no visible stairs",
+   "source": "the user's answer in the stairs review (reports/review/stairs-37.json, data/truth.json stairsReview), 2026-11-22, #447",
+   "sections": [
+    {
+     "name": "along the area's middle, south to north",
+     "from": [
+      4001.4,
+      1406.5
+     ],
+     "to": [
+      4001.4,
+      1417.5
+     ],
+     "expect": {
+      "off the lidar m": 1.0,
+      "sloping m": 1.0
+     },
+     "why": "the sidewalk's level, as the raster has it and the user sees it; the noses on the building's line are not the ground's (StairsHeights)"
+    }
+   ]
   }
  },
  "openTrackReview": {
@@ -6234,6 +6412,314 @@
     ],
     "answer": "paved",
     "source": "user, open track review (reports/review/open-track-22.json), 2026-11-14 (#591)"
+   }
+  ]
+ },
+ "stairsReview": {
+  "note": "The user's answers to the stairs review (reports/review/stairs-N.json, tools/stairs_review.py, #447): what kind of stairs stand at a place, for the rules that draw the ground under the survey's stairs. `place` is a point inside the survey's stairs area (lat, lon); `kind` is one of flight, turning, sunk, two levels, more than stairs, structure, not stairs, or unsure (the imagery does not show them; no rule reads it).",
+  "answers": [
+   {
+    "id": "stairs-50.00443-14.41557",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0044254,
+     14.4155719
+    ],
+    "kind": "unsure",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.02676-14.40432",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.026763,
+     14.4043171
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06570-14.41520",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0656959,
+     14.4152018
+    ],
+    "kind": "more than stairs",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06599-14.41619",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.065988,
+     14.4161886
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06680-14.41670",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0668011,
+     14.4166981
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06838-14.32993",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0683791,
+     14.3299341
+    ],
+    "kind": "structure",
+    "note": "stairs leading to path in the air around the building",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.06929-14.36727",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0692863,
+     14.3672681
+    ],
+    "kind": "flight",
+    "note": "there's kind of reversed ramp now",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07014-14.41433",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0701359,
+     14.4143308
+    ],
+    "kind": "more than stairs",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07042-14.37345",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0704199,
+     14.3734526
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07071-14.36760",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0707132,
+     14.3676
+    ],
+    "kind": "unsure",
+    "note": "private house",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07154-14.38501",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0715424,
+     14.3850108
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07156-14.38515",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0715575,
+     14.3851453
+    ],
+    "kind": "flight",
+    "note": "kind of long stairs with less steep underlying slope",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07253-14.41665",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0725311,
+     14.4166518
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.07274-14.38679",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0727407,
+     14.3867864
+    ],
+    "kind": "unsure",
+    "note": "private house",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.08051-14.40827",
+    "lines": [
+     "9",
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0805085,
+     14.4082696
+    ],
+    "kind": "turning",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.08158-14.41382",
+    "lines": [
+     "9",
+     "17",
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0815809,
+     14.4138204
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-9.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.08559-14.38592",
+    "lines": [
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0855856,
+     14.3859235
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-22.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.09234-14.41913",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0923419,
+     14.419129
+    ],
+    "kind": "unsure",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.09338-14.40508",
+    "lines": [
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0933808,
+     14.4050847
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-22.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.09469-14.41610",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.094689,
+     14.4161049
+    ],
+    "kind": "more than stairs",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.10481-14.47405",
+    "lines": [
+     "37"
+    ],
+    "place": [
+     50.1048146,
+     14.4740539
+    ],
+    "kind": "not stairs",
+    "note": "no visible stairs",
+    "source": "user, stairs review (reports/review/stairs-37.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.11135-14.43622",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.1113451,
+     14.4362203
+    ],
+    "kind": "more than stairs",
+    "note": "stairs partially under a bridge",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.11145-14.43674",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.1114494,
+     14.4367372
+    ],
+    "kind": "more than stairs",
+    "note": "stairs partially under a bridge",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   },
+   {
+    "id": "stairs-50.12006-14.43862",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.1200588,
+     14.4386204
+    ],
+    "kind": "flight",
+    "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
    }
   ]
  }
