@@ -314,7 +314,9 @@ python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic
   noise. Stuck, unfinished and penalty runs are listed per seed and need a reason, as does every mean outside the
   spread and every move of a seedless check (lint, surfaces).
 - **Which baseline each tier compares with** (#282):
-  - a checkpoint's run stores itself under its name (`--baseline --publish --checkpoint W1`: every check, seeds 1-5);
+  - a checkpoint's run stores itself under its name (`--baseline --publish --checkpoint W1`: every check, seeds 1-5),
+    and loads every line as a player does beside it (`--checks u3 --seeds 1 --player --gpu`, #710: the same counts,
+    or each move with its heights from the 10 m grid);
   - every check compares with main at the merge base: its baseline (the night's, or this machine's), else measured
     there once in a pinned worktree through the queue and kept on this machine by its key. A seeded check is
     measured with the seeds asked (#709), so the first compare on a base takes about twice as long;

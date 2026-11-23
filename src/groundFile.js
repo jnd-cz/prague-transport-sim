@@ -224,8 +224,19 @@ export class GroundTiles {
 
 // The held tiles' lookups as one (GroundLookup's answers; null where no tile is held)
 class TiledLookup {
-  constructor(g) { this.g = g; this.hitZ = 0; }
-  _at(x, y) { return this.g.lookups.get(this.g.keyAt(x, y)) || null; }
+  // (missed: the reads where the file has a tile but its lookup is not held, answered by the 10 m grid or the layers
+  // instead: what a player's streamed page reads that the checks' ?keepgeo page does not, tools/headless.py --player, #710)
+  constructor(g) { this.g = g; this.hitZ = 0; this.missed = { reads: 0, tiles: new Set(), at: [] }; }
+  _at(x, y) {
+    const k = this.g.keyAt(x, y), lk = this.g.lookups.get(k);
+    if (lk) return lk;
+    if (this.g.tiles.has(k)) {
+      const m = this.missed;
+      m.reads++;
+      if (!m.tiles.has(k)) { m.tiles.add(k); if (m.at.length < 20) m.at.push([Math.round(x), Math.round(y)]); }
+    }
+    return null;
+  }
   height(x, y) { const lk = this._at(x, y); if (!lk) return null; const z = lk.height(x, y); this.hitZ = lk.hitZ; return z; }
   survey(x, y) { const lk = this._at(x, y); if (!lk) return null; const v = lk.survey(x, y); this.hitZ = lk.hitZ; return v; }
   kind(x, y) { const lk = this._at(x, y); if (!lk) return null; const v = lk.kind(x, y); this.hitZ = lk.hitZ; return v; }
