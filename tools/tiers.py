@@ -32,8 +32,9 @@ KINDS = [
     ("docs", ("*.md", "docs/*", ".claude/*", ".github/*", "LICENSE", "ruff.toml", "CLAUDE.md"),
      "nothing; the PR says so", "all"),
     ("review", ("src/review.js", "src/reviewFindings.js", "src/reviewIndex.js", "src/verdicts.js",
-                "src/trackHeightProfile.js", "reviews.html", "reports/review/*", "tools/test_review.py"),
-     "tools/test_review.py (phone and desktop sizes)", "headless"),
+                "src/trackHeightProfile.js", "reviews.html", "reports/review/*", "tools/test_review.py",
+                "src/overview.js", "overview.html", "tools/test_overview_page.py"),  # (the overview counts like reviews.html, #826)
+     "tools/test_review.py and tools/test_overview_page.py (phone and desktop sizes)", "headless"),
     ("ground rule", ("tools/ground_mesh.py", "tools/ground_partition.py", "tools/bed_surface.py"),
      "the tool's test; tools/ground_place.py on the rule's places and --all, before → after (a new case becomes a "
      "place in data/truth.json groundPlaces); no line rebuilt", "the lines' rebuild and checks: once for the batch"),
