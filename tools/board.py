@@ -92,8 +92,14 @@ def milestone_order(title):
     return (4, 0) if title == "Backlog" else (3, 0) if not title else (2, 0)
 
 
+# Tools a rebuild imports that shape no step's output: the queue's turn, the step cache and the rebuild label's check
+# (rebuild.py imports board.py for it). They change a step's key, so the next rebuild runs it once again with the
+# same output (#817); a branch changing only these is no rebuild (#829). tools/tiers.py reads this list too.
+NOT_OUTPUT = ("tools/heavy.py", "tools/baseline_store.py", "tools/sysinfo.py", "tools/stepcache.py", "tools/board.py")
+
+
 def build_tools(tools=TOOLS):
-    """tools/ files a rebuild runs: rebuild.py's steps and what they import from tools/, transitively.
+    """tools/ files a rebuild runs: rebuild.py's steps and what they import from tools/, transitively, but NOT_OUTPUT.
     Read from rebuild.py, so a new step counts without a list here."""
     src = open(os.path.join(tools, "rebuild.py"), encoding="utf-8").read()
     todo = {"rebuild.py", *re.findall(r'"(\w+\.py)"', src)}
@@ -112,7 +118,7 @@ def build_tools(tools=TOOLS):
             names = [a.name for a in node.names] if isinstance(node, ast.Import) else \
                 [node.module] if isinstance(node, ast.ImportFrom) and node.module and not node.level else []
             todo.update(f"{m.split('.')[0]}.py" for m in names)
-    return {f"tools/{n}" for n in seen if not n.startswith("test_")}
+    return {f"tools/{n}" for n in seen if not n.startswith("test_")} - set(NOT_OUTPUT)
 
 
 def rebuilds(files, tools):
