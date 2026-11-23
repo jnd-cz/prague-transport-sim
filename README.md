@@ -31,10 +31,11 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
   - **U nástupiště dlouhého aspoň 15 m,** je-li v datech: celá souprava stojí podél něj, konec soupravy nejvýše
     3 m před začátkem nástupiště a čelo nejvýše 4 m za jeho koncem. Za první soupravou tak může obsloužit
     zastávku druhá, na delším nástupišti i dvě soupravy 2×T3 za sebou (asi tři čtvrtiny zastávek). U nástupiště
-    kratšího než souprava stačí čelo od 8 m před jeho koncem do 4 m za ním.
+    kratšího než souprava stačí čelo od 8 m před jeho koncem do 4 m za ním. Čelo u označníku (od 2,5 m před ním do
+    3 m za ním) zastávku obslouží vždy, i když konec delší soupravy stojí mimo nástupiště: cestující nastupují
+    dveřmi podél nástupiště.
   - **Jinde:** čelo od 20 m před označníkem do 12 m za ním.
-  - **Návěstidlo těsně za zastávkou:** čelo nejvýše 0,5 m před ním.
-- Bod zastavení je označník: do 3 m od něj získáte bonus 15 bodů za přesnost. Zastavit o kousek dál se stává
+- Bod zastavení je označník, pro každou soupravu a bez ohledu na návěstidla: do 3 m od něj získáte bonus 15 bodů za přesnost. Zastavit o kousek dál se stává
   i ve skutečnosti a cestující přesto nastoupí a vystoupí, proto do 4 m za označníkem hra nic nestrhne; přejetí
   o více než 4 m stojí 20 bodů, i když zastávku obsloužíte. Zastavení dál vzadu v povoleném místě se netrestá.
 - Cestující: počítadlo ve voze (běžná obsaditelnost 110, nejvýše 160 na vůz). Poptávka se řídí denní dobou:
@@ -63,6 +64,7 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
 | `G` | přiblížit pohled ze stanoviště třikrát, jako když se řidič zahledí do dálky: přečtete návěst na 75 m (držet, i v pauze) |
 | `Z` | pravé zrcátko zapnout a vypnout |
+| `Tab` | panel řidiče složit do úzkého pruhu a rozložit |
 | `,` / `.` | směrovky vlevo / vpravo (znovu: vypnout); dávají se před odbočením na křižovatce a v zastávce, kde cestující přecházejí jízdní pruh (vpravo, od brzdění do rozjezdu) |
 | `/` (na české klávesnici `-`) | výstražná světla |
 | `L` | dálková světla: držením problik, se `Shift` zapnout a vypnout |
@@ -152,10 +154,36 @@ teplo z odporníků zrychlovače do salónu (F). Informační panel ukazuje tepl
 Venkovní teplota: Praha teď nebo pevný zimní / podzimní / letní den (menu). Prochladlí cestující (< 12 °C)
 a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká; v létě si cestující otevírají okna.
 
+### Panel řidiče
+
+Pult je pult vozu 6921: jeho ovladače v jeho pořadí a s jeho štítky (v angličtině přeložené). Šedý lak je tramvaj,
+tmavé sklo je hra.
+
+- **Přístroje:** rychloměr 0–80 km/h s počítadlem, ampérmetr 0–600 A (jízda i brzda), voltmetr baterie 0–40 V
+  a doutnavka NAPĚTÍ V TROLEJI (T3 nemá voltmetr trakčního napětí). S asistencí ukazuje červená značka na
+  rychloměru nejvyšší dovolenou rychlost.
+- **Kontrolky** jako na voze: směrovky (zelené), V (VÝSTUP, zelená: cestující zmáčkl znamení řidiči, aby
+  vystoupil v příští zastávce na znamení; svítí do otevření dveří), DVEŘE (zelená, když jsou **všechny zavřené**),
+  BRZDA I, BRZDY II a VLAK (červené při zabrzděných čelisťových brzdách, VLAK u druhého vozu), ZRYCHLOVAČ
+  (oranžová, dokud jsou zařazeny odpory), TOPENÍ ZRCÁTKA.
+- **Ovladače** jdou stisknout myší nebo prstem a pošlou klávesu hry (s asistencí je na nich napsaná). Ty, které
+  hra zatím neumí (mycí stroj, stěrače, osvětlení, havarijní pojezd a další), jsou nakreslené a nic nedělají.
+  Najetí myší na ovladač řekne, co dělá.
+- **Pomůcky hry** ve skle vpravo: sloupec šlapek se zrychlovačem; s asistencí pomocné kontrolky (rychlost,
+  otevřené dveře, proud kontaktem, odjezd, skluz, kolejnicová brzda, písek, bdělost); při pohledu z okna rychlost.
+  Informační obrazovka je vlevo, kde má 6921 palubní počítač.
+- Pult roste s oknem prohlížeče; **Tab** ho složí do úzkého pruhu a zase rozloží.
+
 ### Rozhlížení
 
-- Držením Q / E (nebo ← / →) se díváte levým / pravým oknem; pravé zpětné zrcátko (Z zapíná a vypíná) ukazuje
-  bok soupravy a dveře. Roste s oknem prohlížeče a zorné pole se nemění.
+- Sedíte tam, kde má T3 sedačku řidiče: 0,32 m vlevo od osy vozu a 1,2 m za čelem. Levý sloupek čelního okna
+  proto stojí v pohledu vpřed.
+- Držením Q / E (nebo ← / →) se díváte levým oknem až k zadní stěně kabiny, která okno přetíná, pravým přes
+  přední dveře. S hlavou se otáčí rám stanoviště (sloupky se zaoblenými rohy oken, zadní stěna, dveře) i pult:
+  vlevo je bočnice se směrovým přepínačem, kaloriferem, topením, odpojením topení a pískováním, vpravo křídlo
+  pultu s osvětlením a jízdním řádem pořadí.
+- Pravé zpětné zrcátko (Z zapíná a vypíná) ukazuje bok soupravy a dveře a nic kromě nabídek ho nezakryje. Roste
+  s oknem prohlížeče a zorné pole se nemění.
 - **Pohled zvenku** (V): kamera obíhá kolem tramvaje. Tažením ji otáčíte a nakláníte, kolečkem nebo dvěma prsty
   přibližujete, dvojklik ji vrátí za tramvaj.
 
@@ -172,8 +200,8 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
 
 ### Město
 
-- Terén: koridor trati je zaříznutý do lidarového terénu; opěrné zdi tam, kde trať vede v zářezu ve svahu
-  (Chotkova), Most Legií na mostovce s pilíři.
+- Terén: povrch podle zaměření města a lidaru; opěrné zdi ze zaměření a z dat města jsou jeho součástí
+  (Chotkova, nábřeží pod Letnou), Most Legií na mostovce s pilíři.
 - Značky: klasické červené pražské označníky; rychlostní návěsti podle předpisu D 1/2 (omezení rychlosti černým
   číslem na žluté, rychlostník bílým na černé, předzvěstní trojúhelník, „r“ oblouku o malém poloměru, nebezpečné
   stoupání a klesání), dvakrát větší než skutečné, aby se daly přečíst na obrazovce. Tabulky
@@ -204,10 +232,15 @@ a horko, které jste způsobili, stojí body; otevřenými dveřmi teplo uniká;
   souprava.
 - Nátěr: jen u modelu, který má kromě původního i jiné nátěry (zatím žádný): původní, některý z nich, nebo
   „Libovolný“, přidělený jako ostatním; hra si volbu pamatuje pro každý model. Nátěry nosí i část cizích souprav.
+- Zvuky: jen u modelu, pro který jsou zvukové balíčky: vestavěné (výchozí), nebo balíček. S hrou je dodaný jeden
+  pro hybrid, T2R 6004 – částečné zvuky: zvonek, výstraha dveří a stykače zrychlovače TR37 nahrané ve voze T2R 6004;
+  ostatní zvuky zůstávají vestavěné. Hra si volbu pamatuje pro každý model a hraje ji od začátku další směny.
 - Vozidla…: balíčky od jiných autorů (tramvaj, nátěr, zvuky nebo vozový park), instalované ze souboru .zip, ze
   složky nebo z adresy, i celý komplet v jednom archivu. Hra každý před nabídnutím zkontroluje (soubory, licenci,
   rozměry modelu a jeho náročnost); odmítnutý ukáže s důvody. Instalované zůstávají jen v tomto prohlížeči a jdou
-  vypnout nebo odebrat; nová tramvaj se objeví v menu Model tramvaje. Dole je seznam přihlášených balíčků.
+  vypnout nebo odebrat; nová tramvaj se objeví v menu Model tramvaje. Dole je seznam přihlášených balíčků a
+  formulář, kterým autor svůj balíček (soubor .zip nebo jeho adresu) pošle projektu k posouzení; hra ho napřed
+  zkontroluje a pošle jen takový, který projde.
 
 ### Na telefonu nebo tabletu
 
@@ -217,16 +250,19 @@ zařízení; vypnutá je 🎮 vrátí i za jízdy). Posílají klávesy klávesn
 - řada nad panelem řidiče (na šířku sloupec vpravo): ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
-- ⋯ pro ostatní: směrovky ⇦ ⇨, výstražná světla ⚠, dálková světla (problik držením, zapnout a vypnout), zajišťovací brzda (pokročilé ovládání), kontakt výhybky, stavěcí klíč, odpojení topení, topení, autopilot,
-  zvuk, ✉ zpětná vazba.
+- Pult (kde bývalo ⋯) otevře pult v záložkách bočnice, pult, spínače, křídlo a hra. Ovladače jsou tam, kde jsou na
+  voze: směrovky, výstražná světla, světlomety a světelná houkačka, výhybka, topení a jeho odpojení, písek. V záložce
+  Hra je zajišťovací brzda (pokročilé ovládání), stavěcí klíč, klapka, zrcátko, autopilot, zvuk a ✉ zpětná vazba.
+  Otevře ho i klepnutí na panel řidiče.
 
-Na malé obrazovce jsou panel řidiče a horní lišta menší a mapka je skrytá. Telefon na šířku má ovládač jako
+Na malé obrazovce je panel řidiče úzký pruh (rychloměr, ampérmetr, kontrolky, pomůcky a šlapky), horní lišta je menší a mapka je skrytá. Telefon na šířku má ovládač jako
 sloupec u pravého palce (▲ nahoře, STOP dole), ostatní tlačítka ve dvou sloupcích vlevo a panel řidiče mezi nimi.
 
 **Celá obrazovka:** telefon se jednou zeptá v menu; s „Celá obrazovka“ se každá směna spustí na celé obrazovce,
-otočená na šířku, kde to prohlížeč dovolí (Chrome na Androidu), jinde hra ukáže, ať telefon otočíte. ⛶ v menu ji
-kdykoli zapne nebo vypne; gesto zpět ji opustí do příštího startu. Safari na iPhonu celou obrazovku stránce nedovolí: hra jednou poradí
-Sdílet ⬆ → Přidat na plochu a spuštěná z ikony na ploše běží na celé obrazovce.
+otočená na šířku, kde to prohlížeč dovolí (Chrome na Androidu), jinde hra ukáže, ať telefon otočíte. ⛶ v menu
+a ve směně na panelu pauzy (II) ji kdykoli zapne nebo vypne; gesto zpět ji opustí do příštího startu nebo ⛶. Safari na
+iPhonu celou obrazovku stránce nedovolí: hra jednou poradí Sdílet ⬆ → Přidat na plochu a spuštěná z ikony na ploše běží
+na celé obrazovce.
 
 ### S herním ovladačem
 
@@ -276,7 +312,7 @@ působí řízení a provoz.
 
 - **Na co se ptáme:** jak se ovládá kontrolér, rozjezd, výběh a brzdění; zastávky a jízdní řád; návěsti,
   výhybky a pravidla; které pojmy nezní jako u řidičů tramvají; co vás při jízdě vytrhne.
-- **Jak psát:** ✉ Zpětná vazba (**F9**, na telefonu v ⋯) zastaví hru a otevře poznámku. Přiloží místo na
+- **Jak psát:** ✉ Zpětná vazba (**F9**, na telefonu v Pultu, záložka Hra) zastaví hru a otevře poznámku. Přiloží místo na
   lince, stav tramvaje, verzi hry a případně obrázek obrazovky, takže stačí napsat, co vidíte a jak by to mělo
   být. Když se hra nespustí nebo grafika přestane pracovat, tlačítko „Poslat chybu autorům“ pošle, co se stalo.
 - **Plynulost:** test výkonu v menu minutu jede autopilotem pevný úsek linky a ukáže, jak hra stíhá; výsledek

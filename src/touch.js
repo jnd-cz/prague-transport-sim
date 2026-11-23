@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // On-screen controls for a phone or tablet (#79): the essentials as buttons over the view, sending the same
 // key events as the keyboard (src/main.js keeps one control path). Shown on a touch screen by default;
-// the 🎮 button in the menu switches them, remembered per device. ⋯ opens the rarer ones, ✉ the feedback note.
+// the 🎮 button in the menu switches them, remembered per device. "Pult" (where ⋯ was) opens the driver's panel's sheet
+// (src/panel.js, #246) with the rarer controls where they are in the cab, and the game's own (autopilot, sound, ✉ the note).
 // Full screen (#485): asked once in the menu on a touch screen; with a yes, a shift starts in full screen turned to
-// landscape (a browser goes full screen only from a tap: Start's), and ⛶ switches it any time. Leaving it (the back
-// gesture) holds until the next start. Safari on an iPhone has no full screen for a page: there the question becomes how
-// to add the game to the home screen, from where it opens full screen (app.webmanifest, the apple-* tags in index.html);
+// landscape (a browser goes full screen only from a tap: Start's), and ⛶ switches it any time: in the menu, and in a shift
+// on the pause panel. Leaving it (the back gesture) holds until the next start or ⛶. Safari on an iPhone has no full
+// screen for a page: there the question becomes how to add the game to the home screen, from where it opens full screen (app.webmanifest, the apple-* tags in index.html);
 // opened so, it asks nothing and only the hint to turn the phone stays. In landscape on a phone the controller is a column at the right thumb and the
 // other buttons two columns at the left, the dashboard between them (the CSS below).
 import { t } from './i18n.js';
@@ -16,20 +17,22 @@ const STARTS = ['btnStart', 'btnPerfTest', 'btnPerfRef'];
 const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { /* (no storage) */ } return null; };
 const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
 const fsAble = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+// (shown by default only where the device takes touch: a coarse pointer alone is no touch screen. A desktop Firefox
+// showed them at load with navigator.maxTouchPoints 0, the player's note fb-20261118-083538, #675)
+const touchDevice = () => navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
 // (started from the home screen: full screen already, the browser's bars gone)
 const standalone = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
 // [key, label, hold] — a held button sends keyup on release (sand, look, zoom, the emergency brake)
 const MAIN = [['Shift', 'tb.deadman', true, 'dm'], ['s', '▼', false, 'brake'], ['n', '0', false, 'neutral'], ['w', '▲', false, 'drive'], [' ', 'tb.stop', true, 'emerg']];
 const SIDE = [['d', 'tb.doors'], ['b', 'tb.bell'], ['a', 'tb.sand', true], ['q', '◀', true], ['e', '▶', true], ['g', '🔍', true], ['v', 'tb.view'], ['z', 'tb.mirror'], ['p', 'II']];
-// (the indicators: left, right, hazard; the high beams: held a flash, 'L' on and off as Shift+L)
-const MORE = [[',', '⇦'], ['.', '⇨'], ['/', '⚠'], ['l', 'tb.flash', true], ['L', 'tb.beam'], ['r', 'tb.park'], ['y', 'tb.switch', true], ['x', 'tb.iron'], ['c', 'tb.cutout', true], ['h', 'tb.saloon'], ['k', 'tb.cab'], ['f', 'tb.flap'], ['o', 'tb.auto'], ['m', 'tb.mute'], ['F9', '✉']];
 
 export class TouchControls {
-  constructor({ deadman }) {
+  constructor({ deadman, sheet }) {
     this.deadman = deadman; // () => the dead-man option is on: a held button for Shift
+    this.sheet = sheet; // () => the panel's sheet opened or closed
     let on;
     try { on = localStorage.getItem(KEY); } catch { /* (no storage) */ }
-    this.set(on === null || on === undefined ? matchMedia('(pointer: coarse)').matches : on === '1', false);
+    this.set(on === null || on === undefined ? touchDevice() : on === '1', false);
     const css = document.createElement('style');
     css.textContent = `
 #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 6; user-select: none; -webkit-user-select: none }
@@ -43,12 +46,12 @@ body.touch.shift #touch { display: block }
 #touch .main .drive { background: rgba(44,107,55,.85) }
 #touch .main .brake { background: rgba(138,90,28,.85) }
 #touch .side { position: absolute; left: 6px; top: calc(var(--topH) + 6px); display: flex; flex-direction: column; gap: 6px; max-height: calc(100% - var(--topH) - var(--dashH) - 80px); flex-wrap: wrap }
-#touch .more { position: absolute; left: 62px; top: calc(var(--topH) + 6px); display: none; flex-wrap: wrap; gap: 6px; max-width: 60vw }
-#touch.open .more { display: flex }
 #touch .main .dm { display: none; background: rgba(40,70,120,.85); font-size: 13px }
 #touch.deadman .main .dm { display: block }
 body.touch #rpBtn { display: none !important }
 .tbToggle { position: fixed; top: 8px; left: 8px; z-index: 11; font-size: 18px; padding: 6px 9px }
+/* (switched on: the menu says so, so a desktop that once switched them on can tell why they show, #675) */
+.tbToggle.on { background: rgba(44,107,55,.9); border: 1px solid rgba(170,230,180,.8); border-radius: 6px }
 body.shift .tbToggle { display: none }
 /* (a touch screen with the controls switched off has no pause and no way back to them: 🎮 stays in the shift, the user's
    phone in landscape, 2026-11-11, #485) */
@@ -63,6 +66,8 @@ body.shift .tbToggle { display: none }
 #fsTurn { position: fixed; top: 40%; left: 50%; transform: translateX(-50%); z-index: 7; display: none; pointer-events: none;
   background: rgba(10,14,12,.86); color: #eee; padding: 8px 14px; border-radius: 8px; font: 600 15px system-ui, sans-serif }
 @media (orientation: portrait) { body.fs.shift #fsTurn { display: block } }
+/* (in portrait the pause panel stands right of the side column: with ⛶ it reached under View, #691) */
+@media (orientation: portrait) { body.touch #pausePanel { left: calc(50% + 42px); max-width: calc(100vw - 100px) } }
 /* a phone in landscape: the controller at the right thumb, the rest at the left, the dashboard and the top bar between */
 @media (orientation: landscape) and (max-height: 520px) {
   body.touch { --padL: 132px; --padR: 104px }
@@ -76,18 +81,16 @@ body.shift .tbToggle { display: none }
   #touch .main .brake { order: 3 } #touch .main .emerg { order: 4; font-size: 14px }
   #touch .side { top: 6px; max-height: none; width: 120px; flex-direction: row; align-content: flex-start }
   #touch .side button { width: 57px; min-width: 0; padding: 2px; font-size: 13px }
-  /* (in pairs: doors bell, sand zoom, look left right, view mirror, pause more) */
+  /* (in pairs: doors bell, sand zoom, look left right, view mirror, pause panel) */
   #touch .side [data-k="g"] { order: 1 } #touch .side [data-k="q"], #touch .side [data-k="e"] { order: 2 }
   #touch .side [data-k="v"], #touch .side [data-k="z"] { order: 3 } #touch .side [data-k="p"], #touch .side [data-more] { order: 4 }
-  #touch .more { left: var(--padL); top: 6px; max-width: calc(100vw - var(--padL) - var(--padR) - 8px) }
 }`;
     document.head.appendChild(css);
     const box = (this.box = document.createElement('div'));
     box.id = 'touch';
     const btn = ([k, label, hold, cls]) => `<button data-k="${k === ' ' ? 'space' : k}"${hold ? ' data-hold="1"' : ''}${cls ? ` class="${cls}"` : ''} data-l="${label}"></button>`;
     box.innerHTML = `<div class="main">${MAIN.map(btn).join('')}</div>
-<div class="side">${SIDE.map(btn).join('')}<button data-more="1">⋯</button></div>
-<div class="more">${MORE.map(btn).join('')}</div>`;
+<div class="side">${SIDE.map(btn).join('')}<button data-more="1" data-l="tb.panel"></button></div>`;
     document.body.appendChild(box);
     this.labels();
     // a pressed button: keydown, and keyup when the finger lifts (or slides off a held one)
@@ -97,7 +100,7 @@ body.shift .tbToggle { display: none }
       const b = e.target.closest('button');
       if (!b) return;
       e.preventDefault();
-      if (b.dataset.more) { box.classList.toggle('open'); return; }
+      if (b.dataset.more) { this.sheet?.(); return; }
       b.classList.add('down');
       down.set(e.pointerId, b);
       try { b.setPointerCapture(e.pointerId); } catch { /* (gone) */ }
@@ -110,7 +113,6 @@ body.shift .tbToggle { display: none }
       down.delete(e.pointerId);
       b.classList.remove('down');
       if (b.dataset.hold) send('keyup', b.dataset.k);
-      if (MORE.some(([k]) => (k === ' ' ? 'space' : k) === b.dataset.k) && !b.dataset.hold) box.classList.remove('open');
     };
     box.addEventListener('pointerup', up);
     box.addEventListener('pointercancel', up);
@@ -121,6 +123,7 @@ body.shift .tbToggle { display: none }
     tg.textContent = '🎮';
     tg.onclick = () => this.set(!this.on);
     document.body.appendChild(tg);
+    this.set(this.on, false);
     this.fullscreen();
     this.sync();
   }
@@ -152,6 +155,16 @@ body.shift .tbToggle { display: none }
       ask.classList.remove('show');
     };
     document.body.appendChild(fs);
+    // ⛶ in a shift: the pause panel's (#691). A shift that had left full screen (the back gesture) had no way back but the
+    // menu (the user's phone, 2026-11-18: "there is no button for full screen"). A click, as ⛶'s: the browser takes no
+    // touch's pointerdown as the gesture full screen needs, so it is no key sent from one.
+    const pause = document.getElementById('pausePanel');
+    if (pause) {
+      const b = (this.fsPause = document.createElement('button'));
+      b.id = 'btnFs';
+      b.onclick = fs.onclick;
+      pause.appendChild(b);
+    }
     const ask = (this.fsAsk = document.createElement('div'));
     ask.id = 'fsAsk';
     ask.innerHTML = '<span></span><button data-a="1"></button><button data-a="0"></button>';
@@ -184,6 +197,7 @@ body.shift .tbToggle { display: none }
   fsLabels() {
     if (this.fsTurn) this.fsTurn.textContent = '↻ ' + t('fs.turn');
     if (this.fsToggle) this.fsToggle.title = t(fsElement() ? 'fs.off' : 'fs.on');
+    if (this.fsPause) this.fsPause.textContent = '⛶ ' + t(fsElement() ? 'fs.leave' : 'fs.yes');
     if (!this.fsAsk) return;
     const [q, a, b] = this.fsAsk.children;
     if (this.fsAsk.classList.contains('home')) { q.textContent = t('fs.home'); a.textContent = t('fs.ok'); return; }
@@ -196,7 +210,7 @@ body.shift .tbToggle { display: none }
     this.on = on;
     document.body.classList.toggle('touch', on);
     if (keep) try { localStorage.setItem(KEY, on ? '1' : '0'); } catch { /* (no storage) */ }
-    if (this.toggle) this.toggle.title = t(on ? 'tb.off' : 'tb.on');
+    if (this.toggle) { this.toggle.title = t(on ? 'tb.off' : 'tb.on'); this.toggle.classList.toggle('on', on); }
   }
 
   labels() {

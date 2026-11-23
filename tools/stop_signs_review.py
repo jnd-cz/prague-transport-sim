@@ -37,6 +37,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
+import sources  # noqa: E402
 
 # A card's answers: the sources it has, the user's own point and unsure (the user, 2026-11-05: "pick which is
 # right: DTM, OSM, GTFS/timetable, other - my own mark", #310). The own mark starts placing on the review page;
@@ -46,7 +47,44 @@ OWN, UNSURE = "my own mark: place it on the map", "unsure"
 MARK_OF = {"DTM": "DTM stop sign", "OSM": "OSM stop position", "GTFS": "timetable (GTFS) point"}  # (the marks' labels)
 # the wording before #310 (answers already given keep importing)
 OPTIONS = ["sign at the pin", "sign at the timetable point (GTFS)", "unsure"]
-OSM, GTFS, END, DTM = "#3e9dff", "#ff9e31", "#ffffff", "#ff3b30"
+# The answers that said the sign the build takes was right (the card's pin was the DTM sign where it had one, else
+# OSM's stop position): a fact with one confirms that source; the others (placed on the map, the GTFS point) correct
+# it. A placed fact matches the DTM's sign within MATCH in the plane, and only the DTM's: OSM's stop position lies on
+# the track's centre line, 2-3 m across from the pole (the user, 2026-11-18, #670: "within 1 meter would be good match
+# but the actual 2D position on the stop platform matters (for visual purposes), not only the position along the
+# tracks"; then, on pictures of the signs 1.3-1.6 m from the DTM's: "I would extend the tolerance to 2 meters because
+# in your images I can see Čechova čtvrť, Malostranské náměstí, Podolská vodárna, Národní divadlo look right too", "I
+# would treat DTM as the most accurate so retire only those and if it's missing then keep my answer").
+CONFIRMS = (OPTIONS[0], BY_SOURCE["DTM"], BY_SOURCE["OSM"])
+MATCH = 2.0  # m
+PLACED = "placed on the map"  # (a fact the user placed on the review page's map)
+POLE_AT = 0.2  # m: a fact this near a DTM sign stands at that sign (its pin was the DTM's, or the user confirmed it);
+# a source this near the card's pin is the one the user saw (the pins are kept to 0.1 m)
+
+
+def pole(fact, dtm):
+    """Whether a fact's point is a sign's pole on the platform: the user placed it, or it is a DTM sign's point (`dtm`:
+    [(x, y)]). OSM's stop position lies on the track's centre line and the GTFS point anywhere: a sign there keeps
+    the game's fixed place beside the track (#685)."""
+    return fact["how"] == PLACED or any(math.hypot(fact["x"] - x, fact["y"] - y) <= POLE_AT for x, y in dtm)
+
+
+def sign_state(fact, chain):
+    """A stopSigns fact's state against the sign the build takes without it: `chain` (source, x, y) in the city frame,
+    or None (sources.fact_state; `pin` is the card's pin, recorded with the answers imported since #670). A correction
+    matches only the DTM's sign (MATCH). `at` and `src`: the fact's point and the source's, for the review of a match
+    (tools/fact_review.py)."""
+    near = lambda a, b: math.hypot(a[0] - b[0], a[1] - b[1]) <= MATCH  # noqa: E731
+    now = (chain[1], chain[2]) if chain else None
+    seen = lambda a, b: math.hypot(a[0] - b[0], a[1] - b[1]) <= POLE_AT  # noqa: E731
+    state = sources.fact_state((fact["x"], fact["y"]), tuple(fact["pin"]) if fact.get("pin") else None, now, near,
+                               confirms=fact["how"] in CONFIRMS, unchanged=seen)
+    if state == "matches" and chain[0] != "dtmpoints":
+        state = "holds"
+    return {"id": sources.fact_id("stopSigns", fact), "state": state, "how": fact["how"], "now": chain[0] if chain else None,
+            "off": round(math.hypot(fact["x"] - now[0], fact["y"] - now[1]), 2) if now else None,
+            "at": [round(fact["x"], 2), round(fact["y"], 2)], "src": [round(now[0], 2), round(now[1], 2)] if now else None}
+OSM, GTFS, END, DTM, YOURS = "#3e9dff", "#ff9e31", "#ffffff", "#ff3b30", "#ffd60a"
 # The other direction's stop position lies on the parallel track, 3.1-5.9 m off ours: within 6 m it was taken
 # at 5 stops (Hercovka on 17, Vršovické náměstí on 22: the user, review 2026-11-05), while our direction's
 # node lies on our track (under 1.5 m) at all 174 stops of the 5 lines. Hercovka's own is 86 m past the GTFS point.
@@ -124,8 +162,10 @@ def side(path, s, x, y):
     return (bx - ax) * (y - ay) - (by - ay) * (x - ax)
 
 
-def review(line, path, stops, nodes, dtm, facts, over, back=False):
-    """Cards for one direction's stops on its path; and per stop what each source says (for the summary)"""
+def review(line, path, stops, nodes, dtm, facts, over, back=False, again=()):
+    """Cards for one direction's stops on its path; and per stop what each source says (for the summary). `again`:
+    the ids of answered stops (sources.fact_id) the user wants to answer again: a card of their own (id "...-again",
+    shown unanswered) with the sign the user's fact puts there; its answer replaces the fact on --import (#685)."""
     rows, findings, seen = [], [], {}
     tag, dirn = ("back-", " (the other direction)") if back else ("", "")
     for k, st in enumerate(stops):
@@ -150,7 +190,8 @@ def review(line, path, stops, nodes, dtm, facts, over, back=False):
         sid = f"stop-sign-{line}-{tag}{st['name']}-{seen[st['name']]}"
         fact = next((f for f in facts if f["stop"] == st["name"] and (f.get("towards") == nxt if nxt else f.get("from") == prv)), None)
         rows.append({"gtfs": st["s"], "osm": o[1] if o else None, "dtm": m[1] if m else None, "fact": bool(fact)})
-        if fact or (m and abs(m[1] - ref) <= over):
+        redo = bool(fact) and sources.fact_id("stopSigns", {"stop": st["name"], **({"towards": nxt} if nxt else {"from": prv})}) in again
+        if not redo and (fact or (m and abs(m[1] - ref) <= over)):
             continue
         gx, gy = at(path, st["s"])
         marks = []
@@ -171,6 +212,10 @@ def review(line, path, stops, nodes, dtm, facts, over, back=False):
         else:
             why = "no DTM sign beside the track"
         towards = nxt or "end"
+        if redo:
+            sid += "-again"
+            marks.append({"x": round(fact["x"], 1), "y": round(fact["y"], 1), "label": "your sign now (data/truth.json)", "color": YOURS})
+            why = "asked again: the sign your answer put here (yellow) is in question."
         opts = [BY_SOURCE[k] for k, have in (("DTM", m), ("OSM", o), ("GTFS", True)) if have] + [OWN, UNSURE]
         findings.append({"kind": "stop sign", "id": sid, "line": line, **key, "x": round(px, 1), "y": round(py, 1), "s": round(ps, 1),
                          "mag": round(abs(m[1] - ref), 1) if m else 10, "status": "review", "pick": True, "marks": marks,
@@ -198,7 +243,7 @@ def sign_facts(cards, answers):
             src = next((k for k, v in BY_SOURCE.items() if r["v"] == v), None)
             mark = next((m for m in c["marks"] if src and m["label"].startswith(MARK_OF[src])), None)
             if "px" in r:
-                x, y, how = r["px"], r["py"], "placed on the map"
+                x, y, how = r["px"], r["py"], PLACED
             elif mark:
                 x, y, how = mark["x"], mark["y"], r["v"]
             elif r["v"].startswith("sign at the pin"):
@@ -208,17 +253,20 @@ def sign_facts(cards, answers):
             else:
                 continue  # (unsure, or a placed answer whose point was lost: held)
             k = (c["stop"], c["towards"] or "", c["from"] if not c["towards"] else "")
+            # the pin: the sign the build took then (sign_state's recorded value, #670)
+            pin_from = next((k2 for k2 in ("DTM", "OSM", "GTFS") if any(m["label"].startswith(MARK_OF[k2]) for m in c["marks"])), None)
             f = {"stop": c["stop"], **({"towards": c["towards"]} if c["towards"] else {"from": c["from"]}),
                  "x": round(x, 2), "y": round(y, 2), "how": how,
                  **({"note": r["note"]} if r.get("note") else {}),
                  "osm_node": c.get("osm_node"), "gtfs": [gtfs["x"], gtfs["y"]] if gtfs else None,
-                 "line": c["line"], "t": r.get("t", 0)}
+                 "pin": [c["x"], c["y"]], "pinFrom": pin_from,
+                 "line": c["line"], "issue": c.get("issue", 258), "t": r.get("t", 0)}
             if k not in best or f["t"] > best[k]["t"]:
                 best[k] = f
     out = []
     for f in sorted(best.values(), key=lambda f: (f["stop"], f.get("towards", ""), f.get("from", ""))):
         day = time.strftime("%Y-%m-%d", time.gmtime(f.pop("t") / 1000)) if f.get("t") else "?"
-        f["source"] = f"user, stop-sign review (reports/review/stop-signs-{f.pop('line')}.json) on the test host, {day} (#258)"
+        f["source"] = f"user, stop-sign review (reports/review/stop-signs-{f.pop('line')}.json) on the test host, {day} (#{f.pop('issue')})"
         out.append(f)
     return out
 
@@ -258,7 +306,9 @@ def do_import(lines, reviews):
     for line in lines:
         cp = os.path.join(ROOT, "reports", "review", f"stop-signs-{line}.json")
         if os.path.exists(cp):
-            cards += json.load(open(cp, encoding="utf-8"))["findings"]
+            with open(cp, encoding="utf-8") as fh:
+                d = json.load(fh)
+            cards += [{**c, "issue": d.get("issue", 258)} for c in d["findings"]]  # (the issue the set waited for)
         ap_ = os.path.join(ROOT, reviews, f"line{line}.json")
         if os.path.exists(ap_):
             a = json.load(open(ap_, encoding="utf-8"))
@@ -280,6 +330,9 @@ def main():
     ap.add_argument("--over", type=float, default=5.0, help="m along the track: list stops differing by more")
     ap.add_argument("--import", dest="imp", action="store_true", help="the user's answers into data/truth.json")
     ap.add_argument("--reviews", default=os.path.join("reports", "reviews"))
+    ap.add_argument("--issue", type=int, default=258, help="the issue the cards wait for (the review directory lists them there)")
+    ap.add_argument("--again", default="", help="answered stops to review again, ';'-separated ids as fact_status.py "
+                                                 "names them ('Výstaviště → Nádraží Holešovice'): the user's word")
     args = ap.parse_args()
     if args.imp:
         return do_import(args.lines.split(","), args.reviews)
@@ -298,14 +351,15 @@ def main():
             dirs.append(("other direction", back, back_stops(line, path, back), True))
         findings = []
         for name, p_, st_, b in dirs:
-            f, rows = review(line, p_, st_, nodes, dtm, facts, args.over, back=b)
+            f, rows = review(line, p_, st_, nodes, dtm, facts, args.over, back=b,
+                             again={x.strip() for x in args.again.split(";") if x.strip()})
             findings += f
             dd = [r["dtm"] - (r["osm"] if r["osm"] is not None else r["gtfs"]) for r in rows if r["dtm"] is not None]
             print(f"line {line}{' ' + name if name else ''}: {len(rows)} stops; the user's sign {sum(r['fact'] for r in rows)}, "
                   f"DTM sign {len(dd)} (DTM - OSM/GTFS median {statistics.median(dd) if dd else float('nan'):+.1f} m, "
                   f"over {args.over:.0f} m {sum(abs(x) > args.over for x in dd)}), OSM {sum(r['osm'] is not None for r in rows)}; "
                   f"{len(f)} to review")
-        out = {"schema": 1, "issue": 258, "over_m": args.over, "findings": findings}
+        out = {"schema": 1, "issue": args.issue, "over_m": args.over, "findings": findings}
         with replacing(os.path.join(ROOT, "reports", "review", f"stop-signs-{line}.json"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(out, ensure_ascii=False, indent=1) + "\n")
 

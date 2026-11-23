@@ -700,6 +700,11 @@ ${f.kind === 'trackheight' ? '<div class="dim" id="rvPreview" aria-live="polite"
     if (!this.dtm) return;
     const { x: tx, y: ty } = this.T, R2 = NEAR * NEAR, c = new THREE.Color();
     const tri = [], tcol = [], kerb = [], seam = [], scol = [];
+    // (with the ground file the ground level's triangles are the file's, each with its survey class: #509)
+    this.ground.lookup?.surveyNear(tx, ty, NEAR, (cls, t) => {
+      c.set(CLASS_COLORS[cls] || '#888');
+      for (const p of t) { tri.push(p[0], p[2] + 0.2, -p[1]); tcol.push(c.r, c.g, c.b); }
+    });
     for (const a of this.dtm.areas) {
       if (a.c === 'wall' || a.c === 'roof') continue;
       a.box ??= bbox(a.ring);

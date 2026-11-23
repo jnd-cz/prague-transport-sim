@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The repository's health, for the weekly housekeeping pass (#290, docs/housekeeping.md): sizes, work in
-flight, review sets, leftovers, known failures, dated issues, CI. Read-only apart from --post.
+flight, review sets, leftovers, known failures, dated issues, CI, and the data/truth.json facts over a source that
+a source now matches or that changed (tools/fact_status.py, #670). Read-only apart from --post.
 
     python -I tools/repo_health.py              # Markdown to stdout
     python -I tools/repo_health.py --json       # the numbers as JSON
@@ -23,6 +24,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import board  # noqa: E402  (gh, git, the rows of the work in flight)
+import fact_status  # noqa: E402
 import review_sets  # noqa: E402
 
 MARK = "repo-health"  # the hidden block: <!-- repo-health {...} -->
@@ -175,6 +177,12 @@ def collect(root=ROOT, now=None):
     for i in board.gh("issue", "list", "--state", "open", "--limit", "400", "--json", "number,title,body") or []:
         for kind, d in due(f"{i['title']}\n{i.get('body') or ''}", today):
             dated.append({"issue": i["number"], "title": i["title"], "when": f"{kind} {d}"})
+    try:  # the built data's facts over a source: what to retire or look at again (#670)
+        fs = fact_status.collect(root)
+        facts = {"summary": fact_status.summary(fs),
+                 "look": [f"{f['state']}: {fact_status.describe(f)}" for f in fs if f["state"] in fact_status.LOOK + ("retired",)]}
+    except FileNotFoundError:  # no data/ in this checkout (python -I tools/snapshot.py data-fetch)
+        facts = None
     return {
         "date": today.isoformat(), "commit": board.git("rev-parse", "--short", "origin/main", cwd=root),
         "sizes": sizes(root),
@@ -183,7 +191,7 @@ def collect(root=ROOT, now=None):
                  "rebuildLabel": [n for n in labels if board.REBUILD in labels[n]]},
         "reviews": {"sets": len(sets), "findings": sum(s["findings"] for s in sets), "issueClosed": closed_sets},
         "leftovers": {"worktreesDone": gone_wt, "worktreesStale": stale_wt, "branches": leftover_branches},
-        "knownFailuresClosed": kf_closed, "dated": dated, "ci": ci_times(),
+        "knownFailuresClosed": kf_closed, "dated": dated, "ci": ci_times(), "facts": facts,
     }
 
 
@@ -226,6 +234,9 @@ def markdown(h, before=None):
     if h["dated"]:
         out += ["", f"**Dated, due within {SOON} days or past:**"]
         out += [f"- #{x['issue']} {x['title']}: {x['when']}" for x in h["dated"]]
+    if h.get("facts"):
+        out += ["", f"**Facts over a source** (`tools/fact_status.py`): {h['facts']['summary'] or 'none stated'}."]
+        out += [f"- {x}" for x in h["facts"]["look"]]
     c = h["ci"]
     out += ["", f"**CI:** last {c['runs']} runs, median {c['median_s']} s, longest {c['max_s']} s, {c['failed']} not successful."]
     out += ["", f"<!-- {MARK} {json.dumps({'date': h['date'], 'sizes': h['sizes']}, separators=(',', ':'))} -->"]

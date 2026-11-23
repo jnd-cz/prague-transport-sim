@@ -43,6 +43,7 @@ IGNORE_ANSWERS = []  # the user's answers that drop heights: data/truth.json rad
 STRETCH_NEAR = 1.0   # m: a height this near an `ignore` answer's stretch is on it
 RADIUS_ANSWERS = []  # the user's answers on the radius review: [{'xy': city frame, 'answer': ...}] (data/truth.json)
 HOLD, FOLLOW, GROUND = 'hold the radius', 'follow the data', 'follow the ground'
+STRUCTURE_FACTS = []  # the state of the user's structures no source maps (import_track_heights.structure_states, #670)
 GROUND_ANSWERS = []  # the user's areas where the tracks take the lidar ground: radiusAnswers with `area` (load_ground_answers)
 GROUND_OTHER = 1.5   # m: a lidar this far from the track's height there is another level (a wall, a roof), no evidence
 ANSWER_REACH = 15.0  # m: an answer applies to the place where the radius would give way this near it
@@ -200,9 +201,12 @@ def staged_heights(path=None):
         if staged['snapshot'] != snap or json.dumps(have, sort_keys=True) != json.dumps(spans, sort_keys=True):
             raise SystemExit(f'{path}: snapshot {staged["snapshot"]} with {len(have)} reviewed spans, this checkout '
                              f'{snap} with {len(spans)}: run without --staged')
-        return staged
-    from import_track_heights import stage
-    return stage({'span_reviews': spans})
+    else:
+        from import_track_heights import stage
+        staged = stage({'span_reviews': spans})
+    global STRUCTURE_FACTS
+    STRUCTURE_FACTS = staged.get('structure_facts', [])
+    return staged
 
 
 def answered_source(series):
@@ -325,13 +329,25 @@ def beside(chs, tree, ci, x):
 
 
 SOURCES_OFF, SOURCES_ON, SOURCES_EDGE, SOURCES_RUN = 0.5, 0.3, 0.1, 3  # m, m, m, bins (archive_over_di)
+UNDER_OFF = 0.20      # m: an older record this far under the lidar (archive_before_lidar): where numeric DI has a height
+                      # too, off structures, DI lies with the lidar at 694 of 725 such samples on paved track (within
+                      # 0.1 m of it at 90 %, median -0.1 cm), even where the survey agrees with the archive (176 of 184),
+                      # and at 868 of 871 where the construction is unknown
+BESIDE = 7.0          # m: a track this near a stretch the lidar took lies in the same street (NEIGHBOUR_GAP's far side)
+OVER_KINDS, UNDER_KINDS = {'paved'}, {'paved', 'unknown'}  # (the constructions each side holds on: over the lidar, DI
+                      # sided with it at 23 of 52 samples of unknown construction, a ballast bed standing over the bare
+                      # earth; open track has no DI heights to calibrate against)
+SOURCES_CAP = 1.0     # m: an archive this far over or under the lidar is another level (archive_before_lidar; the staging holds it:
+                      # track_heights.TERRAIN)
 STRUCTURE_FLAGS = {'structure_hint', 'structure_unverified', 'tunnel_unverified', 'known_archive_disagreement'}
 
 
 HELD_NEAR = 0.10      # m: a held height's source the lidar lies this near, the other source further (held_settled, rule 1)
 LIDAR_AROUND = 100.0  # m: the rail's offset over the lidar where only the lidar has a height: the median of the chain's
 LIDAR_OFFSET = 0.01   # heights this near, else this (the network's median: p10 -0.067, p90 +0.182 m on 61,403 bins)
-LIDAR_LOG = []        # (xy, rule, height) of the heights held_settled gave: reports/line-heights.json
+LIDAR_LOG = []        # (xy, rule, height) of the heights held_settled and archive_before_lidar gave: reports/line-heights.json
+LIDAR_YEAR = 2023     # the year of the lidar's flight (tools/sources.py `ipr-dtm`): an archive record surveyed before it
+                      # (its ROK, a bin's `year`) is the older measurement of the two
 
 
 def held_settled(chs):
@@ -405,6 +421,108 @@ def held_settled(chs):
             else:
                 n3 += 1
     return n1, n2, n3
+
+
+def archive_before_lidar(chs):
+    """Where the archive is a track's measured height (no numeric DI, no reviewed span) and its record was surveyed before
+    the lidar's flight (the bin's `year`, the archive's ROK, under LIDAR_YEAR), a stretch of SOURCES_RUN bins and more
+    standing over SOURCES_OFF m over the lidar, or lying over UNDER_OFF m under it, is the street as it was when the
+    record was made: the lidar is the newer measurement. The track takes the lidar plus LIDAR_OFFSET, the rail's offset
+    over it on the network, along the whole stretch where the archive lies more than SOURCES_EDGE off the lidar the same
+    way. (Not the offset of the chain's heights around the stretch: the archive's own are the measurement in doubt, and
+    at Modřany, 0.1-0.2 m under the lidar, they left the stretch 0.12 m under it; DI's within 100 m stood 0.2 m over the
+    lidar at Sokolovská's junction, line 37, and set the junction's moved tracks 0.15-0.24 m over the tracks beside
+    them: 5 rails under a neighbour's bed, ground batch D's first build. Where DI has a height beside such a record it
+    lies a median 0.1 cm under the lidar on paved track.)
+    - Over: on paved track (the bin's `kind`: a style fact, OSM's surface, the survey's pavement at the axis;
+      OVER_KINDS). A kerbed bed or a crown stands a little over the street, hence the larger margin. #539: line 9 at
+      Bertramka, both tracks' records of 1999 humped up to 0.83 and 0.92 m over the lidar for 200 m, the lidar level
+      across the street with its kerbs (the user, 2026-11-21: "bertramka is embedded asphalt, same level as the road next
+      to it"); one track at Letenské náměstí, its record of 2013 on a 1.0 m plateau for 25 m beside a track on the lidar
+      (the user, 2026-11-22: "Letenské náměstí has both track at the same height ... there shouldn't be 1m step anywhere
+      near"). Calibrated where numeric DI has a height too (samples off structures, an older record 0.5-1.5 m over the
+      lidar): on paved track DI sides with the lidar at 71 of 76, where the construction is unknown at 23 of 52 (a
+      ballast bed on its own body, small bridges nothing marks).
+    - Under: on paved track and track of unknown construction (UNDER_KINDS). Rails lie in the street's surface or over
+      the bed, so they cannot lie a fifth of a metre under the lidar between them (the user, 2026-11-14, on Bělohorská:
+      the track "doesn't sit lower"). Calibrated as over: UNDER_OFF.
+    A track within BESIDE m of a stretch taken lies in the same street: where its own archive lies more than SOURCES_EDGE
+    off the lidar the same way, it goes with it (no rail stays under its neighbour's bed).
+    Not a record of the lidar's year or later (a track rebuilt since the flight stands off it by right), nor one without
+    a year; not on a structure (the bare-earth lidar lies under a deck), under a step answer, or where the lidar itself
+    steps more than any track climbs (MAX_GRADE). Each height goes to LIDAR_LOG as rule 4; returns their count."""
+    def older(x, kinds):
+        return (x.get('kind') in kinds and x.get('src') in ('dtmp', 'zps', None)
+                and x.get('archive') is not None and x.get('terrain') is not None
+                and x.get('year') is not None and x['year'] < LIDAR_YEAR
+                and not STRUCTURE_FLAGS & set(x.get('flags') or ()) and not (STEP_ANSWERS and step_answer_at(x['xy'])))
+
+    def level(run):
+        return all(abs(q['terrain'] - p['terrain']) <= MAX_GRADE * (q['s'] - p['s']) for p, q in zip(run, run[1:]))
+    taken = {}  # (chain, bin's index in its sorted bins): the bin
+    for sign, least, kinds in ((1, SOURCES_OFF, OVER_KINDS), (-1, UNDER_OFF, UNDER_KINDS)):
+        tracks = []  # per chain: its bins along it, and each one's archive off the lidar this way (False: not this rule's)
+        for c in chs:
+            bins = sorted((x for x in c.bins if x['xy']), key=lambda x: x['s'])
+            tracks.append((bins, [older(x, kinds) and sign * (x['archive'] - x['terrain']) for x in bins]))
+        joined = lambda bins, a, b: bins[b]['s'] - bins[a]['s'] <= 2 * BIN + .01  # noqa: E731
+        edge = lambda off, i: off[i] is not False and SOURCES_EDGE < off[i] < SOURCES_CAP  # noqa: E731
+
+        def stretch(ci, a, b):
+            """The bins a..b of chain ci, grown along it while the archive lies off the lidar; taken where the lidar is level."""
+            bins, off = tracks[ci]
+            while a > 0 and edge(off, a - 1) and joined(bins, a - 1, a):
+                a -= 1
+            while b + 1 < len(bins) and edge(off, b + 1) and joined(bins, b, b + 1):
+                b += 1
+            if not level(bins[a:b + 1]):
+                return b, []
+            new = [(ci, i) for i in range(a, b + 1) if (ci, i) not in taken]
+            taken.update((k, bins[k[1]]) for k in new)
+            return b, new
+        fresh = []
+        for ci, (bins, off) in enumerate(tracks):
+            core = lambda i: off[i] is not False and least < off[i] < SOURCES_CAP  # noqa: E731
+            k = 0
+            while k < len(bins):
+                if not core(k):
+                    k += 1
+                    continue
+                e = k
+                while e + 1 < len(bins) and core(e + 1) and joined(bins, e, e + 1):
+                    e += 1
+                if e - k + 1 >= SOURCES_RUN:
+                    e, new = stretch(ci, k, e)
+                    fresh += new
+                k = e + 1
+        # the tracks beside a stretch taken, in the same street: where their own archive lies off the lidar the same way
+        # by more than SOURCES_EDGE they go with it, and so on from them (Sokolovská's junction, line 37: tracks 0.2 m
+        # under the lidar taken, three short ones 0.11-0.22 m under it left, their rails 11-15 cm under their neighbours'
+        # beds: ground batch D)
+        cell = lambda xy: (int(xy[0] // BESIDE), int(xy[1] // BESIDE))  # noqa: E731
+        grid = {}
+        for ci, (bins, off) in enumerate(tracks):
+            for i in range(len(bins)):
+                if edge(off, i):
+                    grid.setdefault(cell(bins[i]['xy']), []).append((ci, i))
+        while fresh:
+            nxt = []
+            for ci, i in fresh:
+                x, y = tracks[ci][0][i]['xy']
+                cx, cy = cell((x, y))
+                for gx in (cx - 1, cx, cx + 1):
+                    for gy in (cy - 1, cy, cy + 1):
+                        for cj, j in grid.get((gx, gy), ()):
+                            if cj == ci or (cj, j) in taken:
+                                continue
+                            q = tracks[cj][0][j]['xy']
+                            if math.hypot(q[0] - x, q[1] - y) <= BESIDE:
+                                nxt += stretch(cj, j, j)[1]
+            fresh = nxt
+    for x in taken.values():
+        x['z'], x['w'], x['src'] = x['terrain'] + LIDAR_OFFSET, 1.0, 'lidar'
+        LIDAR_LOG.append((x['xy'], 4, round(x['z'], 3)))
+    return len(taken)
 
 
 def archive_over_di(chs):
@@ -524,6 +642,7 @@ def apply(chs):
     n1, n2, n3 = held_settled(chs)
     print(f'held heights settled by the lidar: {n1} where it sided with the archive or the survey, {n2} where only it had one, '
           f'{n3} where it confirmed the only source', flush=True)
+    print(f'{archive_before_lidar(chs)} heights took the lidar where an archive record surveyed before it stood over or lay under it', flush=True)
     print(f'{snap_to_neighbour(chs)} heights took the neighbouring track\'s at a step or dip', flush=True)
     print(f'{answered_ground(chs)} heights took the ground, or part way to it, in {len(GROUND_ANSWERS)} areas an answer has '
           f'follow the ground', flush=True)

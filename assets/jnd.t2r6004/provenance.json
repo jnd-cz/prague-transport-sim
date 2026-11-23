@@ -1,0 +1,145 @@
+{
+  "issue": 590,
+  "recording": "T2R 6004, TR37, 2026-11-11; microphone near middle of saloon",
+  "release_cut": "Original recording 745.250–745.730 s; earlier -3 dB gain and 2 ms fades retained unchanged.",
+  "start_selection": "User-trimmed attachments, exact original boundaries unknown; no further trimming or normalization.",
+  "synthetic_sources": "Five bell/door-alert WAVs supplied by the user from earlier synthesis work, selected as temporary approximations.",
+  "samples": [
+    {
+      "file": "bell_short.wav",
+      "bytes": 83834,
+      "sha256": "699ce5a31791e70891db7583e8d4acc46139c4adec47ce2b6f10b39a26c8c4bb",
+      "source": "bell_short.wav",
+      "sample_rate_hz": 44100,
+      "frames": 41895,
+      "duration_s": 0.95,
+      "channels": 1,
+      "peak_dbfs": -1.4121828334625561,
+      "rms_dbfs": -21.09990969477432,
+      "samples_at_full_scale": 0,
+      "processing": "none; byte-identical copy"
+    },
+    {
+      "file": "bell_medium.wav",
+      "bytes": 101472,
+      "sha256": "2547a2ed7082ac9c421afee4413cb1962e128d46a8a28cf2392adaa2ba3a7609",
+      "source": "bell_medium.wav",
+      "sample_rate_hz": 44100,
+      "frames": 50714,
+      "duration_s": 1.1499773242630384,
+      "channels": 1,
+      "peak_dbfs": -1.4121828334625561,
+      "rms_dbfs": -20.83144895878082,
+      "samples_at_full_scale": 0,
+      "processing": "none; byte-identical copy"
+    },
+    {
+      "file": "bell_long.wav",
+      "bytes": 176444,
+      "sha256": "6873f8102d5433fc6c977a76f3147481a6ffda41037db5f54efe93a415b16fe4",
+      "source": "bell_long.wav",
+      "sample_rate_hz": 44100,
+      "frames": 88200,
+      "duration_s": 2.0,
+      "channels": 1,
+      "peak_dbfs": -1.4121828334625561,
+      "rms_dbfs": -16.940803096471356,
+      "samples_at_full_scale": 0,
+      "processing": "none; byte-identical copy"
+    },
+    {
+      "file": "door_alert.wav",
+      "bytes": 282284,
+      "sha256": "de9c765c6dbf4d843b938bbf5c07571f550252eeb146da6ff19bab38ef117cc5",
+      "source": "door_alert.wav",
+      "sample_rate_hz": 44100,
+      "frames": 141120,
+      "duration_s": 3.2,
+      "channels": 1,
+      "peak_dbfs": -3.098645100425797,
+      "rms_dbfs": -10.491272039718854,
+      "samples_at_full_scale": 0,
+      "processing": "none; byte-identical copy"
+    },
+    {
+      "file": "door_alert_loop.wav",
+      "bytes": 176482,
+      "sha256": "15889ba7cbe1735807e160216d8f49e2bbadb4cbaa47d2342ff6797527e92f53",
+      "source": "door_alert_loop.wav",
+      "sample_rate_hz": 44100,
+      "frames": 88219,
+      "duration_s": 2.0004308390022674,
+      "channels": 1,
+      "peak_dbfs": -3.098645100425797,
+      "rms_dbfs": -10.303245609141829,
+      "samples_at_full_scale": 0,
+      "processing": "none; byte-identical copy"
+    },
+    {
+      "file": "start-01.wav",
+      "bytes": 183710,
+      "sha256": "feb1fb60e9e4a0c88107a5bee9f56d97b259777bf4bcc6ee3259b9caac4bcefc",
+      "source": "start-01.wav",
+      "sample_rate_hz": 44100,
+      "frames": 30611,
+      "duration_s": 0.6941269841269841,
+      "channels": 2,
+      "peak_dbfs": -10.453511414087249,
+      "rms_dbfs": -23.0631960427913,
+      "samples_at_full_scale": 0,
+      "processing": "none; byte-identical copy"
+    },
+    {
+      "file": "start-02.wav",
+      "bytes": 171542,
+      "sha256": "73c2c9418931fc2008eaf428877e38eaba31ff002e8455658f152dab171b0773",
+      "source": "start-02.wav",
+      "sample_rate_hz": 44100,
+      "frames": 28583,
+      "duration_s": 0.648140589569161,
+      "channels": 2,
+      "peak_dbfs": -7.693320407415234,
+      "rms_dbfs": -21.118799311059135,
+      "samples_at_full_scale": 0,
+      "processing": "none; byte-identical copy"
+    },
+    {
+      "file": "release-01.wav",
+      "bytes": 84716,
+      "sha256": "0f0afc4139788c587becaf7d2b6cf6c565881543ba8d7f6285d926690beac647",
+      "source": "release-01.wav",
+      "sample_rate_hz": 44100,
+      "frames": 21168,
+      "duration_s": 0.48,
+      "channels": 2,
+      "peak_dbfs": -5.246602021456612,
+      "rms_dbfs": -20.22340775308527,
+      "samples_at_full_scale": 0,
+      "processing": "none; byte-identical copy"
+    }
+  ],
+  "initial_licence_decision": {
+    "date": "2026-11-16",
+    "source": "Codex session",
+    "quote": "I would choose free license suitable for assets like sound. Implement the separate triggers too",
+    "choice": "CC0-1.0, selected under this authorization; credit Jenda / jnd-cz"
+  },
+  "licence_decision": {
+    "source": "Codex session, follow-up to #590",
+    "quote": "Can the sound pack have the same license as the built in assets?",
+    "choice": "AGPL-3.0-or-later, matching the built-in assets",
+    "previous_release": "The identical WAVs were made available with the CC0-1.0 notice in package 0.1.0 on PR #625."
+  },
+  "playback": {
+    "issue": 636,
+    "date": "2026-11-17",
+    "quotes": [
+      "The actual files for playback should be compressed and small file size oriented audio codec should be chosen.",
+      "Ok please install mp3 encoder and use mp3 as fallback in some good quality setting."
+    ],
+    "source": "Claude session, the user's answers on shipping the pack",
+    "codec": "Ogg Opus at a variable bitrate, 64 kbit/s mono and 96 kbit/s stereo, 20 ms frames, complexity 10, encoded by Chromium's WebCodecs AudioEncoder (tools/sound_encode.py)",
+    "fallback": "each .ogg names an MP3 of its master as its fallback: LAME 3.100 -V2 (lameenc), with a LAME info frame holding the encoder delay and padding so that decoders trim them",
+    "masters": "the WAVs above, unchanged; each .ogg and .mp3 names its own as master"
+  }
+}

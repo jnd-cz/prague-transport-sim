@@ -7,8 +7,8 @@
   "model": "tatra-t3-hybrid-nc.glb",
   "rig": "rig.json",
   "files": [
-    { "path": "tatra-t3-hybrid-nc.glb", "bytes": 2925460 },
-    { "path": "rig.json", "bytes": 7121 }
+    { "path": "tatra-t3-hybrid-nc.glb", "bytes": 2928644 },
+    { "path": "rig.json", "bytes": 6604 }
   ],
   "preload": true,
   "licence": {

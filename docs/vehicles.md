@@ -81,14 +81,93 @@ The game's sounds are events and loops (#528; the decision record, section 5): t
 with a sound pack's recording where the pack has one, else with the built-in sound it synthesises (the sounds the game
 had before the packs). A pack is a vehicle manifest's `sounds` (its files among the vehicle's) or a folder
 `assets/<id>/` with a `sounds.json` (`kind` `sounds`, `requires` its vehicle, `names`, `licence`, `files`), listed under
-`sounds` in `assets/vehicles.json`; a vehicle sounds with the first package for it, else its own. The game ships none
-yet: every vehicle has the built-in sounds; `tools/test_sounds.py` serves a sample pack of its own.
+`sounds` in `assets/vehicles.json`, or a package. The menu's *Sounds* (#636) offers the packs for the chosen vehicle,
+shipped and installed, beside its own sounds (the built-in ones where it has none), which are the default; the pick
+is remembered per vehicle and plays from the next shift's start. The game ships one, for the hybrid (below);
+`tools/test_sounds.py` serves a sample pack of its own.
+
+**The format.** A pack is a folder: its manifest (`sounds.json` in the repository, `package.json` as a package), the
+files it plays, their masters, and its notes. The manifest holds the fields every package has (*Packages*, below:
+`schema`, `kind` `sounds`, `id`, `version`, `game`, `requires` its vehicle, `names`, `licence`, `files`) and these:
 
 | field | what |
 |---|---|
-| `events` | event → a file, or a list of files (one picked at random each time); WAV or MP3 |
+| `events` | event → a file, or a list of files (one picked at random each time); WAV, MP3, or Ogg Opus with an MP3 fallback (below) |
 | `loops` | loop → `{ "file", "refSpeed" (m/s, motor and rolling) or "refRpm" (mg), "gain" }`: the recording plays pitched by its parameter over the reference, as loud as the built-in loop's share of its loudest, times `gain` (default 1) |
 | `gain` | the pack's events' loudness (default 1); an event over a joint or a frog plays louder with speed |
+| `lineContactorRelease` | optional `{ "minGain": 0.25, "maxGain": 1, "refCurrent": 480 }`; opening gain rises linearly from the minimum at 0 A to the maximum at the reference current, clamped there. Requires `0 < minGain <= maxGain <= 1`, `refCurrent > 0` A. Listening settings, not physical constants. |
+
+A file's entry in `files`:
+
+| key | what |
+|---|---|
+| `path` | the file's path in the folder. In a package: folders by `/`, each name of letters, digits, `.`, `_`, `-` and spaces, starting with a letter, a digit or `_` (`path` in `src/packageRules.json`) |
+| `bytes`, `sha256` | its size and SHA-256, checked at an install (a package) and by `tools/test_vehicles.py` (a shipped pack) |
+| `fallback` | an `.ogg`'s: its MP3, which a browser that cannot decode Opus plays instead |
+| `master` | an encoded file's: the recording it was encoded from (`tools/sound_encode.py` reads it; the game does not) |
+
+An author lists the masters and names them in `events` and `loops`; `tools/sound_encode.py` (below) writes the rest.
+A pack for the hybrid with a bell, two takes of the line contactor closing and a motor loop, after the encoder (the
+entries of `start-1`, `start-2` and `motor-30kmh` left out here):
+
+```json
+{
+  "schema": 1, "kind": "sounds", "id": "author.t3-sounds", "version": "1.0.0", "game": ">=1.3 <2",
+  "requires": { "t3h": ">=1" },
+  "names": { "cs": "T3 – nahrávky", "en": "T3 recordings" },
+  "licence": { "spdx": "CC-BY-4.0", "authors": ["Author"], "sources": ["own recordings, 2026-11"],
+               "credit": "T3 recordings: Author (CC BY 4.0)", "commercial": true },
+  "events": { "bell": "bell.ogg", "lineContactor.close": ["start-1.ogg", "start-2.ogg"] },
+  "loops": { "motor": { "file": "motor-30kmh.ogg", "refSpeed": 8.3 } },
+  "files": [
+    { "path": "bell.wav", "bytes": 101472, "sha256": "2547a2ed…" },
+    { "path": "bell.ogg", "bytes": 9779, "sha256": "38747804…", "fallback": "bell.mp3", "master": "bell.wav" },
+    { "path": "bell.mp3", "bytes": 17052, "sha256": "59f8bebb…", "master": "bell.wav" }
+  ]
+}
+```
+
+`lineContactor.close` and `lineContactor.open` replace the generic `lineContactor` for their respective edge.
+Each edge plays once: directional recording, else generic recording, else synthesis. Opening carries traction
+current from immediately before the equipment opens (the maximum relay uses the current that tripped it),
+captured at simulation-step resolution. The gain floor is below the pack and master gains; mute and pause still
+silence it. Reapplying power before LS opens cancels the pending release without another start sound.
+
+**The recordings** (the masters): WAV, mono or stereo, 16 or 24 bits, or 32-bit float as field recorders write
+them, at 44.1 or 48 kHz. An event plays from the file's first sample at its recorded level, times the event's level
+and the pack's `gain`: trim the silence before the sound, and keep the takes at their real loudness to each other (the
+shipped pack's peaks: −1.9 dBFS the bell, −11.6 a start). A loop plays its whole file end to start, pitched by its
+parameter over its reference: record it at its `refSpeed` or `refRpm` and cut it where its end joins its start.
+
+**The playback files.** The game plays Ogg Opus (`.ogg`; Chromium, Firefox, Safari from 18.4); a browser that cannot
+decode it plays the `.ogg`'s MP3 `fallback` instead (the decision record, section 5: "Ogg/Opus only with an MP3
+fallback"), and `soundProblems` (`src/vehicles.js`) refuses an `.ogg` without one. Both decode to their master's
+length to the sample, so an event starts on its first sample and a loop cut in its master loops the same: Opus's
+pre-skip and end granule, and the MP3's LAME info frame (the encoder's delay and padding), trim what the encoders add.
+`python -P -E tools/sound_encode.py <folder>` writes both from the masters the manifest names (in `events` and
+`loops`, or as the `.ogg` files' `master` on a later run):
+- Opus by Chromium's WebCodecs encoder (headless), at a variable bitrate of 64 kbit/s mono and 96 stereo (`--kbps`
+  sets the mono one), 20 ms frames, complexity 10;
+- MP3 by LAME 3.100 at -V2, its variable-bitrate setting for transparent quality (the shipped pack's: 97 to
+  119 kbit/s mono, 200 to 207 stereo), through the `lameenc` module (`python -m pip install --user lameenc`). A
+  master that is an MP3 is its `.ogg`'s fallback itself.
+
+It decodes each file back in the browser and compares it with its master (the length, a shift over 1 ms, the loudness
+envelope, the peak), writes nothing while one fails, then names the `.ogg` files in `events` and `loops` and refreshes
+every file's size and hash; `--check` checks a folder without writing. The shipped pack's five sounds are 823 kB as
+WAV, 60 kB as Ogg Opus and 102 kB as MP3.
+
+**Shipping it.** In the repository: a folder `assets/<id>/` with `sounds.json`, listed under `sounds` in
+`assets/vehicles.json`, its masters kept beside the files it plays (the game fetches only those), with a `README.txt`,
+a `LICENSE.txt` and a `provenance.json` (where each recording came from, its hashes). As a package: the same folder
+with the manifest named `package.json`, in a .zip (*Packages*, below). A package installs every file it lists, so it
+may leave its masters out (their entries too; the `master` keys may stay).
+
+The shipped AGPL-3.0-or-later pack `assets/jnd.t2r6004/` (#590, #636), *T2R 6004 – partial sounds* in the menu's
+*Sounds* while the hybrid is the model, supplies both trimmed startup variants, the first release, the medium bell
+and full door alert, in Ogg Opus with MP3 fallbacks. The other bell lengths and door-alert loop are retained as
+alternatives (WAV masters only); the loop awaits a warning start/stop lifecycle. See its `README.txt` for source
+provenance. Other events and loops retain built-in synthesis.
 
 A pack naming an event or a loop the game does not have, a file it does not list, or a loop without its reference is
 left out with the name (`sound pack x left out: event gong: the game raises no such event`). The frogs: a facing
@@ -111,6 +190,8 @@ switch's `frog` m past its fork, a trailing switch's before it (11.5 m where the
 | `notch.up` | the controller moved to a higher command |
 | `notch.down` | the controller moved to a lower command |
 | `lineContactor` | the line contactor closes or opens |
+| `lineContactor.close` | the line contactor closes; falls back to lineContactor |
+| `lineContactor.open` | the line contactor opens; level follows interrupted traction current, falls back to lineContactor |
 | `contactor` | a field-weakening stage of the accelerator |
 | `trackBrake.on` | the track brakes' magnets drop |
 | `trackBrake.off` | the track brakes' magnets lift |
@@ -175,6 +256,13 @@ above; its `loader` `gltf` or `gltf-rigged`), a `livery` `livery.json`'s (*Liver
 - the manifest's fields above, `game` and `requires` met, the vehicle installed and switched on;
 - every file listed: a type the game reads (`types`), present, of its `bytes` and `sha256`, within the caps (`caps`:
   the package, a model, an image, a sound);
+- before a .zip is unpacked, by its directory: the archive's own size and what it unpacks to (`caps.archive`), the
+  number of its files (`caps.entries`), each file's declared size against its type's cap; a file is then unpacked to
+  its declared size and no further. A folder is held to the same before it is read, an address before more than the
+  caps is fetched;
+- at an install, what the files hold: an image's sides (`image.maxSide`; a livery's textures power-of-two ones), a
+  sound's length (`sound.maxSeconds`), a sound pack's and its loops' `gain` (0 to `sound.maxGain`); an `id` is none of
+  the store's own names (`reserved`);
 - a vehicle's model, loaded by the game's own loader: its rig's names for the `moves` it claims
   (`src/rigged.js` `rigProblems`), and one car as the game draws it (`src/models.js` `vehicleFit`): at most `fit`'s
   `maxLength` (33 m) long, at most its type's width (`VEHICLE_TYPES` in `src/tram.js`) plus `widthOver` wide, its
@@ -182,6 +270,8 @@ above; its `loader` `gltf` or `gltf-rigged`), a `livery` `livery.json`'s (*Liver
   level, wide for now to see what authors bring: the user, 2026-11-13). A car longer than its type's length over the
   coupler faces is offered with a warning: it runs on its type's two pivots until it has a type of its own
   (articulated vehicles: #579). The model is measured at install; at a start the hashes stand for it;
+- a model's links: every `uri` in a `.gltf` or `.glb` is data inside the file or one of the package's listed files
+  beside or below the model (a `.bin`, a texture). A package is its listed files: a model names nothing elsewhere;
 - a livery's slots, a sound pack's events and loops, a fleet's types: among those its vehicle and the game declare.
 
 A package that fails is listed with its reasons and not offered; one with warnings is offered with them. The
@@ -195,14 +285,23 @@ ones join the registry after the repository's (`src/packages.js` `loadInstalled`
 package installed from a `package.json` address offers *Update* when a newer version is there.
 
 **The curated list** (the user, 2026-11-11: "perhaps some curated list of what others officially submitted"):
-`assets/catalogue.json`, shown under the installed ones with an *Install* button. Submitting through the game's
-website, the pack or its address, is #580. Until then, to submit a package, open an issue
-with its address (an https `package.json` or `.zip` on your own host, which must allow the game's page to fetch it:
-CORS), its licence, and the check's report from installing it. Once it is reviewed, an entry goes into the list:
-`id`, `names` (cs, en), `author`, `licence`, `kind`, `url`, `home` (its page). The project hosts no package it did not
-make. `tools/test_vehicles.py` checks the entries.
+`assets/catalogue.json`, shown under the installed ones with an *Install* button. An entry: `id`, `names` (cs, en),
+`author`, `licence`, `url`, `home` (its page), `packages` (a bundle's), `submission`. `tools/test_vehicles.py` checks
+the entries.
 
-`tools/test_packages.py` installs a sample bundle and six broken packages in headless Chromium (docs at its top).
+**Submitting a package** (#580; the user, 2026-11-13: "submit the pack or link to the asset through our website where
+we can pick it up and review"): the Vehicles… page's *Submit a package to the project* takes a .zip or its address
+(an https `package.json` or `.zip` on the author's host, which must let the game's page fetch it: CORS), an optional
+contact for the verdict (an email or a Discord name) and a note. A box says whether the project may host the files on
+its server and offer them to everyone from the menu; unticked, they stay on the author's host and the list links
+them (the user, 2026-11-15). The page checks the package as an install does, keeping nothing (`src/packages.js`
+`dryCheck`), and sends only one that passes, with the check's report, to the host's `submit.php`
+(`tools/submit.php`: 10 an hour from everyone together, 64 MB each, 2 GB kept until a pull; only the file types of
+`src/packageRules.json`; no IP address stored). The review (DEVELOPING.md, Deploy) adds an accepted one to the list.
+A GitHub issue with the same facts stays a way in.
+
+`tools/test_packages.py` installs a sample bundle and broken packages in headless Chromium (docs at its top);
+`tools/test_submission_check.py` submits one, checks it, accepts it and installs it from the list.
 
 ## The rig
 
@@ -216,22 +315,25 @@ name; a part its manifest's `moves` claims and the model lacks makes the game re
 | `wheels` | `wheels`: each `name` (a node under its bogie) and `radius` | rolls them by the distance; half a bogie's wheelbase comes from where they stand |
 | `couplers` | `couplers`: `front` and `rear`, the bar's meshes | turns each about the type's pin (6.25 m), its bar refitted from the pin to the coupling plane, along the link to the next car |
 | `collector` | `pantograph`: `root`, `head`, `linkages`, `clip` (lowering it, 0 raised .. 1 down), `minContactHeight`, `maxContactHeight` | scrubs the clip to the wire's height, lowers it below its range |
-| `lamps` | `signals`: `left`, `right` (glow nodes); `brakes`; `beams` (the headlights' centres, for the high beams' glow); `tailLamps` (`size`, `at`: lamps the model lacks) | lights them by state (`src/lamps.js`) |
+| `lamps` | `signals`: `left`, `right` (glow nodes); `brakes`; `headlights` (a node at each headlight's centre, for the high beams' glow); `tailLamps` (the tail lamps' glow meshes, lit on every car) | lights them by state (`src/lamps.js`) |
 | `doors` | `doors`: each `name`, `clip` (opening it) and `leaves` (`outer`, `inner` nodes) | scrubs the clips by the doors' openness |
 | `trackBrakes` | `shoes`: a bogie's name and the shoes' meshes under it | hangs them at the type's gap over the rail (12 mm), drops them when the magnets are on |
 
-Also by name: `root` (the car's node), `saloon` (`materials`, and `within`: a box whose parts belong to the saloon;
-left out far away), `numberPlates` (drawn with the fleet number, its digits `fleetDigits` m tall), `routeStyles`
+Also by name: `root` (the car's node), `saloon` (the node the saloon's parts are under; left out far away), `numberPlates` (drawn with the fleet number, its digits `fleetDigits` m tall), `routeStyles`
 (each route plate and its style: `normal`, `inverted`, `mirror`), `infoPlates` (`frontDestination`, `runNumber`,
 `sideBoards`). Transparent materials are the glass. The lighter level for AI trams far away is built at load: the
 doors shut, the collector at the wire, everything but the saloon merged by material. `tools/test_rigged.py` makes a
-sample vehicle with every part and checks each of them moves.
+sample vehicle with every part and checks each of them moves. A rig of interface 1.0 may still give the headlights'
+centres as `beams` (points), the tail lamps as boxes (`tailLamps`: `size`, `at`) and the saloon as `materials` and a box
+`within`: the loader reads both forms (#525).
 
 The hybrid is maintained in the repo: the asset lab it came from is retired (the user, 2026-11-12: the lab "is
 just website for viewing the model and it's animations, it doesn't export anything on its own and most likely won't
 be used anymore"). Its rig is generated by [`tools/export_t3h_rig.py`](../tools/export_t3h_rig.py) from
 [`tools/t3h_rig_roles.json`](../tools/t3h_rig_roles.json) and the base rig, with its bindings checked
-against the GLB (#471). When the model changes, update the part assignments in the roles file and the
+against the GLB (#471). The model names its own parts: the shoes, couplers, headlights, tail lamps and the
+saloon were named in it by [`tools/edit_t3h_glb.py`](../tools/edit_t3h_glb.py) (#525), so the roles file holds names
+only. When the model changes, update the part assignments in the roles file and the
 base rig as needed, then regenerate `assets/t3h/rig.json` and update its byte count in `vehicle.json`.
 `revision` records the asset revision and `rigRevision` versions the generated rig.
 

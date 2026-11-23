@@ -79,9 +79,21 @@ Zvuky hry jsou události a smyčky (#528; rozhodnutí, oddíl 5): hra vyvolá ud
 když náprava přejede srdcovku) a nastaví veličiny, kterými se řídí smyčky; `src/audio.js` přehraje každou nahrávkou
 zvukového balíčku, kde ji má, jinak vestavěným zvukem, který syntetizuje (zvuky, které hra měla před balíčky). Balíček
 je `sounds` v popisu vozidla (jeho soubory mezi soubory vozidla), nebo složka `assets/<id>/` se souborem `sounds.json`
-(`kind` `sounds`, `requires` jeho vozidlo, `names`, `licence`, `files`), uvedená pod `sounds` v `assets/vehicles.json`.
-Hra zatím žádný nemá; `tools/test_sounds.py` podává vlastní ukázkový. Pole, seznam událostí, smyček a veličin a pravidla
-srdcovek: anglická verze, [Sound packs](vehicles.md#sound-packs) (seznamy píše `tools/sound_lists.py` z kódu).
+(`kind` `sounds`, `requires` jeho vozidlo, `names`, `licence`, `files`), uvedená pod `sounds` v `assets/vehicles.json`,
+nebo balíček. Volba *Zvuky* v menu (#636) nabízí balíčky pro zvolené vozidlo, dodané s hrou i nainstalované, vedle
+jeho vlastních zvuků (vestavěných, kde vlastní nemá), které jsou výchozí; volba se pamatuje pro každé vozidlo a hraje
+od začátku další směny. Hra dodává jeden, pro hybrid: `assets/jnd.t2r6004/` (#590), *T2R 6004 – částečné zvuky*;
+`tools/test_sounds.py` podává vlastní ukázkový.
+
+Balíček je složka: popis (`sounds.json` v repozitáři, `package.json` jako balíček), soubory, které hraje, jejich
+předlohy a poznámky. Předlohy jsou WAV, mono nebo stereo, 16 nebo 24 bitů nebo 32bitové float, 44,1 nebo 48 kHz;
+událost hraje od prvního vzorku souboru v nahrané hlasitosti (ticho před zvukem ořízněte), smyčka hraje celý soubor
+dokola. Hra hraje Ogg Opus (`.ogg`); každý `.ogg` v `files` jmenuje svoje MP3 jako `fallback`, které přehraje
+prohlížeč, jenž Opus nedekóduje (Safari před 18.4), a svou předlohu jako `master`. Oba soubory píše z předloh
+`python -P -E tools/sound_encode.py <složka>`: Opus 64 kbit/s mono a 96 stereo s proměnným tokem, MP3 kodérem LAME
+-V2 (modul `lameenc`); oba dekódují na délku předlohy přesně na vzorek. Pět zvuků dodaného balíčku má jako WAV 823 kB,
+jako Ogg Opus 60 kB a jako MP3 102 kB. Pole, příklad popisu, seznam událostí, smyček a veličin a pravidla srdcovek:
+anglická verze, [Sound packs](vehicles.md#sound-packs) (seznamy píše `tools/sound_lists.py` z kódu).
 
 ## Balíčky
 
@@ -90,9 +102,19 @@ Hráč si instaluje balíčky v menu *Vozidla…* (#530; rozhodnutí, oddíly 1,
 balíčků, každý ve své složce. Hra každý zkontroluje podle `src/packageRules.json` (stejná pravidla čte
 `tools/test_vehicles.py`): pole, typy souborů, velikosti a otisky SHA-256, licenci; model vozidla načte vlastním
 loaderem a změří vůz proti jeho typu a rozpočtu trojúhelníků a volání kreslení; pohyblivé díly podle `moves`.
+Cesty souborů jsou prostá jména ve složkách (písmena bez diakritiky, číslice, `.`, `_`, `-` a mezery) a model odkazuje
+jen na data v sobě nebo na soubory balíčku vedle sebe.
+Archiv .zip hra před rozbalením posoudí podle jeho adresáře: velikost archivu a toho, co se z něj rozbalí, počet souborů
+a deklarovanou velikost každého; složku před načtením a adresu před stažením stejně. Při instalaci zkontroluje i obsah:
+strany obrázku (nejvýš 2048 px, textury nátěru mocniny dvou), délku zvuku (nejvýš 60 s) a hlasitost `gain` (0 až 2).
 Balíček, který neprojde, odmítne s důvody. Instalované leží v úložišti prohlížeče (OPFS) a hra je při startu
 kontroluje znovu. Pole, kontrola a jak balíček přihlásit do seznamu `assets/catalogue.json`: anglická verze,
 [Packages](vehicles.md#packages).
+
+Autor balíček přihlásí v *Vozidla…*, oddíl *Přihlásit balíček do projektu* (#580): soubor .zip nebo jeho adresu,
+nepovinný kontakt pro výsledek (e-mail nebo jméno na Discordu) a poznámku. Zaškrtnutím dovolí projektu soubory umístit
+na jeho server a nabídnout je všem z menu; jinak zůstanou na autorově serveru a seznam na ně odkazuje (uživatel,
+2026-11-15). Stránka balíček zkontroluje jako při instalaci, nic si neponechá, a pošle jen takový, který projde.
 
 ## Soubor pohyblivých dílů (rig)
 
@@ -106,16 +128,16 @@ Hra jimi hýbe podle jmen; díl, který jeho popis tvrdí v `moves` a model nem�
 | `wheels` | `wheels`: každé `name` (uzel pod podvozkem) a `radius` | otáčí je podle ujeté dráhy; polovinu rozvoru podvozku zjistí z jejich polohy |
 | `couplers` | `couplers`: `front` a `rear`, sítě tyče | otáčí každé kolem čepu typu (6,25 m), tyč natažená od čepu k rovině spojení, ve směru spojnice k dalšímu vozu |
 | `collector` | `pantograph`: `root`, `head`, `linkages`, `clip` (stažení, 0 nahoře .. 1 dole), `minContactHeight`, `maxContactHeight` | posune animaci na výšku drátu, pod rozsahem ho stáhne |
-| `lamps` | `signals`: `left`, `right` (uzly svitu); `brakes`; `beams` (středy světlometů, pro záři dálkových); `tailLamps` (`size`, `at`: světla, která model nemá) | rozsvítí je podle stavu (`src/lamps.js`) |
+| `lamps` | `signals`: `left`, `right` (uzly svitu); `brakes`; `headlights` (uzel ve středu každého světlometu, pro záři dálkových); `tailLamps` (sítě svitu koncových světel, svítí na každém voze) | rozsvítí je podle stavu (`src/lamps.js`) |
 | `doors` | `doors`: každé `name`, `clip` (otevření) a `leaves` (uzly `outer`, `inner`) | posune animace podle otevření dveří |
 | `trackBrakes` | `shoes`: jméno podvozku a sítě čelistí pod ním | zavěsí je v mezeře typu nad kolejnicí (12 mm), spustí je při zapnutých magnetech |
 
-Dále podle jmen: `root` (uzel vozu), `saloon` (`materials` a `within`: kvádr, jehož díly patří k interiéru; zdálky
-se vynechá), `numberPlates` (s evidenčním číslem, číslice vysoké `fleetDigits` m), `routeStyles` (každá tabule linky
+Dále podle jmen: `root` (uzel vozu), `saloon` (uzel, pod nímž jsou díly interiéru; zdálky se vynechá), `numberPlates` (s evidenčním číslem, číslice vysoké `fleetDigits` m), `routeStyles` (každá tabule linky
 a její styl: `normal`, `inverted`, `mirror`), `infoPlates` (`frontDestination`, `runNumber`, `sideBoards`). Průhledné
 materiály jsou sklo. Lehčí úroveň pro vzdálené cizí tramvaje vznikne při načtení: dveře zavřené, sběrač na drátu,
 vše kromě interiéru sloučené podle materiálu. `tools/test_rigged.py` vyrobí vzorové vozidlo se všemi díly a zkontroluje,
-že se každý hýbe.
+že se každý hýbe. Rig rozhraní 1.0 smí dál dát středy světlometů jako `beams` (body), koncová světla jako kvádry
+(`tailLamps`: `size`, `at`) a interiér jako `materials` a kvádr `within`: zavaděč čte obě podoby (#525).
 
 Podrobný model se udržuje v repozitáři: projektová dílna na modely, ze které pochází, už se nepoužívá (uživatel,
 12. 11. 2026: dílna je jen web na prohlížení modelu a jeho animací, sama nic neexportuje a nejspíš se už používat

@@ -2,13 +2,13 @@
 // Landmarks past the fog (#610). The user, 2026-11-15: "hide the small things far away and on the opposite keep the
 // largest building on higher ground so that they can be see as visual landmarks, like in real city".
 // The camera draws to the fog's end (src/main.js applyWeather); a landmark is drawn beyond it, in a lighter haze that
-// ends LANDMARK_STRETCH times farther. Its own meshes in the world (src/world.js buildLod2) take that haze near the
+// ends LANDMARK_STRETCH times farther. Its own meshes in the world (src/buildings.js buildLod2) take that haze near the
 // camera, and a copy of its triangles is drawn first, in a pass of its own from just inside the far plane to the
 // haze's end; the world is then drawn over it. A hill in front of a landmark past the fog's end is drawn in the sky's
 // colour, as all the ground there, and covers the landmark's foot.
 import * as THREE from 'three';
 
-// which buildings (src/world.js buildLod2): LANDMARK_TALL m and higher (line 17: 45 buildings of 2080 over 12 m,
+// which buildings (src/buildings.js buildLod2): LANDMARK_TALL m and higher (line 17: 45 buildings of 2080 over 12 m,
 // 37: 15 of 1276, 9: 40 of 4784; 2026-11-15), or LANDMARK_HIGH m and higher standing LANDMARK_RISE m or more over
 // the line's typical ground, the median of the ground along its route (17: +12 at Barrandov, 9: +61, Řepy's panel
 // blocks at 355 m; 37: none)

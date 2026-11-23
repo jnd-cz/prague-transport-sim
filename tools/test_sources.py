@@ -73,6 +73,33 @@ class Stamp(unittest.TestCase):
         self.assertEqual(list(p["sources"]), ["coarse", "osm", "rule:assumed"])
         self.assertNotIn("attribution", p["sources"]["rule:assumed"])
 
+    def test_facts_are_kept_per_section_and_dropped_when_none_applies(self):
+        p = S.stamp("a.py", {"clearances": S.entry("clearances", [3, 2])})
+        self.assertNotIn("facts", p)  # no tool stated one: the provenance is as before #670
+        f = [{"id": "b", "state": "holds"}, {"id": "a", "state": "matches"}]
+        p = S.stamp("speeds.py", {}, p, facts={"postedSpeeds": f})
+        p = S.stamp("signs.py", {}, p, facts={"stopSigns": [{"id": "s", "state": "agrees"}]})
+        self.assertEqual(p["facts"]["postedSpeeds"], {"tool": "speeds.py", "facts": sorted(f, key=lambda e: e["id"])})
+        self.assertEqual(set(p["facts"]), {"postedSpeeds", "stopSigns"})
+        self.assertEqual(set(p["lists"]), {"clearances"})
+        p = S.stamp("speeds.py", {}, p, facts={"postedSpeeds": []})
+        self.assertEqual(set(p["facts"]), {"stopSigns"})
+        with self.assertRaises(ValueError):
+            S.stamp("x.py", {}, facts={"postedSpeeds": [{"id": "a", "state": "fine"}]})
+
+    def test_fact_states(self):
+        st = S.fact_state
+        self.assertEqual([st(65, 60, 60), st(65, 60, 65), st(65, 60, 70), st(65, 60, None)],
+                         ["holds", "matches", "changed", "changed"])
+        self.assertEqual([st(65, None, 70), st(65, None, None)], ["holds", "holds"])  # nothing recorded: no change seen
+        near = lambda a, b: abs(a - b) <= 1  # noqa: E731
+        self.assertEqual([st(10, 3, 10.8, near), st(10, 3, 3.5, near), st(10, 3, 6, near)], ["matches", "holds", "changed"])
+        # the source as when the user answered holds, even within the fact's tolerance: the user set theirs apart from it
+        self.assertEqual([st(10, 9.5, 9.5, near), st(10, 9.5, 9.6, near), st(10, 9.5, 9.6, near, unchanged=near)],
+                         ["holds", "matches", "holds"])
+        self.assertEqual([st(10, 10, 10.5, near, confirms=True), st(10, 10, 12, near, confirms=True),
+                          st(10, 10, None, confirms=True)], ["agrees", "moved", "moved"])
+
     def test_a_level_with_no_features_is_not_a_source(self):
         p = S.stamp("c.py", {"blocks": S.entry("terrain", [5, 0, 0], "blocks", {"x": 1})})
         self.assertEqual(list(p["sources"]), ["ipr-dtm"])

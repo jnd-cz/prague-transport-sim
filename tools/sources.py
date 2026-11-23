@@ -6,7 +6,7 @@ datum) and LAYERS (per layer the sources in the order they are used; a feature's
 index there, 0 = the preferred source). Decision: docs/decisions/2026-10-30-source-per-layer.md.
 
 A build tool stamps each output file, per list (JSON key) the layer and the count per level:
-    out["provenance"] = stamp("fine_terrain.py", {"blocks": entry("terrain", [n_ipr, n_dmr5g, n_coarse], "blocks")})
+    out["provenance"] = stamp("city_terrain.py", {"cells": entry("terrain", [n_ipr, n_dmr5g, n_coarse], "cells")})
     out["attribution"] = attribution(out["provenance"])
 A list whose features come from several levels gives each feature its level (`fb`, or a parallel `fb`
 array for lists of bare coordinates); a list from one level has no per-feature field: its counts say
@@ -25,7 +25,7 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # m: a terrain height under this is no ground, in every terrain source the tools read: IPR's raster (ipr_dtm.py), the
-# DMR 5G tiles (fine_terrain.py, city_terrain.py) and the coarse grid (build_line.py). The user, 2026-11-09 (#428): "I
+# DMR 5G tiles (city_terrain.py) and the coarse grid (build_line.py). The user, 2026-11-09 (#428): "I
 # would put lower limit to 170 metres height which is well below lowest point of Prague". IPR's lowest cell is 170.73 m
 # (the file's minVal); line 17's 10 m grid holds 57 cells of 163.1-169.8 m at Troja (docs/knowledge.md, #325).
 TERRAIN_FLOOR = 170.0
@@ -47,7 +47,7 @@ SOURCES = {
     # terrain
     "ipr-dtm": Source("IPR Praha digital terrain model, 1 m raster", "ipr-dtm", f"Terrain: {IPR}",
                       "lidar 2023, corrected and resampled 2025-07-10", "capture",
-                      "Bpv assumed: the file states none; measured against DMR 5G on every build (fine_terrain.py), IPR asked (#62)"),
+                      "Bpv assumed: the file states none; measured against DMR 5G on every city mesh build (dmr5g.datum_check), IPR asked (#62)"),
     "dmr5g": Source("ČÚZK DMR 5G, 2 m", "dem", "Terrain: ČÚZK DMR 5G (CC BY 4.0)",
                     "lidar 2009-2013, updated since; exported 2026-10-21..23", "capture", "Bpv"),
     "coarse": Source("the line's 10 m grid of DMR 5G (build_line.py)", "dem", "Terrain: ČÚZK DMR 5G (CC BY 4.0)",
@@ -105,7 +105,7 @@ LAYERS = {
                                                      # DTM's sign, OSM's stop position (#258)
     "timetable": ("gtfs",),
     "signals": ("osm", "rule:placement"),
-    "speeds": ("osm", "rule:curvature"),
+    "speeds": ("truth", "osm", "rule:curvature"),  # a posted speed the user saw over OSM's maxspeed (#612)
     "clearances": ("osm", "rule:assumed"),  # OSM maxheight, else the default per kind
     "crossings": ("osm",),  # where roads and paths cross the tracks (#24)
     "areas": ("osm",),  # water, green, landuse
@@ -163,10 +163,11 @@ def single(layer, source, n, unit="features"):
     return entry(layer, [n if s == source else 0 for s in LAYERS[layer]], unit)
 
 
-def stamp(tool, lists, prev=None, root=ROOT):
+def stamp(tool, lists, prev=None, root=ROOT, facts=None):
     """A built file's provenance: per list (the file's JSON key) its layer, levels and counts, and the
     sources used with their dates. Several tools writing one file (lineN.json) each add their lists
-    to the block already there (`prev`)."""
+    to the block already there (`prev`). `facts`: per data/truth.json section, the state of each of its facts the tool
+    applied over a source (fact_state, #670); kept from `prev` like the lists, and absent while no tool states one."""
     out = {"lists": dict((prev or {}).get("lists", {}))}
     for key, e in lists.items():
         out["lists"][key] = {"tool": tool} | e
@@ -176,7 +177,80 @@ def stamp(tool, lists, prev=None, root=ROOT):
     out["sources"] = {s: {k: v for k, v in (("title", SOURCES[s].title), ("date", dated(s, root)),
                                             ("attribution", SOURCES[s].attribution), ("datum", SOURCES[s].datum)) if v}
                       for s in used}
+    stated = dict((prev or {}).get("facts", {}))
+    for section, es in (facts or {}).items():
+        for e in es:
+            if e.get("state") not in FACT_STATES:
+                raise ValueError(f"{section} {e.get('id')}: state {e.get('state')!r} is not one of {FACT_STATES}")
+        if es:
+            stated[section] = {"tool": tool, "facts": sorted(es, key=lambda e: str(e["id"]))}
+        else:  # none of the section's facts applies to this file
+            stated.pop(section, None)
+    if stated:
+        out["facts"] = stated
     return out
+
+
+# The state of a data/truth.json fact the build applies over a source, on every build (#670; the user, 2026-11-18: "report
+# the custom facts which are overriding source data once they match [...] so we can eventually retire the manual
+# corrections"). A correction holds while the source still differs from it, matches once the source gives the fact's
+# value (it can be retired: deleted from truth.json on the user's word, "git history is good enough"), and changed when
+# the source gives neither the value recorded with the fact nor the fact's (look again). A confirmation (the user said
+# the source was right) agrees while the source still gives it, and moved once the source left it: the fact then holds
+# against the source.
+FACT_STATES = ("holds", "matches", "changed", "agrees", "moved")
+
+# The data/truth.json sections whose facts override a source (#670): where their facts are in the file, each fact's
+# stable id (its own id, else its place: never an array index), the tool that states them, and which of them the build
+# applies where not all (the others, such as a "not grass" answer, only keep a review card away). tools/fact_status.py
+# lists a fact of these that no built file states as not stated.
+OVERRIDES = {
+    "postedSpeeds": (("postedSpeeds",), lambda f: f["id"], "tools/osm_speeds.py"),
+    "stopSigns": (("stopSigns", "signs"), lambda f: f"{f['stop']} → {f['towards']}" if f.get("towards")
+                  else f"{f['stop']}, from {f.get('from')}", "tools/build_line.py"),
+    "switchTips": (("trackSources", "switchTips"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
+    "photoTracks": (("trackSources", "photoTracks"), lambda f: f["place"], "tools/di_network.py, through tools/build_line.py"),
+    "steppedAnswers": (("trackSources", "steppedAnswers"), lambda f: f["decision"], "tools/di_network.py, through tools/build_line.py",
+                       lambda f: f.get("answer") == "smooth"),
+    "structures": (("trackHeights", "structures"), lambda f: f["id"], "tools/import_track_heights.py, through tools/line_heights.py"),
+    "surveyGround": (("surveyGround", "places"), lambda f: f"{f['lat']},{f['lon']}", "tools/dtm.py (zps_ground.judge)"),
+    "grassReview": (("grassReview", "answers"), lambda f: f["id"], "tools/track_styles.py",
+                    lambda f: f.get("answer") == "grass"),
+    "trackSurfaceReview": (("trackSurfaceReview", "answers"), lambda f: f["id"], "tools/track_styles.py",
+                           lambda f: f.get("answer") in ("setts", "embedded", "panels", "grass")),
+}
+
+
+def overriding(truth, section):
+    """The facts of an OVERRIDES section in data/truth.json (as loaded) that the build applies, in file order."""
+    v = truth
+    for k in OVERRIDES[section][0]:
+        v = (v or {}).get(k) if isinstance(v, dict) else None
+    applies = OVERRIDES[section][3] if len(OVERRIDES[section]) > 3 else None
+    return [f for f in v or [] if applies is None or applies(f)]
+
+
+def fact_id(section, fact):
+    return OVERRIDES[section][1](fact)
+
+
+def fact_state(fact, recorded, now, same=None, confirms=False, unchanged=None):
+    """The state of a fact whose value is `fact`, recorded when the source said `recorded` (None: not recorded), where
+    the source now says `now` (None: nothing there). `same(a, b)`: within the kind's tolerance (default: equal);
+    `unchanged(a, b)`: the source says what it said when the user answered (default: equal). A correction whose
+    source is unchanged holds, even within the tolerance of the fact: the user saw that value and set theirs apart
+    (#685: Královka's sign, placed 1.6 m from the DTM's the user judged misplaced); a match is a source that moved."""
+    same = same or (lambda a, b: a == b)
+    unchanged = unchanged or (lambda a, b: a == b)
+    if confirms:
+        return "agrees" if now is not None and same(now, fact) else "moved"
+    if recorded is not None and now is not None and unchanged(now, recorded):
+        return "holds"
+    if now is not None and same(now, fact):
+        return "matches"
+    if recorded is None or (now is not None and same(now, recorded)):
+        return "holds"
+    return "changed"
 
 
 def attribution(*provs):

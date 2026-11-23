@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Screenshot controls and isolation: python -P -E tools/test_shot.py."""
+from contextlib import nullcontext
 from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from PIL import Image
 from playwright.sync_api import sync_playwright, TimeoutError
@@ -116,6 +117,21 @@ class Shots(unittest.TestCase):
             self.assertEqual(image.getpixel((0,shot.BAR)), (255,0,0))
             self.assertEqual(image.getpixel((20,shot.BAR)), (0,0,255))
 
+    def test_an_overlays_files_stand_in_for_the_checkouts_at_the_same_paths(self):
+        """#757: a place's ground file served over the checkout's; every other file, and a path out of the overlay, as ever."""
+        import urllib.request
+        (self.root / 'data').mkdir(exist_ok=True)
+        (self.root / 'data' / 'a.bin').write_bytes(b'checkout')
+        (self.root / 'data' / 'b.bin').write_bytes(b'only here')
+        with tempfile.TemporaryDirectory() as over:
+            (Path(over) / 'data').mkdir()
+            (Path(over) / 'data' / 'a.bin').write_bytes(b'overlay')
+            with site(self.root, over) as url, site(self.root) as plain:
+                read = lambda u: urllib.request.urlopen(u, timeout=10).read()  # noqa: E731
+                self.assertEqual(read(f'{url}/data/a.bin'), b'overlay')
+                self.assertEqual(read(f'{url}/data/b.bin'), b'only here')
+                self.assertEqual(read(f'{plain}/data/a.bin'), b'checkout')
+
     def test_a_missing_game_hook_is_named(self):
         (self.root / 'index.html').write_text(HTML.replace('dispose() {}, ', ''), encoding='utf-8')
         with self.assertRaisesRegex(RuntimeError, 'window.traffic.dispose'):
@@ -135,6 +151,40 @@ class Shots(unittest.TestCase):
             shot.main(['--line','17','--s','5064','--out',str(output)], self.root)
         self.assertEqual(prior.read_bytes(), b'previous successful image')
         self.assertEqual(list(output.iterdir()), [prior])
+
+    def test_weather_reaches_both_captures_and_names_the_files(self):
+        output, seen = self.root/'shots-w', []
+        def fake_capture(browser, root, line, s, view, dst, timeout, **kwargs):
+            seen.append(kwargs.get('weather'))
+            Image.new('RGB',(10,10),'red').save(dst)
+            return {'camera':{},'target_xy':{}}
+        with patch.object(shot,'git',return_value='reference'), patch.object(shot,'capture',fake_capture), \
+             patch.object(shot,'checkout',return_value=nullcontext(self.root)), \
+             patch.object(shot,'sync_playwright',return_value=nullcontext()), \
+             patch.object(shot.gpu,'launch',return_value=(MagicMock(),'fake')):
+            shot.main(['--line','17','--s','5064','--weather','snow','--out',str(output)], self.root)
+        self.assertEqual(seen, ['snow', 'snow'])
+        self.assertTrue((output/'line17-s5064-cab-snow-pair.png').exists())
+
+
+class SameCheckout(unittest.TestCase):
+    """Two captures of the real game in one checkout at one camera are the same picture (#689: a pair once differed in
+    its trees). Needs data/ (python -I tools/snapshot.py data-fetch)."""
+    ROOT = Path(__file__).resolve().parent.parent
+
+    @unittest.skipUnless((ROOT / 'data' / 'line17.json').is_file(), 'needs data/: python -I tools/snapshot.py data-fetch')
+    def test_two_captures_of_one_checkout_are_pixel_equal(self):
+        with sync_playwright() as pw, tempfile.TemporaryDirectory() as tmp:
+            browser, _ = gpu.launch(pw, quiet=True)
+            try:
+                shots = [capture(browser, self.ROOT, 23, 0, 'cab', Path(tmp) / f'{k}.png', 240) for k in range(2)]
+            finally:
+                browser.close()
+            with Image.open(Path(tmp) / '0.png') as a, Image.open(Path(tmp) / '1.png') as b:
+                self.assertEqual(a.tobytes(), b.tobytes(), 'two captures of one checkout differ')
+            self.assertEqual(shots[0]['near'], shots[1]['near'])
+            self.assertTrue(all(s['fill_from_camera'] == 0 for s in shots[0]['near'].values() if s['fill_from_camera'] is not None),
+                            shots[0]['near'])
 
 
 if __name__ == '__main__':

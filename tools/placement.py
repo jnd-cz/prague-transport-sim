@@ -31,6 +31,7 @@ from shapely.geometry import LineString, Point
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing  # noqa: E402
+from step_inputs import there  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 STOP_AHEAD = 6.0     # m: without a sign in the data the front stops this far past the GTFS point (src/game.js STOP_AHEAD)
@@ -103,7 +104,7 @@ def _densify(line, step):
 
 
 def widened(roads, tracks):
-    """The roads as the game widens them before it looks for conflicts (src/world.js widenTramStreets): a road with 60 %
+    """The roads as the game widens them before it looks for conflicts (src/streets.js widenTramStreets): a road with 60 %
     of its points within 2.6 m of a track carries the track zone too, 3.2 m per track (two where tracks lie 1.6 m to
     both sides of 30 % of its points). Copies; the data's roads stay as they are."""
     segs = [LineString([a[:2], b[:2]]) for t in tracks for a, b in zip(t['p'], t['p'][1:]) if a[:2] != b[:2]]
@@ -258,8 +259,11 @@ def place_signals(signals, C, stops, targets):
 
 def platform_rule(placed, stops, targets):
     """A signal never stands along a platform (src/game.js _initSignals): it moves to the platform head, or, where the
-    crossing follows too closely, hangs past it and the stop's point moves back to 3 m before it. Changes `placed`
-    and `targets` in place; the signals' `head` is the stop's index."""
+    crossing follows too closely, hangs past it. No signal moves a stop point (#694: the user, 2026-11-18, "The stop
+    sign will be the stop point by definition as D1/2 rules say"): (placed, before) with `before` the hung signals whose
+    stop line lies before their stop's point, [(signal, stop index)] (src/game.js signalsBeforeSign). Changes `placed`
+    in place; the signals' `head` is the stop's index."""
+    before = []
     for d in placed:
         if d.get('drop'):
             continue
@@ -275,19 +279,19 @@ def platform_rule(placed, stops, targets):
                 far = d.get('farEdge', d.get('edge', d['cross']))
                 d['s'] = max(d['s'], min(targets[i], far) + 3)
                 if d['s'] - 3 < targets[i]:
-                    targets[i] = d['s'] - 3
-    return placed, targets
+                    before.append((d, i))
+    return placed, before
 
 
 def place(data, osm_tram):
-    """(signals, stop targets, moves, conflicts) for a line's data."""
+    """(signals, stop targets, moves, conflicts, route, the hung signals before their stop's point) for a line's data."""
     R = Route(data['path'])
     stops = data['stops']
     targets = stop_points(stops, R.length)
     C = route_conflicts(R, widened(data.get('roads', []), data.get('tracks', [])), data.get('crossings', []), osm_tram, stops, targets)
     placed, moved = place_signals(data.get('signals', []), C, stops, targets)
-    placed, targets = platform_rule(placed, stops, list(targets))
-    return placed, targets, moved, C, R
+    placed, before = platform_rule(placed, stops, targets)
+    return placed, targets, moved, C, R, before
 
 
 # The survey's ground areas (src/terrain.js groundArea) and their rank where they overlap (SURFACE_RANK)
@@ -490,7 +494,7 @@ def built_geojson(line, data, placed, targets, C, R, build):
     for st, t in zip(data['stops'], targets):
         x, y, _, _ = R.at(t)
         feat({'type': 'Point', 'coordinates': ll(x, y)}, id=f"tram_stop_point:{line}:{st['name']}", type='tram_stop_point',
-             stop=st['name'], s=round(t, 1), rule='platformHang' if st.get('sign') is not None and abs(t - st['sign']) > 0.05 else 'sign' if st.get('sign') is not None else 'gtfsAhead')
+             stop=st['name'], s=round(t, 1), rule='sign' if st.get('sign') is not None else 'gtfsAhead')
     for d in placed:
         sid = f"tram_signal:{line}:sig@{round(d['s0'])}"
         x, y, hx, hy = R.at(d['s'])
@@ -532,7 +536,7 @@ def main():
     raw = data.get('signalsRaw') or [{'s': d['s0'], 'cross': d['cross']} if 's0' in d else {'s': d['s'], 'cross': d['cross']}
                                      for d in data.get('signals', [])]
     data['signals'] = raw
-    placed, targets, moved, C, R = place(data, osm_tram_signals(a.line))
+    placed, targets, moved, C, R, before = place(data, osm_tram_signals(a.line))
     data['signalsRaw'] = raw
     # (unrounded: the game's own rules keep full precision, and a 5 cm shift of signals and stop points reshuffled every
     # seeded drive like a new seed)
@@ -549,7 +553,7 @@ def main():
         pl_.pop('vienna', None)
     for st in data['stops']:
         st.pop('vienna', None)
-    if dtm.exists():
+    if there(dtm, ROOT):
         survey = Survey(json.loads(dtm.read_text(encoding='utf-8'))['areas'])
         plats, stops = stop_types(data, survey, stop_points(data['stops'], R.length), R, RB)
         for k, kerb in plats.items():
@@ -567,7 +571,11 @@ def main():
     for d in placed:
         rules[d.get('rule')] = rules.get(d.get('rule'), 0) + 1
     print(f"line {a.line}: {len(C)} conflicts, {len(placed)} signals {rules}, "
-          f"{sum(1 for st, t in zip(data['stops'], targets) if st.get('sign') is not None and abs(t - st['sign']) > 0.05)} stop points moved back")
+          f"{sum(1 for st, t in zip(data['stops'], targets) if st.get('sign') is None or abs(t - st['sign']) > 0.05)} stop points "
+          f"off their sign (no sign, the route's end)")
+    for d, i in before:
+        print(f"signal hung before its stop's sign (#406): sig@{round(d['s0'])} at {d['s']:.1f}, "
+              f"{targets[i] - d['s']:.1f} m before {data['stops'][i]['name']}'s point at {targets[i]:.1f}")
     print(f"signals placed: {', '.join(moved)}")
 
 

@@ -5,6 +5,12 @@
     python -P -E tools/shot.py --line 17 --s 5064 --view review --ref ../other-checkout
     python -P -E tools/shot.py --line 17 --s 0 --view review --at 3185.9,3756.8 --dist 25   # a place off the route
     python -P -E tools/shot.py --line 17 --s 5064 --view chase --vehicle t3simple --livery sample.t3simple-green
+    python -P -E tools/shot.py --line 22 --s 6330 --view cab --weather snow   # bare crowns, snow on the ground
+    python -P -E tools/shot.py --line 37 --s 3420 --view cab --plain --ref .   # as a player sees it (the ground's
+                                                                   # tiles, #30) against every tile in detail
+    python -P -E tools/shot.py --line 17 --s 12568 --view review --at=-755,-1450 --ref . --overlay reports/places/rasinovo-quay/overlay
+                                                                   # a place's ground (tools/ground_place.py --overlay,
+                                                                   # #757) against the checkout's own
 
 Writes individual PNGs, a labelled side-by-side PNG, and camera/data hashes to reports/shots/.
 Git references are exported temporarily and use verified published files from TRAMDATA_CACHE.
@@ -34,6 +40,19 @@ from data_reference import ROOT, checkout, digest, git
 
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
+    overlay = None  # a folder whose files stand in for the checkout's at the same paths (--overlay)
+
+    def translate_path(self, path):
+        p = super().translate_path(path)
+        if self.overlay:
+            try:
+                q = Path(self.overlay) / Path(p).resolve().relative_to(Path(self.directory).resolve())
+            except ValueError:
+                return p
+            if q.is_file():
+                return str(q)
+        return p
+
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store')
         super().end_headers()
@@ -43,9 +62,10 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 
 
 @contextmanager
-def site(root):
+def site(root, overlay=None):
     # The kernel reserves this ephemeral socket before any browser is started.
-    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Quiet, directory=str(root)))
+    handler = type('Overlaid', (Quiet,), {'overlay': str(overlay)}) if overlay else Quiet
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(handler, directory=str(root)))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -81,7 +101,8 @@ def font(size=20):
     return ImageFont.load_default(size)
 
 
-def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45, picks=()):
+def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45, picks=(), plain=False, weather='dry',
+            overlay=None):
     context = browser.new_context(viewport={'width': 1280, 'height': 720}, device_scale_factor=1)
     context.add_init_script('''window.headless = true;
       let state = 158; Math.random = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296);''')
@@ -94,12 +115,13 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
         return max(1, (deadline - time.monotonic()) * 1000)
 
     try:
-        with site(root) as url:
-            print(f'Loading line {line}, {view}: {root}', flush=True)
-            page.goto(f'{url}/?line={line}&seed=158&keepgeo', timeout=remaining())
+        with site(root, overlay) as url:
+            print(f'Loading line {line}, {view}: {root}' + (f' under {overlay}' if overlay else ''), flush=True)
+            keep = '' if plain else '&keepgeo'  # (plain: the ground's tiles round the camera only, as a player loads, #30)
+            page.goto(f'{url}/?line={line}&seed=158{keep}', timeout=remaining())
             page.wait_for_function("document.getElementById('loading')?.classList.contains('hidden') && "
                                    "!document.getElementById('menu')?.classList.contains('hidden')", timeout=remaining())
-            page.select_option('#optWeather', 'dry')
+            page.select_option('#optWeather', weather)
             page.select_option('#optObst', 'off')
             if page.locator('#selStop').count():
                 page.select_option('#selStop', index=0)
@@ -125,7 +147,7 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
             target = target or point
             if view == 'review':
                 at = f"{target['x']},{target['y']},{target['yaw']},{pitch},{dist}"
-                page.goto(f'{url}/?line={line}&seed=158&keepgeo&review&at={at}', timeout=remaining())
+                page.goto(f'{url}/?line={line}&seed=158{keep}&review&at={at}', timeout=remaining())
                 page.wait_for_function('window.review', timeout=remaining())
                 require(page, 'review')
                 page.evaluate('''() => { window._shotReady = false;
@@ -167,14 +189,35 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
             }''', pose)
             if not info['canvas_visible']:
                 raise RuntimeError('the scene canvas is hidden; refusing a blank screenshot')
+            if plain:  # (the window round the captured camera and the route ahead, waited for: src/groundFile.js)
+                page.evaluate('''async () => {
+                  const g = window.groundTiles, cam = window.review ? window.review.camera : window.camera;
+                  if (!g) return;
+                  const pts = [[cam.position.x, -cam.position.z]], r = window.game?.route, s = window.game?.tram.s ?? 0;
+                  if (r) for (let d = 0; d <= 1000; d += 100) { const p = r.at(Math.min(r.length, s + d)); pts.push([p.x, p.y]); }
+                  g.last = Infinity;
+                  await g.update(pts, g.reach(window.scene?.fog.far ?? 950));
+                  g.drain();
+                }''')
+            # the small things drawn near the camera (src/nearbatch.js, #610) refill only once the camera has moved a
+            # tenth of their range: refilled round the captured camera before the drawn frame, so the picture does not
+            # hold where the camera was before it (#689)
+            page.evaluate('() => { for (const s of window.nearBatches?.sets ?? []) s.dirty = true; }')
             count = page.evaluate('window.drawCount')
             page.wait_for_function('n => window.drawCount > n', arg=count, timeout=remaining())
             page.screenshot(path=str(output), timeout=remaining())
+            # what of them the picture holds: per set its range, drawn and kept instances, and how far its fill is from
+            # the camera (0: filled round it)
+            info['near'] = page.evaluate('''() => {
+              const nb = window.nearBatches, cam = window.review ? window.review.camera : window.camera;
+              return nb ? Object.fromEntries(nb.sets.map((s) => [s.name, {range: Math.round(s.range), drawn: s.mesh.count,
+                total: s.total, fill_from_camera: s.at ? Math.round(Math.hypot(s.at[0] - cam.position.x, s.at[1] - cam.position.z) * 10) / 10 : null}])) : null;
+            }''')
             if errors:
                 raise RuntimeError('; '.join(errors))
             inputs = [*sorted((root / 'data').glob(f'line{line}.*')), root/'data/truth.json', root/'data/MANIFEST.json']
             info.update(target_xy=target, page_errors=errors, image_sha256=digest(output),
-                        settings={'viewport':[1280,720], 'seed':158, 'trip_index':0, 'weather':'dry'},
+                        settings={'viewport':[1280,720], 'seed':158, 'trip_index':0, 'weather':weather},
                         data_sha256={p.name: digest(p) for p in inputs if p.is_file()})
             return info
     finally:
@@ -205,9 +248,17 @@ def main(argv=None, root=ROOT):
     ap.add_argument('--dist', type=float, default=60, help='review: the camera\'s distance in m (default 60)')
     ap.add_argument('--pitch', type=float, default=45, help='review: degrees down from level (default 45)')
     ap.add_argument('--yaw', type=float, default=0, help='review with --at: the heading looked along, degrees')
+    ap.add_argument('--plain', action='store_true', help='the current checkout without ?keepgeo: the ground as a player sees it (#30)')
+    ap.add_argument('--ref-plain', action='store_true', help='the reference without ?keepgeo')
     ap.add_argument('--vehicle', help='the tram model picked in the menu (assets/vehicles.json; default the first)')
+    ap.add_argument('--weather', choices=('dry', 'rain', 'leaves', 'snow'), default='dry',
+                    help="the menu's weather in both pictures (snow: winter, bare crowns; leaves: autumn)")
     ap.add_argument('--livery', help='the livery picked in the menu (#529; default the vehicle\'s own)')
+    ap.add_argument('--overlay', type=Path, help='a folder whose files stand in for the current checkout\'s at the same paths '
+                    '(a place\'s ground: tools/ground_place.py --overlay); the reference is drawn without it')
     a = ap.parse_args(argv)
+    if a.overlay and not a.overlay.is_dir():
+        ap.error(f'--overlay: no folder {a.overlay}')
     at = None
     if a.at:
         try:
@@ -218,7 +269,7 @@ def main(argv=None, root=ROOT):
     if a.line <= 0 or not math.isfinite(a.s) or a.s < 0 or not math.isfinite(a.timeout) or a.timeout <= 0:
         ap.error('s must be finite and nonnegative; timeout must be finite and positive')
     a.out.mkdir(parents=True, exist_ok=True)
-    stem = f'line{a.line}-s{a.s:g}-{a.view}' + (f"-at{at['x']:g}_{at['y']:g}" if at else '') + ''.join(f'-{x}' for x in (a.vehicle, a.livery) if x)
+    stem = f'line{a.line}-s{a.s:g}-{a.view}' + (f"-at{at['x']:g}_{at['y']:g}" if at else '') + ''.join(f'-{x}' for x in (a.vehicle, a.livery, a.weather if a.weather != 'dry' else None) if x)
     picks = (('#optModel', a.vehicle), ('#optLivery', a.livery or ''))
     try:
         reference_rev = (git(root, 'rev-parse', '--verify', a.ref + '^{commit}')
@@ -229,7 +280,8 @@ def main(argv=None, root=ROOT):
             # (both pictures drawn the same way, on the GPU where there is one, #411)
             browser, renderer = gpu.launch(pw)
             try:
-                now = capture(browser, root, a.line, a.s, a.view, current, a.timeout, target=at, dist=a.dist, pitch=a.pitch, picks=picks)
+                now = capture(browser, root, a.line, a.s, a.view, current, a.timeout, target=at, dist=a.dist, pitch=a.pitch, picks=picks,
+                              plain=a.plain, weather=a.weather, overlay=a.overlay and a.overlay.resolve())
                 report = {'line': a.line, 's': a.s, 'view': a.view, 'renderer': renderer, 'current': now,
                           'current_commit': git(root, 'rev-parse', 'HEAD'),
                           'working_changes': git(root, 'status', '--porcelain', '--', 'src', 'index.html', 'data/truth.json', 'data/MANIFEST.json')}
@@ -237,7 +289,8 @@ def main(argv=None, root=ROOT):
                     reference = work / f'{stem}-reference.png'
                     with checkout(root, reference_rev or a.ref, a.cache, a.line) as other:
                         report['reference'] = capture(browser, other, a.line, a.s, a.view, reference, a.timeout,
-                                                      pose=now['camera'], target=now['target_xy'], dist=a.dist, pitch=a.pitch, picks=picks)
+                                                      pose=now['camera'], target=now['target_xy'], dist=a.dist, pitch=a.pitch, picks=picks,
+                                                      plain=a.ref_plain, weather=a.weather)
                         if reference_rev is None:
                             try:
                                 report['reference_commit'] = git(other, 'rev-parse', 'HEAD')

@@ -39,7 +39,7 @@ from route import Route  # noqa: E402
 GAUGE = 0.72           # m: a rail from the axis (src/world.js)
 RAIL = 1.35            # m: the bed's half width before #547 (the report's before)
 MIN, MAX = 1.0, 3.0    # m: the bed's half width from the survey's area (MAX: the track corridor the street is laid to,
-                       # src/world.js flushDtm)
+                       # src/groundDraw.js flushDtm)
 PAIR = (2.0, 6.0)      # m: a parallel track this far is the paired one (the opposite track, heights.backOff)
 PARALLEL = 0.95        # |cos| of the angle between two tracks counted parallel
 STEP_OUT = 0.1         # m: the survey read across the track
@@ -213,9 +213,9 @@ def beds(data, survey_dtm, probe=None):
     return out
 
 
-def outline(tr, bed, old=False, strip=False):
+def outline(tr, bed, old=False, strip=False, keep=None):
     """The bed's outline as a polygon (old: the 2.7 m ribbon before #547; strip: only its sides that meet a paired
-    track, beyond the rail)."""
+    track, beyond the rail; keep: the samples it covers, a stretch between two kept ones, tools/ground_partition.py)."""
     rt = Route(tr["p"])
     n = len(bed["l"])
     step = rt.length / max(1, n - 1)
@@ -230,7 +230,7 @@ def outline(tr, bed, old=False, strip=False):
             if strip and not bed["meet"][k] & bit:
                 w = inner
             cur.append(((x - hy * side * inner, y + hx * side * inner), (x - hy * side * w, y + hx * side * w)))
-        if prev is not None:
+        if prev is not None and (keep is None or keep[k - 1] and keep[k]):
             for j in range(2):
                 q = shapely.Polygon([prev[j][0], prev[j][1], cur[j][1], cur[j][0]])
                 if q.area > 1e-6:

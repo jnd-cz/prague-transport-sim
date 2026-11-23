@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The cab view is fixed to the tram body (#597): python -P -E tools/test_cab_view.py [--line 17] [--shots DIR] [--root DIR]
 (its own server on a free port). The tram stands in the line's tightest curve, its front past the curve's middle. The
-camera must be the lead car's point 0.8 m behind the body's front, 2.39 m over the rail, on the centre line, and
-look along the body. It prints how far the track 4 m ahead of the tram (the old view's heading) turns from the body
-there. --shots saves the cab view; --root serves another checkout (main's, to compare its view)."""
+camera must be the lead car's point over the driver's seat (src/cabframe.js EYE: 1.2 m behind the body's front, 0.32 m
+left of the centre line, 2.39 m over the rail), and look along the body. It prints how far the track 4 m ahead of the
+tram (the old view's heading) turns from the body there. --shots saves the cab view; --root serves another checkout (main's, to compare its view)."""
 import argparse
 import faulthandler
 import functools
@@ -89,8 +89,8 @@ def main():
     if abs(r["viewVsBody"]) > 0.5:
         fails.append(f"the cab view looks {r['viewVsBody']} degrees off the body (the track ahead turns {r['oldHeadingVsBody']})")
     x, y, z = r["eye"]
-    if abs(x) > 0.02 or abs(y - 2.39) > 0.02 or not 5.5 < z < 7:
-        fails.append(f"the eye at {r['eye']} in the lead car (want 0, 2.39, 0.8 m behind the body's front)")
+    if abs(x - 0.32) > 0.02 or abs(y - 2.39) > 0.02 or not 5.3 < z < 6.3:
+        fails.append(f"the eye at {r['eye']} in the lead car (want 0.32, 2.39, 1.2 m behind the body's front)")
     if r["errors"]:
         fails.append(f"page errors: {r['errors']}")
     if fails:

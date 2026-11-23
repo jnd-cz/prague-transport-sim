@@ -1,0 +1,294 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""tools/network.py: the page's arithmetic and survey reads, the roads' rules on a made-up survey, and
+the terrain grid. The page holding the file: tools/test_network_layer.py.
+
+    python -P -E tools/test_network.py
+"""
+import math
+import os
+import sys
+import unittest
+
+import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import network as nw  # noqa: E402
+
+
+class Arithmetic(unittest.TestCase):
+    def test_hypot(self):
+        for a, b in ((3, 4), (0, 0), (-1e-3, 2.5), (1e6, 1e-6), (0.1, 0.2)):
+            self.assertEqual(nw.hyp(a, b), float(nw.js_hypot(a, b)))
+            self.assertAlmostEqual(nw.hyp(a, b), math.hypot(a, b), delta=1e-12 * max(1, abs(a), abs(b)))
+
+    def test_round_halves_up(self):
+        self.assertEqual([nw.js_round(v) for v in (2.5, -2.5, -0.4, 0.49)], [3, -2, 0, 0])
+        self.assertEqual(nw.cm(-0.125), -12)
+
+    def test_varints(self):
+        import ground_mesh as gm
+        v = np.random.default_rng(1).integers(-2**40, 2**40, 5000)
+        blob = b"xy" + gm.varints(gm.zigzag(v))
+        u, off = nw.read_varints(blob, len(v), 2)
+        self.assertEqual(off, len(blob))
+        self.assertTrue((nw.unzigzag(u) == v).all())
+
+
+class Geometry(unittest.TestCase):
+    def test_smooth_keeps_the_ends(self):
+        pts = [[0, 0], [30, 0], [30, 30]]
+        out = nw.smooth_polyline(pts, 3, 6)
+        self.assertEqual(len(out), 21)
+        self.assertEqual(out[0].tolist(), [0, 0])
+        self.assertAlmostEqual(out[-1][0], 30, places=9)
+        self.assertAlmostEqual(out[-1][1], 30, places=9)
+        self.assertGreater(min(math.hypot(x - 30, y) for x, y in out), 1)  # (the corner rounded)
+
+    def test_path_at(self):
+        p = nw.Path([[0, 0], [10, 0], [10, 10]])
+        x, y, hx, hy = p.at(np.array([-5, 5, 15, 99]))
+        self.assertEqual(p.length, 20)
+        self.assertEqual(list(zip(x, y)), [(0, 0), (5, 0), (10, 5), (10, 10)])
+        self.assertEqual(list(zip(hx, hy)), [(1, 0), (1, 0), (0, 1), (0, 1)])
+
+    def test_route_nearest(self):
+        r = nw.Route([[0, 0], [100, 0]], {"before": [[-20, 0]], "after": [[120, 0]]})
+        self.assertEqual(r.length, 100)
+        self.assertEqual(r.at(50)[:2], (50, 0))
+        d, s = r.nearest(33, 3)
+        self.assertAlmostEqual(d, 3)
+        self.assertAlmostEqual(s, 33)
+        self.assertIsNone(r.nearest(500, 500))
+
+
+class FakeSurvey:
+    """A survey of straight bands across y: [(y0, y1, class)], first match; or of boxes [(x0, x1, y0, y1, class)]."""
+
+    def __init__(self, bands):
+        self.bands = bands
+
+    def class_at(self, x, y):
+        out = np.full(len(y), None, dtype=object)
+        for b in reversed(self.bands):
+            x0, x1, y0, y1, c = b if len(b) == 5 else (-np.inf, np.inf, *b)
+            out[(x >= x0) & (x <= x1) & (y >= y0) & (y <= y1)] = c
+        return out
+
+    def covered(self, x, y):
+        return np.ones(len(x), bool)
+
+    def class_under(self, x, y):
+        return np.full(len(x), None, dtype=object)
+
+
+def roads(survey, *ways):
+    data = {"roads": [{"p": p, "w": w, "f": 0, "c": 1, **kw} for p, w, kw in ways]}
+    return nw.Network(data, survey, None, None).roads
+
+
+class Fit(unittest.TestCase):
+    def test_kerbs(self):
+        r = roads(FakeSurvey([(-4, 4, "road"), (-9, 9, "sidewalk")]), ([[0, 0], [100, 0]], 8, {}))[0]
+        self.assertEqual(set(r["fitLo"]), {-4.25})
+        self.assertEqual(set(r["fitHi"]), {4.25})
+        self.assertIsNone(r["fitMed"])
+
+    def test_tram_area_at_the_side_trimmed(self):
+        # (y = -l: the right side of a road heading east is south)
+        r = roads(FakeSurvey([(-4, 4, "road"), (-8, -4, "tram")]), ([[0, 0], [100, 0]], 8, {}))[0]
+        self.assertEqual(set(r["fitHi"]), {4.25})
+
+    def test_median_on_a_two_way_road(self):
+        sv = FakeSurvey([(-0.5, 0.5, "median"), (-6, 6, "road")])
+        two = roads(sv, ([[0, 0], [100, 0]], 12, {}))[0]
+        self.assertEqual([set(a) for a in two["fitMed"]], [{-0.75}, {0.75}])
+        one = roads(sv, ([[0, 0], [100, 0]], 12, {"o": 1}))[0]
+        self.assertIsNone(one["fitMed"])  # (a one-way road's carriageway ends at it: here at the centre)
+
+    def test_parallel_ways_split_the_carriageway(self):
+        sv = FakeSurvey([(-4, 7, "road")])
+        a, b = roads(sv, ([[0, 0], [100, 0]], 8, {}), ([[0, 3], [100, 3]], 8, {}))
+        self.assertEqual(set(a["fitLo"]), {-1.5})  # (the way 3 m to its left takes that side)
+        self.assertEqual(set(b["fitHi"]), {1.5})
+
+    def test_plaza_not_fitted(self):
+        r = roads(FakeSurvey([(-15, 15, "road")]), ([[0, 0], [100, 0]], 8, {}))[0]
+        self.assertIsNone(r["fitLo"])
+
+
+class Lanes(unittest.TestCase):
+    """laneOffset on a road along x fitted to kerbs at ±4.25 m (+ right of the car's direction)."""
+
+    def setUp(self):
+        self.sv = FakeSurvey([(-4, 4, "road"), (-9, 9, "sidewalk")])
+
+    def build(self, w=8, **kw):
+        data = {"roads": [{"p": [[0, 0], [100, 0]], "w": w, "f": 0, "c": 1, **kw}]}
+        return nw.Network(data, self.sv, None, None)
+
+    def test_two_way(self):
+        R = self.build()
+        r = R.roads[0]
+        self.assertEqual([round(R.lane_offset(r, 50, d), 6) for d in (1, -1)], [2.55, 2.55])  # (1.7 m in from the kerb)
+        self.assertEqual([(x["dir"], x["from"], x["to"]) for x in R.lanes], [(1, "0,0", "100,0"), (-1, "100,0", "0,0")])
+        a, b = R.lanes
+        self.assertAlmostEqual(a["path"].p[len(a["path"].p) // 2][1], -2.55)  # (right of eastbound: south)
+        self.assertAlmostEqual(b["path"].p[len(b["path"].p) // 2][1], 2.55)
+        self.assertAlmostEqual(a["path"].p[0][0], 5)  # (trimmed 5 m back from the junction)
+
+    def test_one_way_two_lanes(self):
+        R = self.build(o=1, ln=2)
+        r = R.roads[0]
+        self.assertEqual(len(R.lanes), 2)
+        self.assertEqual([round(R.lane_offset(r, 50, 1, k), 6) for k in (0, 1)], [2.55, -0.7])  # (3.25 m apart)
+
+    def test_narrow_street_on_its_own_track(self):
+        R = self.build()
+        r = {**R.roads[0], "fitLo": [-2.0] * 26, "fitHi": [2.0] * 26, "trk": [[-0.8, 0.8]] * 26}
+        self.assertEqual(R.lane_offset(r, 50, 1), 0.8)  # (the band right of the tracks' middle is under 3.2 m)
+        self.assertEqual(R.lane_offset(r, 50, -1), 0.8)
+
+
+class Walks(unittest.TestCase):
+    @staticmethod
+    def net(survey, ways, buildings=()):
+        data = {"roads": [{"p": p, "w": w, "f": f, "c": int(not f), **kw} for p, w, f, kw in ways],
+                "buildings": [{"p": b} for b in buildings]}
+        return nw.Network(data, survey, None, None)
+
+    def test_footway_cut_on_the_carriageway(self):
+        n = self.net(FakeSurvey([(80, 120, -50, 50, "road")]), [([[0, 0], [200, 0]], 3, 1, {})])
+        ends = sorted((round(w["path"].p[0][0]), round(w["path"].p[-1][0])) for w in n.walks if not w["link"])
+        self.assertEqual(ends, [(0, 78), (122, 200)])  # (every 2 m: the last point off it on each side)
+
+    def test_short_crossing_kept(self):
+        n = self.net(FakeSurvey([(99, 103, -50, 50, "road")]), [([[0, 0], [200, 0]], 3, 1, {})])
+        self.assertEqual(sum(1 for w in n.walks if not w["link"]), 1)
+
+    def test_sidewalks_on_the_survey(self):
+        sv = FakeSurvey([(-4, 4, "road"), (-7, 7, "sidewalk")])
+        n = self.net(sv, [([[0, 0], [100, 0]], 8, 0, {})])
+        ys = sorted(round(float(np.median(w["path"].p[:, 1])), 2) for w in n.walks if not w["link"])
+        self.assertEqual(ys, [-5.75, 5.75])  # (the kerb at 4.25, the sidewalk from 4.75, 1 m into it)
+
+    def test_ends_joined_and_linked(self):
+        sv = FakeSurvey([(-100, 100, "sidewalk")])
+        n = self.net(sv, [([[0, 0], [60, 0]], 3, 1, {}), ([[60.2, 0], [120, 0]], 3, 1, {}), ([[0, 2], [0, 60]], 3, 1, {})])
+        a = n.walks[0]
+        self.assertIn((1, 0), a["links"][1])  # (0.2 m apart: joined)
+        links = [w for w in n.walks if w["link"]]
+        self.assertTrue(any(w["links"] == [[(0, 0)], [(2, 0)]] for w in links), links)  # (2 m apart: a link walk)
+
+    def test_door(self):
+        sv = FakeSurvey([(-100, 100, "sidewalk")])
+        n = self.net(sv, [([[0, 0], [60, 0]], 3, 1, {})], [[[20, 3], [30, 3], [30, 13], [20, 13]]])
+        d = n.doors[0]
+        self.assertEqual((d["walk"], d["s"], d["x"], d["y"]), (0, 20, 20, 0))
+        self.assertAlmostEqual(math.hypot(d["ix"] - 20, d["iy"] - 3), 1.5)
+
+
+class Signals(unittest.TestCase):
+    def test_resample_heights(self):
+        z = nw.resample_heights([10, 12, None], 2, 5, 1)
+        self.assertEqual(z[:3].tolist(), [10, 11, 12])
+        self.assertTrue(np.isnan(z[3:]).all())
+
+    def sig(self, **kw):
+        s = object.__new__(nw.Signals)
+        s.zebras, s.osm_stops, s.jpos = [], [], {"100,0": [100, 0]}
+        s.__dict__.update(kw)
+        return s
+
+    def test_stop_line_before_a_zebra(self):
+        s = self.sig(zebras=[[[48, -3], [48, 3]]])
+        s.stop_line_at = lambda *a: (0, "edge")
+        lane = {"path": nw.Path([[0, 0], [50, 0]]), "to": "100,0"}
+        self.assertEqual(s.stop_line(lane, "cross", 60, 0, []), (4, "edge"))  # (2 m before the zebra at 48 m)
+
+    def test_osm_stop_line(self):
+        s = self.sig(osm_stops=[{"x": 45, "y": 1, "hx": 1, "hy": 0}, {"x": 44, "y": 1, "hx": -1, "hy": 0}])
+        lane = {"path": nw.Path([[0, 0], [50, 0]]), "to": "100,0"}
+        self.assertEqual(s.osm_stop(lane, 60, 0), 5)  # (the node serving the other direction left out)
+        s.jpos = {"100,0": [46, 0]}
+        self.assertIsNone(s.osm_stop(lane, 60, 0))  # (on the junction's own node: no stop line)
+
+
+class Heights(unittest.TestCase):
+    def test_terrain_grid_on_the_cells_triangles(self):  # (what the over-bridge test reads past the ground's tiles)
+        import base64
+        raw = np.array([0, 10, 20, 40], "<i2")  # (2 x 2: rows going south, 0.1 m units over the base)
+        g = nw.TerrainGrid({"data": base64.b64encode(raw.tobytes()).decode(), "base": 100, "scale": 0.1,
+                            "x0": 0, "y0": 0, "dx": 10, "dy": -10, "nx": 2, "ny": 2})
+        self.assertEqual(np.round(g.height([0, 10, 0, 5, 9], [0, 0, -10, -2.5, -9]), 3).tolist(), [100, 101, 102, 101, 103.5])
+
+    def test_sections_every_2_m(self):
+        self.assertEqual(nw.sections(10, 20), [10, 12, 14, 16, 18, 20])
+        self.assertEqual(nw.sections(0, 1), [0, 0.5, 1])  # (at least two)
+
+    def test_what_start_stands_on(self):
+        """heights(): the ways' ends once a chain, each head's surface at its cm point, and a platform's zo (a strip the
+        survey does not draw), zs (a Vienna-type one's sign on the opposite path) and zh (an opposite one's shelter)."""
+        class G:
+            way_of = {3: 0, 5: 0, 7: 1}
+
+            def way_ends(self):
+                return {3: (1.0, 2.0), 5: (1.0, 2.0), 7: (3.0, 4.0)}
+
+            def surface_many(self, xs, ys):
+                return [x + y / 100 for x, y in zip(xs, ys)]
+
+            def surface(self, x, y):
+                return x + y / 100
+
+            def track_at(self, x, y):
+                return 1000 + x
+        route = nw.Route([[0, 0], [100, 0]])
+        back = nw.Route([[100, 10], [0, 10]])
+
+        class SG:
+            heads = [(1.234, 0.0, 0.0)]
+            ped_heads = []
+
+        class ST:
+            platforms = [
+                {"i": 0, "rt": route, "back": False, "s0": 10, "s1": 14, "side": -1, "outer": 4.0, "kerb": None, "surveyed": False},
+                {"i": 1, "rt": route, "back": False, "s0": 10, "s1": 14, "side": -1, "outer": 4.0, "kerb": None, "surveyed": True},
+                {"i": 2, "rt": back, "back": True, "s0": 20, "s1": 40, "side": -1, "outer": 5.0, "kerb": 3.0, "surveyed": True},
+                {"i": 3, "rt": back, "back": True, "s0": 20, "s1": 40, "side": -1, "outer": 5.0, "kerb": 3.0, "surveyed": True,
+                 "shared": True}]
+            stops = []
+        data = {"platforms": [{}, {}, {"stop": [70, 10], "shelter": 1}, {}], "stops": []}
+        z = nw.heights(G(), data, SG, ST)
+        self.assertEqual(z["ways"], [[3, 1.0, 2.0], [7, 3.0, 4.0]])
+        self.assertAlmostEqual(z["heads"][0], 1.23)
+        self.assertEqual(sorted(z["platforms"]), [0, 2])
+        self.assertEqual([round(v, 4) for v in z["platforms"][0]["zo"]], [9.96, 11.96, 13.96])  # (4 m right of the route: south)
+        # (the back path runs west: 3.8 m right of it is north, at the stop's s 30)
+        self.assertAlmostEqual(z["platforms"][2]["zs"], 70 + 13.8 / 100)
+        self.assertAlmostEqual(z["platforms"][2]["zh"], 1000 + 70)
+
+
+    def test_our_stop_once_for_every_set(self):
+        """stop_heights(): a Vienna-type stop's sign (at its pole where the build knows it) and shelter on the sidewalk,
+        a stand-in platform's outer kerb; nothing for one on an OSM platform (#694: one record whatever the set)."""
+        class G:
+            def surface(self, x, y):
+                return x + y / 100
+
+            def surface_many(self, xs, ys):
+                return [x + y / 100 for x, y in zip(xs, ys)]
+        route = nw.Route([[0, 0], [100, 0]])
+        z = nw.stop_heights(G(), {"sign": 52, "signOff": -4}, {"target": 50, "kerb": 3.0, "stand": False}, route)
+        self.assertAlmostEqual(z["zs"], 52 - 4 / 100)                  # (the pole: 4 m right of the route, south)
+        self.assertAlmostEqual(z["zh"], 38 - 5.4 / 100)                # (12 m back, 2.4 m past the 3 m kerb)
+        z = nw.stop_heights(G(), {"sign": 50}, {"target": 50, "kerb": 3.0, "stand": False}, route)
+        self.assertAlmostEqual(z["zs"], 50.5 - 3.6 / 100)              # (no pole known: half a metre on, 0.6 m past the kerb)
+        z = nw.stop_heights(G(), {}, {"target": 50, "kerb": None, "stand": True}, route)
+        self.assertEqual(sorted(z), ["zo"])
+        self.assertEqual(len(z["zo"]), len(nw.sections(19, 49)))
+        self.assertAlmostEqual(z["zo"][0], 19 - 4.1 / 100)
+        self.assertEqual(nw.stop_heights(G(), {}, {"target": 50, "kerb": None, "stand": False}, route), {})
+
+
+if __name__ == "__main__":
+    unittest.main()

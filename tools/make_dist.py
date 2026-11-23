@@ -8,9 +8,10 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DST = os.path.join(ROOT, "dist", "tatra-t3-prague.zip")
 # (reports/review: the findings lists for review mode, ?review=reports/review/track-sources-17.json; reviews.html:
-# the directory of them, #288)
-INCLUDE = ["index.html", "app.webmanifest", "reviews.html", "README.md", "README.en.md", "src", "assets", "data", "reports/review"]
-# (built files only later build steps read, not the page: the street surfaces for the ground's partition and weld, #512)
+# the directory of them, #288; overview.html: the project's overview, #826, test site only)
+INCLUDE = ["index.html", "app.webmanifest", "reviews.html", "overview.html", "README.md", "README.en.md", "src", "assets", "data", "reports/review"]
+# (built files only later build steps read, not the page: the street surfaces for the ground's partition and weld, #512.
+# The ground file ships: the page draws it, #509; left home, the deployed page drew the old layers)
 BUILD_ONLY = ["data/line*.streets.*"]
 
 

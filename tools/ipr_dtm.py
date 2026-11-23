@@ -12,7 +12,7 @@ The file: BigTIFF, 35001 x 26001 float32, tiled 128 x 128, LZW without predictor
 no cells of it (cells() checks the bounds; a reader of whole tiles crops them, #325). A height under
 sources.TERRAIN_FLOOR is no ground, as the no-data. Its cell centres are not on whole metres: the top-left centre is
 (-757500.2778, -1034000.3889), so it is sampled bilinear at our lattice points, never copied cell by
-cell. It states no vertical datum (Bpv assumed and checked against DMR 5G on every build: fine_terrain.py).
+cell. It states no vertical datum (Bpv assumed and checked against DMR 5G on every city mesh build: dmr5g.datum_check).
 
 Only the tiles a build touches are decoded (a line's band is ~1000 of the 55896): each tile wrapped as a TIFF of
 its own for Pillow's libtiff (6-7x faster than the small TIFF-LZW decoder below, which stays the fallback; #205:

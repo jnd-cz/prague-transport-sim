@@ -38,14 +38,6 @@ def read_glb(path):
         return json.loads(f.read(size))
 
 
-def vector(value, label, positive=False):
-    if len(value) != 3 or any(
-        type(v) not in (int, float) or not math.isfinite(v) or (positive and v <= 0)
-        for v in value
-    ):
-        raise ValueError(f"{label}: expected three finite {'positive ' if positive else ''}coordinates")
-
-
 def transform_point(point, node):
     if "matrix" in node:
         matrix = node["matrix"]
@@ -60,6 +52,18 @@ def transform_point(point, node):
                v + w * b + z * a - x * c,
                t + w * c + x * b - y * a]
     return [p + offset for p, offset in zip(rotated, node.get("translation", [0, 0, 0]))]
+
+
+def world(glb, i):
+    """A node's origin in the scene's frame."""
+    nodes = glb["nodes"]
+    parents = {child: k for k, n in enumerate(nodes) for child in n.get("children", [])}
+    point = [0, 0, 0]
+    while True:
+        point = transform_point(point, nodes[i])
+        if i not in parents:
+            return point
+        i = parents[i]
 
 
 def check_beams(glb, mesh_node, points, forward):
@@ -187,31 +191,24 @@ def export_rig(glb, rig, roles):
     for name in [*lamps, *plates]:
         node(name, "lamp or plate", scope, mesh=True)
 
-    saloon = roles["saloon"]
-    materials = {m.get("name") for m in glb["materials"]}
-    missing = set(saloon["materials"]) - materials
-    if missing:
-        raise ValueError(f"saloon: missing materials {', '.join(sorted(missing))}")
-    lo, hi = saloon["within"]
-    vector(lo, "saloon minimum")
-    vector(hi, "saloon maximum")
-    if any(a >= b for a, b in zip(lo, hi)):
-        raise ValueError("saloon: empty bounds")
-    for role, points in (("beams", roles["beams"]), ("tail lamps", roles["tailLamps"]["at"])):
-        if len(points) != 2:
-            raise ValueError(f"{role}: expected two centres")
-        for point in points:
-            vector(point, role)
+    saloon = node(roles["saloon"], "saloon", scope)
+    if not any("mesh" in nodes[i] for i in descendants([saloon])):
+        raise ValueError("saloon: no parts under it")
+    for role in ("headlights", "tailLamps"):
+        if len(roles[role]) != 2:
+            raise ValueError(f"{role}: expected two")
+    lamps = [node(name, "headlight", scope) for name in roles["headlights"]]
     headlight = node(roles["headlightMesh"], "headlight", scope, mesh=True)
-    check_beams(glb, headlight, roles["beams"], rig["forward"])
-    vector(roles["tailLamps"]["size"], "tail lamp size", positive=True)
+    check_beams(glb, headlight, [world(glb, i) for i in lamps], rig["forward"])
+    for name in roles["tailLamps"]:
+        node(name, "tail lamp", scope, mesh=True)
     digits = roles["fleetDigits"]
     if type(digits) not in (int, float) or not math.isfinite(digits) or digits <= 0:
         raise ValueError("fleetDigits must be a positive height in metres")
 
     result = {**rig, "doors": doors, "pantograph": panto}
     result.update({key: roles[key] for key in (
-        "rigRevision", "saloon", "shoes", "couplers", "beams", "tailLamps", "fleetDigits"
+        "rigRevision", "saloon", "shoes", "couplers", "headlights", "tailLamps", "fleetDigits"
     )})
     result.pop("handWritten", None)
     return result

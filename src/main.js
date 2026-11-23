@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import * as THREE from 'three';
 import { Route, checkBuiltRoute } from './route.js';
-import { Terrain, Profile, makeGround, carveCorridor, bridgeModel, DtmSurface, chainTunnels, nearTracks } from './terrain.js';
-import { buildWorld, widenTramStreets, WORLD_PARTS, buildStreetDetail } from './world.js';
+import { Terrain, Profile, makeGround, rockTunnels, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
+import { buildWorld, WORLD_PARTS } from './world.js';
+import { widenTramStreets, buildStreetDetail } from './streets.js';
+import { groundStyles } from './groundDraw.js';
+import { fetchGround, GroundTiles, WINDOW_AHEAD, WINDOW_STEP } from './groundFile.js';
 import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
-import { Game, fmtTime, fmtDev } from './game.js';
+import { fmtTime, fmtDev } from './game.js';
 import { Hud } from './hud.js';
 import { TramAudio } from './audio.js';
 import { makeT3, placeConsist, poseT3, setConsistLine, loadVehicle, pickVehicle, disposeModel, CONTACT_WIRE, RAIL_TOP } from './models.js';
-import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor } from './vehicles.js';
-import { Traffic } from './traffic.js';
+import { loadRegistry, fileUrl, vehicleName, FleetDealer, preferredSet, fleetChoices, liveries, liveriesFor, soundsFor, soundPacksFor } from './vehicles.js';
+import { Between } from './between.js';
 import { Autopilot } from './autopilot.js';
+import { createRun } from './run.js';
 import { junctionTurns, indicating } from './indicators.js';
 import { signalsAt } from './lamps.js';
 import { Inspect } from './inspect.js';
@@ -25,16 +29,18 @@ import { t, getLang, setLang, applyStatic, onLangChange, setLine } from './i18n.
 import { Loader } from './loading.js';
 import { createDebugOverlay, builtGeoJSON } from './debugOverlay.js';
 import { rng, runSeed } from './random.js';
-import { trackStyles, loadHeightFacts } from './heights.js';
+import { trackStyles, loadHeightFacts, BED_BELOW, ROAD_BELOW } from './heights.js';
 import { speedFacts } from './speedRules.js';
 import { loadFigureFont, signFacts } from './speedSigns.js';
 // the signs' fallback face (D-DIN) loads while the world does; the game waits for it before it draws them (#364)
 const figureFont = loadFigureFont();
 import { credits, logProvenance, fallbacks } from './provenance.js';
+import { crc32, checkBuild } from './buildId.js';
 import { initHelp } from './help.js';
 import { initPackages } from './packagesMenu.js';
 import { loadInstalled } from './packages.js';
 import { Mirror } from './mirror.js';
+import { CabFrame, EYE, lookLimits, leanFor } from './cabframe.js';
 import { People, PEOPLE_FILES, loadPeople } from './people.js';
 
 const $ = (id) => document.getElementById(id);
@@ -49,8 +55,7 @@ let lineId = params.get('line');
 try { lineId = lineId || localStorage.getItem('tram.line'); } catch { /* storage unavailable */ }
 if (!lineId || (lines.length && !lines.some((l) => l.line === lineId))) lineId = lines[0]?.line || '22';
 // every file of the line at once (the optional ones may be missing); the T3 model alongside
-for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'dtmpoints.json']) load.prefetch(`data/line${lineId}.${f}`);
-if (!params.has('nofine')) load.prefetch(`data/line${lineId}.fine.json`).prefetch(`data/line${lineId}.fine.bin`);
+for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'dtmpoints.json', 'ground.json', 'ground.bin']) load.prefetch(`data/line${lineId}.${f}`);
 // the tram models (assets/vehicles.json, #455): the ones loaded at start downloaded with the line
 const vehicles = await loadRegistry((u) => load.get(u));
 // the packages the player installed (#530, src/packages.js): checked and added after the repository's
@@ -61,7 +66,9 @@ const figures = !params.has('boxpeople');
 if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
 // (weights: the steps' usual milliseconds on line 17; the bar shares them with the downloads by time)
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
-const data = await (await load.get(`data/line${lineId}.json`)).json();
+const lineFile = await load.get(`data/line${lineId}.json`);
+const data = await lineFile.json();
+const lineBuild = crc32(lineFile.bytes); // (the line's build ID: every file of the line carries it, src/buildId.js, #702)
 data.line = String(data.line);
 checkBuiltRoute(data); // (the track as the build draws it: its curves, the run past the termini, radius and cant: #477, #478)
 const built = { [`line${lineId}.json`]: data }; // every built file, for the credits and the provenance log
@@ -106,13 +113,30 @@ try {
   const r = await load.get(`data/line${lineId}.dtmpoints.json`);
   if (r.ok) { const j = await r.json(); data.dtmPoints = j.points; built[`line${lineId}.dtmpoints.json`] = j.provenance ? j : { attribution: 'Street furniture: DTM Praha (archive), data base © IPR Praha (CC BY 4.0).' }; }
 } catch { /* none for this line */ }
+// the network the build made (tools/network.py, #658): the traffic's roads, lanes, footways and doors, the signals
+// bound to the lanes, what the platforms read of the survey, the heights of what Start places. Start builds none of it.
+{
+  const r = await load.get(`data/line${lineId}.network.json`);
+  if (!r.ok) throw new Error(`line ${lineId}: no network file (data/line${lineId}.network.json, tools/network.py): ${r.status}`);
+  data.network = await r.json();
+  if (!(data.network.version >= 3)) throw new Error(`line ${lineId}: the network file has no heights for our stops (built before #694): python -P -E tools/network.py --lines ${lineId}`);
+  built[`line${lineId}.network.json`] = data.network;
+}
 // wait for the rest before the build steps, which block the page
 // the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
 const truth = await loadHeightFacts();
-const fineRes = params.has('nofine') ? [] : await Promise.all([load.get(`data/line${lineId}.fine.json`), load.get(`data/line${lineId}.fine.bin`)]);
+// the prebuilt ground (tools/ground_mesh.py, #509): its tiles' lookups decoded in workers while the page goes on (#30).
+// Every line has it: the layers the page built without it went, #510. ?keepgeo and ?bot keep every tile (the checks).
+const groundFile = await fetchGround(load, lineId);
+built[`line${lineId}.ground.json`] = groundFile.layout;
+checkBuild(lineId, lineBuild, built); // (a file of another build stops the load, naming the rebuild, #702)
+const groundTiles = new GroundTiles(groundFile, groundStyles(groundFile.layout), params.has('bot') || params.has('keepgeo'));
+window.groundTiles = groundTiles; // (what is held: tools/bench/tiles.js)
+const groundLookups = groundTiles.loadLookups();
 await Promise.all(vehicles.filter((v) => v.preload).flatMap((v) => v.files.map((f) => load.get(fileUrl(v, f.path)))));
 await load.begin('terrain');
 // (dev switch for comparing lint runs: ?notunnels)
+data.allRoads = data.roads; // (the network's ways by their index: tools/network.py)
 if (params.has('notunnels')) data.roads = data.roads.filter((r) => !r.t);
 chainTunnels(data.roads); // road tunnels and bridges: heights between their real portals / abutments
 // the track beyond both termini as the build walked it, so a two-car set standing at the first stop is on rails
@@ -121,27 +145,21 @@ route.speedInfo = data.speed || null; // posted speeds and dedicated track (tool
 // the curves' radius and the banked curves as the build worked them out (tools/cant.py, #478)
 route.useBuilt(data.curvature.path, data.curvature.unit, data.cant, data.crossLevel && { ...data.crossLevel, c: data.crossLevel.path });
 const terrain = new Terrain(data.terrain);
-// the fine terrain near the tracks (2 m, tools/fine_terrain.py), where it was made for this line
-// (dev switch ?nofine: the coarse grid only, for comparing lint runs)
-if (!params.has('nofine')) try {
-  const [mr, br] = fineRes;
-  if (mr.ok && br.ok) {
-    const meta = await mr.json();
-    terrain.addFine(meta, new Int16Array(await br.arrayBuffer()));
-    built[`line${lineId}.fine.json`] = meta;
-  }
-} catch { /* not made for this line */ }
 data.attribution = credits(built);
 logProvenance(built);
-// (the survey meshed finer near every drawn track, so it can be laid under the beds: terrain.js nearTracks, #548)
-const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, nearTracks(data.tracks)) : null;
+// (the survey's ground level is the file's, through the file's lookup: its decks alone are triangulated here)
+await groundLookups;
+const groundLookup = groundTiles.lookup;
+const dtm = data.dtm ? new DtmSurface(data.dtm, terrain, THREE, groundLookup) : null;
 await load.begin('profile');
 const styles = trackStyles(truth, data); // (the build's sections and lift, tools/track_styles.py, #479, #480)
 const profile = new Profile(route, data, styles.lift, dtm, terrain, styles.liftBack); // (the built top of rail and structures, #197, #480)
 const ground = makeGround(route, terrain, profile, dtm);
+useGroundLookup(ground, groundLookup);
+ground.tiles = groundTiles;
 ground.styles = styles;
 ground.model = bridgeModel(data.geo); // the Mosty 3D decks anywhere (bridge ways off the route)
-ground.walls = carveCorridor(terrain, route, profile, dtm); // flatten the track bench, retaining walls
+ground.rock = rockTunnels(terrain, route, profile); // our tunnels through rock
 route.ground = ground;
 
 // ------------------------------------------------------------------ renderer & scene
@@ -238,11 +256,36 @@ function uploadWorld() {
   for (const o of culled) o.frustumCulled = true;
 }
 
+// The prebuilt ground's lookup answers the ground's height reads (#509): the survey's (DtmSurface's lookup) and the
+// terrain's, so ground.at is the drawn ground, but at a track: next to our tracks it keeps the track's surface level that
+// the OSM road ribbons meet the rail heads at (src/heights.js ROAD_BELOW), and at another track's bed off the survey it
+// is the same, from the file's bed (BED_BELOW under that level): main lowered the terrain under every track for this,
+// and the file's bed under a ribbon put it 0.11 m over the rail heads (line 37: 31 -> 55 places). Cars and walkers
+// (ground.surface) stand on the survey as drawn (the file's is not lifted: no DTM_LIFT), else on an OSM ribbon's top as
+// before. The terrain grid's and the layers' answers where the file has no ground (past its box).
+function useGroundLookup(ground, lk) {
+  const at = ground.at.bind(ground), th = ground.terrain.height.bind(ground.terrain);
+  ground.lookup = lk;
+  ground.terrain.height = (x, y) => lk.height(x, y) ?? th(x, y);
+  ground.at = (x, y, deck = false) => {
+    const zb = deck ? null : lk.bedOffSurvey(x, y);
+    return zb !== null ? zb + BED_BELOW - ROAD_BELOW : at(x, y, deck);
+  };
+  ground.surface = (x, y) => { const t = ground.dtm?.surfaceAt(x, y); return t ? t.z : ground.at(x, y) + 0.12; };
+  ground.later = (x, y, fn) => lk.g.later(x, y, fn); // (once (x, y)'s tile holds its lookup: src/groundFile.js)
+}
+
 // The world is built once (in the loading step 'world'); the weather only sets the sky, the light, the
 // precipitation and the materials' state (src/weather.js): instant, so it could change during a shift.
 async function buildCity() {
   await load.parts(WORLD_PARTS);
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
+  // (the ground's window round the start before the first frame: the route ahead of the tram and the camera, #30)
+  const t0 = performance.now(), ahead = [];
+  for (let d = 0; d <= WINDOW_AHEAD; d += WINDOW_STEP) { const p = route.at(Math.min(route.length, d)); ahead.push([p.x, p.y]); }
+  await groundTiles.update([[camera.position.x, -camera.position.z], ...ahead], groundTiles.reach(scene.fog.far));
+  groundTiles.drain(); // (the start's tiles in the scene at once: the 'gpu' step uploads them with the world)
+  window.groundTimes = { ...groundTiles.times, window: Math.round(performance.now() - t0) }; // (the workers' ms, summed; the window's wait)
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)
   const lm = world.userData.landmarks;
@@ -382,7 +425,24 @@ function liveryMenu() {
   sel.value = pick === '*' || list.some((l) => l.id === pick) ? pick : '';
 }
 liveryMenu();
-$('optModel').addEventListener('change', () => { fleetMenu(); liveryMenu(); useVehicle($('optModel').value); });
+// Our tram's sounds (#636; the user, 2026-11-17: "it's alternative to the default in game sounds but it's shipped
+// with the game"): the vehicle's own (the built-in sounds) or a sound pack for it, shipped or installed; remembered
+// per vehicle, played from the next shift's start.
+const SOUNDS_KEY = 'tram.sounds';
+let soundPicks = {};
+try { soundPicks = JSON.parse(localStorage.getItem(SOUNDS_KEY) || '{}'); } catch { /* storage unavailable */ }
+function soundsMenu() {
+  const v = vehicles.find((x) => x.id === $('optModel').value), list = soundPacksFor(v), sel = $('optSounds');
+  $('soundsRow').hidden = !list.length;
+  sel.replaceChildren(new Option(t('sounds.own'), ''), ...list.map((p) => new Option(vehicleName(p, getLang()), p.id)));
+  sel.value = list.some((p) => p.id === soundPicks[v?.id]) ? soundPicks[v.id] : '';
+}
+soundsMenu();
+$('optModel').addEventListener('change', () => { fleetMenu(); liveryMenu(); soundsMenu(); useVehicle($('optModel').value); });
+$('optSounds').addEventListener('change', () => {
+  soundPicks[$('optModel').value] = $('optSounds').value;
+  try { localStorage.setItem(SOUNDS_KEY, JSON.stringify(soundPicks)); } catch { /* storage unavailable */ }
+});
 $('optFleet').addEventListener('change', () => {
   fleetPicks[$('optModel').value] = $('optFleet').value;
   try { localStorage.setItem(FLEET_KEY, JSON.stringify(fleetPicks)); } catch { /* storage unavailable */ }
@@ -428,6 +488,7 @@ const audio = new TramAudio();
 let tram = new Tram();
 let game = null;
 let traffic = null;
+let run = null; // the shift's run (src/run.js): its game, traffic, autopilot and tram, stepped each frame
 let pilot = null; // autopilot driving the tram (watch the ride), or null
 // our tram's lamps (#436): the indicators ('left', 'right', 'hazard' or none: the driver's switch, the autopilot's
 // own while it drives), the high beams (latched on, or held for a flash); the line's junction turns and the
@@ -469,14 +530,14 @@ menuTexts();
 $('optLang').value = getLang();
 $('optLang').addEventListener('change', () => setLang($('optLang').value));
 initHelp();
-initPackages({ onChange: () => { modelMenu(); fleetMenu(); liveryMenu(); } });
-onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
+initPackages({ onChange: () => { modelMenu(); fleetMenu(); liveryMenu(); soundsMenu(); } });
+onLangChange(() => { menuTexts(); modelMenu(); fleetMenu(); liveryMenu(); soundsMenu(); const v = selTrip.value; fillTrips(); selTrip.value = v; touch.labels(); });
 // on-screen controls on a phone or tablet (src/touch.js): buttons that send the keys
-const touch = new TouchControls({ deadman: () => game?.opts.deadman });
+const touch = new TouchControls({ deadman: () => game?.opts.deadman, sheet: () => hud.panel.toggleSheet() });
 // a gamepad (src/gamepad.js): its buttons and triggers send the keys too
 const pad = new Gamepad({
   onConnect: (id) => game?.msg(t('msg.pad', { name: id.replace(/\s*\(.*$/, '') }), 'info', 4),
-  onLook: (x) => { lookTarget = -LOOK * x; }, // (the right stick: as far as Q / E at its end)
+  onLook: (x) => { const m = lookMax(); lookTarget = -x * (x > 0 ? m.right : m.left); }, // (the right stick: as far as Q / E at its end)
 });
 data.stops.slice(0, -1).forEach((s, i) => selStop.add(new Option(`${i + 1}. ${s.name}`, i)));
 
@@ -497,22 +558,41 @@ function fillTrips() {
 selStop.addEventListener('change', fillTrips);
 fillTrips();
 
+// The run's options from the menu (#226): what start() and src/run.js createRun read; a bench starts a run with its own
+// over these (window.startRun), as clicking Start with the menu set that way
+function menuOpts() {
+  return {
+    vehicle: $('optModel').value, sounds: $('optSounds').value,
+    cars: $('optCars').value === 'auto' ? lineCars : +$('optCars').value,
+    controls: controlMode(), weather: $('optWeather').value, temp: $('optTemp').value,
+    trip: +selTrip.value, startStop: +selStop.value,
+    assist: $('optAssist').checked, deadman: $('optDeadman').checked, autoSwitch: $('optAutoSwitch').checked,
+    obstacles: $('optObst').value, autopilot: $('optAuto').checked,
+  };
+}
 $('btnStart').addEventListener('click', () => start());
+// a bench's shift (#226): the menu's options with the bench's over them (seed, trip, startStop, weather, temp, obstacles,
+// autopilot, ...), started as Start starts it; the run returned
+window.startRun = async (opts = {}) => {
+  const o = { ...menuOpts(), ...opts };
+  // (a trip past the timetable as the menu took it: its select had no such option and read as trip 0. The drives ask
+  // for trip 40; line 23 has 19 trips, so its drives have always run trip 0, and still do)
+  if (!(o.trip >= 0 && o.trip < data.timetable.length)) o.trip = 0;
+  await start({}, o);
+  return run;
+};
 
-// extra: Game options over the menu's (the performance test's lead to the departure)
-async function start(extra = {}) {
-  await useVehicle($('optModel').value);
+// extra: Game options over the menu's (the performance test's lead to the departure); o: the run's options (menuOpts)
+async function start(extra = {}, o = menuOpts()) {
+  await useVehicle(o.vehicle);
   audio.start();
   await figureFont;   // after audio.start: the click's activation unlocks the audio
-  // the vehicle's sound pack (#528), the built-in sounds where it has none
-  try { await audio.usePack(soundsFor(pickVehicle($('optModel').value))); } catch (e) { console.warn('sound pack not loaded: the built-in sounds play', e); await audio.usePack(null); }
-  const cars = $('optCars').value === 'auto' ? lineCars : +$('optCars').value;
-  tram = new Tram(cars);
+  // the sound pack picked for the vehicle (#528, #636), the built-in sounds where none is
+  try { await audio.usePack(soundsFor(pickVehicle(o.vehicle), o.sounds)); } catch (e) { console.warn('sound pack not loaded: the built-in sounds play', e); await audio.usePack(null); }
+  const { cars, vehicle } = o;
   zoom = zoomTarget = 1;
-  tram.eq.mode = controlMode();
-  const vehicle = $('optModel').value;
-  // one seeded stream for the whole run (rules and traffic), apart from Math.random
-  const seed = runSeed(), random = rng(seed);
+  // the run's seed: the bench's, else ?seed=N, window.runSeed or a fresh one (src/random.js)
+  const seed = o.seed ?? runSeed();
   const dealer = fleetDealer(vehicle, seed), ours = ourSet(dealer, vehicle, cars);
   if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id
     || String(tramModel.userData.fleet) !== String(ours.numbers) || tramModel.userData.livery !== (ours.livery ?? null)) {
@@ -522,42 +602,27 @@ async function start(extra = {}) {
     scene.add(tramModel);
   }
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
-  const weather = $('optWeather').value;
-  applyWeather(weather);
-  game = new Game(scene, data, route, tram, audio, {
-    weather,
-    tripIndex: +selTrip.value,
-    startStop: +selStop.value,
-    assist: $('optAssist').checked,
-    deadman: $('optDeadman').checked,
-    // onboard computer sets every switch by radio (no overhead contacts to work)
-    autoSwitch: $('optAutoSwitch').checked,
-    autoIrc: $('optAutoSwitch').checked,
-    obstacles: $('optObst').value,
-    toutAt: outdoorTemperature($('optTemp').value),
-    vehicle: $('optModel').value,
-    dealer,
-    seed: Math.floor(random() * 1e9),
-    substations: truth.substations?.list,
-    speedFacts: speedFacts(truth),
-    signFacts: signFacts(truth),
-    ...extra,
+  if (traffic) traffic.dispose();
+  applyWeather(o.weather);
+  sWas = null; carry = 0; between.clear(); // (the steps start afresh with the shift: fixedSteps, drawnS, src/between.js)
+  run = createRun({ scene, data, route, ground, audio }, {
+    ...o, seed, dealer, toutAt: outdoorTemperature(o.temp), extra,
+    facts: { substations: truth.substations?.list, speedFacts: speedFacts(truth), signFacts: signFacts(truth) },
   });
-  game.runSeed = seed; // (replay: ?seed=N)
-  perfLog.reset({ line: data.line, model: tramModel.userData.vehicle, cars, weather, controls: tram.eq.mode, autopilot: $('optAuto').checked });
+  ({ game, traffic, tram } = run);
+  pilot = run.pilot;
+  perfLog.reset({ line: data.line, model: tramModel.userData.vehicle, cars, weather: o.weather, controls: tram.eq.mode, autopilot: o.autopilot });
   // the line number shown on the tram, the top bar and in messages follows the run
   const showLine = (l) => { $('line').textContent = l; setLine(l); setConsistLine(tramModel, l, game.destination, runNumber(game.opts.tripIndex)); };
   showLine(game.line);
   game.onLineChange = showLine;
-  if (traffic) traffic.dispose();
-  traffic = new Traffic(scene, data, route, ground, game, random);
   debugOverlay.reset();
   Object.assign(lamps, { indicate: null, high: false, held: false, turns: junctionTurns(route, data.switches), kerb: game.stops.filter((st) => st.vienna).map((st) => st.target) });
   game.lamps = lamps; // (the console and tests: the junction turns and kerb stops found, the lamps' state)
-  pilot = $('optAuto').checked ? new Autopilot() : null;
-  game.autopilot = !!pilot;
   pedalKey = null;
   window.game = game; // handy for debugging from the console
+  window.run = run;
+  window.hud = hud; // (its cost measured: tools/bench/hud.py)
   game.provenance = { files: built, fallbacks: () => fallbacks(built) }; // where each list came from (#10)
   game.mirror = mirror.stats;
   window.camera = camera;
@@ -765,8 +830,12 @@ $('btnToMenu').addEventListener('click', () => {
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
 let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, the user, 2026-11-14)
-const LOOK = 1.3; // the head turned out of a side window (rad)
+// the head turned out of a side window, until the screen's edge shows the cab's rear wall past the cab window on the left
+// and reaches the front door's end on the right (src/cabframe.js, #246; it was 1.3 rad both ways)
+const lookMax = () => lookLimits(CAB_FOV, camera.aspect);
+const cabFrame = new CabFrame($('cabFrame'));
 let look = 0, lookTarget = 0, mirrorOn = true, camAcc = 0; // head turned left (+) / right (-), right mirror shown
+const mirrorShown = () => game && !chase && mirrorOn && !window.freeCam && !window.headless;
 let zoom = 1, zoomTarget = 1; // the cab view's magnification, eased towards the target (G held: ZOOM)
 window.addEventListener('keydown', (e) => {
   if (!game || game.finished || !$('menu').classList.contains('hidden') || reporter.isOpen) return;
@@ -816,8 +885,8 @@ window.addEventListener('keydown', (e) => {
     case 'd': game.toggleDoors(); break;
     case 'b': game.ringBell(); break;
     case 'x': game.crowbar(); break;
-    case 'q': case 'arrowleft': lookTarget = LOOK; break;   // look out of the left window
-    case 'e': case 'arrowright': lookTarget = -LOOK; break; // look right, at the doors
+    case 'q': case 'arrowleft': lookTarget = lookMax().left; break;    // look out of the left window
+    case 'e': case 'arrowright': lookTarget = -lookMax().right; break; // look right, at the front door
     case 'z': mirrorOn = !mirrorOn; document.body.classList.toggle('nomirror', !mirrorOn); break;
     case 'h': game.setHeating('saloon'); break;
     case 'k': game.setHeating('cab'); break;
@@ -888,7 +957,7 @@ window.addEventListener('blur', () => {
 // ------------------------------------------------------------------ camera & loop
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 let yaw = 0; // the lead car's heading (route frame: atan2 of east, north)
-const EYE = new THREE.Vector3(), FWD = new THREE.Vector3();
+const EYE_AT = new THREE.Vector3(), FWD = new THREE.Vector3();
 // the outside view (V) orbits the tram: drag turns and tilts, the wheel or two fingers zoom, a double
 // click or tap brings it back behind the tram (#79). Any button turns: tied to the tram, it has nowhere to move (#342).
 // It turns about the lead car's centre, 2 m over the rail, as inspect's orbit does (#541): by default 16 m behind the
@@ -949,7 +1018,7 @@ function placeTram(s) {
 }
 
 function updateCamera(dt, t) {
-  const s = tram.s;
+  const s = drawnS();
   placeTram(s);
   if (window.freeCam) { tramModel.visible = true; return; } // debugging: camera set from the console
   tramModel.visible = chase;
@@ -969,15 +1038,16 @@ function updateCamera(dt, t) {
     orbit.drag -= dt;
     camera.position.lerp(camPos, orbit.drag > 0 ? 1 : Math.min(1, dt * 4));
     camera.lookAt(camLook);
+    hud.panel.setLook(0);
     return;
   }
-  // the driver's eye is a point of the lead car (#597): 0.8 m behind the body's front, 2.39 m over the rail, on the centre
-  // line; it turns with the body and swings out with its front in a curve. (It stood on the track's centre line and looked
-  // along the track 4 m ahead of the tram, eased: 33 degrees ahead of the body in a 20 m curve, the user, 2026-11-14:
-  // "starts turning ahead of tram body in curves")
+  // the driver's eye is a point of the lead car (#597), over the driver's seat (src/cabframe.js EYE): 1.2 m behind the body's
+  // front, 0.32 m left of the centre line, 2.39 m over the rail; it turns with the body and swings out with its front in a
+  // curve. (It stood on the track's centre line and looked along the track 4 m ahead of the tram, eased: 33 degrees ahead
+  // of the body in a 20 m curve, the user, 2026-11-14: "starts turning ahead of tram body in curves")
   const lead = tramModel.userData.cars[0];
   lead.updateWorldMatrix(true, false);
-  const eye = EYE.set(0, 2.39, leadFront() - 0.8).applyMatrix4(lead.matrixWorld);
+  const eye = EYE_AT.set(EYE.x, EYE.h, leadFront() - EYE.back).applyMatrix4(lead.matrixWorld);
   const fwd = FWD.set(0, 0, 1).transformDirection(lead.matrixWorld);
   yaw = Math.atan2(fwd.x, -fwd.z);
   const bob = Math.sin(t * 9) * 0.012 * Math.min(1, Math.abs(tram.v) / 8);
@@ -989,7 +1059,7 @@ function updateCamera(dt, t) {
   camAcc += (tram.a - camAcc) * Math.min(1, dt * 3);
   const pitch = -0.035 - camAcc * 0.006 + slope;
   // turning the head also leans towards that side window
-  const lean = look * 0.25, lx = -Math.cos(yaw) * lean, ly = Math.sin(yaw) * lean;
+  const lean = leanFor(look), lx = -Math.cos(yaw) * lean, ly = Math.sin(yaw) * lean;
   camera.position.set(eye.x + lx, eye.y + bob, eye.z - ly);
   camera.rotation.set(0, 0, 0);
   camera.rotation.order = 'YXZ';
@@ -997,6 +1067,9 @@ function updateCamera(dt, t) {
   camera.rotation.x = pitch;
   // sway, and the lean into a canted curve
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
+  // the cab's frame where the eye sees it, the panel's band turned with the head
+  cabFrame.draw(camera, lead, leadFront(), game ? game.doorOpenness : 0, mirrorShown() ? $('mirror') : null);
+  hud.panel.setLook(look, lookMax());
 }
 
 // ✉ Feedback (F9, #138, #350): a note with the moment's state and a screenshot, to feedback.php
@@ -1045,14 +1118,35 @@ function drawWorld() {
 }
 
 let last = performance.now(), hudTimer = 0, lastDraw = 0;
-// The game's steps per frame (#609): no step longer than STEP_MAX, as many as the real time since the last frame
-// needs, so the game keeps real time below 20 fps. Up to SPAN_MAX of it: past that (a stall, a hidden tab
-// coming back, a breakpoint) the game slows rather than run seconds at once. The cap alone (one step of at
-// most 50 ms) ran the user's 16 fps perftests of 2026-11-15 at 74-80 % of real time, unevenly on the tablet.
-const STEP_MAX = 0.05, SPAN_MAX = 0.25;
-function realSteps(span) {
-  const n = Math.max(1, Math.ceil(span / STEP_MAX - 1e-6));
-  return new Array(n).fill(span / n);
+// The game's steps (#722): each STEP long, the benches' and the checks' step, as many as the real time since the last
+// frame needs, the rest carried to the next frame. So a seed and the same inputs give the same run at any frame rate
+// (before: the frame's time cut into equal parts of at most 50 ms, 16.7 ms steps at 60 fps against the checks' 33 ms).
+// Up to SPAN_MAX a frame: past that (a stall, a hidden tab coming back, a breakpoint) the game slows rather than run
+// seconds at once; the game keeps real time down to 4 fps (#609: the 50 ms cap alone ran the user's 16 fps perftests
+// of 2026-11-15 at 74-80 % of real time). A frame between two steps draws our tram and the camera between them
+// (drawnS), and the cars, the other trams and the game's movers too (src/between.js: recorded after the frame's last
+// two steps, put back after the draw); the walkers are drawn as the last step left them.
+const STEP = 1 / 30, STEP_MAX = 0.05, SPAN_MAX = 0.25;
+let carry = 0, sWas = null;
+const between = new Between();
+window.between = between; // (tools/test_frame_rate.py)
+// after a step the page draws from: where what it moved stands (a step the traffic did not take, paused or the shift
+// over, moved none of it)
+function recordStep(moved) {
+  if (moved) between.record([...traffic.movers(), ...game.movers()]);
+  else between.hold();
+}
+function fixedSteps(span) {
+  carry += span;
+  const n = Math.floor(carry / STEP + 1e-9);
+  carry = Math.max(0, carry - n * STEP);
+  return new Array(n).fill(STEP);
+}
+// where our tram is drawn: between its place before the last step and after it, by the time carried since that step
+// (none across a jump, a new shift or in inspect mode, whose steps are its own)
+function drawnS() {
+  if (sWas === null || inspect.active || Math.abs(tram.s - sWas) > 5) return tram.s;
+  return sWas + (tram.s - sWas) * Math.min(1, carry / STEP);
 }
 // An idle page draws 4 frames a second (#149): the menu, a pause, the results, and review mode with its
 // camera at rest. Driving, inspect mode and a moving review camera draw every frame; a hidden tab draws
@@ -1077,24 +1171,33 @@ function frame(now) {
     const sounding = !inMenu && !game.paused && !game.finished && !(inspect.active && inspect.paused);
     audio.setActive(sounding, !inMenu && !game.paused && game.finished && !(inspect.active && inspect.paused));
     // (inspecting: several game steps per frame, or none while paused)
-    const steps = inspect.active ? inspect.steps(span) : realSteps(span);
+    const steps = inspect.active ? inspect.steps(span) : fixedSteps(span);
     input.deadman = shiftHeld || pad.active;
+    between.back(); // (the last draw's poses are gone before anything steps: the steps read some of them)
+    if (inspect.active) between.clear(); // (its steps are its own, drawn as they leave the world)
+    let step = null; // (the frame's last step's game half: its traffic's focus, src/run.js)
     steps.forEach((h, i) => {
-      const lastStep = i === steps.length - 1;
+      const lastStep = i === steps.length - 1, drawn = i >= steps.length - 2;
+      sWas = tram.s;
       if (pedalKey && !pilot && !game.paused && (pedalKey.t += h) > 0.35) tram.eq.hold(pedalKey.dir, h);
-      if (pilot && !game.paused && !game.finished) pilot.step(game, h);
       if (!game.paused && !game.finished) simmed += h;
-      game.update(h, pilot ? pilot.input : input);
-      // (the traffic steps with the tram, as in the checks; posed for drawing on the frame's last step only,
-      // which outside inspect mode runs after the camera has moved, below)
-      if ((inspect.active || !lastStep) && !game.paused && !game.finished) traffic.update(h, camera, inspect.active && lastStep);
+      step = run.stepGame(h, input, pilot);
+      // (the traffic steps with the tram, as in the checks; posed for drawing on the frame's last two steps, the
+      // last of which outside inspect mode runs after the camera has moved, below)
+      if (inspect.active || !lastStep) {
+        run.stepTraffic(step, camera, inspect.active ? lastStep : drawn);
+        if (!inspect.active && drawn) recordStep(step.go);
+      }
     });
     game.updateVisuals();
     updateCamera(dt, now / 1000);
     if (inspect.active) inspect.update(dt);
     updateRain(dt);
     updateSnow(dt, now / 1000);
-    if (!inspect.active && !game.paused && !game.finished && steps.length) traffic.update(steps[steps.length - 1], camera);
+    if (!inspect.active && step) {
+      run.stepTraffic(step, camera);
+      recordStep(step.go);
+    }
     // The shift may have finished during game.update().
     if (game.finished) audio.setActive(false, !inMenu && !game.paused && !(inspect.active && inspect.paused));
     audio.update(tram, game.currentLimit, dt);
@@ -1110,11 +1213,14 @@ function frame(now) {
     }
   }
   if (review) review.update(dt);
+  if (world) groundTiles.tick(now, camera, route, tram.s, scene.fog.far);
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   const lazy = idle();
   const draw = window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS;
   if (draw) {
+    // (the movers between the last two steps, as our tram; back where the steps left them after the draw, below)
+    if (game && !inspect.active && !window.headless) between.show(Math.min(1, carry / STEP));
     if (people && game) people.sync(camera, traffic, game);
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
@@ -1135,9 +1241,10 @@ function frame(now) {
   if (perfTest) perfTestStep(now);
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.
-  if (draw && game && !chase && mirrorOn && !window.freeCam && !window.headless) {
+  if (draw && mirrorShown()) {
     mirror.draw(now, !lazy, poseMirror, tramModel);
   }
+  between.back();
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back
@@ -1171,6 +1278,12 @@ function poseMirror(mirrorCam) {
 }
 
 load.finish();
+// What Start places from the network (data/lineN.network.json, tools/network.py, #658) stands on the heights the build
+// read from the ground file (tools/network.py heights, #682): from here the bridges' and road tunnels' ways run between
+// the build's heights at their chains' ends (during the load each read its own); the heads and the platforms read theirs
+// from their records. The window drops the lookups past it, and Start reads none of them.
+for (const [k, a, b] of data.network.ways) { const w = data.allRoads[k].way; if (w) ground.wayEnds.set(w, [a / 100, b / 100]); }
+groundTiles.trim = true; // (the world is placed: from here the window drops the tiles past it)
 // review mode (?review, src/review.js): the checks' findings on the map, no shift
 let review = null;
 if (params.has('review')) {

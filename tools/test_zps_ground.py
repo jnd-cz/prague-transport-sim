@@ -54,6 +54,42 @@ def verdict(areas, rails=NONE, older=ground, cover=None, facts=(), changing=None
     return v[i]
 
 
+class Stray(unittest.TestCase):
+    """#548: a strip 60 m long and 3 m across on a street that falls 5 % along x."""
+
+    xy = [(0, 0), (10, 0), (48, 0), (60, 0), (60, 3), (48, 3), (10, 3), (0, 3)]
+
+    @staticmethod
+    def street(x, y):
+        return 300.0 - 0.05 * np.asarray(x, float) + 0 * np.asarray(y, float)
+
+    def test_a_point_off_the_ground_between_two_on_it_is_stray(self):
+        # (the points at x = 10 carry the height of the strip's end 38 m on, 1.9 m under the street: both stray. The
+        # outline falls there anyway, and the median of six neighbours sees nothing)
+        zs = [float(self.street(x, y)) for x, y in self.xy]
+        zs[1] = zs[6] = float(self.street(48, 0))
+        self.assertEqual(zg.stray_points(self.xy, zs, self.street), [1, 6])
+        self.assertEqual(zg.stray_points(self.xy, [float(self.street(x, y)) + 0.1 for x, y in self.xy], self.street), [])
+        # (0.4 m off: a kerb's or a planter's height, under STRAY_OFF; a point with no height)
+        zs = [float(self.street(x, y)) for x, y in self.xy]
+        zs[1] -= 0.4
+        zs[5] = None
+        self.assertEqual(zg.stray_points(self.xy, zs, self.street), [])
+
+    def test_the_other_side_of_a_step_is_not(self):
+        # (a wall 2 m tall along y = 1.5 in the lidar's ground: the outline's point on its top at x = 10 is the wall's,
+        # its neighbours at the foot; and a point whose neighbour is off the ground too: a stretch, not one point)
+        def walled(x, y):
+            return self.street(x, y) + 2.0 * (np.asarray(y, float) > 0.5)
+        zs = [float(walled(x, y)) for x, y in self.xy]
+        zs[1] += 2.0
+        self.assertEqual(zg.stray_points(self.xy, zs, walled), [])
+        zs = [float(self.street(x, y)) for x, y in self.xy]
+        zs[1] -= 1.9
+        zs[2] -= 1.9
+        self.assertEqual(zg.stray_points(self.xy, zs, self.street), [])
+
+
 class Judge(unittest.TestCase):
     def test_inner_points_lie_inside(self):
         xy = np.array([[0, 0], [10, 0], [10, 10], [0, 10]], float)
@@ -119,6 +155,27 @@ class Judge(unittest.TestCase):
         facts = [{"lat": 0.01, "lon": 0.01, "verdict": "survey"}]
         v = verdict([square(0, 0, 20, GROUND - 1.8)], rails_through(0, 0, 20, GROUND), facts=facts)
         self.assertEqual((v["verdict"], v["by"]), ("survey", "fact"))
+
+    def test_an_answer_states_what_the_sources_decide_without_it(self):
+        """#670: the rails say the survey is wrong (lidar): the user's lidar matches, survey holds; an area that fits
+        IPR now matches whatever the answer; an answer whose point lies in no area is not stated."""
+        rails = rails_through(0, 0, 20, GROUND)
+        for said, state in (("lidar", "matches"), ("survey", "holds")):
+            states = {}
+            facts = [{"lat": 0.01, "lon": 0.01, "verdict": said}, {"lat": 5.0, "lon": 5.0, "verdict": "survey"}]
+            v = zg.judge([square(0, 0, 20, GROUND - 1.8)], ground, ground, zg.cover_union([]), rails, F, facts, states=states)[0]
+            self.assertEqual(states, {0: (state, "lidar", "rails")}, said)
+            self.assertEqual((v["verdict"], v["by"]), (said, "fact"))
+            self.assertNotIn("rails", v)  # (the area's report is as before #670)
+        states = {}
+        zg.judge([square(0, 0, 20, GROUND - 0.1)], ground, ground, zg.cover_union([]), NONE, F,
+                 [{"lat": 0.01, "lon": 0.01, "verdict": "survey"}], states=states)
+        self.assertEqual(states, {0: ("matches", "fits", "fits")})
+        # the user's held rule giving the same verdict is no source catching up: holds
+        states, rule = {}, {"courtyard": "lidar", "outsideGreen": "survey", "outside": "survey"}
+        zg.judge([square(0, 0, 20, GROUND - 1.8)], ground, lambda E, N: [float("nan")] * len(E), zg.cover_union([]), NONE, F,
+                 [{"lat": 0.01, "lon": 0.01, "verdict": "survey"}], rule=rule, buildings=shapely.Polygon(), states=states)
+        self.assertEqual(states, {0: ("holds", "survey", "rule")})
 
     def test_an_answer_takes_its_own_area_not_the_one_around_it(self):
         """A courtyard's lawn is a hole in the sidewalk around it: the answer is the lawn's, the sidewalk fits."""

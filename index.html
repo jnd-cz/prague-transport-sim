@@ -14,6 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/icon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
 <title>Tatra T3 – Line 22</title>
+<link rel="stylesheet" href="src/panel.css">
 <style>
   :root {
     --panel: #2f3a33;
@@ -33,41 +34,17 @@
   #view { position: fixed; inset: 0; }
   canvas#gl { display: block; width: 100%; height: 100%; }
 
-  /* cab frame (windshield pillars and roof) */
+  /* the cab's frame: the ceiling band, and the posts, windows' ends and the front door where the eye sees them
+     (src/cabframe.js, #246) */
   #cab { position: fixed; inset: 0; pointer-events: none; }
+  #cab canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  body:not(.shift) #cab canvas { display: none; }
   #cab .roof { position: absolute; left: 0; right: 0; top: 0; height: 7vh;
-    background: linear-gradient(#1b211d, #39443c); border-bottom: 3px solid #121612; }
-  #cab .pillar { position: absolute; top: 0; bottom: 0; width: 5.5vw; background: linear-gradient(90deg, #1b211d, #3a463d 60%, #222a24); }
-  #cab .pillar.l { left: 0; } #cab .pillar.r { right: 0; transform: scaleX(-1); }
+    background: linear-gradient(#4b514e, #7a807c 75%, #5d635f); border-bottom: 3px solid #2f3431; }
   #cab .mid { position: absolute; top: 7vh; bottom: 180px; left: 50%; width: 10px; margin-left: -5px; background: #222a24; opacity: .0; }
   body.chase #cab { display: none; }
 
-  /* dashboard */
-  #dash { position: fixed; left: 0; right: 0; bottom: 0; height: 180px; display: flex; gap: 14px; align-items: center;
-    justify-content: center; padding: 10px 16px; pointer-events: none;
-    background: linear-gradient(#3c4a40, var(--panel) 30%, var(--panel-edge)); border-top: 4px solid #151b17;
-    box-shadow: 0 -10px 30px rgba(0,0,0,.45); }
-  body.chase #dash { background: rgba(30,38,33,.82); }
-  .gauge { position: relative; }
-  .gauge svg { display: block; }
-  .group { display: flex; flex-direction: column; gap: 6px; align-items: center; }
-  .notch { width: 64px; height: 156px; background: #151a17; border: 2px solid #0b0e0c; border-radius: 6px; display: flex; flex-direction: column; padding: 4px; gap: 2px; }
-  .notch div { flex: 1; font: 600 11px/1 ui-monospace, monospace; display: flex; align-items: center; justify-content: center; color: #59645b; border-radius: 3px; background: #1e2420; }
-  .notch div.on.drive { background: #2c6b37; color: #d9ffd9; }
-  .notch div.on.neutral { background: #6a6a52; color: #fff; }
-  .notch div.on.brake { background: #8a5a1c; color: #fff1d9; }
-  .notch div.on.emerg { background: #a02018; color: #fff; }
-  .lamps { display: grid; grid-template-columns: repeat(3, 92px); gap: 6px; }
-  .lamp { height: 34px; border-radius: 5px; background: #151a17; border: 2px solid #0b0e0c; display: flex; align-items: center; justify-content: center;
-    font: 700 10px/1.05 system-ui, sans-serif; text-align: center; color: #4b554d; letter-spacing: .04em; padding: 2px; }
-  .lamp.on { color: #111; }
-  .lamp.on.red { background: var(--red); box-shadow: 0 0 12px var(--red); }
-  .lamp.on.amber { background: var(--amber); box-shadow: 0 0 12px var(--amber); }
-  .lamp.on.green { background: var(--green); box-shadow: 0 0 12px var(--green); }
-  .lamp.on.blue { background: var(--blue); box-shadow: 0 0 12px var(--blue); }
-  .info { width: 280px; background: #101511; border: 2px solid #0b0e0c; border-radius: 6px; padding: 8px 10px; font: 12px/1.38 ui-monospace, "Cascadia Mono", monospace; color: #c9f0c0; height: 156px; overflow: hidden; }
-  .info .big { font-size: 15px; color: #fff; }
-  .info .k { color: #7f9a7a; }
+  /* the driver's panel (#dash): src/panel.css */
 
   /* top bar */
   #top { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: stretch; pointer-events: none; }
@@ -100,8 +77,9 @@
   #action { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); background: rgba(10,14,12,.9); padding: 14px 22px; border-radius: 8px; font-size: 16px; display: none; }
 
   /* the mirror frame grows with the viewport (src/mirror.js sizes its picture to it); the aspect
-     stays the mirror camera's 150:190, so its field of view does not change */
-  #mirror { position: fixed; right: calc(5.5vw + 10px); bottom: calc(var(--dashH) + 16px); height: clamp(110px, 24vh, 420px); aspect-ratio: 150 / 190; border: 6px solid #1b1f1d;
+     stays the mirror camera's 150:190, so its field of view does not change. Over everything but the menus and the
+     panel's sheet; the cab's frame leaves its picture out (src/cabframe.js, #246) */
+  #mirror { position: fixed; z-index: 6; right: calc(5.5vw + 10px); bottom: calc(var(--dashH) + 16px); height: clamp(110px, 24vh, 420px); aspect-ratio: 150 / 190; border: 6px solid #1b1f1d;
     border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.5); pointer-events: none; }
   body.chase #mirror, body.nomirror #mirror, #mirror.hidden { display: none; }
   #perf { position: fixed; left: calc(5.5vw + 8px); top: calc(7vh + 8px); z-index: 5; pointer-events: none;
@@ -122,7 +100,9 @@
   select, button { font: inherit; background: #2c3631; color: var(--ink); border: 1px solid #4a5a50; border-radius: 6px; padding: 7px 10px; }
   button.primary { background: #b5161c; border-color: #d43; font-weight: 700; padding: 10px 26px; cursor: pointer; font-size: 16px; }
   button.primary:hover { background: #cf2026; }
-  #pausePanel { position: fixed; top: calc(40% + 36px); left: 50%; transform: translateX(-50%); display: none; gap: 10px; z-index: 5; }
+  /* (three buttons with ⛶, #691: in a row where they fit, else wrapped round the middle) */
+  #pausePanel { position: fixed; top: calc(40% + 36px); left: 50%; transform: translateX(-50%); display: none; gap: 10px; z-index: 5;
+    width: max-content; max-width: calc(100vw - 16px); flex-wrap: wrap; justify-content: center; }
   #pausePanel.show { display: flex; }
   .checks { display: flex; gap: 18px; flex-wrap: wrap; margin: 6px 0 16px; font-size: 13px; }
   .keys { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 12px; font-size: 13px; margin: 14px 0; color: #cfd6c9; }
@@ -175,23 +155,18 @@
   .pkgProblem { color: #ff9c8a; }
   .pkgWarn { color: #f0d27a; }
   .pkgOk { color: #a8e0a0; }
+  #subForm input[type=text], #subForm input[type=url], #subForm textarea { flex: 1 1 260px; min-width: 0; padding: 6px; font: inherit; }
+  .subCheck { display: block; margin: 6px 0; }
   #helpBody table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
   #helpBody th, #helpBody td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #2c3631; vertical-align: top; }
   #helpBody th { color: var(--dim); font-weight: 400; }
   #help { position: fixed; left: 7vw; bottom: calc(var(--dashH) + 12px); font-size: 11px; color: #cfd6c9; background: rgba(15,20,17,.7); padding: 6px 10px; border-radius: 6px; pointer-events: none; line-height: 1.6; }
   body.chase #help { left: 10px; }
 
-  @media (max-width: 1100px) {
-    .info { display: none; }
-    .lamps { grid-template-columns: repeat(3, 74px); }
-    .lamp { font-size: 9px; }
-  }
   /* on-screen controls (src/touch.js) on a small screen: a compact dashboard and top bar, the controller
      buttons above the dashboard, the mirror above them */
   @media (max-width: 760px), (max-height: 520px) {
     body.touch { --dashH: 112px; --topH: 64px; }
-    body.touch #dash { height: var(--dashH); gap: 4px; padding: 4px; }
-    body.touch #dash > * { zoom: .6; }
     body.touch #top { zoom: .7; top: 4px; }
     body.touch #minimap { display: none; }
     body.touch #help { display: none; }
@@ -200,14 +175,10 @@
   }
   @media (max-height: 520px) {
     body.touch { --dashH: 88px; }
-    body.touch #dash > * { zoom: .47; }
     body.touch #cab .roof { height: 3vh; }
     body.touch #mirror { height: clamp(90px, 30vh, 200px); }
   }
   @media (max-width: 640px) {
-    #dash { gap: 6px; padding: 8px; }
-    .lamps { grid-template-columns: repeat(3, 58px); }
-    .lamp { font-size: 8px; }
     #minimap { width: 140px; height: 140px; }
     #help { display: none; }
   }
@@ -215,7 +186,7 @@
 </head>
 <body>
 <div id="view"><canvas id="gl"></canvas></div>
-<div id="cab"><div class="roof"></div><div class="pillar l"></div><div class="pillar r"></div></div>
+<div id="cab"><canvas id="cabFrame"></canvas><div class="roof"></div></div>
 
 <div id="top" class="hidden">
   <div id="line">22</div>
@@ -236,13 +207,7 @@
 <canvas id="minimap" width="440" height="440" class="hidden"></canvas>
 <div id="help" class="hidden"></div>
 
-<div id="dash" class="hidden">
-  <div class="group"><div id="g-amp" class="gauge"></div><div id="g-volt" class="gauge"></div></div>
-  <div id="g-speed" class="gauge"></div>
-  <div class="notch" id="notch"></div>
-  <div class="lamps" id="lamps"></div>
-  <div class="info" id="info"></div>
-</div>
+<div id="dash" class="hidden"></div>
 
 <div id="menu" class="overlay hidden">
   <div class="card">
@@ -263,6 +228,7 @@
       <label><span data-i18n="menu.model"></span> <select id="optModel"></select></label>
       <label id="fleetRow"><span data-i18n="menu.fleet"></span> <select id="optFleet"></select></label>
       <label id="liveryRow"><span data-i18n="menu.livery"></span> <select id="optLivery"></select></label>
+      <label id="soundsRow"><span data-i18n="menu.sounds"></span> <select id="optSounds"></select></label>
       <label><span data-i18n="menu.consist"></span> <select id="optCars"><option value="auto" selected data-i18n="consist.auto"></option><option value="1" data-i18n="consist.1"></option><option value="2" data-i18n="consist.2"></option></select></label>
       <label><span data-i18n="menu.controls"></span> <select id="optControls"><option value="arcade" selected data-i18n="ctl.arcade"></option><option value="advanced" data-i18n="ctl.advanced"></option></select></label>
       <label><span data-i18n="menu.temp"></span> <select id="optTemp"><option value="live" selected data-i18n="temp.live"></option><option value="winter" data-i18n="temp.winter"></option><option value="autumn" data-i18n="temp.autumn"></option><option value="summer" data-i18n="temp.summer"></option></select></label>
@@ -278,6 +244,7 @@
       <kbd>A</kbd><span data-i18n="k.sand"></span>
       <kbd>Q / E</kbd><span data-i18n="k.look"></span>
       <kbd>Z</kbd><span data-i18n="k.mirror"></span>
+      <kbd>Tab</kbd><span data-i18n="k.panel"></span>
       <kbd>H / K / F</kbd><span data-i18n="k.heat"></span>
       <kbd>C</kbd><span data-i18n="k.cutout"></span>
       <kbd>Y</kbd><span data-i18n="k.switchBtn"></span>

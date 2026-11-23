@@ -55,6 +55,7 @@ export class Game {
     this.route = route;
     this.tram = tram;
     this.audio = audio;
+    audio.watchEquipment(tram.eq);
     this.opts = opts;
     this.rand = rng(opts.seed ?? 12345);
     this.messages = [];
@@ -190,17 +191,22 @@ export class Game {
     const built = this.data.signals?.some((d) => d.rule) ? this.data.signals : null;
     const own = this._placeSignals(built ? (this.data.signalsRaw || []) : this.data.signals);
     // grade separation: where our track is on a bridge, the junctions and their traffic lights
-    // belong to the road underneath (e.g. the Modřany estakáda), not to the tram
-    const live = (list) => list.filter((d) => !d.drop && !this.profile.overBridge(d.cross)).map((d) => ({ ...d }));
+    // belong to the road underneath (e.g. the Modřany estakáda), not to the tram (the build's answer, by the signal's
+    // crossing: tools/network.py over_bridge, #658: Start reads no ground past the window). Each of the build's keeps its
+    // index in the data (`i`): the network's lanes are bound to it (src/traffic.js _loadSignals)
+    const over = new Set((this.data.network?.overBridge || []).map((i) => this.data.signals[i].cross));
+    const live = (list) => list.map((d, i) => ({ ...d, i: list === built ? i : undefined })).filter((d) => !d.drop && !over.has(d.cross));
     let placed;
     if (built) {
       placed = live(built).map((d) => ({ ...d, head: d.head !== undefined ? this.stops[d.head] : undefined }));
-      // (the stop point moves back before a hung signal as below, after the zone the set's length gave it)
-      for (const d of placed) if (d.head && d.s - 3 < d.head.target) this._stopBefore(d.head, d);
-      this._dryTargets = new Map();
+      this.signalsBeforeSign = placed.filter((d) => d.head && d.s - 3 < d.head.target).map((d) => this._beforeSign(d.head, d));
       this.placementDiffs = [...(this.stopTypeDiffs || []), ...this._placementDiffs(placed, live(own).map((d) => this._platformRule(d, true)))];
       if (this.placementDiffs.length) console.log(`placement: the build and the game differ at ${this.placementDiffs.join('; ')}`);
-    } else placed = live(own).map((d) => this._platformRule(d));
+    } else {
+      this.signalsBeforeSign = [];
+      placed = live(own).map((d) => this._platformRule(d));
+    }
+    if (this.signalsBeforeSign.length) console.log(`signals hung before their stop's sign (not used to move it, #694): ${this.signalsBeforeSign.map((b) => b.info).join('; ')}`);
     this.signals = placed.map((d, i) => {
       const mesh = makeTramSignal();
       // (at a platform end: on its own pole at the island's tip, a few metres past the post and further from
@@ -238,12 +244,12 @@ export class Game {
   }
 
   // A signal never stands along a platform: it moves to the platform head, just past where the tram front stops; if the
-  // crossing follows too closely for that, it hangs from the wire and the stop point moves back before it (tools/
-  // placement.py platform_rule, the same). `dry`: decide only, for the comparison with the build's placement, with the
-  // stop points moved so far kept in this._dryTargets.
+  // crossing follows too closely for that, it hangs from the wire past the crossing (tools/placement.py platform_rule,
+  // the same). No signal moves the stop point (#694): one hung before its stop's sign is listed (signalsBeforeSign).
+  // `dry`: decide only, for the comparison with the build's placement.
   _platformRule(d, dry = false) {
     for (const st of this.stops) {
-      const target = dry ? this._dryTargets.get(st) ?? st.target : st.target;
+      const target = st.target;
       const a = (st.p0 ?? target - 30) - 1, b = target + 2;
       if (d.s > a && d.s < b) {
         // (only while the platform head is still before the junction's near edge)
@@ -254,18 +260,19 @@ export class Game {
           // back over the platform it made trams stop short of the platform end at red, Kublov)
           d.hang = true; d.head = st;
           d.s = Math.max(d.s, Math.min(target, d.farEdge ?? d.edge ?? d.cross) + 3); // (farEdge: kept short of it, Nádraží Modřany)
-          if (d.s - 3 < target) { if (dry) this._dryTargets.set(st, d.s - 3); else this._stopBefore(st, d); }
+          if (d.s - 3 < target && !dry) this.signalsBeforeSign.push(this._beforeSign(st, d));
         }
       }
     }
     return d;
   }
 
-  // (and the front stops for the passengers no further than that: the crossing began 4 m before the platform's end at
-  // Staroměstská, the tram served the stop 3 m past its red stop point; served up to 0.5 m before the signal, 2.5 m past
-  // the stop point: 0.5 m was too little to stop a T3 in, the user, #255)
-  _stopBefore(st, d) {
-    st.target = d.s - 3; st.zone[1] = Math.min(st.zone[1], d.s - 0.5); st.zone[0] = Math.min(st.zone[0], st.target - 6); st.signPlace?.(st.target);
+  // A signal hung with its stop line before its stop's sign: listed, the stop point stays at the sign (before #694 it
+  // moved to 3 m before the signal: 7.6 m short of the user's sign at Čechův most, where the user says no tram signal
+  // stands after the stop, only at the bridge junction; the signals' placement is #406's)
+  _beforeSign(st, d) {
+    const by = st.target - d.s;
+    return { s: d.s, stop: st.name, by, info: `sig@${Math.round(d.s0 ?? d.s)} hung at ${d.s.toFixed(1)}, ${by.toFixed(1)} m before ${st.name}'s sign` };
   }
 
   // Where the build's placement and the rules here disagree: ["sig@s0: what"], by the signals' input position s0.
@@ -1108,17 +1115,20 @@ export class Game {
     return this.tram.s >= st.zone[0] && this.tram.s <= st.zone[1];
   }
 
-  // Where the tram front may stand to serve a stop. With the OSM platform known, the whole set
-  // must stand alongside it (rear at most 3 m short of its start, front at most 4 m past its end),
-  // so on a long platform a second tram can stop behind the first one; a platform shorter than
-  // the set only needs the first doors at it. Otherwise 20 m behind to 12 m past the stop sign.
+  // Where the tram front may stand to serve a stop. The stop point is the sign for every set (D 1/2 § 27.6; the
+  // user, 2026-11-18, #694: "The stop sign will be the stop point by definition ... OSM platform will define the
+  // boarding area"; a longer set's rear stands wherever it can and its doors along the platform board). With the OSM
+  // platform known, the zone keeps the whole set alongside it where it fits (rear at most 3 m short of its start, front
+  // at most 4 m past its end), so on a long platform a second tram can stop behind the first one, and it always reaches
+  // 2.5 m before and 3 m past the sign. Otherwise 20 m behind to 12 m past the stop sign.
   _stopZone(st) {
     const L = this.tram.length;
     if (st.p0 !== undefined && st.p1 - st.p0 >= 15) {
       const hi = st.p1 + 4;
       const lo = Math.min(hi - 8, st.p1 - st.p0 + 3 >= L ? st.p0 + L - 3 : st.p1 - 8); // at least 8 m to aim at
-      st.zone = [lo, hi];
-      st.target = Math.max(lo + 2.5, Math.min(st.target, hi - 3));
+      // (before #694 the stop point moved into this zone: 9.5 m on at Královka, whose path begins 5.2 m behind the
+      // sign, for two cars; 0.5 m at Vozovna Kobylisy)
+      st.zone = [Math.min(lo, st.target - 2.5), Math.max(hi, st.target + 3)];
     } else st.zone = [st.target - STOP_TOL_BEHIND, st.target + STOP_TOL_AHEAD];
   }
 
@@ -1624,6 +1634,17 @@ export class Game {
   }
 
   // ------------------------------------------------------------------ visuals
+  // what the steps move, for the page to draw between the last two (src/between.js): the cross streets' cars at the
+  // signalled crossings, the late passengers running for the doors, the obstacles, the driver with the switch iron
+  movers() {
+    const out = [];
+    for (const sig of this.signals) for (const c of sig.cars || []) out.push(c.mesh);
+    for (const r of this.runners) out.push(r.mesh);
+    for (const ob of this.obstacles) if (ob.state !== 'gone') out.push(ob.mesh);
+    if (this.action?.driver) out.push(this.action.driver);
+    return out;
+  }
+
   updateVisuals() {
     // crowd at the next stop platform
     const st = this.stops[this.nextStop];

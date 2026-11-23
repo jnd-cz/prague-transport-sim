@@ -1,6 +1,6 @@
 {
-  "about": "The tram models the game offers, in the menu's order; a vehicle not loaded falls back to the first loaded one in this order. Each is a folder assets/<id>/ with its vehicle.json (docs/vehicles.md, The manifest).",
+  "about": "The tram models the game offers, in the menu's order; a vehicle not loaded falls back to the first loaded one in this order. Each is a folder assets/<id>/ with its vehicle.json (docs/vehicles.md, The manifest). The sound packs (assets/<id>/sounds.json) are the player's choice in the menu's Sounds beside the built-in sounds (#636).",
   "vehicles": ["t3h", "t3", "t3simple"],
   "liveries": [],
-  "sounds": []
+  "sounds": ["jnd.t2r6004"]
 }

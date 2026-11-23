@@ -117,7 +117,9 @@ export async function run({ unfiltered = false } = {}) {
     if (!m.isMesh) return;
     if (m.userData.surface === 'rail') rails.push(m);
     else if ((m.userData.surface === 'road' && m.userData.surfaceKind === 'footway') ||
-             m.userData.surface === 'dtm') footways.push(m);
+             m.userData.surface === 'dtm' ||
+             // (the ground file's walkways: its 'other' material group, sidewalks, islands, paved and plots, #509)
+             (m.userData.surface === 'ground' && m.userData.surfaceKind === 'other')) footways.push(m);
   });
   const route = game.route, profile = route.ground.profile, ray = new THREE.Raycaster();
   const origin = new THREE.Vector3(), down = new THREE.Vector3(0, -1, 0), bad = new Map();
@@ -191,7 +193,7 @@ export async function run({ unfiltered = false } = {}) {
       const source = surface.object.userData.surface === 'dtm' ? area(surface.object, surface.faceIndex) : null;
       const way = source ? null : surface.object.userData.footwayRanges?.find((r) => r[0] <= surface.faceIndex && surface.faceIndex < r[1])?.[2];
       const hit = { s, side, x: head.point.x, y: -head.point.z, railZ: head.point.y, surfaceZ: surface.point.y, way: way ?? null,
-                  source: source ? 'dtm' : 'osm-footway', area: source?.[4] ?? null,
+                  source: source ? 'dtm' : surface.object.userData.surface === 'ground' ? 'ground' : 'osm-footway', area: source?.[4] ?? null,
                   class: source?.[2] ?? 'footway', level: source?.[3] ?? null, excess };
       hit.geometryReason = crossingReason(game, hit, source, way);
       hit.reason = hit.geometryReason;
@@ -201,7 +203,7 @@ export async function run({ unfiltered = false } = {}) {
     }
     if (excess > 0.001 && !(bad.get(key)?.mag >= excess)) bad.set(key, {
       s: Math.round(s), x: head.point.x, y: -head.point.z, side, mag: excess,
-      info: `${surface.object.userData.surface === 'dtm' ? `dtm/${area(surface.object, surface.faceIndex)[2]}` : 'OSM footway'} ${(excess * 1000).toFixed(0)} mm above rail`,
+      info: `${surface.object.userData.surface === 'dtm' ? `dtm/${area(surface.object, surface.faceIndex)[2]}` : surface.object.userData.surface === 'ground' ? 'ground walkway' : 'OSM footway'} ${(excess * 1000).toFixed(0)} mm above rail`,
     });
   }
   const edges = crossingEdgeHits(game, heads);

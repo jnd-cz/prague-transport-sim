@@ -65,6 +65,7 @@ elif LINE != "22":
 DEM_SERVICE = "https://ags.cuzk.gov.cz/arcgis2/rest/services/dmr5g/ImageServer/exportImage"
 DEM_STEP = 10.0     # terrain grid spacing (m)
 DEM_MARGIN = 700.0  # terrain extends this far around the route bbox (m)
+POLE_CLEAR = 1.5    # m from the track's centre: a stop sign's pole nearer stands in the tram's way (half its 2.5 m body, #685)
 
 REFRESH = "--refresh" in sys.argv
 FETCH = "--fetch" in sys.argv  # downloads what raw/ lacks; a cache miss is an error without it (#223)
@@ -84,6 +85,7 @@ from geo import Frame  # noqa: E402
 from gtfs_runs import pair_continuations  # noqa: E402
 from route import path_ext  # noqa: E402
 import sources  # noqa: E402
+from stop_signs_review import pole, sign_state  # noqa: E402  (a stop sign fact's state, #670; its pole, #685)
 try:
     import osm_local
 except ImportError:
@@ -984,27 +986,39 @@ def main():
     # since 2024), else OSM's stop position on our own track (the other direction's lies 3-6 m off, on the
     # parallel track, and was taken at 5 stops within 6 m: tools/stop_signs_review.py; within 2 m of 14 of 25),
     # else none (the game: GTFS + STOP_AHEAD).
+    # Where the sign's point is its pole on the platform (the user's placed sign, a DTM sign: stop_signs_review.pole),
+    # the stop keeps its offset from the track too (`signOff`, + left), and the game stands the sign there; nearer the
+    # track's centre than POLE_CLEAR it would stand in the tram's way, and on the left of travel it is another track's
+    # (a T3's doors are on the right): those keep the game's fixed place (#685: the user, 2026-11-18, "the stop sign
+    # placement to the actual place on the platform (where it's available, not decided by point on a track)"; at
+    # Královka, the one pole on the left, "now on the wrong track ... the DTM data being correct on the middle track").
+    poles, at_track, other_side = [], [], []
+
+    def pole_at(st_, d, side):
+        if side > 0:
+            other_side.append(f"{st_['name']} {d:.2f} m")
+        elif d >= POLE_CLEAR:
+            st_["signOff"] = round(-d, 2)
+            poles.append(st_["signOff"])
+        else:
+            at_track.append(f"{st_['name']} {d:.2f} m")
     truth_signs = json.load(open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8")).get("stopSigns", {}).get("signs", [])
     spos = overpass("stop_positions", Q_STOPPOS, optional=True)["elements"]
     sp_ = os.path.join(ROOT, "raw", "dtmpoints", f"line{LINE}.signs.json")
     dtm_signs = [P(g["lat"], g["lon"]) for g in json.load(open(sp_, encoding="utf-8"))["signs"]] if os.path.exists(sp_) else []
+    sign_facts = []  # each applied fact's state against the sign the sources give (#670)
     for k, st_ in enumerate(stops):
         nxt = stops[k + 1]["name"] if k + 1 < len(stops) else None
         prv = stops[k - 1]["name"] if k else None
         f = next((f for f in truth_signs if f["stop"] == st_["name"]
                   and (f.get("towards") == nxt if nxt else f.get("from") == prv)), None)
-        if f:
-            s, d, _ = path.project((f["x"], f["y"]), st_["s"] - 150, st_["s"] + 150, radius=3)
-            if s is not None and d < 8:
-                st_["sign"], st_["signSrc"] = round(s, 1), "truth"
-                continue
-            print(f"  ! stop sign of {st_['name']} (truth.json) is not beside the route near the stop: {s} {d}")
         cand = []
         for e in spos:
             if e.get("tags", {}).get("name") == st_["name"]:
-                s, d, _ = path.project(P(e["lat"], e["lon"]), st_["s"] - 100, st_["s"] + 100, radius=3)
+                q = P(e["lat"], e["lon"])
+                s, d, _ = path.project(q, st_["s"] - 100, st_["s"] + 100, radius=3)
                 if s is not None and d < 1.5:
-                    cand.append((abs(s - st_["s"]), s))
+                    cand.append((abs(s - st_["s"]), s, tuple(q)))
         osm_s = min(cand)[1] if cand else None
         # the DTM's: on the platform side (right of travel), within 6 m of the track and 40 m of OSM's point
         # (else the GTFS point), the nearest to it (the opposite direction's sign stands on the left: 6 of the
@@ -1014,13 +1028,31 @@ def main():
         for q in dtm_signs:
             s, d, side = path.project(q, ref - 45, ref + 45, radius=3)
             if s is not None and d < 6 and side < 0 and abs(s - ref) < 40:
-                near.append((abs(s - ref), s))
+                near.append((abs(s - ref), s, tuple(q), d, side))
+        # the sign the sources give: the build's without the user's (the fact's state, #670)
+        chain = ("dtmpoints", *min(near)[2]) if near else ("osm", *min(cand)[2]) if cand else None
+        if f:
+            s, d, side = path.project((f["x"], f["y"]), st_["s"] - 150, st_["s"] + 150, radius=3)
+            if s is not None and d < 8:
+                st_["sign"], st_["signSrc"] = round(s, 1), "truth"
+                if pole(f, dtm_signs):
+                    pole_at(st_, d, side)
+                sign_facts.append(sign_state(f, chain))
+                continue
+            print(f"  ! stop sign of {st_['name']} (truth.json) is not beside the route near the stop: {s} {d}")
         if near:
             st_["sign"], st_["signSrc"] = round(min(near)[1], 1), "dtmpoints"
+            pole_at(st_, *min(near)[3:])
         elif osm_s is not None:
             st_["sign"], st_["signSrc"] = round(osm_s, 1), "osm"
     print("stop signs: " + ", ".join(f"{sum(st_.get('signSrc') == k for st_ in stops)} {k}" for k in ("truth", "dtmpoints", "osm"))
-          + f", {sum('sign' not in st_ for st_ in stops)} none")
+          + f", {sum('sign' not in st_ for st_ in stops)} none; the user's: "
+          + ", ".join(f"{sum(e['state'] == k for e in sign_facts)} {k}" for k in sources.FACT_STATES
+                      if any(e["state"] == k for e in sign_facts)))
+    print(f"stop signs at their pole: {len(poles)}" + (f" ({min(map(abs, poles)):.2f}-{max(map(abs, poles)):.2f} m from the track)"
+          if poles else "") + f", {len(stops) - len(poles)} at the game's place"
+          + (f"; a pole too near the track: {', '.join(at_track)}" if at_track else "")
+          + (f"; a pole on the left, another track's: {', '.join(other_side)}" if other_side else ""))
     # platforms (OSM): where along the route each stop's platform begins and ends, so the game
     # can require the whole set to stand alongside it (and let two sets stop one behind another).
     # Matched around the sign where there is one (Hercovka's timetable point is 86 m short of the sign,
@@ -1234,6 +1266,11 @@ def main():
         # the line number changes at this stop (index into stops): passengers of the first line
         # all leave there, the tram waits and departs as the second line
         out["segments"] = [{"line": LINE, "from": 0}, {"line": THEN, "from": run["change"]}]
+    # the facts applied over DI on the whole network (data/truth.json switchTips, photoTracks: di_network.py) that lie
+    # on the tracks this line draws (its route both ways and the others: a switch's legs), with their state (#670)
+    on_tracks = [path] + ([Polyline(back_pts)] if len(back_pts) > 1 else []) + [
+        Polyline([q[:2] for q in t["p"]]) for t in track_lines if len(t.get("p") or []) > 1]
+    di_facts = {k: [e for e in v if any(pl.project(e["at"])[1] <= 15 for pl in on_tracks)] for k, v in net.facts.items()}
     one = sources.single
     by = lambda ranges: [round(sum(b - a for a, b, s in ranges if s == k)) for k in ("ortho", "di", "dtmp", "osm")]
     out["provenance"] = sources.stamp("build_line.py", {
@@ -1250,7 +1287,8 @@ def main():
         "timetable": one("timetable", "gtfs", len(timetable), "trips"),
         "signals": one("signals", "osm", len(signals)), "crossings": one("crossings", "osm", len(crossings)),
         "buildings": one("buildings", "osm", len(buildings)), "roads": one("streets", "osm", len(roads)),
-        "green": one("areas", "osm", len(green)), "water": one("areas", "osm", len(water))})
+        "green": one("areas", "osm", len(green)), "water": one("areas", "osm", len(water))},
+        facts={"stopSigns": sign_facts, **di_facts})
     out["attribution"] = sources.attribution(out["provenance"])
     dst = os.path.join(OUT, f"line{LINE}.json")
     with replacing(dst, "w", encoding="utf-8") as f:

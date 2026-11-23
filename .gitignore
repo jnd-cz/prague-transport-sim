@@ -12,11 +12,6 @@ Thumbs.db
 # deploy package (tools/make_dist.py)
 dist/
 
-# lint reports (tools/lint.js)
-reports/*.json
-# (--baseline's local copy: main's baselines and the checkpoints live in the data store, #346)
-reports/baseline/
-
 # tools/snapshot.py download scratch
 .snap-*/
 
@@ -25,29 +20,18 @@ data/*
 !data/truth.json
 !data/MANIFEST.json
 
-# headless check results (tools/headless.py) and runs' logs and folders kept beside them
-reports/headless/
-reports/headless-*/
-reports/*.log
-
-# comparison evidence (tools/shot.py, tools/datadiff.py)
-reports/shots/
-reports/diffs/
-
-# rebuild logs (tools/rebuild.py)
-reports/rebuild/
-
 # web host login for tools/deploy.py (host, user, folder; never the password)
 deploy.local.json
 
-# review verdicts (tools/serve.py, tools/deploy.py --pull-reviews)
-reports/reviews/
-
-# tools/autodeploy.py log and state
-reports/autodeploy.*
-
-# the review directory's index (tools/review_sets.py; tools/deploy.py builds it at each deploy, #288)
+# reports/: the tools' output and a session's scratch, none of it in git (lint reports, headless results and logs,
+# the baselines' local copy, shots, diffs, rebuild logs, review verdicts, autodeploy's log and state, the city
+# terrain's report). Only the review findings files are in git (reports/review/*.json and their notes), without
+# the review directory's index, which tools/deploy.py builds at each deploy (#288)
+reports/*
+!reports/review/
+reports/review/*
+!reports/review/*.json
+!reports/review/*.md
 reports/review/index.json
-
-# tools/city_terrain.py: its report and picture (the mesh is in the machine cache)
-reports/city-terrain/
+# tools/overview.py's snapshot, served beside overview.html (#826)
+/overview.json

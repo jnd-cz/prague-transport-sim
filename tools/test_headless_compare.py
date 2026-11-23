@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Seed-spread comparison of headless runs (#156): python -P -E tools/test_headless_compare.py"""
+from contextlib import redirect_stdout
+import io
 import os
 import sys
 import unittest
@@ -92,8 +94,8 @@ class FakeStore:
     def keep(self, k, counts, places):
         self.kept_now = counts
 
-    def measure_at(self, rev, lines, checks, want):
-        self.asked.append((lines, checks))
+    def measure_at(self, rev, lines, checks, want, seeds=None):
+        self.asked.append((lines, checks, seeds) if seeds else (lines, checks))
         return self.measured or {}, {}
 
     def checkpoints(self):
@@ -125,11 +127,26 @@ class ChooseBaseline(unittest.TestCase):
 
     def test_a_seedless_run_without_one_is_measured_once_and_kept(self):
         s = FakeStore(measured={"line9-lint": self.entry(self.NOW, 5)})
-        base, _, stale = self.choose({"line9-lint": self.entry(self.OLD)}, {("9", "lint", 0): {}, ("9", "u3", 1): {}}, s)
-        self.assertEqual(s.asked, [(["9"], ["lint"])])  # (the seeded run is not measured)
+        base, _, stale = self.choose({"line9-lint": self.entry(self.OLD)}, {("9", "lint", 0): {}}, s)
+        self.assertEqual(s.asked, [(["9"], ["lint"])])
         self.assertEqual(base["line9-lint"]["counts"], {"n": 5})
         self.assertEqual(s.kept_now, {"line9-lint": self.entry(self.NOW, 5)})
         self.assertEqual(stale, [])
+
+    def test_a_seeded_run_without_one_is_measured_at_the_merge_base_with_its_seeds(self):
+        """#709: main's own runs of the seeds asked, not a checkpoint's (#582)."""
+        measured = {f"line9-{c}-seed{s}": self.entry(self.NOW, 10 * s) for c in ("u3", "stops") for s in (1, 2)}
+        s = FakeStore(measured=measured, checkpoint={"line9-u3-seed1": self.entry(self.OLD, 3)})
+        results = {("9", c, k): {} for c in ("u3", "stops") for k in (1, 2)}
+        base, _, stale = self.choose({"line9-u3-seed1": self.entry(self.OLD, 9)}, results, s)
+        self.assertEqual(s.asked, [(["9"], ["stops", "u3"], [1, 2])])
+        self.assertEqual([base[f"line9-u3-seed{k}"]["counts"] for k in (1, 2)], [{"n": 10}, {"n": 20}])
+        self.assertEqual((s.kept_now, stale), (measured, []))
+
+    def test_seeded_runs_this_machine_kept_are_not_measured_again(self):
+        s = FakeStore(here={"line9-u3-seed1": self.entry(self.NOW, 5)})
+        base, _, _ = self.choose({}, {("9", "u3", 1): {}}, s)
+        self.assertEqual((base["line9-u3-seed1"]["counts"], s.asked), ({"n": 5}, []))
 
     def test_what_this_machine_kept_is_reused(self):
         s = FakeStore(here={"line9-lint": self.entry(self.NOW, 5)})
@@ -141,14 +158,22 @@ class ChooseBaseline(unittest.TestCase):
         _, _, stale = self.choose({"line9-lint": self.entry(self.OLD)}, {("9", "lint", 0): {}}, s, measure=False)
         self.assertEqual((s.asked, stale), ([], ["line9-lint"]))
 
-    def test_a_seeded_run_takes_the_latest_checkpoint(self):
+    def test_without_measuring_a_seeded_run_takes_the_latest_checkpoint(self):
         s = FakeStore(checkpoint={"line9-u3-seed1": self.entry(self.OLD, 3)})
-        base, _, stale = self.choose({"line9-u3-seed1": self.entry(self.OLD, 9)}, {("9", "u3", 1): {}}, s)
-        self.assertEqual(base["line9-u3-seed1"]["counts"], {"n": 3})
+        out = io.StringIO()
+        with redirect_stdout(out):
+            base, _, stale = self.choose({"line9-u3-seed1": self.entry(self.OLD, 9)}, {("9", "u3", 1): {}}, s, measure=False)
+        self.assertEqual((base["line9-u3-seed1"]["counts"], s.asked), ({"n": 3}, []))
         self.assertEqual(stale, [])  # (said by the note, not as a stale baseline)
+        self.assertIn("not with main", out.getvalue())
 
-    def test_no_checkpoint_leaves_a_seeded_run_stale(self):
-        _, _, stale = self.choose({"line9-u3-seed1": self.entry(self.OLD)}, {("9", "u3", 1): {}}, FakeStore())
+    def test_a_measurement_that_gives_nothing_falls_back_to_the_checkpoint(self):
+        s = FakeStore(measured={}, checkpoint={"line9-u3-seed1": self.entry(self.OLD, 3)})
+        base, _, _ = self.choose({}, {("9", "u3", 1): {}}, s)
+        self.assertEqual((base["line9-u3-seed1"]["counts"], s.asked), ({"n": 3}, [(["9"], ["u3"], [1])]))
+
+    def test_no_checkpoint_and_no_measuring_leaves_a_seeded_run_stale(self):
+        _, _, stale = self.choose({"line9-u3-seed1": self.entry(self.OLD)}, {("9", "u3", 1): {}}, FakeStore(), measure=False)
         self.assertEqual(stale, ["line9-u3-seed1"])
 
 

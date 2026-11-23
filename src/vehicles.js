@@ -62,14 +62,27 @@ export async function loadRegistry(get = (u) => fetch(u)) {
 
 // A sound pack (#528; docs/decisions/2026-11-10-vehicle-packages.md, section 5): `events`, an event's file or a list
 // (one picked at random each time), and `loops`, a loop's `file` with its reference (`refSpeed` m/s for motor and
-// rolling, `refRpm` for mg) and `gain`; files in WAV or MP3. A vehicle's manifest may hold one as `sounds` (its
-// files among the vehicle's), or a package (kind `sounds`) adds one; the events and loops it leaves out keep the
-// built-in sounds (src/audio.js).
+// rolling, `refRpm` for mg) and `gain`; files in WAV or MP3, or in Ogg (Opus, #636) with an MP3 among the files as
+// its `fallback` (Safari before 18.4 decodes no Ogg; the decision of 2026-11-10: "Ogg/Opus only with an MP3
+// fallback"). A vehicle's manifest may hold one as `sounds` (its files among the vehicle's), or a pack shipped in
+// assets/ or a package (kind `sounds`) adds one; the events and loops it leaves out keep the built-in sounds
+// (src/audio.js).
 export function soundProblems(p, v) {
   const out = [];
   if (!v) return [`its vehicle ${liveryVehicle(p)} is not loaded`];
-  const files = new Set((p.files || []).map((f) => f.path)), sound = /\.(wav|mp3)$/i;
-  const file = (what, f) => { if (!files.has(f)) out.push(`${what}: ${f} is not among its files`); else if (!sound.test(f)) out.push(`${what}: ${f} is not WAV or MP3`); };
+  const entries = new Map((p.files || []).map((f) => [f.path, f])), files = new Set(entries.keys()), sound = /\.(wav|mp3)$/i;
+  const fallback = (f) => { const fb = entries.get(f)?.fallback; return files.has(fb) && /\.mp3$/i.test(fb); };
+  if (p.lineContactorRelease != null) {
+    const { minGain = 0.25, maxGain = 1, refCurrent = 480 } = p.lineContactorRelease;
+    if (typeof p.lineContactorRelease !== 'object' || Array.isArray(p.lineContactorRelease) ||
+        ![minGain, maxGain, refCurrent].every(Number.isFinite) || !(minGain > 0 && minGain <= maxGain && maxGain <= 1 && refCurrent > 0))
+      out.push('lineContactorRelease: wants 0 < minGain <= maxGain <= 1 and refCurrent > 0 A');
+  }
+  const file = (what, f) => {
+    if (!files.has(f)) out.push(`${what}: ${f} is not among its files`);
+    else if (/\.ogg$/i.test(f)) { if (!fallback(f)) out.push(`${what}: ${f} has no MP3 fallback among its files`); }
+    else if (!sound.test(f)) out.push(`${what}: ${f} is not WAV, MP3 or Ogg`);
+  };
   for (const [e, f] of Object.entries(p.events || {})) {
     if (!(e in EVENTS)) out.push(`event ${e}: the game raises no such event`);
     for (const x of [f].flat()) file(`event ${e}`, x);
@@ -82,12 +95,19 @@ export function soundProblems(p, v) {
   }
   return out;
 }
-// the sound pack a set of vehicle v sounds with: the first package for it, else its manifest's own, else none (the
-// built-in sounds); { id, events, loops, url(path) }
-export function soundsFor(v) {
-  const p = [...soundPacks.values()].find((x) => liveryVehicle(x) === v?.id);
-  if (p) return { ...p, url: (f) => localUrl(dir(p.id) + f) };
-  return v?.sounds ? { ...v.sounds, id: `${v.id}:own`, url: (f) => localUrl(dir(v.id) + f) } : null;
+// the sound packs for vehicle v, shipped and installed: the menu's Sounds (#636)
+export const soundPacksFor = (v) => [...soundPacks.values()].filter((x) => liveryVehicle(x) === v?.id);
+// the sound pack a set of vehicle v sounds with: the pack the player picked for it (pick, its id), else the
+// vehicle's own (its manifest's sounds), else none (the built-in sounds); { id, events, loops, url(path),
+// fallback(path) } (fallback: the file to play where the browser cannot decode this one)
+export function soundsFor(v, pick) {
+  const p = soundPacksFor(v).find((x) => x.id === pick);
+  const at = (id, list) => {
+    const fb = new Map((list || []).filter((f) => f.fallback).map((f) => [f.path, f.fallback]));
+    return { url: (f) => localUrl(dir(id) + f), fallback: (f) => fb.get(f) ?? null };
+  };
+  if (p) return { ...p, ...at(p.id, p.files) };
+  return v?.sounds ? { ...v.sounds, id: `${v.id}:own`, ...at(v.id, v.files) } : null;
 }
 
 // An installed package (#530, src/packages.js; checked there) into the registry: a vehicle after the repository's,

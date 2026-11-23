@@ -189,6 +189,74 @@ class Network(unittest.TestCase):
         self.assertEqual(net.report['edges from the orthophoto'], 1)
         self.assertEqual(sum(ed['src'] == 'ortho' for ed in net.edges.values()), 1)
 
+    def test_a_user_tip_states_where_dis_fork_is(self):
+        # #670: DI's fork (50, 0) still where the user answered holds; at the tip's point on the through track matches
+        # (within TIP_MATCH: a manhole 1.65 m beside the track at the fork, Podolská); elsewhere changed. `off` is the
+        # fork's distance from that point
+        # (a fork DI still gives where it did when the user answered holds, however near: the user set the tip apart
+        # from it, #685; it matches where DI moved it there)
+        for near, tip, state, off in (((50.0, 0.0), (46.7, -1.65), 'holds', 3.3), ((50.0, 0.0), (50.3, 0.1), 'holds', 0.3),
+                                      ((54.0, 0.0), (50.3, 0.1), 'matches', 0.3), ((53.7, 0.0), (50.2, -1.65), 'matches', 0.2),
+                                      ((54.0, 0.0), (46.7, -1.65), 'changed', 3.3)):
+            net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[(near, tip, 'the switch')])
+            self.assertEqual(net.facts['switchTips'], [{'id': 'the switch', 'state': state, 'off': off,
+                                                        'at': [round(tip[0], 2), round(tip[1], 2)], 'src': [50.0, 0.0]}], (near, tip))
+        net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[((50.0, 0.0), (46.7, -1.65))])
+        self.assertEqual(net.facts['switchTips'], [])  # no id: not stated
+
+    def test_a_switch_whose_fork_dis_network_moved_to_the_tip_is_found_by_the_tip(self):
+        # #677: DI's fork when the user answered lay 48.6 m from the pin (Ohrada); the network forks at the pin since,
+        # 0.75 m along the track from it: the switch is found by the tip, stays and matches
+        net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[((98.0, 0.0), (50.75, 0.3), 'Ohrada')])
+        self.assertEqual(net.report['switch tips at their fork already'], 1)
+        self.assertEqual(net.report['switch tips placed'], 0)
+        self.assertEqual([(f['state'], f['off']) for f in net.facts['switchTips']], [('matches', 0.75)])
+        fork = next(n for n in net.nodes if len(net.at[n]) == 3)
+        self.assertAlmostEqual(net.nodes[fork]['xy'][0], 50.0, delta=0.01)
+
+    def test_a_tip_with_no_switch_stops_the_build_with_its_place(self):
+        with self.assertRaisesRegex(SystemExit, 'Nowhere'):
+            net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[((90.0, 9.0), (89.0, 9.0), 'Nowhere')])
+        with self.assertRaisesRegex(SystemExit, 'Too far'):  # its point past the through edge's far end (a crossing)
+            net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), [(70, -30), (70, 30)],
+                   tips=[((50.0, 0.0), (90.0, -1.0), 'Too far')])
+
+    def test_a_photo_track_states_how_far_dis_line_is(self):
+        branch = turnout(50)
+        for dy, state in ((0.3, 'holds'), (0.05, 'matches'), (2.0, 'changed')):
+            photo = dt.Source('ortho', [rec(9, [(x, y + dy) for x, y in branch]) | {'place': 'the curve'}])
+            f = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], branch, photo=photo).facts['photoTracks']
+            self.assertEqual([(e['id'], e['state']) for e in f], [('the curve', state)], dy)
+            if state != 'changed':
+                self.assertAlmostEqual(f[0]['off'], dy, delta=0.02)
+
+
+    def test_a_smooth_answer_states_whether_dis_line_still_steps(self):
+        # #672: DI's line with a 5-degree corner in a 500 m curve at s 100 (lint's rule flags it): the answer holds; one
+        # curve there: it matches; no DI line within its reach: changed. The line is two records, the corner 20 m past
+        # their joint: the rule reads DI's line followed on through the joint
+        def kinked(corner):
+            pts, x, y, h = [(0.0, 0.0)], 0.0, 0.0, 0.0
+            for k in range(1, 201):
+                h += 1 / 500 + (math.radians(corner) if k == 100 else 0.0)
+                x, y = x + math.cos(h), y + math.sin(h)
+                pts.append((x, y))
+            return pts
+        for corner, state in ((5.0, 'holds'), (0.0, 'matches')):
+            p = kinked(corner)
+            steps = [{'id': 'the curve', 'xy': p[100], 'reach': 10.0, 'step': None}]
+            f = net_of(p[:81], p[80:], steps=steps).facts['steppedAnswers']
+            self.assertEqual([(e['id'], e['state']) for e in f], [('the curve', state)], corner)
+            self.assertEqual(f[0]['step'] is None, state == 'matches')
+        p = kinked(5.0)
+        f = net_of(p, steps=[{'id': 'gone', 'xy': (p[100][0], p[100][1] + 30), 'reach': 10.0, 'step': None}]).facts
+        self.assertEqual(f['steppedAnswers'][0]['state'], 'changed')
+        # (the step's radii recorded with the answer: DI's step as it was holds, a step drawn otherwise is changed)
+        got = net_of(p, steps=[{'id': 'x', 'xy': p[100], 'reach': 10.0, 'step': None}]).facts['steppedAnswers'][0]['step']
+        for rec, state in (((got['r5'], got['r25']), 'holds'), ((got['r5'] * 3, got['r25']), 'changed')):
+            f = net_of(p, steps=[{'id': 'x', 'xy': p[100], 'reach': 10.0, 'step': rec}]).facts['steppedAnswers']
+            self.assertEqual(f[0]['state'], state, rec)
+
 
 class Matching(unittest.TestCase):
     def test_each_track_of_a_double_track_keeps_its_own(self):

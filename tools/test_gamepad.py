@@ -108,7 +108,9 @@ def main():
             pad(buttons={9: 1})
             pad(buttons={})
             r["paused"].append(ev("window.game.paused"))
-            # the right stick: the head turned in proportion (0.575 is half way past the dead zone of 0.15)
+            # the right stick: the head turned in proportion, at its end as far as Q (0.575 is half way past the dead
+            # zone of 0.15). How far Q turns it comes from the cab and the window (cabframe.js lookLimits, #662), so it
+            # is measured, not written here (#680)
             # (the head eases there: read once it holds still, 0.4 s apart)
             yaw = lambda: ev("new Promise((ok) => { let a = camera.rotation.y; const f = () => { const b = camera.rotation.y; if (Math.abs(b - a) < 0.001) ok(b); else { a = b; setTimeout(f, 400); } }; setTimeout(f, 400); })")  # noqa: E731
             page.keyboard.press("Shift+Digit5")  # (stopped: a moving tram turns the view itself)
@@ -122,7 +124,13 @@ def main():
             y2 = yaw()
             pad(axes=[0, 0, 0.1, 0])
             y3 = yaw()
+            page.keyboard.down("q")
+            yq = yaw()
+            page.keyboard.up("q")
+            yaw()
+            ev("window.keys.length = 0")
             r["look"] = [round(y1 - y0, 2), round(y2 - y0, 2), round(y3 - y0, 2)]
+            r["lookQ"] = round(yq - y0, 2)
             pad(buttons={3: 1})
             pad(buttons={})
             pad(buttons={14: 1})
@@ -191,8 +199,10 @@ def main():
     if r["paused"] != [True, False]:
         fails.append(f"Start did not pause and resume: {r['paused']}")
     want = ["+r", "-r", "+,", "-,"]
-    if not (0.6 <= r["look"][0] <= 0.7 and 1.25 <= r["look"][1] <= 1.35 and abs(r["look"][2]) < 0.02):
-        fails.append(f"the right stick at half, full and in its dead zone turned the head {r['look']} (want 0.65, 1.3, 0)")
+    q = r["lookQ"]
+    if not (0.5 < q < 2.0 and abs(r["look"][0] - q / 2) <= 0.02 and abs(r["look"][1] - q) <= 0.02 and abs(r["look"][2]) < 0.02):
+        fails.append(f"the right stick at half, full and in its dead zone turned the head {r['look']} "
+                     f"(want {q / 2:.2f}, {q:.2f} as Q, 0)")
     if r["keys"] != want:
         fails.append(f"Y, D-pad ←: {r['keys']} (want {want})")
     if r["deadman"] != 0 or r["deadmanNotch"] <= 0:

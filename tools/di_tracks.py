@@ -480,7 +480,8 @@ class Source:
                     break
 
 def switch_tips(truth=None):
-    """[(near, tip)] in city metres: switches whose tip the user placed (data/truth.json trackSources.switchTips)."""
+    """[(near, tip, place)] in city metres: switches whose tip the user placed (data/truth.json trackSources.switchTips);
+    `near` is DI's fork when the user answered, `place` the fact's id (#670)."""
     import json
     from geo import Frame
     path = truth or Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
@@ -488,7 +489,7 @@ def switch_tips(truth=None):
     frame, out = Frame(), []
     for f in facts:
         (nx, tx), (ny, ty) = frame.xy([f['near'][0], f['tip'][0]], [f['near'][1], f['tip'][1]])
-        out.append(((float(nx), float(ny)), (float(tx), float(ty))))
+        out.append(((float(nx), float(ny)), (float(tx), float(ty)), f['place']))
     return out
 
 
@@ -519,6 +520,24 @@ def stepped_answers(truth=None):
     for f in facts:
         x, y = frame.xy(*f['place'])
         out.append(((float(x), float(y)), f['answer'], float(f.get('reach', STEPPED_REACH))))
+    return out
+
+
+def stepped_facts(truth=None):
+    """The 'smooth' answers of the stepped-curve review as facts to state (di_network.Network.state_steps, #672):
+    [{'id': its decision, 'xy', 'reach', 'step': (r5, r25) recorded from its card, or None}]."""
+    import json
+    from geo import Frame
+    path = truth or Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
+    facts = json.loads(Path(path).read_text(encoding='utf-8'))['trackSources'].get('steppedAnswers', [])
+    frame, out = Frame(), []
+    for f in facts:
+        if f.get('answer') != 'smooth' or not f.get('decision'):
+            continue
+        x, y = frame.xy(*f['place'])
+        st = f.get('step')
+        out.append({'id': f['decision'], 'xy': (float(x), float(y)), 'reach': float(f.get('reach', STEPPED_REACH)),
+                    'step': (float(st['r5_m']), float(st['r25_m'])) if st else None})
     return out
 
 

@@ -51,6 +51,7 @@ page reads with the sections. Where ground-level areas overlap at a point, the h
 one whose surface lay nearest the lidar ground, then the rank (src/terrain.js DtmSurface._hitTri): on all five lines
 the two agree at every sample (21,641, #479).
 """
+from collections import ChainMap
 import json
 import math
 from pathlib import Path
@@ -63,6 +64,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 from route import Route  # noqa: E402
+import sources  # noqa: E402
+from step_inputs import there  # noqa: E402
 import track_beds  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -79,6 +82,8 @@ DIAMOND_MIN = 20       # degrees: another track crossing ours more shallowly is 
 BED = 2.7              # m: a bed's width (src/world.js), the extent a diamond covers on ours
 PAVED_IN = ("embedded", "setts")   # the styles a junction's pieces join across (#574: setts as embedded)
 SURFACE_STYLE = {"setts": "setts", "embedded": "embedded", "panels": "panels", "grass": "grass"}  # answer -> style
+STYLE_MATCH = 0.9      # of an answer's stretch the styles laid without the answers give its style, for it to match (#670)
+DATA_SECTIONS = ("survey", "lidar", "list")  # the sections a source lays (not a rule's, nor the user's marks or answers)
 CROSS_REACH = 6        # m past OSM's carriageway half-width that the survey's road at the axis may still extend it
 BRIDGE_HEAD = 6        # m inside a bridge's ends (OSM's) where a way across still meets the track at grade (on_bridge)
 CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
@@ -472,6 +477,33 @@ def reviewed(data, truth):
     return out
 
 
+def answer_states(data, truth, survey, opens=()):
+    """The user's grass and surface answers this line lays (grassReview `grass`, trackSurfaceReview's styles) against
+    the styles laid without them: matches where a source's sections (DATA_SECTIONS: the survey, the lidar, the grassed-
+    track list) give the answer's style over STYLE_MATCH of its stretch (a junction answer: of its place), else holds,
+    with what lays it there most (a rule's or the user's own count for `by`, not for a match) (#670). {truth.json
+    section: [state entry]}."""
+    # (the two sections without their answers over the rest, not a copy of it: the step cache keys this step by the
+    # sections of truth.json it reads, and a copy reads every one, #816)
+    bare = ChainMap({"grassReview": {**truth.get("grassReview", {}), "answers": []},
+                     "trackSurfaceReview": {**truth.get("trackSurfaceReview", {}), "answers": []}}, truth)
+    without = sections(data, bare, survey, opens)
+
+    def entry(i, style, s0, s1):
+        if s1 - s0 < 1:  # (a place, not a stretch)
+            s0, s1 = (s0 + s1) / 2 - 0.5, (s0 + s1) / 2 + 0.5
+        by = {}
+        for x in without:
+            if x["style"] == style:
+                by[x.get("source")] = by.get(x.get("source"), 0.0) + max(0.0, min(s1, x["s1"]) - max(s0, x["s0"]))
+        sh = sum(by.values()) / (s1 - s0)
+        data = sum(v for k, v in by.items() if k in DATA_SECTIONS) / (s1 - s0)
+        return {"id": i, "state": "matches" if data >= STYLE_MATCH else "holds", "style": style, "share": round(sh, 2),
+                "by": max(by, key=by.get) if sh > 0 else None}
+    return {"grassReview": [entry(r["card"], "grass", r["s0"], r["s1"]) for r in reviewed(data, truth)],
+            "trackSurfaceReview": [entry(i, st, s0, s1) for s0, s1, what, st, i in surface_places(data, truth)]}
+
+
 def sections(data, truth, survey, opens=(), track="ours"):
     """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479), the
     paved track embedded at junctions and road crossings (#546), and the junctions the user's surface answers lay in
@@ -675,7 +707,7 @@ def main():
     data = json.loads(p.read_text(encoding="utf-8"))
     truth = json.loads((ROOT / "data" / "truth.json").read_text(encoding="utf-8"))
     dp = ROOT / "data" / f"line{line}.dtm.json"
-    dtm = json.loads(dp.read_text(encoding="utf-8")) if dp.exists() else None
+    dtm = json.loads(dp.read_text(encoding="utf-8")) if there(dp, ROOT) else None
     survey = Survey(dtm) if dtm else None
     import open_track
     opens = open_track.found(data)
@@ -699,6 +731,8 @@ def main():
             tr["bed"] = bs[i]
         else:
             tr.pop("bed", None)
+    data["provenance"] = sources.stamp("track_styles.py", {}, data.get("provenance"),
+                                       facts=answer_states(data, truth, survey, opens))
     data["lift"] = lift_series(data, data["styles"], offsets(truth))
     if "stylesBack" in data:
         data["liftBack"] = lift_series(data, data["stylesBack"], offsets(truth))

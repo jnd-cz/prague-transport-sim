@@ -55,9 +55,13 @@ class Markdown(unittest.TestCase):
              "work": {"prs": [{"pr": 1, "title": "t", "draft": True, "idle_h": 60}], "issues": 3, "lanes": {"sim": 2, "none": 1},
                       "halfDone": [21], "parked": 0, "needsUser": 1, "rebuildLabel": []},
              "reviews": {"sets": 1, "findings": 2, "issueClosed": []}, "leftovers": {"worktreesDone": [], "worktreesStale": [], "branches": []},
-             "knownFailuresClosed": [], "dated": [], "ci": {"runs": 1, "median_s": 30, "max_s": 30, "failed": 0}}
+             "knownFailuresClosed": [], "dated": [], "ci": {"runs": 1, "median_s": 30, "max_s": 30, "failed": 0},
+             "facts": {"summary": "holds 1 · matches 1", "look": ["matches: postedSpeeds a (lines 37; now 65)"]}}
         before = {"date": "2026-11-02", "sizes": {"src": {"src/a.js": 30}, "srcTotal": 30, "testFiles": 1}}
         md = H.markdown(h, before)
+        self.assertIn("**Facts over a source** (`tools/fact_status.py`): holds 1 · matches 1.", md)
+        self.assertIn("- matches: postedSpeeds a (lines 37; now 65)", md)
+        self.assertNotIn("Facts over a source", H.markdown(h | {"facts": None}))
         self.assertIn("`src/a.js` 35 (+5)", md)
         self.assertIn("against 2026-11-02", md)
         self.assertIn("idle 60 h: #1 t", md)

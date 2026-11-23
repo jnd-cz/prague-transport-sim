@@ -12,7 +12,7 @@ The ground of each cell of IPR's raster (35,001 x 26,001 cells of 1 m, rows nort
     cell's centre (tools/dmr5g.py: the 500 m tiles in raw/dem/; --fetch downloads the missing ones);
   2 inside it still: the lines' 10 m grids (raw/line*/terrain5514.tif, build_line.py);
   else no ground, and no triangles. Outside the boundary, IPR's own cells only.
-No passages rule (fine_terrain.py's): IPR's ground stays where it has ground, the floors of underpasses and culverts and
+No passages rule (fine_terrain.py's, gone with it, #510): IPR's ground stays where it has ground, the floors of underpasses and culverts and
 the streets through building passages included; a street or track over a passage becomes a deck in #276's partition (the
 user, 2026-11-10: "keeping IPR lidar everywhere to keep the actual lowest points. Then bridge the gaps on streets and
 track/rail passes with other data"; tools/bench/terrain_compare.py --passages measured what the rule took and why).
@@ -62,6 +62,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOL, D0, TOL_MAX = 0.10, 120.0, 3.0  # m: the user's 10 cm at the track (2026-11-06), growing beyond D0, at most 3 m
 LAT = 8  # cells: the distance to the tracks is exact on this lattice, bilinear between (the bench's)
 CAP = 3700.0  # m: tol is TOL_MAX from D0 * TOL_MAX / TOL = 3,600 m on: farther distances are held at this
+SMOOTH_SIGMA, SMOOTH_NEAR = 1.5, (15.0, 30.0)  # m: the raster's Gaussian, blended in between these distances from a track
 BASE_BLOCK, BASE_SIGMA = 64, 8  # the base: the ground's 64 m block means, a Gaussian of 8 blocks (512 m)
 BLOCK = 16  # cells: no-ground cells take s from the ground's 16 m block means
 RAMP, RAMP_R = 0.25, 16  # s a cell, cells: no-ground cells rise this much a cell away from the ground, up to RAMP_R
@@ -200,6 +201,41 @@ def at_lattice(dl, rows, cols, lat=LAT):
     j, i = fj.astype(np.int64), fi.astype(np.int64)
     tj, ti = fj - j, fi - i
     return (dl[j, i] * (1 - ti) + dl[j, i + 1] * ti) * (1 - tj) + (dl[j + 1, i] * (1 - ti) + dl[j + 1, i + 1] * ti) * tj
+
+
+def smooth(Z, lev, dl, sigma=None, near=None, band=256):
+    """The ground's cells (IPR's and the fills') smoothed by a Gaussian of `sigma` m, the ground's own cells weighted
+    (no ground does not pull it down), blended in from near[0] to near[1] m from a track: the mesh drew IPR's 1 m detail
+    to 10 cm, a terrace's edge, a crest and the ground under trees as zigzags of steep facets (line 37 by the Krejcarek
+    viaduct, line 17 at Modrany s 2352; #632, the user, 2026-11-16: "I'd like to solve the issues first"). In place,
+    band by band; the count of cells changed."""
+    from scipy.ndimage import gaussian_filter
+    sigma = sigma or SMOOTH_SIGMA
+    near = near or SMOOTH_NEAR
+    h, w = Z.shape
+    r = int(3 * sigma) + 1
+    cols = np.arange(w)
+    n = 0
+    for r0 in range(0, h, band):
+        r1 = min(h, r0 + band)
+        a0, a1 = max(0, r0 - r), min(h, r1 + r)
+        z = np.asarray(Z[a0:a1], np.float64)
+        g = (np.asarray(lev[a0:a1]) & LEVEL) != NO
+        if not g.any():
+            continue
+        num = gaussian_filter(np.where(g, z, 0.0), sigma, mode="nearest")
+        den = gaussian_filter(g.astype(np.float64), sigma, mode="nearest")
+        k = slice(r0 - a0, r1 - a0)
+        R, C = np.meshgrid(np.arange(r0, r1), cols, indexing="ij")
+        wgt = np.clip((at_lattice(dl, R, C) - near[0]) / (near[1] - near[0]), 0.0, 1.0)
+        on = g[k] & (wgt > 0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            zs = num[k] / den[k]
+        out = z[k].copy()
+        out[on] = z[k][on] * (1 - wgt[on]) + zs[on] * wgt[on]
+        Z[r0:r1] = out.astype(np.float32)
+        n += int(on.sum())
+    return n
 
 
 def ground_steps(g, steps):
@@ -960,16 +996,61 @@ def show(rep):
         print(f"  zero area {a['n']}: {a['km2']} km², {a['district']} {a['cadastral']}, holds {a['holds']}, filled {a['filled']}")
 
 
+BOOKKEEPING = b"\n# ---------------------------------------------------------------- the key and the cache\n"
+
+
+def code_hash(here=None):
+    """The hash of the code that makes the mesh: CODE's files, this one up to its section on the key and the cache (the
+    key, the cache's folders, the command line and the turn among the heavy jobs follow it; what main() passes on is in
+    the key by value). #748 changed the turn's line, and with the whole file hashed every checkout lost its cached mesh:
+    13 min and 15 GB to build the same one again, #757."""
+    here = here or os.path.dirname(os.path.abspath(__file__))
+    h = hashlib.sha256()
+    for f in CODE:
+        with open(os.path.join(here, f), "rb") as fh:
+            h.update(fh.read().replace(b"\r\n", b"\n").split(BOOKKEEPING)[0])
+    return h.hexdigest()
+
+
+def inputs(box=None):
+    """What the cache key hashes, as main reads it: (key()'s arguments, DI's network, the 10 m grids' paths, a function
+    hashing the DMR 5G tiles: --fetch adds tiles and keys again)."""
+    import dmr5g
+    import di_network
+    import osm_local
+    from ipr_dtm import TIF
+    net = di_network.load_network()
+    segs = segments(net)
+    print(f"DI's network: {len(net.edges)} edges, {sum(e['line'].length for e in net.edges.values()) / 1000:.0f} km of track", flush=True)
+    grid_paths = sorted(p for p in __import__("glob").glob(os.path.join(ROOT, "raw", "**", "terrain5514.tif"), recursive=True))
+    code = code_hash()
+
+    def tile_hashes():
+        return {f: sha256(os.path.join(dmr5g.DIR, f)) for f in sorted(os.listdir(dmr5g.DIR)) if f.endswith(".tif")}
+    grids_h = {os.path.relpath(p, ROOT).replace(os.sep, "/"): sha256(p) for p in grid_paths}
+    parts = dict(raster=sha256(TIF), tiles=tile_hashes(), grids=grids_h, tracks=segs, osm=osm_local.base_id(), code=code,
+                 box=box)
+    return parts, net, grid_paths, tile_hashes
+
+
+def cached(box=None):
+    """The city mesh of the current inputs from the machine cache: (its folder, the key), or SystemExit naming the run
+    that builds it (#507 reads it; the whole city takes 13 min and 15 GB)."""
+    k = key(**inputs(box)[0])
+    out = os.path.join(cache_root(), k)
+    if not os.path.exists(os.path.join(out, "mesh.npz")):
+        raise SystemExit(f"no city terrain mesh for the current inputs ({k}): python -P -E tools/city_terrain.py")
+    return out, k
+
+
 # ---------------------------------------------------------------- the run
 def main(argv):
     arg = lambda k, d: type(d)(argv[argv.index(k) + 1]) if k in argv else d  # noqa: E731
     box = tuple(float(v) for v in arg("--box", "").split(",")) if "--box" in argv else None
     threads, min_free = arg("--threads", 8), arg("--min-free", 6.0)
     import dmr5g
-    import di_network
-    import osm_local
     from geo import Frame
-    from ipr_dtm import IprDtm, TIF
+    from ipr_dtm import IprDtm
     F = Frame()
     ipr = IprDtm()
     win = window(ipr, box, F)
@@ -979,21 +1060,11 @@ def main(argv):
     t_all = time.perf_counter()
     origin = (float(origin[0]), float(origin[1]))
     print(f"window {shape[1]} x {shape[0]} cells, cell (0, 0) at ({origin[0]:.4f}, {origin[1]:.4f})", flush=True)
-    net = di_network.load_network()
-    segs = segments(net)
-    print(f"DI's network: {len(net.edges)} edges, {sum(e['line'].length for e in net.edges.values()) / 1000:.0f} km of track", flush=True)
-    grid_paths = sorted(p for p in __import__("glob").glob(os.path.join(ROOT, "raw", "**", "terrain5514.tif"), recursive=True))
-    here = os.path.dirname(os.path.abspath(__file__))
-    code = hashlib.sha256(b"".join(open(os.path.join(here, f), "rb").read() for f in CODE)).hexdigest()
-
-    def tile_hashes():
-        return {f: sha256(os.path.join(dmr5g.DIR, f)) for f in sorted(os.listdir(dmr5g.DIR)) if f.endswith(".tif")}
     t0 = time.perf_counter()
-    raster = sha256(TIF)
-    grids_h = {os.path.relpath(p, ROOT).replace(os.sep, "/"): sha256(p) for p in grid_paths}
-    parts = dict(raster=raster, tiles=tile_hashes(), grids=grids_h, tracks=segs, osm=osm_local.base_id(), code=code, box=box)
+    parts, net, grid_paths, tile_hashes = inputs(box)
+    segs, grids_h, code = parts["tracks"], parts["grids"], parts["code"]
     k = key(**parts)
-    print(f"key {k} ({time.perf_counter() - t0:.0f} s hashing the inputs)", flush=True)
+    print(f"key {k} ({time.perf_counter() - t0:.0f} s reading and hashing the inputs)", flush=True)
     out = os.path.join(cache_root(), k)
     rep_dir = os.path.join(ROOT, "reports", "city-terrain")
     os.makedirs(rep_dir, exist_ok=True)
@@ -1009,7 +1080,8 @@ def main(argv):
     import contextlib
     import sysinfo
     heavy = shape[0] * shape[1] > SMALL
-    with HeavyJob("city_terrain") if heavy else contextlib.nullcontext():
+    # (a build: beside counts and other builds while the whole city's 15 GB and its threads fit, #728)
+    with HeavyJob("city_terrain", share={"gb": 15, "cores": threads}) if heavy else contextlib.nullcontext():
         def guard():  # (the machine is shared: this run ends itself rather than push other jobs into swapping)
             while True:
                 if (sysinfo.available_gb() or 99) < min_free:
@@ -1052,6 +1124,12 @@ def main(argv):
                 dem.tiles.pop(t, None)
                 if (n_ + 1) % 20 == 0:
                     print(f"  {n_ + 1}/{len(missing)} tiles downloaded", flush=True)
+            # (IPR states no vertical datum: its median against DMR 5G (Bpv) on the snapshot's tiles stops the build past
+            # dmr5g.DATUM_TOLERANCE, #62; fine_terrain.py checked it on every line's build until #510)
+            t0 = time.perf_counter()
+            datum = dmr5g.datum_check(ipr)
+            print(f"IPR - DMR 5G on {datum['cells']:,} cells of {datum['tiles']} tiles: median {datum.get('median', 0):+.3f} m, "
+                  f"p10 {datum.get('p10', 0):+.3f}, p90 {datum.get('p90', 0):+.3f}, {time.perf_counter() - t0:.0f} s", flush=True)
             t0 = time.perf_counter()
             grids = Grids(grid_paths)
             fb = fallbacks(Z, lev, origin, F, dem, grids)
@@ -1062,6 +1140,11 @@ def main(argv):
                 k = key(**parts)
                 out = os.path.join(cache_root(), k)
                 print(f"{len(dem.fetched)} tiles downloaded: key {k}", flush=True)
+            t0 = time.perf_counter()
+            n_smooth = smooth(Z, lev, dl)
+            secs["smooth"] = time.perf_counter() - t0
+            print(f"smoothed {n_smooth:,} cells (sigma {SMOOTH_SIGMA} m past {SMOOTH_NEAR[0]:.0f}-{SMOOTH_NEAR[1]:.0f} m from a track)"
+                  f" in {secs['smooth']:.0f} s; peak {peak_gb():.1f} GB", flush=True)
             areas, rest = zero_areas(lev, origin, parts_)
             # the cells by level, inside and outside the city
             cnt = np.zeros((2, 4, 4), np.int64)  # inside, level, kind
@@ -1084,7 +1167,7 @@ def main(argv):
                     pass
         km2 = lambda v: round(int(v) / 1e6, 3)  # noqa: E731
         rep = {"key": k, "window": list(win), "origin": list(origin), "tolerance": {"tol": TOL, "d0": D0, "tol_max": TOL_MAX,
-               "lattice": LAT, "floor": TERRAIN_FLOOR}, "inputs": {"raster": raster, "tiles": len(parts["tiles"]),
+               "lattice": LAT, "floor": TERRAIN_FLOOR}, "inputs": {"raster": parts["raster"], "tiles": len(parts["tiles"]),
                "grids": grids_h, "osm": parts["osm"], "track_km": round(sum(e["line"].length for e in net.edges.values()) / 1000, 1),
                "code": code},
                "mesh": mesh, "cells": {
@@ -1094,7 +1177,7 @@ def main(argv):
                    "ipr outside": {KINDS[v]: km2(cnt[0, :, v].sum()) for v in range(4)},
                    "rim (no ground under kept triangles)": km2(mesh["rim_cells"])},
                "fallbacks": fb, "dmr5g": {"needed": len(need), "downloaded": len(dem.fetched),
-                                          "fetched": [os.path.basename(f) for f in dem.fetched]},
+                                          "fetched": [os.path.basename(f) for f in dem.fetched], "iprMinusDmr5g": datum},
                "zero_areas": areas, "zero_areas_small": rest, "s": {a: round(b, 1) for a, b in secs.items()},
                "peak_gb": round(peak_gb(), 1), "ipr_kinds": {KINDS[v]: int(kinds[v]) for v in range(4)}}
         save(out, V, T, origin, rep)

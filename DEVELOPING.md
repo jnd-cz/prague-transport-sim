@@ -31,22 +31,31 @@ All lines share one frame: S-JTSK metres from the Marian column (`tools/geo.py`)
 
 The whole chain for a line (logs in `reports/rebuild/`): `build_line` first, then its independent steps
 side by side; `--parallel` also builds the lines side by side, as many as free memory holds (~2.5 GB each).
-A line takes ~2-4 min:
+A line takes ~2-4 min to its street surfaces; then its ground (4-10 min a line, up to 21 GB), the network on it and
+the build ID, one line after another (#702):
 
 ```bash
 python -P -E tools/rebuild.py 17 22          # or all lines: python -P -E tools/rebuild.py --parallel
-python -P -E tools/rebuild.py 9 --from dtm   # that step runs again (track = build_line, heights = line_heights)
+python -P -E tools/rebuild.py 9 --from dtm   # that step runs again (track = build_line, heights = line_heights,
+                                             # ground = ground_mesh)
 python -P -E tools/rebuild.py --force        # every step runs
 ```
 
 A step runs only when something it read changed (`tools/stepcache.py`, #511): each run is traced (the files it
 opened, probed or listed under the checkout, the modules it imported from it, the packages' versions) and
-recorded in `reports/rebuild/cache/`; a step whose record still holds is skipped and its outputs put back as that
+recorded in `TRAMDATA_CACHE/stepcache/` (without a machine cache: `reports/rebuild/cache/` of the checkout; the
+records name files by their path under the checkout, so they hold in a fresh worktree, #797); a step whose record still holds is skipped and its outputs put back as that
 run left them, so the next step reads what it read before (`data/lineN.json` is rewritten by several steps in
 turn). A change to one rule reruns the steps that read what it changed, down to the first whose output stays the
 same. `lineN.log` says per step whether it ran and why (`tools/track_profile.py changed`, `data/line9.json
-changed`). A tool that reads a file the trace cannot see (C code other than osmium's reader, a subprocess) needs
-`--from` or `--force`.
+changed`). `data/truth.json` is keyed by the sections a step read (#816): a step that parses it with `json.load`
+or `json.loads` gets a dict that notes the top-level keys it reads, so a new place in `groundPlaces` reruns no
+build step (`data/truth.json: stopSigns changed` where one did change). A step that reads it whole (iterates,
+copies or dumps it) or opens it without parsing keeps the whole file in its key. A tool that reads a file the trace cannot see (C code other than osmium's reader, a subprocess) needs
+`--from` or `--force`, or the file declared: `rebuild.py` gives the step a name and a value that changes with it, kept
+in its record (`run_step(declared=...)`). The ground declares the city mesh it reads from the machine cache by its
+key; where the mesh of the current inputs is not there, `rebuild.py` runs `tools/city_terrain.py` first (#702).
+`reports/rebuild/ground.summary.log` names the mesh.
 
 The single steps:
 
@@ -108,10 +117,11 @@ it). Built lines: 9, 17, 22, 23, 37.
 The steps after `build_line` (`tools/rebuild.py` runs them in this order; its docstring is the one
 list). Each also runs alone, as `python -P -E tools/<step>.py --line N` (the line-17 tools take the line
 as a plain argument, `dtm` also the district packages: `rebuild.py` shows the exact arguments; `-P -E`:
-pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages).
+pyosmium, pyproj, shapely, numpy, SciPy, Pillow, brotli and pydelatin 0.4.0 live in the user site packages;
+`tools/sound_encode.py` also needs lameenc).
 Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait their turn among the heavy jobs, as
 `rebuild.py` does; under it they run in its turn. Any other long run (a profile, a bench, a comparison) goes through
-`python -I tools/heavy.py "what" -- CMD ...` (AGENTS.md, #536):
+`python -I tools/heavy.py "what" -- CMD ...` (AGENTS.md, #536; `--shared GB,CORES` for one that is no timing, #728):
 
 | step | writes | what |
 |---|---|---|
@@ -121,24 +131,51 @@ Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait t
 | `dtm_points` | `lineN.dtmpoints.json` | street furniture from the archived technical map |
 | `osm_signals` | `lineN.signals.json` | line 17 only, until the placement rules (#22): OSM traffic signals |
 | `osm_validate` | `lineN.validate.json` | every line: a check of the line against OSM |
-| `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22) |
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
-| `fine_terrain` | `lineN.fine.json`, `.fine.bin` | terrain on a 2 m grid in 128 m blocks within 120 m of either track (`?nofine` loads without it) |
 | `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS), their ground level judged against IPR (`tools/zps_ground.py`, #446), their decks checked against Mosty 3D and the raised rails, flat over the ways under them, thinner by `maxheight` (`tools/zps_decks.py`, #445), railway yards, lawns and paved yards on IPR's ground marked to take the lidar inside and the passages' plugged portals on IPR's floor (`tools/zps_inside.py`, #444), with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
+| `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them), where each platform is drawn, and the stop types from the survey's areas (`vienna`: so after `dtm`, #701). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22). From here on a line with surveyed streets needs its `lineN.dtm.json`: a step that reads it and finds none stops `rebuild.py` (`tools/step_inputs.py`) |
 | `track_styles` | `lineN.json` | the track styles (`styles`: the user's marks, prazsketramvaje.cz's grassed-track list, answered review cards, the survey's grass; cut at platforms and crossings, #479, #503) and the rails' height over the bed every 2 m (`lift`, blended inside each section, #480) |
 | `line_heights` (all lines once) | `lineN.json` | the top of rail every 2 m along the path, the opposite path and every drawn track (`heights`, `heightSource`, a track's `zs`, #197); where no source has one, the surface plus the lift (`surface`, #480): no sample is left without a height, else the build fails |
 | `line_structures` | `lineN.json` | the spans the route runs on a bridge, those with a deck the track lies on, and the roads under it with their clearance (`spans`, `realDecks`, `underpasses`, #480) |
 | `cross_level` | `lineN.json` | the cross level of paved track where the road tilts across both tracks: one plane of IPR across them, the rails tilted with it (`crossLevel`, #538) |
+| `ground_mesh` (`--no-network`) | `lineN.ground.*` | after `street_profile`: the ground welded into one mesh (below, **Ground**); written only when the file decodes to the mesh built, its vertices and each class's triangles with their names, else the build fails (#702) |
+| `network` | `lineN.network.json` | on the ground file: the traffic's roads, lanes, walks, doors, the signals bound to the lanes (below, **The network**) |
+| `build_id` | the line's other files | the line's build ID, `data/lineN.json`'s CRC-32, into the provenance (`build`) of the files the page loads with it (`FILES`); the page computes the line file's and refuses a set of another build, or with a file that carries none, naming `rebuild.py N` (`src/buildId.js`, #702). A tool that writes one of those files stamps its provenance afresh, so a file built by hand after a rebuild carries none; a set where no file carries one was built before #702 and loads. `python -I tools/build_id.py --check N` lists them |
 
 The page computes no profile of its own (#480): it reads the built top of rail, the lift and the structures. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
 packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
 
 **The city terrain** (#428, the first step of #276's ground): `python -P -E tools/city_terrain.py` meshes IPR's
 1 m raster of the whole city once, 10 cm within 120 m of DI's tracks and growing beyond (at most 3 m), with no
-cell over its tolerance. It is no line step: the mesh goes into the machine cache
-(`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and code), not `data/`, and nothing in the game reads
-it yet. A heavy job: 13 min and 15 GB on the dev PC; `--box x0,y0,x1,y1` meshes a part at once. Its report and a
-picture of the city limits go to `reports/city-terrain/`.
+cell over its tolerance. It is no line step (`rebuild.py` runs it before the ground where the mesh of the current
+inputs is not there): the mesh goes into the machine cache
+(`TRAMDATA_CACHE/city-terrain/<key>/`, keyed by its inputs and the code that makes the mesh: the three files of
+`CODE`, `city_terrain.py` up to its section on the key and the cache, so a change to the command line or the
+heavy-job turn keeps the mesh, #757), not `data/`. The ground file is built from it (`tools/ground_mesh.py`). A
+heavy job: 13 min and 15 GB on the dev PC; `--box x0,y0,x1,y1` meshes a part at once. Its report and a picture of
+the city limits go to `reports/city-terrain/`.
+
+**A place's ground** (#757): `python -P -E tools/ground_place.py NAME` builds the ground of one place of
+`data/truth.json` `groundPlaces` (or `--line N --at X,Y`) with the line build's own code
+(`ground_mesh.build(within=...)`): the tiles its reach touches and one ring of tiles round them, in about a minute
+and 2 GB, with no turn among the heavy jobs (`--all` takes a shared one). Into `reports/places/NAME/` go its
+measures inside the reach (the steps' walls by height, the steep faces that are no wall, the area per class), the
+same of the written file, both from above as pictures, and the **locality**: the place's middle tiles against
+`data/lineN.ground.*`, vertex for vertex and triangle for triangle. A tile's ground is meant to depend on the tile
+and its ring only, so with unchanged tools every difference is a rule that reads something farther away, named by
+what gave the vertex its height. A ground rule is tried on its places first; the lines are rebuilt once for a
+batch of changes.
+
+A place says how it should look and how that is measured. `seen` is what street-level imagery shows there, in
+words, with the points and headings it was looked at from (the pictures themselves are not kept: they are the
+provider's). `sections` are lines across the place, each with the most of a measure it may have: the ground is
+sampled every 0.25 m along the line and compared with IPR's 1 m raster. A wall between level grounds may slope
+for a few metres at most (rise over run between 0.2 and 3) and stay within 0.5 m of the raster but for the wall's
+own 2 m; a ramp or a flight of stairs keeps to the straight line between its ends. `--written` measures the
+written file alone, in seconds: the quay's section slopes for 10 m of its 30 (2.5 allowed) and Krejcárek's stairs
+stray 0.39 m from their chord (0.15 allowed) on the data of 2026-11-19. To see a place as the game draws it from
+where a panorama stands, `tools/shot.py --view review --at X,Y --yaw H --pitch P --dist D` with the target `D` m
+ahead of the camera along `H`; a compass heading is 7.8° more in the local frame.
 
 ## Deploy
 
@@ -186,6 +223,26 @@ takes them locally into `local/` there. `python -I tools/feedback.py` lists them
 `--kind`), `--perf` gives frames per second and slow frames per machine. A note becomes an issue only when
 someone decides so.
 
+**Package submissions** (#580): the Vehicles… page sends a checked package, or its address, to `submit.php`
+(`tools/submit.php`, on every target; its caps beside `tools/submissions.py`'s, which `tools/serve.py` applies
+locally). The host's PHP must take a 64 MB upload (`upload_max_filesize`, `post_max_size`). `deploy.py --pull` moves
+them into the machine's submissions folder (`$TRAM_SUBMISSIONS`, else beside the data cache:
+`tramdata/submissions/<target>/<id>/`, never in git: the contact is the author's). The review:
+`python -I tools/submissions.py` lists them; `python -P -E tools/submissions.py --check ID` installs it in a fresh
+headless browser, writes the check's report and pictures it beside the hybrid (`reports/submissions/<id>/`);
+`--accept ID` adds it to `assets/catalogue.json` (a PR), hosted when its author allowed it (the pack copied to
+`tramdata/submissions/hosted/`, which `deploy.py` uploads as `hosted/<name>`: a deploy refuses while the catalogue
+names one that is not there) or linked at the author's address (`--url` for an uploaded one; the upload deleted);
+`--reject ID "why"`; `--delete ID` once the author has the verdict.
+
+**Sound packs' files** (#636): a pack's WAV masters become the Ogg Opus files it plays and their MP3 fallbacks with
+`python -P -E tools/sound_encode.py assets/<id>`: headless Chromium encodes the Opus (WebCodecs), LAME the MP3s
+(`python -m pip install --user lameenc`, the user, 2026-11-17: "please install mp3 encoder and use mp3 as fallback
+in some good quality setting"), and each is checked against its master; the manifest then names the `.ogg` files,
+each with its MP3 as `fallback` and its master as `master`, and every file's size and hash. `--check` checks a pack
+as it is (`tools/test_sound_encode.py` runs it on the shipped one). The format:
+[docs/vehicles.md](docs/vehicles.md#sound-packs).
+
 **Performance on players' machines** (#350): every drawn frame of a shift goes into a 1 ms histogram of frame
 intervals (`src/perf.js`; pauses and idle redraws left out), with the places of frames over 33 ms. A player's
 browser keeps vsync, so this says whether a machine keeps up with its display; `tools/frametime.py` (vsync off)
@@ -195,6 +252,12 @@ the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the dep
 minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
 the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 
+**The HUD's cost** (`python -P -E tools/bench/hud.py`, #706): what one update of the HUD changes in the page (0 when
+nothing changed: texts are written only when they change, `src/hud.js` `put`) and how long it takes with the CPU
+throttled 4 times. Line 17, 2026-11-19, before -> after: 13 -> 0 changes an idle update, an update 7.2 -> 2.9 ms (the
+minimap 4.2 -> 0.35 ms), a frame 45 -> 32-40 ms. A drawing routine that needs an element's box takes it from
+`src/boxes.js` `rectOf`, not from the page on every frame.
+
 **The site's icons** (#485): `assets/icons/icon-{32,180,192,512}.png`, the favicon, the iPhone's home-screen icon
 (`apple-touch-icon` in `index.html`) and the web manifest's (`app.webmanifest`), are drawn by
 `python -P -E tools/make_icons.py`: change the drawing there and run it, never the PNGs by hand.
@@ -202,8 +265,8 @@ the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 ## Dev
 
 **Headless checks from the command line** (Playwright, see DATA.md setup): the benches and lints below,
-each in a fresh headless page, with pass / fail per run (exit code 1 on a failure) and the results in
-`reports/headless/`:
+a line's runs batched in headless pages (#205, #413; `--batch 1`: a fresh page per run), with pass / fail per
+run (exit code 1 on a failure; the thresholds are `judge` in the tool) and the results in `reports/headless/`:
 
 ```bash
 python -P -E tools/headless.py --lines 17,23 --checks u3,redruns --seeds 1-3
@@ -228,17 +291,39 @@ The harness verifies its own server before launching a job. An occupied `--port`
 or stopping the existing listener; use `--port 0` to allocate a free port atomically. `--url` explicitly
 uses an already-running server.
 
-Regression checks compare with main's baseline in the data store: the key counts of each run, with the code and data they were measured on. `--baseline` also keeps a local copy in `reports/baseline/`, ignored by git.
+### Baselines
+
+Regression checks compare a run with main's stored baseline (#89, #156, #282; `/regress` picks the lines and checks):
 
 ```bash
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --compare
-python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --seeds 1 --baseline
+python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic,lint --compare
 ```
 
-`--compare` prints baseline → now per run (also in `reports/headless/compare.md`, for the PR) and marks
-problem counts that rose (traffic counts beyond a 15 % + 5 noise band). It warns when the baseline was not
-measured on main's code and data. `--baseline` stores the run as the new baseline; it needs the game,
-the in-page checks and `data/MANIFEST.json` committed and `data/` matching the manifest.
+- **What is stored:** the key counts of each run and their places, under a key of what the counts depend on
+  (`tools/baseline_store.py` `MEASURED`: `src/`, `index.html`, the in-page checks, `data/MANIFEST.json`,
+  `data/truth.json`), in the data store.
+- **Who measures main:** the deploy PC, at night, after a merge that changes one of those (`tools/autodeploy.py`,
+  2 pages at once, not while a heavy job runs). A PR does not refresh the baseline. `--baseline` stores a run as
+  one (it needs the game, the checks and `data/MANIFEST.json` committed and `data/` matching the manifest) and
+  keeps a local copy in `reports/baseline/`.
+- **`--compare`** takes the baseline of the branch's merge base and prints baseline → now per run (also in
+  `reports/headless/compare.md`, for the PR), with the places new and gone (#157). It warns when main has moved
+  since.
+- **Seeded counts** (seeds 1-5 by default) are judged by the branch's mean against the min–max of main's seeds: a
+  change to the tram's timing reshuffles traffic like a new seed (#156), so moves inside the spread are listed as
+  noise. Stuck, unfinished and penalty runs are listed per seed and need a reason, as does every mean outside the
+  spread and every move of a seedless check (lint, surfaces).
+- **Which baseline each tier compares with** (#282):
+  - a checkpoint's run stores itself under its name (`--baseline --publish --checkpoint W1`: every check, seeds 1-5);
+  - every check compares with main at the merge base: its baseline (the night's, or this machine's), else measured
+    there once in a pinned worktree through the queue and kept on this machine by its key. A seeded check is
+    measured with the seeds asked (#709), so the first compare on a base takes about twice as long;
+  - `--against W1` compares with a checkpoint instead; `--no-measure-base` leaves the measuring out, and a seeded
+    run then takes the latest checkpoint's.
+- **A seeded compare against a checkpoint is not a compare with main** (the note says "not with main"): read no
+  move from it. #582's stops moved by up to 50 late seconds against W2 and were identical to main's.
+- **One drive a seed:** `u3`, `redruns`, `stops` and `traffic` asked together come from one drive of each line and
+  seed, its watchers reporting each (#205, #708, #722; `--separate`: a drive each).
 
 For a combined GTFS run, independently check every logged pair and the built timetable against the
 pinned GTFS, including eligible pairs omitted from both the log and timetable:
@@ -259,7 +344,7 @@ autopilot(0, 99, { obstacles: 'normal', weather: 'rain' });
 
 **Lints** ([docs/knowledge.md](docs/knowledge.md)): each check counts one kind of problem over the whole line. With the dev server
 (`tools/serve.py`, which saves the reports), the page loaded with **`?keepgeo`** (the game otherwise frees
-the meshes' CPU copies after loading) and a shift started on the line:
+the meshes' CPU copies after loading, and draws only the ground's tiles round the camera, #30) and a shift started on the line:
 
 ```js
 const { lint } = await import('/tools/lint.js?v=' + Date.now());
@@ -268,12 +353,16 @@ await lint({ bot: true });  // + the street bot where DTM streets exist (about a
 await lint({ traffic: true }); // + the whole line driven headless with the real traffic (1–2 minutes)
 ```
 
-The traffic run (`tools/traffic_lint.js`) starts a shift at the first stop and lets the autopilot drive
-to the end with a fixed time step; the page's frame loop only draws meanwhile (`window.headless`).
-Every 0.2 s it records every visible car, walker and tram and counts: cars or walkers moving sideways
-(`slide`), teleporting (`jump`), vehicles intersecting (`overlap`, once per episode) and walkers inside
-a vehicle (`walkerHit`), each with its cause where known (next road, lane beside the tram, …). It is
-seeded and uses the first trip, autumn and dry weather, so a run on a **freshly loaded page** gives
+The traffic run (`tools/traffic_lint.js`) is a watcher on the `u3` drive (`tools/bench/u3.js`): the autopilot
+drives the whole line from the first stop with a fixed time step, trip 40, obstacles normal; the page's frame loop
+only draws meanwhile (`window.headless`). Before #722 it drove its own run (trip 0, no obstacles), so no traffic
+count is read across that change. Every 0.2 s it records every visible car, walker and tram and counts: cars or
+walkers moving sideways
+(`slide`), teleporting (`jump`), vehicles intersecting (`overlap`, once per episode), walkers inside
+a vehicle (`walkerHit`), each with its cause where known (next road, lane beside the tram, …), and
+walkers that keep within 2 m of one place for 30 s while not waiting at a kerb or in a door
+(`walkerStuck`: turning, round a loop of walks, or still; #366). It is
+seeded and uses autumn and dry weather, so a run on a **freshly loaded page** gives
 the same counts every time (a second run in the same page differs slightly).
 
 Reports go to `reports/lineN.json` (not in git). Regression checks use `tools/headless.py --compare`
@@ -295,7 +384,7 @@ python -I tools/datadiff.py --line 17 zps --at=-2489,-8331 --radius 5
 python -I tools/datadiff.py --line 17 dtm --ref '5d6c427^'
 ```
 
-`shot.py` writes individual PNGs, a labelled pair and camera/data hashes to `reports/shots/`.
+`shot.py` writes individual PNGs, a labelled pair and camera/data hashes to `reports/shots/`. The small things drawn near the camera (`src/nearbatch.js`) are refilled round the captured camera before the picture, and the JSON keeps each set's range and drawn count (`near`); two captures of one checkout are the same picture (`tools/test_shot.py`, #689).
 Views: `cab` (default), `chase`, `review`. The tram is paused at `s`, traffic and HUD are hidden;
 review uses `&at=` at that route point. Both sides use the current view's exact camera, so a changed
 profile cannot move the comparison camera. It starts its own free-port servers, one view at a time.
@@ -312,6 +401,19 @@ fields and array counts. `--at X,Y` lists nearby working survey areas and source
 their levels and height-accuracy classes); the JSON report retains their vertices.
 Both tools accept `--cache DIR`. If an old blob is missing, populate the cache with `snapshot.py data-fetch`
 in a separate checkout of that reference; comparisons never restore over the working data.
+
+**Pictures in a PR** (#662): GitHub takes uploaded pictures only from its web page (drag and drop into a comment);
+`gh` and the API have no upload. A session puts them in its branch instead, so the PR shows them and main never
+carries them:
+
+1. Shrink each picture to a JPEG of at most about 200 KB (#662's seven: 27–209 KB) and commit them as
+   `docs/reviews/issueN-<what>.jpg` in a commit of their own. Push.
+2. Link them from the PR's body by that commit's full SHA, not the branch, which is deleted at the merge:
+   `![desktop](https://raw.githubusercontent.com/jnd-cz/prague-transport-sim/<sha>/docs/reviews/issueN-desktop.jpg)`.
+   A phone's portrait shot goes in as `<img src="…" width="320" alt="…">`.
+3. Remove them in the next commit (`git rm docs/reviews/issueN-*`, only the issue's own: the directory keeps older
+   pictures of #162, #176 and #178 on main) and push. The squash merge then adds nothing to main. The links keep working after the merge: `refs/pull/N/head` keeps the commit (#662's still load
+   with its branch deleted).
 
 **The limits against real rides** (#451): `python -P -E tools/rides_limits.py --lines 22,23` maps the GPS rides in
 `raw/reference/rides/` (`RIDES`, the ones in a line's direction) onto each line's track and lists where a ride went
@@ -341,6 +443,18 @@ lines, the issues' titles and states, the PRs' questions) is built at each deplo
 lines in the file (`issue`, `line`, or per finding `line` / `lines_near`); `KNOWN` there covers the
 tools that do not write them yet. The kerb review lists are listed there too, under #142, though they lie in each
 line's survey data, not in a file.
+
+**The project overview** (`overview.html`, test site only; #826) is for the phone: what waits for the user (PRs ready
+to merge, the PRs' questions, issues labelled `needs-user`, the review sets' unanswered findings counted as the review
+directory counts them), the heavy queue with estimated starts and finishes, the agents' sessions of the last 48 h and
+the board. `tools/overview.py` writes `overview.json` from `board.py`'s functions, the heavy queue and the session logs
+(Claude Code's and Codex's, `LOGS` there: only the folder a session works in and the PR its harness linked are read,
+from the log's end, never a message), and uploads it to the test site over `deploy.py`'s connection when it changed or
+9 min went by; the page turns red at 15 min. `python -I tools/overview.py --install` runs it every 5 min as a
+scheduled task (pythonw, `--uninstall`), in the deploy checkout (`../tg-deploy`, which has `deploy.local.json`); a run
+takes ~3 s of CPU (the board's git answers cached by commit in `reports/overview-cache.json`). A deploy never deletes
+`overview.json` (`deploy.py` `KEPT`). `--print` prints the snapshot; locally `python -I tools/overview.py --print >
+overview.json` and the dev server show the page.
 
 **Review mode** (the checks' findings on the map, desktop or phone; #129): open
 `index.html?line=17&review`, no shift needed. The panel lists findings worst first:
@@ -415,7 +529,11 @@ and class (#444; `--dtm DIR`, `--page main` for main's drawing); the build marks
 what it took under the decks in `checks.underDecks`. `python -P -E tools/bench/paved_ipr.py` measures paved track
 against IPR along each route: the stretches whose surface lies more than 10 cm under IPR for 6 m or more, each with
 its cause (the source holding it there, split by which of source and IPR the survey sides with; a curve that did not
-follow; no source) and its place (#539; `--json OUT` for every run).
+follow; no source) and its place (#539; `--json OUT` for every run). `python -X utf8 -P -E tools/bench/kerb_causes.py
+DIR` sorts the flat kerbs of a checks folder (`headless.py --checks surfaces --out DIR`, run on the checkout's data) by
+what IPR, the written ground and the street surface have across each kerb: no kerb in the raster either, an area drawn
+from its outline, a kerb spread wider than the check's row, flat in the street surface, the rest (#800; `--list` for
+every sample, `--json OUT`).
 
 **Report an issue** (#138): **⚑ Report** at the bottom left of a shift, or F9 (also in inspect mode),
 pauses the game and asks for a kind and a note. Send stores the note with the moment's state and a
@@ -433,6 +551,131 @@ the places that look wrong, worst first: kerb steps, wheels on a sidewalk, heigh
 floating or sunken cars and walkers, gaps in the surveyed streets, bumpy footways. Click a row (or
 `n` / `b`) to fly there; arrows orbit, `+` / `−` zoom; coloured posts mark every place.
 `window.streetBot` holds the result (`stats`, `findings`, `raw` samples). One run takes about a minute.
+
+## Working rules in detail
+
+What [AGENTS.md](AGENTS.md) states in a line: how it is done, and where the rule came from.
+
+**Skills** (Claude Code, `.claude/skills/`): `/issue N` starts an issue's session, `/regress` runs the regression
+check before a PR, `/housekeeping` is the weekly pass (also every Monday at 06:30) and with `checkpoint` the
+architecture review at a world checkpoint ([docs/housekeeping.md](docs/housekeeping.md)). Housekeeping posts on
+the pinned #291 and only proposes.
+
+**Heavy jobs** (`baseline_store.HeavyJob`, first come first served; #280, #536, #728):
+- Every job that keeps several cores or GBs busy for over a minute waits for the machine's other heavy jobs and
+  holds its turn, so that it does not spoil another's measurement (the user, 2026-11-12, #516). These take their
+  turn themselves: `headless.py`, `rebuild.py`, `frametime.py`, `city_terrain.py`, `ground_mesh.py`;
+  `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py`, `street_profile.py` and
+  `ground_partition.py` when run alone; `ground_place.py` for several places or `--rings` (one place runs as it
+  is); `test_all.py` for the whole suite (`tools/test_heavy.py` holds this list to the code). Anything else runs
+  through `heavy.py`.
+- Two kinds. A job alone (a timing, or one of unknown size: every tool that does not say otherwise, plain
+  `heavy.py`) waits for every job before it and every job running, and holds those after it. A shared job (a count
+  run or a build: its result is the same beside another job, only later) declares its peak memory and its cores:
+  `headless.py` 4 GB and 2 cores a page, `rebuild.py` 2.5 GB a line built side by side and half the cores,
+  `ground_mesh.py` 21 GB and its threads, `city_terrain.py` 15 GB and its threads, `heavy.py --shared GB,CORES`
+  what it is told. It waits for the jobs alone and for the shared ones queued before it, then runs beside the
+  shared ones running while its cores fit beside theirs and its memory fits in what is free, less what they
+  declared and do not hold yet, less 8 GB kept (`city_terrain.py` stops itself under 6 GB free, `ground_mesh.py`
+  under 4). `headless.py` sizes its pages by what that leaves. A ticket from a checkout older than #728 is a job
+  alone, and such a checkout's jobs wait for every job as before. A tool becomes shared when its peak is measured
+  and written at its `HeavyJob(...)`.
+- A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that
+  names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
+- What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
+  started with a clean environment: a job never waits for a process that started it (#585). A job that waits
+  with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
+- Each job prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
+  (`tools/sysinfo.py`). `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
+- A job in its own turn watches itself (#815; on 2026-11-22 a trace expected to take 5 min ran 100 min and held
+  17 GB against the 6 it declared, and the job behind it waited 26 min). Once a minute it reads its process tree
+  (`HeavyJob.verdict` has the rules): past 2× its expected time it warns, and it will end past 4× and 30 min over
+  it once a week of history has calibrated the rule (`HeavyJob.TIME_ENDS`; `heavy.py --history` shows each
+  kind's spread); over its share's memory it warns at 1.25× and ends at 2×, or at 1× with under 4 GB free on the
+  machine (a job alone: under 4 GB free), seen at two looks in a row; with its processes under 2 s of CPU in
+  10 min, or the process that started it gone, it ends. A warning goes on its ticket, which the board and a
+  waiting job's line show (`…, running 100 min, expected 5 (shared: 6 GB, 4 cores): LATE ×20; 17 of 6 GB`), and
+  once into the job's output. Ending stops everything the job started (on Windows a Job Object: a stopped
+  `heavy.py` stops its command too), exits 86 and prints one line: what, how long, how much against what. The
+  board lists the jobs a watch ended in the last hour. The expected time is `heavy.py --expect`, what
+  `headless.py` plans from its runs' times, or the median of the same kind's last full runs (a command's script
+  and its option names) in `history.jsonl` beside the tickets. `--no-limit` (`TRAM_HEAVY_NOLIMIT=1`) keeps the
+  warnings and ends nothing. A job waiting behind one that watches itself gives it 20 min before calling it stuck.
+  The board and the overview add each job's estimated start and finish (`baseline_store.schedule`, #826): the
+  ticket's expected time, else its kind's median in the history (one full run is enough there), the jobs started in
+  queue order as their turns allow (alone after everything, shared while cores and GB fit).
+- A stopped background task can leave its job running: when the command ended in a Git Bash program (`bash
+  chain.sh`), bash handed its process over to it, and the stop kills a pid that is gone (measured 2026-11-22: the
+  chain's shells and its python ran on, their parents unchanged; with the outer shell alive the stop ends the
+  whole tree). `python -I tools/heavy.py --stop PID` asks such a job to end with what it started; a job of
+  another checkout only with `--force`.
+
+**Stacked work:** an issue that needs another branch's unmerged work branches from it and opens its PR with
+`--base` on that branch. Before the base's PR merges, move the stacked PR onto main (`gh pr edit N --base main`):
+deleting the base's branch closes a PR still based on it, and a closed PR cannot change its base (#745, reopened
+by putting the branch back for a moment). Once the base squash-merges, merge main into the stacked branch (no
+force-push); a conflict in code only the base changed takes the stacked branch's side. Then rerun its checks and
+merge (#578 on #575).
+
+**Merging** (`python -I tools/session.py merge N`, on the user's word): one open PR of the issue's branch, none
+standing on it, mergeable, its checks passed, the worktree's changed and untracked files looked at; then the squash
+as `<PR title> (#PR)`, the worktree, the local and the remote branch removed and the agent's label taken off. gh's
+own `--delete-branch` removes the worktree folder with its untracked files at once (gh 2.103.3, seen at #751 and
+#752: each folder was gone right after its merge).
+
+**Unattended runs:** an investigation script is committed only when it runs like the other tools: its own server
+on a free port (as `headless.py`), no fixed agent port, a usage line at the top. Without issues allowed, findings
+go into a "Findings" section of the PR.
+
+**Facts in `data/truth.json`:**
+- A new section names its reader in the file's `readers`, or says it is reference only (#224).
+- No check exemptions, agent audits or lists of generated array indexes: #177's allowlist would have failed every
+  line on the next rebuild. What a check can decide from geometry stays a rule in the check, counted per class
+  with its places, so `--compare` shows what a rebuild moved.
+- A fact that overrides a source records what the source said, and the tool applying it states whether it is
+  still needed (DATA.md, Facts over a source; #670).
+- Built files carry their `provenance` from `tools/sources.py` (a layer's fallback order, date, credits).
+
+**Review findings files** (`reports/review/`, above):
+- Offer only answers an importer turns into evidence, and say on the card why another answer stays held (#162,
+  #176).
+- The file names its `issue` and `line` (or `lines`): the review directory (`reviews.html`, #288) lists it under
+  them, and lists the sets of closed issues apart.
+- A set whose issue is closed while findings wait is deleted (the user, 2026-11-05: "If the issue is closed and
+  reviews are unasnwered then it's out of date and can be deleted"), unless a build reads it
+  (`tools/review_sets.py` `READ_BY`: deleting one broke the build, #416).
+
+**Page checks and tests:**
+- In a page: `tools/lint.js` on a page loaded with `?keepgeo` (`lint()`; `lint({ traffic: true })` averages seeds
+  22, 7, 1234); benches in `tools/bench/` (u3, redruns, walkers; `batch.html`).
+- Run long browser jobs unawaited and poll: script calls time out at 45 s. A background window throttles frames,
+  so no fps readings from one.
+- A test that drives a page limits the whole test (`faulthandler.dump_traceback_later`, as `tools/test_review.py`):
+  Playwright's `page.evaluate` has no limit, and a promise that never resolves hangs the run without output.
+- A test that needs `data/` or `raw/` skips without them, saying what to fetch.
+
+**Dev switches:** `?line=N`, `?inspect`, `?review` (findings on the map), `?bot`, `?keepgeo`, `?notunnels`,
+`?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile
+from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N,
+replayed up to route s and handed over paused: a stuck scene as it was, #157).
+
+**Where some rules came from:**
+
+| rule | from |
+|---|---|
+| `Closes #N` only with every point met | #146 was nearly closed with six places still awaiting the user's answers |
+| calibrate a check before it holds data | #119's survey check held 4.6 km of line 17's open track: it was calibrated on street track only |
+| don't reformat what you don't change | #119's reflow buried its changes |
+| no seeded checks on a world change | they measure traffic reshuffled by the new data (#156). The user, 2026-11-05: "build up the static world … without regression checks at every step where they don't make sense yet (like traffic behavior because of shifting terrain)" |
+| the world first, a lane may pause | the user, 2026-11-05: "pause simulation work after finishing the current PRs"; the simulation lane waited for checkpoint W2 and resumed there (#414) |
+| heavy jobs take turns | the user, 2026-11-12, #516: "Make sure to run any comparison or heavy job in a queue to not affect other work" |
+| count runs and builds share the machine | the user, 2026-11-19, #728, asked whether they may when memory allows, the rule above staying for timings: "yes". A night's sessions waited in one line: 33 min behind another job's count run (PR #461) |
+| one rebuild at a time | two branches publishing rebuilt data overwrite each other's lines (#280) |
+| findings off the path go on a lane's list | issues opened faster than closed: 410 against 251 in 26 days. The user, 2026-11-19: "yes" (#731) |
+| a finding's own issue only for the next step or a failing check, after a search; one issue for a place's or a batch's reports | 202 open on 2026-11-21, 120-129 opened a week against 41-87 closed; a session opened #797 and #800 in a day and reported a build race on #735 that #701 already held. The user, 2026-11-21, on "their number is still slowly but steadily climbing": "yes let's do this" |
+| merges in batches, the heaviest work at night | the user, 2026-11-21, having stopped the other lanes' sessions to save "resources, time as well as attention": "If we can merge in batches like today, keep the heavy work for nights, I'll be happy to resume the other lanes and sessions"; night from 22:00 to 07:00, plus any time the user says go: "yes" |
+| a ground rule's issue closes at the rule's merge | it stayed open as "Part of" until the batch's rebuild, 5-10 issues between batches, while #757 tracks the batch. The user, 2026-11-21: "ok, let's try this approach" |
+| a security hole is not written up in public | the repository is public and the alpha is live. The user, 2026-11-19: "fix and file privately" |
 
 ## How the game's parts work
 
@@ -457,8 +700,27 @@ What the player's guide ([README.md](README.md), [README.en.md](README.en.md)) l
   camera at rest. Driving and inspect mode draw every frame; a hidden tab draws nothing.
 - **Interlaced track in Letenská:** detected automatically from the two OSM route relations.
 - **Radio/IRC switching** remains in the code for switches the data marks as such; none are marked now.
-- **Terrain:** OSM track geometry is smoothed into curves, and the terrain is lowered under every track
-  bed so it never pokes through.
+- **Ground:** the page loads it prebuilt (`data/lineN.ground.*`, `tools/ground_mesh.py`, #509): the survey, the track
+  beds, the building plots, the water and the terrain welded into one mesh that meets the tracks; the page draws the
+  beds the file does not hold (on structures) and the decks, and builds no ground of its own (#510). The file is 500 m
+  tiles on the S-JTSK grid, each decoded on its own in a pool of workers (`src/groundFile.js`, #30): every tile's height
+  lookup at load, then only those within the fog's end of the camera and of 1 km of route ahead, drawn in detail (9-17
+  MB of lookups held, 48-120 MB before #658). `?keepgeo` and `?bot` keep every tile's lookup and meshes. `tools/bench/ground_tiles.py` drives the window along a line:
+  what is held, each tile's time, any tile missing in view. The build's report (`reports/ground-mesh/`) holds the
+  mesh's error against IPR's raster only where `tools/ground_mesh.py --error` asked for it (0.6-8 minutes a line,
+  #704): a checkpoint's run, or a change of the terrain's thinning.
+- **The network** (the traffic's roads, lanes, footways and doors, the signals bound to the lanes, what the platforms and
+  stops read of the survey) is built once, after `tools/ground_mesh.py`, by `tools/network.py` into
+  `data/lineN.network.json` ([the network layer's note](docs/decisions/2026-11-18-network-layer.md), #658), a step of
+  `rebuild.py` of its own after the ground's (#702): a change to a traffic rule runs it alone. Start
+  builds none of it and reads no lookup past the window: what it places stands on the heights the build read from the
+  ground file as the page reads it (`tools/ground_at.py`, held to the page's reads by `tools/test_ground_at.py --browser`,
+  #682): the bridges' and road tunnels' ends, the signal heads, the platforms. Our stops' signs and shelters settle once
+  their tile's lookup comes (`ground.later`). The road tunnels' mouths are in the ground file (`tools/ground_mesh.py`
+  fit_mouths). A change to a traffic rule is a change to `tools/network.py` and a rebuild of the file. The page's
+  rules were ported whole: before they went, its network and the build's were the same to the cm on lines 9, 17, 22, 23
+  and 37 (#667, #668). `tools/test_network_layer.py` holds Start to it; `tools/bench/network_layer.py` times Start and
+  counts its reads.
 - **Buildings:** the type is read from the OSM tag under each LOD2 building, its roof shape and size;
   Mosty 3D sets the deck height on tagged bridges.
 - **Outdoor temperature:** Prague now comes from Open-Meteo, hourly.

@@ -38,10 +38,14 @@ from shapely.ops import substring
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import di_tracks  # noqa: E402
+import sources  # noqa: E402  (fact_state, #670)
 
 JOIN = di_tracks.JOIN    # m: record ends this near meet
 ATTACH = 0.5             # m: a lone chain end this near another chain's middle joins it there
 END_CLEAR = 0.5          # m: a split point this near a chain's end is that end
+TIP_MATCH = 1.0          # m: a switch whose fork lies this near the point the user's tip gives it is at that point already
+                         # (as the user's placed stop signs, 2026-11-18, #670: "within 1 meter would be good match"; DI's
+                         # fork at Ohrada lies 0.75 m along the track from the user's pin since #368, Podolská's 0.18 m)
 LOOK = 2.0               # m along an edge for its direction out of a node
 TURN = 16.0              # degrees: two edges at a node continue each other when their directions out of it are within
                          # this of opposite (measured on DI 2026-10-31: of 913 switches' diverging legs against their
@@ -69,6 +73,8 @@ TWICE = 0.5              # m: two short edges between the same nodes this near e
 SECTION_LEGS = 9.0       # m: a switch drawn as a section has legs this long or shorter (Dvorecký most 4.7 m,
                          # Palackého náměstí 6.8 m; the tongues DI draws: 8.4-9 m)
 PHOTO_SHARE = 0.8        # of an edge's length a photo track covers for the edge to take it
+PHOTO_MATCH = 0.1        # m: DI's line within this of every point of a photo track is as good as the photo (three times
+                         # the photo's own 3.1 cm around its curve, Podolská vodárna): the photo fact matches (#670)
 
 
 def _unit(v):
@@ -80,12 +86,14 @@ class Network:
     """nodes: {id: {'xy', 'kind'}}; edges: {id: {'a', 'b', 'line', 'src', 'records'}}, `line` from a to b;
     at[node]: [(edge, end)] the edge ends at the node (end 0: the edge starts there)."""
 
-    def __init__(self, source, tips=(), photo=None, archive=None):
+    def __init__(self, source, tips=(), photo=None, archive=None, steps=()):
         self.source = source
         self.archive = archive
         self.nodes, self.edges = {}, {}
         self.at = defaultdict(list)
         self.report = defaultdict(int)
+        # the state of each truth.json fact applied over DI (sources.fact_state, #670): {section: [entry with `at`]}
+        self.facts = {'switchTips': [], 'photoTracks': [], 'steppedAnswers': []}
         self._reach = {}
         self._zones = {}
         self._build(source)
@@ -96,6 +104,7 @@ class Network:
         self.unique_pairs()
         self._walk_back()
         self.index()
+        self.state_steps(steps)
 
     # ------------------------------------------------------------------ construction
     def _node(self, xy, kind):
@@ -758,27 +767,45 @@ class Network:
     def move_tips(self, tips):
         """A switch whose tip the user placed (data/truth.json trackSources.switchTips: [(near, tip)] in city metres)
         forks at the point of its through track nearest the tip: the through edge splits there and the diverging
-        leg starts at it (Podolská vodárna: 3.3 m east of DI's fork, at the manhole)."""
-        for near, tip in tips:
-            forks = [(math.dist(v['xy'], near), n) for n, v in self.nodes.items()
-                     if math.dist(v['xy'], near) <= di_tracks.FORK and self.through(n)]
-            if not forks:
-                self.report['switch tips without a fork'] += 1
-                continue
-            F = min(forks)[1]
+        leg starts at it (Podolská vodárna: 3.3 m east of DI's fork, at the manhole). The switch is the through fork
+        nearest the tip within di_tracks.FORK, else nearest `near` (DI's fork when the user answered): DI's network may
+        have moved its fork since (#677: Ohrada's interlaced switch forks at the user's pin since #368). A fork within
+        TIP_MATCH of that point stays. Each tip's state (#670): matches where the fork lies within TIP_MATCH of that
+        point (the tip has no effect), holds where it is still at `near`, changed where it is at neither. A tip with no
+        switch, or whose point lies past the switch's through edges, stops the build with its place (#677: both tips
+        went unplaced, as counts in the log, before #670 stated them)."""
+        same = lambda a, b: math.dist(a, b) <= TIP_MATCH  # noqa: E731
+        forks = [n for n in self.nodes if self.through(n)]
+        for t in tips:
+            near, tip = t[0], t[1]
+            place = t[2] if len(t) > 2 else f'at {tip[0]:.1f}, {tip[1]:.1f}'
+            F = None
+            for p in (tip, near):
+                c = [(math.dist(self.nodes[n]['xy'], p), n) for n in forks if math.dist(self.nodes[n]['xy'], p) <= di_tracks.FORK]
+                if c:
+                    F = min(c)[1]
+                    break
+            if F is None:
+                raise SystemExit(f"data/truth.json switchTips: no switch within {di_tracks.FORK:.0f} m of the tip "
+                                 f"or of DI's fork when answered: {place}")
             toe, thr, div = self.through(F)
-            best = None
-            for x in (toe, thr):
-                line = self.edges[x[0]]['line']
-                s = line.project(Point(tip))
-                d = line.distance(Point(tip))
-                if END_CLEAR < s < line.length - END_CLEAR and (best is None or d < best[0]):
-                    best = (d, x, s)
-            if best is None or math.dist(self.nodes[F]['xy'], tip) <= END_CLEAR:
+            fx, fy = self.nodes[F]['xy']
+            # the tip's point: the nearest of the through track's (a manhole beside the track: Podolská)
+            _, x = min(((self.edges[y[0]]['line'].distance(Point(tip)), y) for y in (toe, thr)), key=lambda z: z[0])
+            line = self.edges[x[0]]['line']
+            s = line.project(Point(tip))
+            at = line.interpolate(s).coords[0]
+            if len(t) > 2:
+                self.facts['switchTips'].append({
+                    'id': t[2], 'state': sources.fact_state(at, near, (fx, fy), same, unchanged=lambda a, b: math.dist(a, b) <= END_CLEAR),
+                    'off': round(math.dist((fx, fy), at), 2), 'at': [round(tip[0], 2), round(tip[1], 2)],
+                    'src': [round(fx, 2), round(fy, 2)]})
+            if same((fx, fy), at):
                 self.report['switch tips at their fork already'] += 1
                 continue
-            _, x, s = best
-            fx, fy = self.nodes[F]['xy']
+            if not END_CLEAR < s < line.length - END_CLEAR:
+                raise SystemExit(f"data/truth.json switchTips: the tip's point lies past the switch's through edge "
+                                 f"({s:.1f} m of its {line.length:.1f} m, the fork {math.dist((fx, fy), at):.1f} m off): {place}")
             Q = self.split(x[0], s, 'tip')
             # (a tip behind the fork: the branch runs along the through track from the tip to the fork first, a long
             # thin switch, Ohrada; ahead of it, the branch starts at the tip)
@@ -798,14 +825,70 @@ class Network:
             self.nodes[F]['kind'] = 'joint'
             self.report['switch tips placed'] += 1
 
+    def state_steps(self, steps):
+        """The 'smooth' answers of the stepped-curve review (data/truth.json trackSources.steppedAnswers, #368) against
+        DI's own line (#672): tools/lint.js steppedCurves' rule (stepped_review.stepped_places) on DI's lines through the
+        place, each followed STEP_FOLLOW m on along the passes either way. A step within the answer's reach: holds (the
+        answer still smooths it); none: matches (DI's line has no step there now); no DI line within reach: changed. With
+        the step's radii recorded with the answer (`step`, from its card), a step DI now draws otherwise is changed too.
+        `steps`: [{'id', 'xy', 'reach', 'step': (r5, r25) or None}]."""
+        import stepped_review
+        for f in steps:
+            pt = Point(f['xy'])
+            near = [e for e in (self.eids[i] for i in self.tree.query(pt.buffer(f['reach'])))
+                    if self.edges[e]['line'].distance(pt) <= f['reach']]
+            found = []
+            for e in near:
+                for q in stepped_review.stepped_places(self.line_through(e)):
+                    if math.dist(q['xy'], f['xy']) <= f['reach']:
+                        found.append(q)
+            worst = max(found, key=lambda q: q['r25'] / q['r5'], default=None)
+            now = None if not near else ('step', worst['r5'], worst['r25']) if worst else ('none',)
+            rec = ('step', *f['step']) if f.get('step') else None
+            same_step = lambda a, b: a[0] == b[0] == 'step' and all(abs(x - y) <= STEP_SAME * y for x, y in zip(a[1:], b[1:]))
+            state = 'changed' if now is None else sources.fact_state(('none',), rec, now, unchanged=same_step)
+            self.facts['steppedAnswers'].append({
+                'id': f['id'], 'state': state, 'at': [round(v, 1) for v in f['xy']], 'lines': len(near),
+                'step': None if worst is None else {'r5': round(worst['r5']), 'r25': round(worst['r25'])}})
+
+    def line_through(self, e):
+        """Edge e's line followed STEP_FOLLOW m on either way along the passes, the straightest pass at each node."""
+        c = list(self.edges[e]['line'].coords)
+        fwd = self._follow(e, 1, c)
+        back = self._follow(e, 0, c[::-1])
+        return back[::-1] + c + fwd
+
+    def _follow(self, e, end, path):
+        out, seen, need = [], {e}, STEP_FOLLOW
+        last = list(path[-2:])
+        while need > 0:
+            nxt = [x for x in self.passes.get((e, end), ()) if x[0] not in seen]
+            if not nxt or len(last) < 2:
+                break
+            hx, hy = last[1][0] - last[0][0], last[1][1] - last[0][1]
+
+            ways = [list(self.edges[f]['line'].coords)[::1 if fend == 0 else -1] for f, fend in nxt]
+            cos = [(hx * (c[1][0] - c[0][0]) + hy * (c[1][1] - c[0][1])) /
+                   ((math.hypot(hx, hy) * math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1])) or 1) for c in ways]
+            k = max(range(len(nxt)), key=cos.__getitem__)
+            (f, fend), c = nxt[k], ways[k]
+            out += c[1:]
+            last = (c[-2], c[-1])
+            need -= self.edges[f]['line'].length
+            seen.add(f)
+            e, end = f, 1 - fend
+        return out
+
     def take_photo(self, photo):
         """Tracks measured on the orthophoto the user took over DI's (data/truth.json photoTracks): an edge the photo
         track covers along PHOTO_SHARE of its length within di_tracks.PHOTO_COVER takes the photo's line between its
-        nodes."""
+        nodes. Each photo's state against DI's lines it replaces (#670): matches where they lie within PHOTO_MATCH of
+        every point of it, holds where they are farther, changed where DI no longer covers it (the photo is not taken)."""
         if photo is None:
             return
         for ch in photo.chains:
             pl = ch['line']
+            replaced = []  # DI's lines the photo takes over, as they were
             for e in list(self.edges):
                 line = self.edges[e]['line']
                 if line.distance(pl) > di_tracks.PHOTO_COVER:
@@ -818,10 +901,17 @@ class Network:
                 piece = substring(pl, min(s0, s1), max(s0, s1))
                 coords = list(piece.coords) if s0 <= s1 else list(piece.coords)[::-1]
                 ed = self.edges[e]
+                replaced.append(ed['line'])
                 coords[0], coords[-1] = self.nodes[ed['a']]['xy'], self.nodes[ed['b']]['xy']
                 ed['line'] = LineString(coords)
                 ed['src'], ed['records'] = 'ortho', ch['records']
                 self.report['edges from the orthophoto'] += 1
+            off = max(min(d.distance(Point(p)) for d in replaced) for p in pl.coords) if replaced else None
+            for r in ch['records']:
+                if isinstance(r, dict) and r.get('place'):
+                    state = 'changed' if off is None else 'matches' if off <= PHOTO_MATCH else 'holds'
+                    self.facts['photoTracks'].append({'id': r['place'], 'state': state, 'off': None if off is None else round(off, 2),
+                                                      'at': [round(v, 1) for v in pl.interpolate(0.5, normalized=True).coords[0]]})
 
     def index(self):
         """The search tree and the passes, after the edges changed."""
@@ -1357,7 +1447,7 @@ def load_network():
 
     def build():
         di, archive = di_tracks.load_sources()
-        return Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), archive)
+        return Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), archive, di_tracks.stepped_facts())
     return kept('network', key, build, code=('di_network.py', 'di_tracks.py'))
 
 
@@ -1419,6 +1509,9 @@ def _radius_over(coords, cum, lo, hi, tip=3.0):
     return (hi - lo - tip) / d if d > 1e-9 else math.inf
 
 
+STEP_FOLLOW = 40.0  # m of DI's line followed on either way from an edge near a 'smooth' answer (state_steps: lint's rule
+# reads 12.5 m either side of each point, within the answer's 10 m)
+STEP_SAME = 0.25  # of each radius: a step DI draws within this of the one recorded with the answer is the same step
 SMOOTHED = None  # the 'smooth' answers of the stepped-curve review, [(xy, reach)], read once (di_tracks.stepped_answers)
 
 
@@ -1879,7 +1972,7 @@ def main():
     t = time.time()
     di, _ = di_tracks.load_sources()
     t1 = time.time()
-    net = Network(di, di_tracks.switch_tips(), di_tracks.photo_source())
+    net = Network(di, di_tracks.switch_tips(), di_tracks.photo_source(), steps=di_tracks.stepped_facts())
     print(f"sources {t1 - t:.1f} s, network {time.time() - t1:.1f} s: {net.summary()}")
     root = Path(__file__).resolve().parent.parent
     d = json.loads((root / 'data' / f'line{line}.json').read_text(encoding='utf-8'))

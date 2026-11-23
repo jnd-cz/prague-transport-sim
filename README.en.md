@@ -31,10 +31,11 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   - **At a platform at least 15 m long,** where the data has one: the whole set stands alongside it, its rear
     at most 3 m short of the platform's start and its front at most 4 m past its end. A second set can serve
     the stop behind the first, on a longer platform even two 2×T3 sets in a row (about three stops in four).
-    At a platform shorter than the set, the front between 8 m before its end and 4 m past it is enough.
+    At a platform shorter than the set, the front between 8 m before its end and 4 m past it is enough. The front at
+    the stop sign (2.5 m before it to 3 m past it) always serves the stop, even where a longer set's rear stands off
+    the platform: passengers board through the doors along the platform.
   - **Elsewhere:** the front between 20 m before and 12 m past the stop sign.
-  - **A signal right after the stop:** the front at most 0.5 m before it.
-- The stopping point is the stop sign: within 3 m of it earns a precision bonus of 15 points. Stopping a little
+- The stopping point is the stop sign, for every set and whatever the signals: within 3 m of it earns a precision bonus of 15 points. Stopping a little
   past it happens in reality too and people still get on and off, so up to 4 m past the sign costs nothing;
   more than 4 m costs 20 points, even though the stop is served. Stopping further back in the allowed place costs
   nothing.
@@ -64,6 +65,7 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 | `Q` / `E` or `←` / `→` | look out of the left / right window (held) |
 | `G` | zoom the cab view three times, as a driver looks into the distance: a sign reads at 75 m (held, also while paused) |
 | `Z` | right mirror on and off |
+| `Tab` | the driver's panel folded into a narrow strip and back |
 | `,` / `.` | indicators left / right (again: off); given before a turn at a junction and at a stop where passengers cross a car lane (right, from braking into it until pulling away) |
 | `/` (on a Czech keyboard `-`) | hazard lights |
 | `L` | high beams: held, a flash; with `Shift`, on and off |
@@ -157,10 +159,37 @@ waste heat into the saloon (F). The info panel shows the outside, saloon and cab
 temperature: Prague now or a fixed winter / autumn / summer day (menu). Cold passengers (< 12 °C) and heat
 you caused cost points; open doors let the heat out; in summer passengers open the windows.
 
+### The driver's panel
+
+The panel is car 6921's: its controls in their order, with its plates (translated in English). Grey paint is the
+tram, dark glass is the game.
+
+- **Instruments:** the speedometer 0–80 km/h with the odometer, the ammeter 0–600 A (drive and brake alike), the
+  battery voltmeter 0–40 V and the glow lamp NAPĚTÍ V TROLEJI (line voltage: a T3 has no line voltmeter). With the
+  assist option a red mark on the speedometer shows the speed limit.
+- **Lamps** as on the car: the indicators (green), V (EXIT, green: a passenger pressed the stop request to get off
+  at the next request stop; lit until the doors open), DOORS (green when **all are closed**), BRAKE I, BRAKES II and
+  TRAIN (red while the shoe brakes are on, TRAIN the second car's), ACCELERATOR (orange while its resistors are in),
+  MIRROR HEATING.
+- **Controls** can be pressed with the mouse or a finger and send the game's key (with the assist option the key is
+  written on them). Those the game doesn't simulate yet (the washing plant, wipers, lighting, emergency drive and
+  others) are drawn and do nothing. Hovering the mouse over a control says what it does.
+- **The game's aids** in the glass on the right: the pedal column with the accelerator; with the assist option the
+  helper lamps (overspeed, doors open, current through the contact, ready to depart, wheel slip, track brake, sand,
+  dead-man); while looking out of a window, the speed. The info screen is on the left, where 6921 has its onboard
+  computer.
+- The panel grows with the browser's window; **Tab** folds it into a narrow strip and back.
+
 ### Looking around
 
-- Hold Q / E (or ← / →) to look out of the left / right window; the right rear-view mirror (Z toggles)
-  shows the side of the set and the doors. It grows with the window and keeps its field of view.
+- You sit where the T3 has the driver's seat: 0.32 m left of the car's centre line, 1.2 m behind its front. So the
+  windscreen's left post stands in the view ahead.
+- Hold Q / E (or ← / →) to look out of the left window to the cab's rear wall, which crosses it, or right through
+  the front door. The cab's frame (the posts with the windows' rounded corners, the rear wall, the door) and the
+  panel turn with the head: on the left the side wall with the reverser, the cab heater, the heating, the heating
+  cut-out and the sanding lever; on the right the panel's wing with the lighting and the run's timetable.
+- The right rear-view mirror (Z toggles) shows the side of the set and the doors, and nothing but the menus covers
+  it. It grows with the window and keeps its field of view.
 - **Outside view** (V): the camera orbits the tram. Drag to turn and tilt it; the wheel or two fingers
   zoom; a double click brings it back behind the tram.
 
@@ -177,8 +206,8 @@ you caused cost points; open doors let the heat out; in summer passengers open t
 
 ### The city
 
-- Terrain: the track corridor is carved into the lidar terrain; retaining walls where the line is cut into
-  a hillside (Chotkova), Most Legií on a deck with piers.
+- Terrain: the ground follows the city's survey and the lidar; the retaining walls of the survey and of the
+  city's data are part of it (Chotkova, the embankment under Letná), Most Legií on a deck with piers.
 - Signs: classic red Prague stop signs; the speed signs of the D 1/2 rules (a restriction in black on yellow,
   a Rychlostník in white on black, the warning triangle, the "r" of a small-radius curve, the dangerous climb
   and descent), twice their real size so they can be read on a screen. Contact
@@ -209,11 +238,16 @@ you caused cost points; open doors let the heat out; in summer passengers open t
   like the others'. No number runs twice on the street, and no other set is dealt yours.
 - Livery: only for a model with liveries besides its own (none yet): its own, one of them, or "Any", dealt like the
   others'; the game remembers it for each model. Some of the other sets wear the liveries too.
+- Sounds: only for a model with sound packs: the built-in sounds (the default) or a pack. The game ships one for the
+  hybrid, T2R 6004 – partial sounds: the bell, the door alert and the TR37 accelerator's contactors recorded in car
+  T2R 6004; the other sounds stay built-in. The game remembers the choice for each model and plays it from the
+  next shift's start.
 - Vehicles…: packages made by others (a tram, a livery, sounds or a fleet), installed from a .zip, a folder or an
   address, a complete set in one archive too. The game checks each before it offers it (its files, its licence,
   the model's size and how heavy it is to draw) and shows a refused one with its reasons. Installed packages stay
   in this browser only and can be switched off or removed; a new tram appears in the Tram model menu. Below them
-  is the list of submitted packages.
+  are the list of submitted packages and a form where an author sends their package (a .zip or its address) to the
+  project for review; the game checks it first and sends only one that passes.
 
 ### On a phone or tablet
 
@@ -223,17 +257,20 @@ device; switched off, 🎮 brings them back during a shift too). They send the k
 - the row above the dashboard (sideways, a column at the right): ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
   and the dead-man button when that option is on;
 - the left column: doors, bell, sand (held), look left / right (held), 🔍 zoom (held), view, mirror, pause;
-- ⋯ for the rest: indicators ⇦ ⇨, hazard lights ⚠, high beams (a flash held, on and off), park (advanced controls), switch contact, switch iron, heating cut-out, heating,
-  autopilot, sound, ✉ feedback.
+- Panel (where ⋯ was) opens the panel in tabs: side wall, panel, switches, wing and game. The controls are where
+  they are in the car: the indicators, hazard lights, headlights and light horn, the switch button, the heating and
+  its cut-out, sand. The Game tab has park (advanced controls), the switch iron, the flap, the mirror, the
+  autopilot, sound and ✉ feedback. A tap on the driver's panel opens it too.
 
-On a small screen the dashboard and the top bar are smaller and the minimap is hidden. A phone held sideways has the
+On a small screen the driver's panel is a narrow strip (speedometer, ammeter, lamps, aids and pedals), the top bar is smaller and the minimap is hidden. A phone held sideways has the
 controller as a column at the right thumb (▲ at the top, STOP at the bottom), the other buttons in two columns at the
 left and the dashboard between them.
 
 **Full screen:** a phone asks once in the menu; with "Full screen", every shift starts in full screen, turned
 sideways where the browser allows it (Chrome on Android), elsewhere the game asks you to turn the phone. ⛶ in the
-menu switches it any time; the back gesture leaves it until the next start. Safari on an iPhone doesn't allow a page
-full screen: the game says once to use Share ⬆ → Add to Home Screen, and started from that icon it runs full screen.
+menu, and in a shift on the pause panel (II), switches it any time; the back gesture leaves it until the next start or
+⛶. Safari on an iPhone doesn't allow a page full screen: the game says once to use Share ⬆ → Add to Home Screen, and
+started from that icon it runs full screen.
 
 ### With a gamepad
 
@@ -284,7 +321,7 @@ helps most is how driving and the traffic feel to you.
 
 - **What we ask:** how the controller, pulling away, coasting and braking feel; stops and the timetable;
   signals, switches and the rules; which terms don't sound like tram drivers'; what breaks the spell.
-- **How to write:** ✉ Feedback (**F9**, on a phone under ⋯) pauses the game and opens a note. It adds the place
+- **How to write:** ✉ Feedback (**F9**, on a phone in Panel, the Game tab) pauses the game and opens a note. It adds the place
   on the line, the tram's state, the game's version and, if you like, a screenshot, so it's enough to write what
   you see and how it should be. When the game doesn't start or the graphics stop, the "Send the error to the
   authors" button sends what happened.

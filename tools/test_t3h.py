@@ -184,18 +184,19 @@ def main():
             page.goto(base + "/__t3h.html")
             r["synthetic"] = s = page.evaluate(SYNTHETIC)
             st, cv = s["straight"], s["curve"]
-            # On R 20, both cars on the circle: the bogie pivots stand 3.2 m along the arc from the car's centre,
-            # so a bogie turns 3.2 / 20 rad to the body and the body's chord is rc from the circle's centre; its
-            # pins (6.25 m from the car's centre) are rp from it; the 2.54 m link (15.04 - 2 x 6.25) spans dt at
-            # rp; the car centres are R (2 a + dt) apart along the track, and each coupler stands at a + dt / 2
-            # to its car.
-            bogie = math.degrees(3.2 / 20)
-            rc = 20 * math.cos(3.2 / 20)
+            # On R 20, both cars on the circle: the bogie pivots stand on it 6.4 m apart in a straight line (src/
+            # articulated.js, #579; before it 3.2 m along the arc from the car's centre), so a bogie turns
+            # asin(3.2 / 20) to the body and the body's chord is rc from the circle's centre; its pins (6.25 m from
+            # the car's centre) are rp from it; the 2.54 m link (15.04 - 2 x 6.25) spans dt at rp; the car centres
+            # are R (2 a + dt) apart along the track, and each coupler stands at a + dt / 2 to its car.
+            h = math.asin(3.2 / 20)
+            bogie = math.degrees(h)
+            rc = 20 * math.cos(h)
             rp, a = math.hypot(rc, 6.25), math.atan2(6.25, rc)
             dt = 2 * math.asin(1.27 / rp)
             pitch, angle = 20 * (2 * a + dt), math.degrees(a + dt / 2)
             want = {
-                "the model loads, 43,668 triangles (the asset's 43,792 less a hidden helper)": s["fullTris"] == 43668,
+                "the model loads, 43,692 triangles (the asset's 43,840 less a hidden helper and the tail lamps' glows, drawn apart, #525)": s["fullTris"] == 43692,
                 "the saloon is its own part (>= 25,000 triangles)": s["insideTris"] >= 25000,
                 "the lighter level: no saloon": s["lightInside"] == 0 and s["lightTris"] < s["fullTris"] - s["insideTris"] + 200,
                 "a hybrid set": s["hybrid"],

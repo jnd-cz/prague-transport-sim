@@ -61,6 +61,10 @@ class FakeFtp:
             raise ftplib.error_perm("550 exists")  # (as some servers: the target goes first)
         os.rename(self._p(a), self._p(b))
 
+    def rmd(self, d):
+        os.rmdir(self._p(d))
+        self.log.append(("RMD", d))
+
     def nlst(self, d):
         if not os.path.isdir(self._p(d)):
             raise ftplib.error_perm("550 no such directory")
@@ -256,7 +260,7 @@ class DeployTest(unittest.TestCase):
         on = {os.path.relpath(os.path.join(b, f), self.server).replace(os.sep, "/") for b, _, fs in os.walk(self.server) for f in fs}
         for p in ("review.php", "reviews.html", "reviews/.htaccess", "reports/review/stop-signs-17.json", "reports/review/index.json"):
             self.assertNotIn(p, on)
-        for p in ("index.html", "feedback.php", "feedback/.htaccess", "robots.txt", "version.json"):
+        for p in ("index.html", "feedback.php", "feedback/.htaccess", "submit.php", "submissions/.htaccess", "robots.txt", "version.json"):
             self.assertIn(p, on)
         self.assertIn("X-Robots-Tag", open(os.path.join(self.server, ".htaccess")).read())
         self.assertEqual(open(os.path.join(self.server, "robots.txt")).read(), "User-agent: *\nDisallow: /\n")
@@ -277,11 +281,12 @@ class DeployTest(unittest.TestCase):
             deploy.checks(True, public=True)
 
     def test_public_ok(self):
-        right = {"": 200, "version.json": 200, "feedback/": 403, "review.php": 404, "reviews.html": 404, "reports/review/index.json": 404}
+        right = {"": 200, "version.json": 200, "feedback/": 403, "submissions/": 403, "review.php": 404, "reviews.html": 404, "reports/review/index.json": 404,
+                 "overview.html": 404, "overview.json": 404}
         self.assertEqual(deploy.public_ok("https://sim", lambda u, p: right[p]), [])
         self.assertEqual(deploy.public_ok("https://sim", lambda u, p: 404 if p == "feedback/" else right[p]), [])
         bad = deploy.public_ok("https://sim", lambda u, p: 200)
-        self.assertEqual(len(bad), 4)
+        self.assertEqual(len(bad), 7)
         self.assertIn("/review.php answers 200, wants 404", bad)
 
     def test_pull_moves_the_notes_off_the_host(self):
@@ -299,6 +304,65 @@ class DeployTest(unittest.TestCase):
         self.assertEqual(json.load(open(os.path.join(dest, note["id"] + ".json"), encoding="utf-8"))["note"], "a bump")
         # (taken off the host once saved; what is not a note stays there to be looked at)
         self.assertEqual(sorted(os.listdir(d)), [".htaccess", "fb-20261111-120001-0000abce.json", "fb-20261111-120002-0000abcf.json"])
+
+    def test_pull_moves_the_submissions_off_the_host(self):
+        self.run_deploy()
+        d = os.path.join(self.server, "submissions")
+        packs = {"sub-20261116-120000-0000abcd": b"PK\x03\x04 a zip", "sub-20261116-120001-0000abce": None}
+        for sid, pack in packs.items():
+            os.makedirs(os.path.join(d, sid))
+            json.dump({"id": sid, "host": False, "packages": [{"id": "a.b", "version": "1.0.0", "kind": "vehicle"}],
+                       **({} if pack else {"url": "https://example.org/a/package.json"})}, open(os.path.join(d, sid, "meta.json"), "w"))
+            if pack:
+                open(os.path.join(d, sid, "pack.zip"), "wb").write(pack)
+        os.makedirs(os.path.join(d, "sub-20261116-120002-0000abcf"))
+        json.dump({"id": "other"}, open(os.path.join(d, "sub-20261116-120002-0000abcf", "meta.json"), "w"))
+        dest = os.path.join(self.tmp, "subs", "test")
+        with mock.patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(deploy.pull_submissions(FakeFtp(self.server), dest), 2)
+        self.assertEqual(open(os.path.join(dest, "sub-20261116-120000-0000abcd", "pack.zip"), "rb").read(), b"PK\x03\x04 a zip")
+        self.assertFalse(os.path.exists(os.path.join(dest, "sub-20261116-120001-0000abce", "pack.zip")))
+        # (taken off the host once saved; what is not a submission stays there)
+        self.assertEqual(sorted(os.listdir(d)), [".htaccess", "sub-20261116-120002-0000abcf"])
+
+    def test_pull_reads_a_missing_folder_as_empty_on_550_and_450(self):
+        # (the alpha answers 450 for submissions/, which came after its last deploy: the hourly pull failed on it, #650)
+        class Ftp450(FakeFtp):
+            def nlst(self, d):
+                if not os.path.isdir(self._p(d)):
+                    raise ftplib.error_temp(f"450 {d}: No such file or directory")
+                return super().nlst(d)
+
+        dest = os.path.join(self.tmp, "pulled")
+        for cls in (FakeFtp, Ftp450):
+            with self.subTest(cls.__name__):
+                ftp = cls(self.server)
+                self.assertIsNone(deploy.pull_reviews(ftp, dest))
+                self.assertEqual(deploy.pull_feedback(ftp, dest), 0)
+                self.assertEqual(deploy.pull_submissions(ftp, dest), 0)
+        self.assertFalse(os.path.exists(dest))
+
+        # another temporary refusal (the connection, the server's load) still fails the pull, to be retried
+        class Busy(FakeFtp):
+            def nlst(self, d):
+                raise ftplib.error_temp("421 too many connections")
+
+        with self.assertRaises(ftplib.error_temp):
+            deploy.pull_feedback(Busy(self.server), dest)
+
+    def test_hosted_packs_go_up_and_a_missing_one_stops_the_deploy(self):
+        cat, folder = os.path.join(self.tmp, "catalogue.json"), os.path.join(self.tmp, "hosted")
+        os.makedirs(folder)
+        json.dump({"packages": [{"id": "a.b", "url": "hosted/a.b-1.0.0.zip"}, {"id": "c.d", "url": "https://example.org/c.zip"}]},
+                  open(cat, "w"))
+        with self.assertRaises(SystemExit) as e:
+            deploy.hosted(cat, folder)
+        self.assertIn("hosted/a.b-1.0.0.zip", str(e.exception))
+        open(os.path.join(folder, "a.b-1.0.0.zip"), "wb").write(b"PK")
+        self.assertEqual(deploy.hosted(cat, folder), {"hosted/a.b-1.0.0.zip": os.path.join(folder, "a.b-1.0.0.zip")})
+        json.dump({"packages": [{"id": "x", "url": "hosted/../deploy.local.json"}]}, open(cat, "w"))
+        with self.assertRaises(SystemExit):
+            deploy.hosted(cat, folder)
 
     def test_pull_every_target(self):
         cfg = json.load(open(deploy.CONFIG))
@@ -328,9 +392,9 @@ class SiteFiles(unittest.TestCase):
         import make_dist
         with tempfile.TemporaryDirectory() as root:
             os.makedirs(os.path.join(root, "data"))
-            for f in ("line17.json", "line17.streets.bin", "line17.streets.json"):
+            for f in ("line17.json", "line17.streets.bin", "line17.streets.json", "line17.ground.bin", "line17.ground.json"):
                 open(os.path.join(root, "data", f), "w").close()
-            self.assertEqual(list(make_dist.files(root)), ["data/line17.json"])
+            self.assertEqual(sorted(make_dist.files(root)), ["data/line17.ground.bin", "data/line17.ground.json", "data/line17.json"])
 
 
 if __name__ == "__main__":
