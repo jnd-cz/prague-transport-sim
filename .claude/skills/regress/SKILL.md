@@ -12,26 +12,14 @@ else the run is measured at the merge base once, in a pinned worktree in the hea
 this machine for the next branch on that base (seedless: a few minutes a line; seeded: as long as the branch's own
 run). `--against W1` names a checkpoint instead.
 
-1. **What changed:** `git diff --name-only origin/main...HEAD` plus uncommitted changes, and
-   `git diff origin/main -- data/MANIFEST.json` if data was rebuilt.
-2. **The tier** (AGENTS.md, "Which checks a change needs"; a change of two kinds runs both), and the
-   lines (unless given: $ARGUMENTS):
-   - **the simulation** (`src/traffic.js`, `src/autopilot.js`, `src/tram.js`, `src/tr37.js`, the game's rules
-     in `src/game.js`, `tools/traffic_lint.js`, `tools/bench/`, `tools/autopilot.js`): all lines,
-     9,17,22,23,37, `--checks u3,redruns,stops,traffic,lint`, seeds 1-5 (`stops` rides on the `u3` drive, #708).
-   - **a build tool with rebuilt data** (world): the lines whose files changed in the manifest (or in
-     `data/` against it); a build tool whose data is not rebuilt yet is rebuilt first
-     (`python -P -E tools/rebuild.py <lines> --parallel`). `--checks lint,surfaces,canted,crossing,spacing,heights`,
-     then a smoke drive per line, `--checks u3 --seeds 1` (it reaches the last stop and is not stuck;
-     its counts are not compared), and `tools/datadiff.py` / `tools/track_moves.py` per line. No traffic
-     or redruns: they measure traffic reshuffled by the new data (#156).
-   - **drawn geometry in the game** (surfaces, track beds, crossings, kerbs: `src/terrain.js`, `src/world.js` and its layers,
-     `src/groundDraw.js`, `src/streets.js` …, `src/heights.js`): all lines, `--checks lint,surfaces,crossing,canted`.
-   - **drawing or load that keeps the world** (models, materials, load cuts): no headless run; screenshots
-     main vs branch, `tools/frametime.py`, and for a load cut the world after load compared with main's.
-   - the review page (`src/review.js`, `src/trackHeightProfile.js`) only: `python -P -E tools/test_review.py`
-     instead of the headless checks.
-   - docs or harness only: no run needed; say so.
+1. **What changed and what it runs:** `python -I tools/tiers.py` reads the branch's files against origin/main
+   (uncommitted ones too) and prints each kind of change, the files that make it so, and the commands, the
+   lines from the manifest (a world change: the lines whose files the manifest changed; none rebuilt yet: all,
+   rebuilt first). The table is in it, once (#727). A file in no row is listed: choose its row by hand. Lines
+   given ($ARGUMENTS) replace the lines it chose.
+2. **Why each row runs what it does:** the simulation's seeded checks (`stops` rides on the `u3` drive, #708); a
+   world change runs no traffic or redruns, which measure traffic reshuffled by the new data (#156), and its smoke
+   drive only has to reach the last stop unstuck (its counts are not compared).
 3. **Run** in the background. Heavy jobs take turns (AGENTS.md): the run waits its turn and says whom it
    waits for, so start it and let it wait rather than starting a second one beside it. Every check on
    every line takes 27 minutes with 4 pages at once (#205), the geometry checks a few minutes a line.
