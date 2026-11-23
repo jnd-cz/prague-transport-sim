@@ -748,8 +748,10 @@ def run_one(page, errors, check, seed, timeout, load=0):
         if isinstance(r, dict):
             r.pop("watch", None)
             # (the reads a streamed page answered from the 10 m grid where the file has a tile: none with keepgeo, #710)
-            far = page.evaluate("() => { const m = window.groundTiles?.lookup?.missed; "
-                                "return m ? { reads: m.reads, tiles: m.tiles.size, at: m.at } : null; }")
+            # (and what the page held at the end: a player's page streams, it holds fewer tiles than the file has)
+            far = page.evaluate("() => { const g = window.groundTiles, m = g?.lookup?.missed; "
+                                "return m ? { reads: m.reads, tiles: m.tiles.size, at: m.at, held: g.lookups.size, "
+                                "of: g.tiles.size, streamed: !!g.trim && !g.keep } : null; }")
             if far is not None:
                 r["farGround"] = far
     except PlaywrightTimeoutError:
@@ -765,7 +767,8 @@ def player_rows(kept, streamed):
     """The checks' world (?keepgeo) beside a player's (#710), run by run: the same counts, or the moves with the reads
     the streamed page answered from the 10 m grid where the file has a tile; a move without such a read is unexplained.
     Returns (the table's rows, the unexplained runs)."""
-    rows = ["| line | check | seed | keepgeo → player | heights from the 10 m grid | verdict |", "|---|---|---|---|---|---|"]
+    rows = ["| line | check | seed | keepgeo → player | tiles held at the end | heights from the 10 m grid | verdict |",
+            "|---|---|---|---|---|---|---|"]
     bad = 0
     for job in sorted(kept, key=lambda j: (int(j[0]) if j[0].isdigit() else j[0], j[1], j[2])):
         r = streamed.get(job)
@@ -777,13 +780,17 @@ def player_rows(kept, streamed):
         far = r.get("farGround") or {}
         reads = far.get("reads", 0)
         grid = f"{reads} reads on {far.get('tiles', 0)} tiles" + (f", first at {far['at'][0]}" if far.get("at") else "") if reads else "none"
-        if not moved:
+        held = f"{far['held']} of {far['of']}" if "held" in far else "?"
+        if "streamed" in far and not far["streamed"]:
+            verdict, bad = "the page held every tile (not streamed): FAIL", bad + 1
+        elif not moved:
             verdict = "same"
         elif reads:
             verdict = "moved: heights from the grid"
         else:
             verdict, bad = "moved without a grid read: FAIL", bad + 1
-        rows.append(f"| {line} | {check} | {'' if check in SEEDLESS else seed} | {'; '.join(moved) or 'same'} | {grid} | {verdict} |")
+        rows.append(f"| {line} | {check} | {'' if check in SEEDLESS else seed} | {'; '.join(moved) or 'same'} | {held} | {grid} | "
+                    f"{verdict} |")
     return rows, bad
 
 
