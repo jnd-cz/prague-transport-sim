@@ -711,10 +711,11 @@ def data_diff(root=ROOT):
 
 
 def stale_data(root=ROOT):
-    """The files a tool must not measure on: missing, or of an earlier build (#835)."""
+    """The files a tool must not measure on: those of an earlier build (#835). A missing file is not one: it fails where
+    it is read, and a checkout without data (CI) runs the tools' tests on mocks."""
     if not os.path.exists(os.path.join(root, "data", "MANIFEST.json")):
         return []
-    return [(k, f) for k, f in data_diff(root) if k in ("missing", "stale")]
+    return [(k, f) for k, f in data_diff(root) if k == "stale"]
 
 
 def require_current_data(root=ROOT):

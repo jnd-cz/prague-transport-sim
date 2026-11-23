@@ -43,10 +43,10 @@ class Stale(unittest.TestCase):
         with open(os.path.join(self.root, "data", f), "wb") as fh:
             fh.write(b)
 
-    def test_after_a_merge_the_old_files_are_stale_and_a_new_one_missing(self):
+    def test_after_a_merge_the_old_files_are_stale(self):
         self.write("line9.json", b"old 9")
         self.write("line17.json", b"17")
-        self.assertEqual(snapshot.stale_data(self.root), [("missing", "line22.json"), ("stale", "line9.json")])
+        self.assertEqual(snapshot.stale_data(self.root), [("stale", "line9.json")])  # (line22.json missing: fails where read)
         with self.assertRaises(SystemExit) as e:
             snapshot.require_current_data(self.root)
         self.assertIn("stale    data/line9.json", str(e.exception.code))
