@@ -332,7 +332,7 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   for (const z of [-4.5, -.5, 4.45]) box(detail, 'Roof_vent', [.58, .075, .88], [0, 3.10, z], roofMat);
   box(detail, 'Electrical_box', [.35, .32, .55], [.56, 3.22, 1.8], steel);
 
-  // Closed stair wells and a 24-place saloon, with the user's early padded seat style.
+  // The exterior study wears 6892's markings; the saloon reference is 6312 (#437).
   floorBox('Saloon_floor', [1.70, .08, 11.75], [.305, .834, -.03]);
   let floorStart = -5.905;
   for (const [a, b] of [...T3_PHOTO.doors.map(z => [z - .70, z + .70]).sort((a, b) => a[0] - b[0]), [5.845, 5.845]]) {
@@ -341,6 +341,10 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   }
   box(cabin, 'Underfloor_frame', [1.45, .25, 11.8], [.20, .65, 0], dark);
   floorBox('Rear_platform_floor', [1.68, .08, .90], [0, .834, -6.21]);
+  for (const x of [-.40, .40]) box(cabin, 'Aisle_hatch_edge', [.015, .004, 9.5], [x, .876, -.25], chrome);
+  for (const z of [-5, -3.2, -1.45, .25, 1.95, 3.6, 4.5]) {
+    box(cabin, 'Aisle_hatch_end', [.80, .004, .014], [0, .876, z], chrome);
+  }
   for (const sign of [-1, 1]) {
     box(cabin, 'End_underframe_crossbeam', [1.50, .18, .14], [0, .65, sign * 6.08], dark);
     for (const x of [-.63, .63]) box(cabin, 'End_underframe_side_member', [.10, .16, .80], [x, .59, sign * 6.35], dark);
@@ -357,15 +361,19 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     }
     rod(cabin, 'Overhead_handrail', V(side * .68, 2.40, -5.6), V(side * .68, 2.40, 4.7), .016, poleMat);
   }
-  const seatPositions = [
-    ...Array.from({ length: 13 }, (_, i) => [.84, -4.42 + i * .72]),
-    ...[-4.14, -3.29, -2.44, .37, 1.11, 1.85, 2.59, 3.33, 4.07].map(z => [-.84, z]),
-    [-.32, -6.15], [.32, -6.15],
-  ];
-  cabin.userData.passengerSeats = seatPositions.map(([x, z]) => ({ x, z, style: 'early upholstered T3' }));
-  for (const [i, [x, z]] of seatPositions.entries()) {
+  const seats = [];
+  function addSeat(x, z, facing = 'forward', base = 'pedestal') {
+    seats.push({ x, z, facing, base, style: 'early upholstered T3' });
+  }
+  for (let i = 0; i < 14; i++) addSeat(.84, -5.06 + i * .72, 'forward', i === 13 ? 'box' : 'pedestal');
+  for (const z of [-4.18, -3.43, -2.68, -1.93]) addSeat(-.84, z);
+  for (const z of [.30, 1.00, 1.70, 2.40, 3.10]) addSeat(-.84, z);
+  addSeat(-.84, 4.18, 'rearward', 'box');
+  cabin.userData.referenceCar = '6312';
+  cabin.userData.passengerSeats = seats;
+  for (const [i, { x, z, facing, base }] of seats.entries()) {
     const seat = group(cabin, `Passenger_seat_${i + 1}`, x, 0, z);
-    if (i === 15) seat.rotation.y = Math.PI; // Facing pair in the rear door-side bay.
+    if (facing === 'rearward') seat.rotation.y = Math.PI;
     // Thick rounded pads on a tubular frame, rather than a single fibreglass shell.
     const pad = (name, w, h, depth, position) => {
       const g = new THREE.ExtrudeGeometry(rr(-w / 2, -h / 2, w, h, .061),
@@ -373,17 +381,27 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
       return mesh(seat, name, g, seatMat, ...position);
     };
     pad('Seat_cushion', .46, .43, .065, [0, 1.25, 0]).rotation.x = -Math.PI / 2;
-    pad('Seat_back_cushion', .43, .46, .075, [0, 1.59, -.24]).rotation.x = -.12;
+    pad('Seat_back_cushion', .425, .405, .048, [0, 1.59, -.24]).rotation.x = -.12;
     tube(seat, 'Seat_loop_frame', [V(-.235, 1.23, .15), V(-.235, 1.23, -.15), V(-.235, 1.39, -.26),
       V(-.235, 1.82, -.32), V(-.18, 1.90, -.33), V(.18, 1.90, -.33), V(.235, 1.82, -.32),
       V(.235, 1.39, -.26), V(.235, 1.23, -.15), V(.235, 1.23, .15)], .016, chrome, false, 28);
-    if ([13, 16, 21].includes(i)) {
-      const base = new THREE.ExtrudeGeometry(rr(-.205, -.18, .41, .36, .06),
+    if (base === 'box') {
+      const housing = new THREE.ExtrudeGeometry(rr(-.205, -.18, .41, .36, .06),
         { depth: .35, bevelEnabled: false, steps: 1, curveSegments: 3 });
-      mesh(seat, 'Seat_electrical_box', base, poleMat, 0, .89, 0).rotation.x = -Math.PI / 2;
+      mesh(seat, 'Seat_electrical_box', housing, poleMat, 0, .89, 0).rotation.x = -Math.PI / 2;
     } else {
-      mesh(seat, 'Seat_pedestal', new THREE.CylinderGeometry(.115, .145, .35, 16), poleMat, 0, 1.065, 0);
+      mesh(seat, 'Seat_pedestal', new THREE.CylinderGeometry(.10, .165, .35, 16), poleMat, 0, 1.065, 0);
       mesh(seat, 'Seat_foot_flange', new THREE.CylinderGeometry(.185, .185, .016, 16), chrome, 0, .885, 0);
+    }
+  }
+  for (const [x, zs] of [[.59, [-4.85, -2.69, -.53, 1.63, 3.79]], [-.59, [-4.4, -2.17, .07, 2.17, 4.44]]]) {
+    for (const z of zs) {
+      rod(cabin, 'Aisle_stanchion', V(x, .877, z), V(x, 2.4, z), .014, poleMat);
+      rod(cabin, 'Stanchion_rail_joint', V(x, 2.4, z), V(Math.sign(x) * .68, 2.4, z), .015, poleMat);
+      if (x > 0 && (z === -2.69 || z === 1.63)) {
+        box(cabin, 'Ticket_validator', [.095, .24, .12], [x - .050, 1.98, z], amber);
+        box(cabin, 'Validator_face', [.008, .09, .08], [x - .099, 2.02, z], rubber);
+      }
     }
   }
   for (const z of T3_PHOTO.doors) {
@@ -400,8 +418,13 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   box(cabin, 'Driver_console', [1.40, .15, .56], [.1, 1.63, 6.16], dark);
   box(cabin, 'Driver_seat', [.48, .12, .47], [.36, 1.30, 5.63], rubber);
   box(cabin, 'Driver_seat_back', [.48, .50, .1], [.36, 1.60, 5.37], rubber);
-  plate(cabin, 'Cab_partition', rr(-1.13, .90, 1.55, 1.62, .03), glass, 0, 0, 4.89);
-  rod(cabin, 'Cab_frame', V(-1.13, 2.52, 4.89), V(.42, 2.52, 4.89), .022, chrome);
+  // Looking forward in 18532, the driver is behind the window-side panel; the gate is beside the entry.
+  for (const [a, b] of [[-.55, .05], [.05, 1.16]]) {
+    box(cabin, 'Cab_partition_laminate', [b - a, .76, .035], [(a + b) / 2, 1.26, 4.89], wallMat);
+    plate(cabin, 'Cab_partition_glazing', rr(a, 1.64, b - a, .88, .018), glass, 0, 0, 4.89);
+    for (const y of [.89, 1.64, 2.52]) rod(cabin, 'Cab_frame', V(a, y, 4.89), V(b, y, 4.89), .016, chrome);
+  }
+  for (const x of [-.55, .05, 1.16]) rod(cabin, 'Cab_jamb', V(x, .89, 4.89), V(x, 2.52, 4.89), .018, chrome);
 
   // Each opening has two bi-fold pairs, outer hinge then inner hinge (four leaves).
   for (const [i, z] of T3_PHOTO.doors.entries()) {

@@ -53,11 +53,13 @@ function view(name) {
     quarter: { eye: [7.6, 1.65, 15.3], target: [0, 2.10, 3.4] },
     entry: { eye: [-4.4, 1.65, 6.7], target: [-.8, 1.10, 5.3] },
     bogie: { eye: [-4.05, .55, 3.20], target: [-.72, .45, 3.2] },
-    interior: { eye: [0, 2.25, -5.85], target: [0, 1.65, 4.25] },
+    interior: { eye: [0, 2.22, -5.55], target: [0, 1.57, 3.7] },
     collector: { eye: [-3.2, 5.2, 7.5], target: [0, 4.25, 3.1] },
     coupler: { eye: [-1.5, 1.15, 8.6], target: [0, .48, 7.12] },
   };
   const close = closeups[name];
+  camera.fov = name === 'interior' ? 64 : 37;
+  camera.updateProjectionMatrix();
   if (name === 'entry') { $('door1').value = 1; pose(); }
   camera.position.set(...(close?.eye || views[name] || views.hero)); controls.target.set(...(close?.target || [0, 1.55, 0]));
   if (innerWidth <= 700) camera.position.sub(controls.target).multiplyScalar(mobileDistance(name)).add(controls.target);

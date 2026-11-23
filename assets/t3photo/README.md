@@ -40,6 +40,7 @@ The five user photographs supplied in the 2026-11-09 session are visual referenc
 | `17884.jpg` (2026-11-16 follow-up) | 7000: headlight pods, aluminium bumper with red inserts, cast coupler, collar, handle and chain |
 | `17398.jpg`, `17399.jpg`, `17400.jpg` (2026-11-16 interior) | Red cushions, tall silver loop frames, round and electrical-box pedestals, pink-beige wall panels and ribbed floor |
 | `17402.jpg` (2026-11-16 interior) | Silver inner folding-door faces, black seals, long handles and amber warning lamp |
+| `18530.jpg`, `18531.jpg`, `18532.jpg`, `18535.jpg`, `18536.jpg` (2026-11-23) | 6312 saloon, single seats and their supports, facing pair, aisle poles, floor hatches and driver's partition. The number 6312 is visible above the cab gate. |
 
 The 874 mm floor height is corroborated by the
 [Bratislava T3 technical table](https://imhd.sk/ba/vehicle-type-description/20/%C4%8CKD-Tatra-T3).
@@ -49,12 +50,15 @@ small fittings are visual approximations. This is a reconstruction of the photog
 not a measured restoration model of every fitting on 6892.
 No source image or user photograph is embedded in the GLB or redistributed in this directory.
 
-The 2026-11-16 review uses the user's requested **24-place early cushioned interior**, inspired by
-6312/6102, under the 6892 exterior. There are 13 single seats on the left, nine on the door side,
-and two at the rear, with one facing pair in the rear door-side bay. The arrangement is a simplified modelling choice, not a survey of 6892.
+The study combines the **6892 exterior and the 6312 saloon**. Separate vehicle variants are planned for later.
+The working 24-place layout puts 14 singles on the continuous window side and ten on the door side.
+Four face forward between the middle and rear doors. Between the front and middle doors, five face
+forward and the chair on the front box faces them. Both the aisle and the rear platform are open.
+The full row count, placement of the facing pair, seat pitch and rear platform arrangement are modelling
+estimates fitted to the requested capacity. The photographs show only parts of the car in each view.
 The interior follow-up supplies the seats' loop frames and pedestal bases, red upholstery,
 pink-beige lower wall panels with silver kick plates, red/silver sill trim and dark rubber ribs.
-Three seats near doorways have rounded electrical-box bases; the others have round pedestals.
+The model uses box bases for the frontmost chair in each file and flared pedestals for the others.
 Door leaves have cream outer faces and silver inner faces, with long handles on the inner leaves.
 The rubber pattern is an original generated 64-pixel tile, embedded alongside the lettering atlas.
 The user's quotes are retained in `data/truth.json`, section `t3PhotoModel`.
@@ -144,7 +148,7 @@ The studio works without world data. Its first load needs the same CDN as the ga
 
 | Files | Author / origin | Licence |
 |---|---|---|
-| `tatra-t3-6892.glb`, generated lettering | Original model made for this project by Codex, 2026-11-09, revised 2026-11-22 | AGPL-3.0-or-later |
+| `tatra-t3-6892.glb`, generated lettering | Original model made for this project by Codex, 2026-11-09, revised 2026-11-23 | AGPL-3.0-or-later |
 | `rig.json`, `preview.png`, `doors-open.png` | Rig manifest and renders of the original model | AGPL-3.0-or-later |
 | `../../src/t3photo.js` | Reproducible geometry and pose source | AGPL-3.0-or-later |
 

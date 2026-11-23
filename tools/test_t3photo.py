@@ -70,6 +70,15 @@ CHECK = """async () => {
   }
   checks.seatFramesClearActualPanels = frameClearance > .04 && frameClearance < .3;
   const cushions = []; interior.traverse(o => { if (o.isMesh && o.material.name === 'Red_seat_cushion') cushions.push(o); });
+  const doorSide = seats.filter(p => p.x < 0), windowSide = seats.filter(p => p.x > 0);
+  const frontBay = doorSide.filter(p => p.z > T3_PHOTO.doors[1]).sort((a, b) => b.z - a.z);
+  checks.saloon6312Banks = interior.userData.referenceCar === '6312' && windowSide.length === 14
+    && frontBay.length === 6 && doorSide.length - frontBay.length === 4 && seats.every(p => Math.abs(p.x) > .6);
+  checks.saloon6312Backrests = seats.every(p => {
+    const reversed = p === frontBay[0], dz = reversed ? 1 : -1;
+    const h = hit([p.x, 1.60, p.z], [0, 0, dz], cushions);
+    return h && h.distance > .14 && h.distance < .32 && p.facing === (reversed ? 'rearward' : 'forward');
+  });
   checks.seatsHaveSolidCushions = seats.every(p => {
     const h = hit([p.x, 1.5, p.z + .08], [0, -1, 0], cushions);
     return h && h.point.y > 1.30 && h.point.y < 1.34;
@@ -235,6 +244,9 @@ CHECK = """async () => {
     ...r.bogies.map(b => b.name), ...r.wheelsets.map(w => w.name), ...r.wipers.map(w => w.name),
     'Pantograph_contact_head', 'Coupler_front', 'Coupler_rear'];
   checks.glbHierarchy = expected.every(n => names.includes(n));
+  const importedSaloon = gltf.scene.getObjectByName('Interior').userData;
+  checks.glb6312Seating = importedSaloon.referenceCar === '6312'
+    && JSON.stringify(importedSaloon.passengerSeats) === JSON.stringify(seats);
   bindPhotoT3(gltf.scene);
   s.pose(gltf.scene, { doors: [1, .5, 0], pantograph: .3, wipers: 1 });
   checks.importedRigMoves = near(Math.abs(gltf.scene.rig.doors[0].pairs[0].outer.rotation.y), T3_PHOTO.doorMaxAngle)
@@ -323,7 +335,7 @@ def main():
                 page.set_viewport_size({'width': 390, 'height': 844})
                 page.wait_for_timeout(350)
                 page.screenshot(path=str(out / 'mobile.png'))
-                page.get_by_role('button', name='Interior', exact=True).click()
+                page.get_by_role('button', name='6312 interior', exact=True).click()
                 page.wait_for_timeout(350)
                 assert page.evaluate('Math.abs(t3studio.camera.position.z) < 6.5')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')

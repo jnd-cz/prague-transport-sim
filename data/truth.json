@@ -62,6 +62,12 @@
    "style": "Early padded T3 seats; requested custom interior under 6892 exterior markings."
   },
   {
+   "id": "saloon-reference-6312",
+   "source": "user, session 2026-11-23, #437, photos 18530.jpg, 18531.jpg, 18532.jpg, 18535.jpg and 18536.jpg",
+   "quote": "the interion is the older 6312 style, so we should later split the model into two",
+   "reference": "18532 identifies the car at the cab partition. The aisle views show single upholstered chairs, a facing pair with a box-base chair, tapered pedestals and an open central aisle."
+  },
+  {
    "id": "end-contours-brow-and-coupler",
    "source": "user follow-up in session 2026-11-16, #437; supplied 6312 photos 15611.jpg, 15609.jpg, 15606.jpg and 7000 detail 17884.jpg",
    "quote": "model the front and back according to these photos. Pay attention to the shape, lines, contours, window, top brow with a bit of overhang and tge line plate alignment. Try to model the coupler too.",
