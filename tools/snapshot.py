@@ -41,6 +41,7 @@ import sys
 import tempfile
 import time
 import zipfile
+import zlib
 
 if sys.stdout:  # (None under pythonw: the nightly baseline imports Store, #195)
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -114,6 +115,14 @@ def sha256(path):
         for b in iter(lambda: f.read(1 << 20), b""):
             h.update(b)
     return h.hexdigest()
+
+
+def crc32(path):
+    c = 0
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            c = zlib.crc32(b, c)
+    return c
 
 
 def rel(p):
@@ -217,10 +226,14 @@ class Store:
 
 
 def put(src, dst):
-    """A copy of src at dst, written whole (dst may be a protected link into a cache: replaced, not written)."""
+    """A copy of src at dst, written whole (dst may be a protected link into a cache: replaced, not written), on the
+    disk before its rename: a PC restart after the rename left a copy of the full size with other contents (#829)."""
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     tmp = f"{dst}.{os.getpid()}.part"
-    shutil.copyfile(src, tmp)
+    with open(src, "rb") as a, open(tmp, "wb") as b:
+        shutil.copyfileobj(a, b, 1 << 20)
+        b.flush()
+        os.fsync(b.fileno())
     os.replace(tmp, dst)
 
 
@@ -329,7 +342,9 @@ class Cache:
                 for n in zf.namelist():
                     if not n.endswith("/"):
                         with zf.open(n) as src, open(os.path.join(part, os.path.basename(n)), "wb") as dst:
-                            shutil.copyfileobj(src, dst)
+                            shutil.copyfileobj(src, dst, 1 << 20)
+                            dst.flush()
+                            os.fsync(dst.fileno())  # (on the disk before the folder's rename, as put)
             os.replace(part, d)
             self.protect(d)
         return d
@@ -488,12 +503,33 @@ def fetch(store, sid, cache=None):
                 if not os.path.exists(out):
                     print("  unzip", rel(out))
                     with zf.open(n) as src, replacing(out, "wb") as dst:
-                        shutil.copyfileobj(src, dst)
+                        shutil.copyfileobj(src, dst, 1 << 20)
+                        dst.flush()
+                        os.fsync(dst.fileno())
     drop_replaced(sid)
 
 
+def unzipped_drift(z):
+    """What fetch unzipped from archive z against the archive's own record of each member: its size and CRC-32.
+    The snapshot lists only the archive; a copy cut by a PC restart (2026-11-22, raw/ipr-dtm/DTM/dtm_1m.tif: its
+    2,123,252,560 bytes with other contents) passed status and failed ipr_dtm (#829)."""
+    folder = z[:-4]
+    bad = []
+    with zipfile.ZipFile(z) as zf:
+        for i in zf.infolist():
+            if i.is_dir():
+                continue
+            out = os.path.join(folder, os.path.basename(i.filename))
+            if not os.path.exists(out):
+                bad.append(("missing", rel(out)))
+            elif os.path.getsize(out) != i.file_size or crc32(out) != i.CRC:
+                bad.append(("changed", rel(out)))
+    return bad
+
+
 def raw_drift(sid):
-    """raw/ against snapshot sid: [(missing|changed, path)], [paths of input files in no group's list]."""
+    """raw/ against snapshot sid: [(missing|changed, path)], [paths of input files in no group's list]. The files
+    unzipped from a listed archive count too."""
     snap = load_snapshot(sid)
     listed = set()
     bad = []
@@ -505,6 +541,8 @@ def raw_drift(sid):
                 bad.append(("missing", f["path"]))
             elif os.path.getsize(p) != f["size"] or sha256(p) != f["sha256"]:
                 bad.append(("changed", f["path"]))
+            elif g.get("unzip") and p.endswith(".zip"):
+                bad += unzipped_drift(p)
     extra = [g2["path"] for g2 in [f for g in scan_sources() for f in g["files"]] if g2["path"] not in listed]
     return bad, extra
 
