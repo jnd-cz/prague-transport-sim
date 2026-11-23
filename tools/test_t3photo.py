@@ -22,6 +22,7 @@ CHECK = """async () => {
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
   const { bindPhotoT3, T3_PHOTO } = await import('/src/t3photo.js');
   const s = window.t3studio, m = s.model, r = m.rig;
+  const variant = m.userData.variant, early = variant === '6312';
   const checks = {}, near = (a, b) => Math.abs(a - b) < .002;
   const pos = n => n.getWorldPosition(new THREE.Vector3());
   s.reset();
@@ -69,18 +70,20 @@ CHECK = """async () => {
     if (h) frameClearance = Math.min(frameClearance, Math.abs(h.point.x) - Math.abs(x));
   }
   checks.seatFramesClearActualPanels = frameClearance > .04 && frameClearance < .3;
-  const cushions = []; interior.traverse(o => { if (o.isMesh && o.material.name === 'Red_seat_cushion') cushions.push(o); });
+  const cushions = []; interior.traverse(o => {
+    if (o.isMesh && o.material.name === (early ? 'Red_seat_cushion' : 'Red_moulded_seat')) cushions.push(o);
+  });
   const doorSide = seats.filter(p => p.x < 0), windowSide = seats.filter(p => p.x > 0);
   const frontBay = doorSide.filter(p => p.z > T3_PHOTO.doors[1]).sort((a, b) => b.z - a.z);
-  checks.saloon6312Banks = interior.userData.referenceCar === '6312' && windowSide.length === 14
+  checks.saloonBanks = interior.userData.referenceCar === variant && windowSide.length === 14
     && frontBay.length === 6 && doorSide.length - frontBay.length === 4 && seats.every(p => Math.abs(p.x) > .6);
-  checks.saloon6312Backrests = seats.every(p => {
+  checks.seatBackrestsMatchVariant = seats.every(p => {
     const reversed = p === frontBay[0], dz = reversed ? 1 : -1;
     const h = hit([p.x, 1.60, p.z], [0, 0, dz], cushions);
     return h && h.distance > .14 && h.distance < .32 && p.facing === (reversed ? 'rearward' : 'forward');
   });
   checks.seatsHaveSolidCushions = seats.every(p => {
-    const h = hit([p.x, 1.5, p.z + .08], [0, -1, 0], cushions);
+    const h = hit([p.x, 1.5, p.z + (p.facing === 'forward' ? .08 : -.08)], [0, -1, 0], cushions);
     return h && h.point.y > 1.30 && h.point.y < 1.34;
   });
   const supports = []; interior.traverse(o => { if (o.isMesh && o.material.name === 'Handrails') supports.push(o); });
@@ -143,11 +146,11 @@ CHECK = """async () => {
   checks.taperedEndShoulders = shoulderWidth > .6 && shoulderWidth < 1.05;
   // Across each front quarter-light the exposed glass is shorter by the jamb.
   const frontMaterials = [shell, m.getObjectByName('Body_Window_glass')];
-  const lenses = m.getObjectByName('Tatra_T3_6892_Headlight_lens');
+  const lenses = m.getObjectByName('Tatra_T3_' + variant + '_Headlight_lens');
   const lensBox = new THREE.Box3().setFromObject(lenses, true);
   checks.headlightsFollowFrontPhoto = near(lensBox.max.y - lensBox.min.y, .178)
-    && near(lensBox.min.x + .089, -.55) && near(lensBox.max.x - .089, .55)
-    && near(lensBox.getCenter(new THREE.Vector3()).y, 1.17);
+    && near(lensBox.min.x + .089, early ? -.575 : -.55) && near(lensBox.max.x - .089, early ? .575 : .55)
+    && near(lensBox.getCenter(new THREE.Vector3()).y, early ? 1.20 : 1.17);
   checks.bogieSkirtReturns = [-1, 1].every(side => [-3.2, 3.2].every(z => {
     const skin = dz => hit([side * 2, .53, z + dz], [-side, 0, 0], [shell])?.distance < 1;
     return [-1, 1].every(end => !skin(end * 1.05) && skin(end * 1.24));
@@ -178,6 +181,8 @@ CHECK = """async () => {
     const first = hit([x, y, 8], [0, 0, -1], [...frontMaterials, m.getObjectByName('Exterior_details')]);
     return frontMaterials.includes(first?.object);
   }));
+  checks.frontWaistMatchesVariant = hit([.25, 1.61, 8], [0, 0, -1], [shell, redShell])?.object === (early ? shell : redShell);
+  checks.rearMarkerMatchesVariant = hit([0, 1.04, -8], [0, 0, 1], [m])?.object.material.name === (early ? 'Prague_red_enamel' : 'Ivory_enamel');
   const routePlate = m.getObjectByName('Route_plate'), routeBounds = new THREE.Box3().setFromObject(routePlate);
   checks.routePlateFollowsBrow = routeBounds.min.y > 2.65 && routeBounds.max.y < 3.02 && routePlate.rotation.x < -.08 && routePlate.rotation.x > -.25;
   const frontCoupler = m.getObjectByName('Coupler_front');
@@ -191,18 +196,18 @@ CHECK = """async () => {
     && highRear.point.z - lowRear.point.z < .05
     && hit([0, 1.69, -8], [0, 0, 1], frontMaterials)?.object === shell;
   const rearWiper = m.getObjectByName('Wiper_rear_pivot');
-  const blade = r.rearCarrier.children.find(o => o.material?.name === 'Rubber');
+  const blade = r.rearCarrier?.children.find(o => o.material?.name === 'Rubber');
   const tip = () => {
     const box = new THREE.Box3().setFromObject(blade, true);
     return new THREE.Vector3(box.getCenter(new THREE.Vector3()).x, box.min.y, box.min.z);
   };
-  const pivot = pos(rearWiper), parked = tip();
-  checks.rearWiperHangsFromBrow = r.wipers.length === 3 && pivot.y > 2.68
+  const pivot = rearWiper && pos(rearWiper), parked = rearWiper && tip();
+  checks.rearWiperMatchesPhoto = early ? !rearWiper && r.wipers.length === 2 : r.wipers.length === 3 && pivot.y > 2.68
     && parked.y > 1.85 && parked.y < 2.05 && Math.abs(parked.x - pivot.x) < .03
     && parked.z < rearGlassAt(parked.x, parked.y).point.z;
   const before = pos(r.doors[0].pairs[0].inner);
   s.pose(m, { doors: [1, .5, 0], bogies: [.2, -.2], wheelAngle: 1.2, wipers: 1, couplers: [.15, -.15], pantograph: 1 });
-  checks.poweredSweepLeavesRearParked = tip().distanceTo(parked) < 1e-6;
+  if (!early) checks.poweredSweepLeavesRearParked = tip().distanceTo(parked) < 1e-6;
   checks.doorsFoldInward = pos(r.doors[0].pairs[0].inner).x > before.x + .3;
   checks.independentDoors = near(r.doors[2].pairs[0].outer.rotation.y, 0) && near(Math.abs(r.doors[1].pairs[0].outer.rotation.y), T3_PHOTO.doorMaxAngle / 2);
   checks.doorsStopShortOf90 = near(Math.abs(r.doors[0].pairs[0].outer.rotation.y), 84 * Math.PI / 180);
@@ -221,7 +226,7 @@ CHECK = """async () => {
            carrier.localToWorld(new THREE.Vector3((i === 0 ? -1 : 1) * .034, 0, .008))) < .001;
     });
   });
-  checks.rearWiperManualBothSides = [-1, 1].every(direction => {
+  if (!early) checks.rearWiperManualBothSides = [-1, 1].every(direction => {
     s.pose(m, { rearWiper: direction });
     return (parked.x - tip().x) * direction > .25 && pivot.distanceTo(pos(rearWiper)) < 1e-6
       && r.rearLink.localToWorld(new THREE.Vector3(.012, -.56, .01)).distanceTo(
@@ -245,14 +250,15 @@ CHECK = """async () => {
     'Pantograph_contact_head', 'Coupler_front', 'Coupler_rear'];
   checks.glbHierarchy = expected.every(n => names.includes(n));
   const importedSaloon = gltf.scene.getObjectByName('Interior').userData;
-  checks.glb6312Seating = importedSaloon.referenceCar === '6312'
+  checks.glbVehicleIdentity = names.includes('Tatra_T3_' + variant) && importedSaloon.referenceCar === variant
     && JSON.stringify(importedSaloon.passengerSeats) === JSON.stringify(seats);
   bindPhotoT3(gltf.scene);
   s.pose(gltf.scene, { doors: [1, .5, 0], pantograph: .3, wipers: 1 });
   checks.importedRigMoves = near(Math.abs(gltf.scene.rig.doors[0].pairs[0].outer.rotation.y), T3_PHOTO.doorMaxAngle)
     && near(gltf.scene.rig.wipers[0].rotation.z, -.63) && near(gltf.scene.rig.wipers[1].rotation.z, .63)
     && near(gltf.scene.rig.frontWiperLinks[0].carrier.rotation.z, .63)
-    && near(gltf.scene.rig.wipers[2].rotation.z, 0) && pivot.distanceTo(pos(gltf.scene.rig.wipers[2])) < .001;
+    && (early ? gltf.scene.rig.wipers.length === 2 :
+      near(gltf.scene.rig.wipers[2].rotation.z, 0) && pivot.distanceTo(pos(gltf.scene.rig.wipers[2])) < .001);
   s.pose(gltf.scene); s.roundTrip = gltf.scene;
   const originalBounds = new THREE.Box3().setFromObject(m), importedBounds = new THREE.Box3().setFromObject(gltf.scene);
   checks.glbBounds = originalBounds.min.distanceTo(importedBounds.min) < .001 && originalBounds.max.distanceTo(importedBounds.max) < .001;
@@ -269,9 +275,13 @@ CHECK = """async () => {
   const nodes = []; m.traverse(o => { if (o.userData.assembly) nodes.push({ name: o.name,
     parent: o.parent.name, translation: o.position.toArray(), rotation: o.quaternion.toArray(),
     ...(o.userData.axis ? { axis: o.userData.axis } : {}), ...(o.userData.range ? { range: o.userData.range } : {}) }); });
-  return { checks, stats: s.stats, body: size.toArray(), roof: bounds.max.y, nodes,
+  const studioDraws = s.renderer.info.render.calls;
+  m.visible = false; s.renderer.render(s.scene, s.camera);
+  const carDraws = studioDraws - s.renderer.info.render.calls;
+  m.visible = true; s.renderer.render(s.scene, s.camera);
+  return { variant, checks, stats: s.stats, body: size.toArray(), roof: bounds.max.y, nodes,
     glbBytes: bytes.byteLength, exportedNodes: names.length, materials: materials.size,
-    drawCalls: s.renderer.info.render.calls, seatFrameClearance: frameClearance,
+    drawCalls: studioDraws, carDraws, seatFrameClearance: frameClearance,
     failed: Object.keys(checks).filter(k => !checks[k]) };
 }"""
 
@@ -285,6 +295,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--export', action='store_true')
     parser.add_argument('--screenshots', action='store_true')
+    parser.add_argument('--car', choices=['6312', '6892'], default='6892')
     args = parser.parse_args()
     faulthandler.dump_traceback_later(180, exit=True)
     server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(QuietHandler, directory=str(ROOT)))
@@ -297,7 +308,7 @@ def main():
             page = browser.new_page(viewport={'width': 1600, 'height': 1000}, device_scale_factor=1)
             errors = []
             page.on('pageerror', lambda e: errors.append(str(e)))
-            page.goto(f'http://127.0.0.1:{server.server_port}/tools/t3-model/', timeout=60000)
+            page.goto(f'http://127.0.0.1:{server.server_port}/tools/t3-model/?car={args.car}', timeout=60000)
             page.wait_for_function('window.t3studio', timeout=60000)
             page.get_by_role('slider', name='Front doors', exact=True).focus()
             page.keyboard.press('End')
@@ -305,19 +316,20 @@ def main():
             page.keyboard.press('Home')
             result = page.evaluate(CHECK)
             result['pageErrors'] = errors
-            if args.export:
+            if args.export and not (errors or result['failed']):
                 encoded = page.evaluate("""async () => {
                   const b = new Uint8Array(await t3studio.exportGLB());
                   let str = ''; for (let i=0;i<b.length;i+=8192) str += String.fromCharCode(...b.subarray(i,i+8192));
                   return btoa(str);
                 }""")
-                target = ROOT / 'assets' / 't3photo' / 'tatra-t3-6892.glb'
+                target = ROOT / 'assets' / 't3photo' / f'tatra-t3-{args.car}.glb'
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(base64.b64decode(encoded))
                 rig = {'schema': 't3photo-rig-v1', 'units': 'metres', 'up': '+Y', 'forward': '+Z',
                        'doorSide': '-X', 'railPlane': 0, 'dimensions': result['stats']['dimensions'],
                        'poseSource': '../../src/t3photo.js#posePhotoT3', 'nodes': result.pop('nodes')}
-                (target.parent / 'rig.json').write_text(json.dumps(rig, indent=2) + '\n', encoding='utf-8')
+                manifest = 'rig.json' if args.car == '6892' else 'rig-6312.json'
+                (target.parent / manifest).write_text(json.dumps(rig, indent=2) + '\n', encoding='utf-8')
             else:
                 result.pop('nodes')
             if args.screenshots:
@@ -335,13 +347,13 @@ def main():
                 page.set_viewport_size({'width': 390, 'height': 844})
                 page.wait_for_timeout(350)
                 page.screenshot(path=str(out / 'mobile.png'))
-                page.get_by_role('button', name='6312 interior', exact=True).click()
+                page.get_by_role('button', name='Interior', exact=True).click()
                 page.wait_for_timeout(350)
                 assert page.evaluate('Math.abs(t3studio.camera.position.z) < 6.5')
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                 page.screenshot(path=str(out / 'mobile-interior.png'))
             browser.close()
-        (out / 'checks.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
+        (out / f'checks-{args.car}.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
         print(json.dumps(result, indent=2))
         if result['failed'] or errors:
             raise SystemExit(1)

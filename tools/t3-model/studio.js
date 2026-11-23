@@ -28,9 +28,20 @@ for (const x of [-.7175, .7175]) {
 }
 const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 1.5, 0);
 controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2; controls.minDistance = 2; controls.maxDistance = 40;
-const model = makePhotoT3(); scene.add(model);
+const url = new URL(location.href);
+const variant = url.searchParams.get('car') === '6892' ? '6892' : '6312';
+const selector = document.querySelector('#vehicle');
+selector.value = variant;
+selector.addEventListener('change', () => {
+  url.searchParams.set('car', selector.value); location.assign(url.href);
+});
+const model = makePhotoT3({ variant }); scene.add(model);
 const stats = photoT3Stats(model);
-document.querySelector('#stats').textContent = `${stats.triangles.toLocaleString()} triangles · ${stats.meshes} meshes`;
+document.querySelector('header p').textContent = 'Fleet ' + variant;
+document.title = 'Tatra T3 ' + variant + ' · Model studio';
+const statsOutput = document.querySelector('#stats');
+const geometryCount = stats.triangles.toLocaleString() + ' model triangles';
+let previousDraws = -1;
 const $ = id => document.getElementById(id), value = id => +$(id).value;
 const state = () => ({ doors: [value('door1'), value('door2'), value('door3')], pantograph: value('pantograph'),
   bogies: [value('bogies'), -value('bogies')], wipers: value('wipers'), wheelAngle });
@@ -73,7 +84,7 @@ $('export').addEventListener('click', async () => {
   $('export').disabled = true;
   try {
     const data = await exportGLB(), url = URL.createObjectURL(new Blob([data], { type: 'model/gltf-binary' }));
-    const a = document.createElement('a'); a.href = url; a.download = 'tatra-t3-6892.glb'; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = 'tatra-t3-' + variant + '.glb'; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (e) { $('error').textContent = `Export failed: ${e.message}`; }
   finally { $('export').disabled = false; }
@@ -92,5 +103,10 @@ let last = performance.now();
 renderer.setAnimationLoop(now => {
   if ($('wheels').checked) { wheelAngle += Math.min(.05, (now - last) / 1000) * 2; pose(); }
   last = now; controls.update(); renderer.render(scene, camera);
+  const draws = renderer.info.render.calls;
+  if (draws !== previousDraws) {
+    statsOutput.textContent = geometryCount + ' · ' + draws + ' studio draws';
+    previousDraws = draws;
+  }
 });
 window.t3studio = { model, scene, camera, renderer, controls, stats, pose: posePhotoT3, reset, view, exportGLB };

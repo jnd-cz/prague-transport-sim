@@ -68,6 +68,12 @@
    "reference": "18532 identifies the car at the cab partition. The aisle views show single upholstered chairs, a facing pair with a box-base chair, tapered pedestals and an open central aisle."
   },
   {
+   "id": "6312-exterior-variant",
+   "source": "user, 2026-11-23, #437, photos 20261122_120509.jpg, 20261122_120525.jpg, 20261122_120722.jpg and 20261122_120531.jpg",
+   "quote": "use them to model the car, separately from 6892.",
+   "reference": "6312 has a front brow route board, a rear window route board, horizontal combined rear lamps and red-insert aluminium mouldings. The rear photograph shows an unobstructed pane."
+  },
+  {
    "id": "end-contours-brow-and-coupler",
    "source": "user follow-up in session 2026-11-16, #437; supplied 6312 photos 15611.jpg, 15609.jpg, 15606.jpg and 7000 detail 17884.jpg",
    "quote": "model the front and back according to these photos. Pay attention to the shape, lines, contours, window, top brow with a bit of overhang and tge line plate alignment. Try to model the coupler too.",

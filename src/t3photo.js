@@ -114,20 +114,25 @@ function batch(root) {
   }
 }
 
-export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVNOV\nKRÁLOVKA' } = {}) {
-  const root = new THREE.Group(); root.name = 'Tatra_T3_6892';
+export function makePhotoT3({ variant = '6892', fleet = variant, line = '23',
+  destination = variant === '6312' ? 'NOVÉ MĚSTO\nBÍLÁ LABUŤ' : 'BŘEVNOV\nKRÁLOVKA' } = {}) {
+  if (!['6892', '6312'].includes(variant)) throw new RangeError('Unknown T3 variant: ' + variant);
+  const early = variant === '6312';
+  const root = new THREE.Group(); root.name = 'Tatra_T3_' + variant;
   root.userData = { asset: 'Original photo-based Tatra T3', units: 'metres', forward: '+Z', up: '+Y',
-    railPlane: 0, licence: 'AGPL-3.0-or-later', dimensions: { ...T3_PHOTO }, reference: 'assets/t3photo/README.md' };
+    variant, fleet, railPlane: 0, licence: 'AGPL-3.0-or-later', dimensions: { ...T3_PHOTO }, reference: 'assets/t3photo/README.md' };
   const material = (name, color, roughness = .5, metalness = 0, extra = {}) => {
     const m = new THREE.MeshStandardMaterial({ color, roughness, metalness, side: THREE.DoubleSide, ...extra });
     m.name = name; return m;
   };
-  const cream = material('Ivory_enamel', '#dfd6b9', .32), red = material('Prague_red_enamel', '#ac1e29', .3);
+  const cream = material('Ivory_enamel', early ? '#eee0a7' : '#dfd6b9', .32);
+  const red = material('Prague_red_enamel', early ? '#bd1925' : '#ac1e29', .3);
   const roofMat = material('Roof_grey', '#565653', .75), rubber = material('Rubber', '#171c1d', .84);
   const steel = material('Steel', '#525b60', .42, .75), chrome = material('Aluminium', '#b4b8b6', .28, .75);
   const dark = material('Underframe', '#303737', .77, .3), floorMat = material('Floor', '#ffffff', .92);
-  const glass = material('Window_glass', '#729293', .12, .28, { transparent: true, opacity: .57, depthWrite: false });
-  const seatMat = material('Red_seat_cushion', '#ae3436', .62), poleMat = material('Handrails', '#a3a7a5', .46, .45);
+  const glass = material('Window_glass', '#729293', .12, .28, { transparent: true, opacity: early ? .35 : .57, depthWrite: false });
+  const seatMat = material(early ? 'Red_seat_cushion' : 'Red_moulded_seat', early ? '#ae3436' : '#a93b31', early ? .62 : .3);
+  const poleMat = material('Handrails', '#a3a7a5', .46, .45);
   const wallMat = material('Interior_laminate', '#bc9f94', .84);
   // Small repeatable rubber ribs, with metre-based UVs shared by the floor and stair blocks.
   const floorCanvas = document.createElement('canvas'); floorCanvas.width = floorCanvas.height = 64;
@@ -199,6 +204,16 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
       box(frame, 'Window_latch', [.065, .025, .025], [c + .04, 2.25, .008], rubber);
     }
     rod(detail, 'Rain_gutter', V(sx, 2.72, -5.94), V(sx, 2.72, 5.94), .017, chrome);
+    if (early) {
+      const spans = side < 0 ? [[-4.59, -1.46], [-.04, 4.59]] : [[-5.98, 5.98]];
+      for (const [level, intervals] of [[.85, spans], [1.66, spans], [2.72, [[-5.95, 5.95]]]]) {
+        for (const [a, b] of intervals) {
+          const height = level === .85 ? .060 : .030;
+          box(detail, 'Alloy_side_moulding', [.035, height, b-a], [sx + side*.014, level, (a+b)/2], chrome);
+          box(detail, 'Side_moulding_insert', [.008, .009, b-a], [sx + side*.033, level, (a+b)/2], red);
+        }
+      }
+    }
     if (side > 0) {
       box(detail, 'Vent_recess', [.018, .43, 1.16], [1.262, 1.20, -1.90], dark);
       for (let y = 1.01; y < 1.42; y += .043) box(detail, 'Vent_louvre', [.027, .023, 1.12], [1.279, y, -1.90], red);
@@ -231,14 +246,22 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     return [lower[0], lower[1] + t * rise, lower[2] - sign * .14 * c * rise * t];
   };
   for (const sign of [-1, 1]) {
+    // On 6312 the front cream sill extends below the alloy strip. The rear red
+    // panel reaches the strip. Both paint lines meet the side waist at the jamb.
+    const waist = a => {
+      if (!early) return 1.66;
+      const endHeight = sign > 0 ? 1.56 : windowY(a, false, sign) - .048;
+      return THREE.MathUtils.lerp(endHeight, 1.66, clamp((Math.abs(a) - 1.35) / (Math.PI / 2 - 1.35)) ** 2);
+    };
     for (const [lo, hi, mat] of [[.34, .85, cream], [.85, 1.66, red]]) {
-      const rows = (lo < .5 ? [lo, .44, hi] : [lo, 1.04, 1.24, 1.45, hi]).map(y => angles.map(a => endPoint(a, y, sign)));
+      const rows = (lo < .5 ? [lo, .44, hi] : [lo, 1.04, 1.24, 1.45, hi]).map(y =>
+        angles.map(a => endPoint(a, y === 1.66 ? waist(a) : y, sign)));
       if (lo < .5) { // open coupler pocket between the two cream cheek panels
         surface(body, 'End_skirt_cheek', rows.map(r => r.slice(0, 13)), mat);
         surface(body, 'End_skirt_cheek', rows.map(r => r.slice(36)), mat);
       } else surface(body, 'End_moulding', rows, mat);
     }
-    surface(body, 'Cream_window_sill', [angles.map(a => endPoint(a, 1.66, sign)), angles.map(a => endPoint(a, windowY(a, false, sign), sign))], cream);
+    surface(body, 'Cream_window_sill', [angles.map(a => endPoint(a, waist(a), sign)), angles.map(a => endPoint(a, windowY(a, false, sign), sign))], cream);
     {
       // Quarter ellipses meet the sill and jamb tangentially. 6892's rear
       // quarter-lights have tighter corners, especially at the sill.
@@ -273,6 +296,18 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
       rod(detail, 'End_window_mullion', V(...endPoint(a, windowY(a, false, sign), sign)), V(...endPoint(a, windowY(a, true, sign), sign)), .018, chrome);
     }
     surface(detail, 'Brow_underside', [angles.map(a => endPoint(a, windowY(a, true, sign), sign)), angles.map(a => browPoint(a, 0, sign))], rubber);
+    if (early) {
+      // Both sills carry an alloy moulding. Only the front has one on the brow.
+      for (const atBrow of (sign > 0 ? [false, true] : [false])) {
+        const edge = (a, dy, offset) => {
+          const p = atBrow ? browPoint(a, .045, sign) : endPoint(a, windowY(a, false, sign) - .041, sign);
+          return [p[0] + offset*Math.sin(a), p[1]+dy, p[2] + sign*offset*Math.cos(a)];
+        };
+        for (const [h, d, mat] of [[.015, .014, chrome], [.004, .017, red]]) {
+          surface(detail, 'End_moulding_trim', [-h,h].map(dy => angles.map(a => edge(a, dy, d))), mat);
+        }
+      }
+    }
     // Broad aluminium bumper with two fine red inserts, as the 7000 close-up shows.
     for (const [lo, hi, mat] of [[.79, .808, rubber], [.808, .827, chrome], [.827, .839, red],
       [.839, .91, chrome], [.91, .922, red], [.922, .941, chrome], [.941, .954, rubber]]) {
@@ -281,7 +316,7 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     for (const x of [-.64, .64]) {
       const z = endPoint(Math.asin(x / 1.25), 1.13, sign, -.025)[2];
       if (sign > 0) {
-        const lampY = 1.17, lampX = Math.sign(x) * .55;
+        const lampY = early ? 1.20 : 1.17, lampX = Math.sign(x) * (early ? .575 : .55);
         const face = endPoint(Math.asin(lampX / (1.25 * taper(7))), lampY, sign);
         const g = group(root, 'Headlamp', lampX, lampY, face[2] - .009); g.rotation.x = Math.PI / 2;
         mesh(g, 'Red_lamp_pod', new THREE.CylinderGeometry(.110, .124, .060, 32), red, 0, .025, 0);
@@ -289,17 +324,35 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
         mesh(g, 'Lamp_bezel', new THREE.CylinderGeometry(.092, .099, .009, 32), chrome, 0, .073, 0);
         mesh(g, 'Lamp_lens', new THREE.SphereGeometry(.089, 24, 12), lamp, 0, .078, 0).scale.y = .14;
       } else {
-        box(detail, 'Rear_lamp_surround', [.23, .105, .04], [x, 1.04, z], rubber);
-        box(detail, 'Rear_red_lamp', [.195, .070, .045], [x, 1.04, z - .02], tail);
+        if (early) {
+          const pod = group(detail, 'Combined_rear_lamp', x * .85, 1.073, z + .012);
+          pod.rotation.y = Math.PI;
+          plate(pod, 'Oval_lamp_bezel', rr(-.127,-.054,.254,.108,.054), chrome, 0,0,.008);
+          plate(pod, 'Amber_outer_lenses', rr(-.119,-.046,.238,.092,.046), amber, 0,0,.010);
+          box(pod, 'Red_centre_lens', [.073,.09,.012], [0,0,.012], tail);
+          for (const edge of [-.039,.039]) box(pod, 'Lens_divider', [.007,.091,.012], [edge,0,.014], chrome);
+        } else {
+          box(detail, 'Rear_lamp_surround', [.23, .105, .04], [x, 1.04, z], rubber);
+          box(detail, 'Rear_red_lamp', [.195, .070, .045], [x, 1.04, z - .02], tail);
+        }
         const reflector = group(detail, 'Rear_reflector', Math.sign(x) * .88, .67, endPoint(Math.asin(.88 / 1.25), .67, -1, -.025)[2]);
         reflector.rotation.x = -Math.PI / 2;
         mesh(reflector, 'Reflector_rim', new THREE.CylinderGeometry(.063, .063, .017, 24), chrome);
         mesh(reflector, 'Reflector_red', new THREE.CylinderGeometry(.048, .048, .022, 24), tail, 0, .012, 0);
       }
     }
-    if (sign < 0) box(detail, 'Rear_white_marker', [.19, .08, .025], [0, 1.04, -7.016], cream);
+    if (sign < 0 && !early) box(detail, 'Rear_white_marker', [.19, .08, .025], [0, 1.04, -7.016], cream);
     for (const x of [-1.08, 1.08]) {
       const z = endPoint(Math.asin(x / 1.25), 1.21, sign, -.025)[2];
+      if (early) {
+        if (sign > 0) {
+          const g = group(detail, 'Front_cheek_marker', x, 1.49, z - .012);
+          g.rotation.y = Math.sign(x) * .56;
+          plate(g, 'Oval_marker_bezel', rr(-.046,-.09,.092,.18,.046), chrome, 0,0,.010);
+          plate(g, 'Clear_marker_lens', rr(-.038,-.081,.076,.162,.038), glass, 0,0,.014);
+        }
+        continue;
+      }
       box(detail, 'Indicator_surround', [.075, .24, .035], [x, 1.21, z], chrome);
       box(detail, 'Indicator', [.055, .092, .042], [x, 1.27, z + sign * .015], amber);
       box(detail, 'Marker_light', [.055, .085, .042], [x, 1.16, z + sign * .016], sign > 0 ? lamp : tail);
@@ -312,7 +365,15 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   for (const [z, w, h] of [[-5.99, 1.25, 3.06], [-4.5, 1.25, 3.06], [0, 1.25, 3.06], [4.5, 1.25, 3.06], [5.99, 1.25, 3.06]]) {
     roofRows.push(angles.map(a => [w * Math.sin(a), 2.74 + (h - 2.74) * Math.cos(a), z]));
   }
-  surface(body, 'Roof_shell', roofRows, cream);
+  if (early) {
+    // The grey roof comes down to the drip rail in the middle, sweeping up at both ends.
+    const boundary = a => 5.87 - 1.85 * Math.abs(Math.sin(a)) ** 6;
+    const row = zAt => angles.map(a => [1.25*Math.sin(a), 2.74+.32*Math.cos(a), zAt(a)]);
+    for (const sign of [-1, 1]) {
+      surface(body, 'Cream_roof_return', [row(() => sign*5.99), row(a => sign*boundary(a))], cream);
+    }
+    surface(body, 'Grey_roof', [row(a => -boundary(a)), row(() => 0), row(boundary)], roofMat);
+  } else surface(body, 'Roof_shell', roofRows, cream);
   for (const sign of [-1, 1]) {
     // One continuous surface from the glass to the crown. The cubic leaves
     // the brow on its tangent and arrives at the roof with zero vertical slope.
@@ -326,13 +387,13 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     }));
     surface(body, 'Rounded_roof_cap', rows, cream);
   }
-  surface(detail, 'Roof_equipment_deck', [-5.6, 5.6].map(z => Array.from({ length: 25 }, (_, i) => {
+  if (!early) surface(detail, 'Roof_equipment_deck', [-5.6, 5.6].map(z => Array.from({ length: 25 }, (_, i) => {
     const x = -.82 + 1.64 * i / 24; return [x, 2.748 + .32 * Math.sqrt(1 - (x / 1.25) ** 2), z];
   })), roofMat);
   for (const z of [-4.5, -.5, 4.45]) box(detail, 'Roof_vent', [.58, .075, .88], [0, 3.10, z], roofMat);
   box(detail, 'Electrical_box', [.35, .32, .55], [.56, 3.22, 1.8], steel);
 
-  // The exterior study wears 6892's markings; the saloon reference is 6312 (#437).
+  // The single-seat layout was reconstructed from the 6312 saloon photos (#437).
   floorBox('Saloon_floor', [1.70, .08, 11.75], [.305, .834, -.03]);
   let floorStart = -5.905;
   for (const [a, b] of [...T3_PHOTO.doors.map(z => [z - .70, z + .70]).sort((a, b) => a[0] - b[0]), [5.845, 5.845]]) {
@@ -363,13 +424,13 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   }
   const seats = [];
   function addSeat(x, z, facing = 'forward', base = 'pedestal') {
-    seats.push({ x, z, facing, base, style: 'early upholstered T3' });
+    seats.push({ x, z, facing, base, style: early ? 'early upholstered T3' : 'moulded shell' });
   }
   for (let i = 0; i < 14; i++) addSeat(.84, -5.06 + i * .72, 'forward', i === 13 ? 'box' : 'pedestal');
   for (const z of [-4.18, -3.43, -2.68, -1.93]) addSeat(-.84, z);
   for (const z of [.30, 1.00, 1.70, 2.40, 3.10]) addSeat(-.84, z);
   addSeat(-.84, 4.18, 'rearward', 'box');
-  cabin.userData.referenceCar = '6312';
+  cabin.userData.referenceCar = variant;
   cabin.userData.passengerSeats = seats;
   for (const [i, { x, z, facing, base }] of seats.entries()) {
     const seat = group(cabin, `Passenger_seat_${i + 1}`, x, 0, z);
@@ -380,11 +441,20 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
         { depth, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: .020, bevelThickness: .018, curveSegments: 4 });
       return mesh(seat, name, g, seatMat, ...position);
     };
-    pad('Seat_cushion', .46, .43, .065, [0, 1.25, 0]).rotation.x = -Math.PI / 2;
-    pad('Seat_back_cushion', .425, .405, .048, [0, 1.59, -.24]).rotation.x = -.12;
-    tube(seat, 'Seat_loop_frame', [V(-.235, 1.23, .15), V(-.235, 1.23, -.15), V(-.235, 1.39, -.26),
-      V(-.235, 1.82, -.32), V(-.18, 1.90, -.33), V(.18, 1.90, -.33), V(.235, 1.82, -.32),
-      V(.235, 1.39, -.26), V(.235, 1.23, -.15), V(.235, 1.23, .15)], .016, chrome, false, 28);
+    if (early) {
+      pad('Seat_cushion', .46, .43, .065, [0, 1.25, 0]).rotation.x = -Math.PI / 2;
+      pad('Seat_back_cushion', .425, .405, .048, [0, 1.59, -.24]).rotation.x = -.12;
+      tube(seat, 'Seat_loop_frame', [V(-.235, 1.23, .15), V(-.235, 1.23, -.15), V(-.235, 1.39, -.26),
+        V(-.235, 1.82, -.32), V(-.18, 1.90, -.33), V(.18, 1.90, -.33), V(.235, 1.82, -.32),
+        V(.235, 1.39, -.26), V(.235, 1.23, -.15), V(.235, 1.23, .15)], .016, chrome, false, 28);
+    } else {
+      // One dished shell sweeps up into the backrest. Roll the exposed edges under.
+      const profile = [[.21,1.29,.19],[.20,1.32,.21],[.11,1.32,.23],[-.11,1.29,.22],
+        [-.18,1.32,.20],[-.208,1.42,.19],[-.245,1.64,.196],[-.27,1.73,.183],[-.28,1.74,.15]];
+      surface(seat, 'Moulded_seat', profile.map(([z,y,w]) =>
+        [-1.02,-1,-.76,0,.76,1,1.02].map(u => [w*u, y + .026*u*u - (Math.abs(u) > 1 ? .015 : 0), z+.018*u*u])), seatMat);
+      box(seat, 'Seat_mounting_plate', [.20,.055,.18], [0,1.267,-.045], poleMat);
+    }
     if (base === 'box') {
       const housing = new THREE.ExtrudeGeometry(rr(-.205, -.18, .41, .36, .06),
         { depth: .35, bevelEnabled: false, steps: 1, curveSegments: 3 });
@@ -438,6 +508,14 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
         const shell = group(leaf, leaf.name + '_panel'); shell.rotation.y = sign > 0 ? Math.PI / 2 : -Math.PI / 2;
         plate(shell, 'Door_enamel', panel, cream, 0, 0, -sign * .006);
         plate(shell, 'Door_inner_aluminium', panel, poleMat, 0, 0, sign * .006);
+        if (early) {
+          const edge = leaf === outer ? .345 : 0, hand = leaf === outer ? -1 : 1;
+          for (const y of [.075, 1.144, 2.168]) {
+            box(shell, 'Enamel_hinge_strap', [.070,.032,.014], [edge + hand*.035,y,-sign*.015], cream);
+            if (leaf === outer) rod(shell, 'Hinge_barrel', V(edge,y-.028,-sign*.022),
+              V(edge,y+.028,-sign*.022), .013, cream, 8);
+          }
+        }
         for (const [y, h] of [[.18, .89], [1.20, .96]]) {
           const s = rr(.065, y, .215, h, .065);
           plate(shell, 'Door_glass', s, glass, 0, 0, .002);
@@ -527,7 +605,7 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
           [.293,.051],[.290,.061],[.285,.064],[.109,.064],[.101,.069],[0,.069]];
         const rim = [[.317,-.061],[.347,-.061],[.350,-.057],[.350,.048],[.346,.053],[.317,.055]];
         for (const [name, profile, mat] of [['Solid_wheel',section,wheelMat],['Wheel_tyre',rim,treadMat]]) {
-          mesh(axle, name, new THREE.LatheGeometry(profile.map(p => new THREE.Vector2(...p)), 48), mat,
+          mesh(axle, name, new THREE.LatheGeometry(profile.map(p => new THREE.Vector2(...p)), 36), mat,
             x, 0, 0).rotation.z = -side * Math.PI / 2;
         }
         // A bevel catches the light around the single hex on the plain wheel disc.
@@ -628,28 +706,41 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     rig.wipers.push(pivot);
   }
   // C5R09032: the arm hangs from the brow on a small twin-spindle plate.
-  const mount = browPoint(0, .40, -1);
-  const rearWiper = group(root, 'Wiper_rear', 0, mount[1], mount[2] - .012);
-  rearWiper.rotation.set(Math.atan(rearRake), Math.PI, 0);
-  box(rearWiper, 'Rear_wiper_mount', [.105, .046, .026], [.025, 0, 0], cream);
-  const rearPivot = group(rearWiper, 'Wiper_rear_pivot'); rearPivot.userData.axis = 'Z';
-  const rearLink = group(rearWiper, 'Wiper_rear_link', .057, 0, 0);
-  const rearCarrier = group(rearPivot, 'Wiper_rear_carrier', .012, -.56, 0);
-  rig.rearLink = rearLink; rig.rearCarrier = rearCarrier;
-  for (const node of [rearLink, rearCarrier]) { node.userData.axis = 'Z'; node.userData.assembly = true; }
-  rod(rearPivot, 'Rear_wiper_arm', V(0, 0, .017), V(.012, -.56, .010), .011, dark);
-  rod(rearLink, 'Rear_wiper_link', V(0, 0, .017), V(.012, -.56, .010), .005, dark);
-  rod(rearCarrier, 'Rear_wiper_bridge', V(.057, 0, .010), V(0, 0, -.010), .008, dark);
-  rod(rearCarrier, 'Rear_wiper_blade', V(0, .25, -.010), V(0, -.27, -.010), .011, rubber);
-  rig.wipers.push(rearPivot);
+  if (!early) {
+    const mount = browPoint(0, .40, -1);
+    const rearWiper = group(root, 'Wiper_rear', 0, mount[1], mount[2] - .012);
+    rearWiper.rotation.set(Math.atan(rearRake), Math.PI, 0);
+    box(rearWiper, 'Rear_wiper_mount', [.105, .046, .026], [.025, 0, 0], cream);
+    const rearPivot = group(rearWiper, 'Wiper_rear_pivot'); rearPivot.userData.axis = 'Z';
+    const rearLink = group(rearWiper, 'Wiper_rear_link', .057, 0, 0);
+    const rearCarrier = group(rearPivot, 'Wiper_rear_carrier', .012, -.56, 0);
+    rig.rearLink = rearLink; rig.rearCarrier = rearCarrier;
+    for (const node of [rearLink, rearCarrier]) { node.userData.axis = 'Z'; node.userData.assembly = true; }
+    rod(rearPivot, 'Rear_wiper_arm', V(0, 0, .017), V(.012, -.56, .010), .011, dark);
+    rod(rearLink, 'Rear_wiper_link', V(0, 0, .017), V(.012, -.56, .010), .005, dark);
+    rod(rearCarrier, 'Rear_wiper_bridge', V(.057, 0, .010), V(0, 0, -.010), .008, dark);
+    rod(rearCarrier, 'Rear_wiper_blade', V(0, .25, -.010), V(0, -.27, -.010), .011, rubber);
+    rig.wipers.push(rearPivot);
+  }
   const mirror = group(detail, 'Mirror_arm');
-  tube(mirror, 'Mirror_support', [V(-1.12, 2.79, 6.1), V(-1.52, 2.81, 6.34), V(-1.64, 2.42, 6.37)], .022, steel);
+  if (early) {
+    rod(mirror, 'Roof_mirror_stay', V(-1.11,2.80,6.40), V(-1.63,2.49,6.36), .012, cream);
+    for (const side of [-1,1]) {
+      tube(mirror, 'Sill_mirror_stay', [V(side*1.14,1.64,6.51), V(side*1.16,1.76,6.51),
+        V(side*1.32,1.84,6.52), V(side*1.36,2.01,6.52)], .012, cream);
+      box(mirror, 'Small_mirror_back', [.125,.205,.039], [side*1.36,2.05,6.52], rubber);
+      box(mirror, 'Small_mirror_glass', [.107,.184,.008], [side*1.36,2.05,6.495], chrome);
+    }
+    rod(mirror, 'Mirror_board_stay', V(-1.16,1.71,6.51), V(-1.62,2.18,6.37), .013, cream);
+    for (const x of [-.057,.057]) rod(detail, 'Roof_disc_stay', V(x,3.01,6.05), V(x,3.21,6.05), .012, cream);
+    mesh(detail, 'Roof_disc', new THREE.CylinderGeometry(.129,.129,.012,24),cream,0,3.212,6.05);
+  } else tube(mirror, 'Mirror_support', [V(-1.12, 2.79, 6.1), V(-1.52, 2.81, 6.34), V(-1.64, 2.42, 6.37)], .022, steel);
   box(mirror, 'Mirror_back', [.18, .41, .085], [-1.64, 2.24, 6.37], rubber);
   box(mirror, 'Mirror_glass', [.151, .37, .008], [-1.64, 2.24, 6.32], chrome);
 
   // Text is a single generated atlas, never a photo projected onto the body.
-  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512;
-  const ctx = cv.getContext('2d'); ctx.clearRect(0, 0, 1024, 512);
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = early ? 1024 : 512;
+  const ctx = cv.getContext('2d');
   const writtenRows = new Set();
   function label(name, text, size, pos, ry, bg, fg, row, parent = detail) {
     const x = 0, y = row * 100, w = 1024, h = 96;
@@ -658,16 +749,20 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
       if (bg) { ctx.fillStyle = bg; ctx.fillRect(x, y, w, h); }
       ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const lines = String(text).split('\n'), virtualW = h * size[0] / size[1];
-      ctx.font = `bold ${lines.length > 1 ? 39 : 80}px Arial`;
+      ctx.font = `bold ${Math.min(80, Math.floor(80 / lines.length))}px ${early && row === 1 ? 'Georgia' : 'Arial'}`;
       ctx.save(); ctx.translate(w / 2, y); ctx.scale(w / virtualW, 1);
       lines.forEach((t, i) => {
         ctx.save();
         if (lines.length === 1) ctx.scale(virtualW * .86 / Math.max(1, ctx.measureText(t).width), 1);
+        if (early && row === 1) {
+          ctx.strokeStyle = '#251d17'; ctx.lineWidth = 4;
+          ctx.strokeText(t, 0, h * .53, virtualW * .92);
+        }
         ctx.fillText(t, 0, h * (i + .5) / lines.length, virtualW * .92); ctx.restore();
       }); ctx.restore();
     }
     const g = new THREE.PlaneGeometry(...size, name.startsWith('Fleet_') ? 24 : 1, 1), uv = g.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i), 1 - (y + h * (1 - uv.getY(i))) / 512);
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i), 1 - (y + h * (1 - uv.getY(i))) / cv.height);
     if (name === 'Fleet_front' || name === 'Fleet_rear') {
       const p = g.attributes.position, sign = name === 'Fleet_front' ? 1 : -1;
       for (let i = 0; i < p.count; i++) p.setZ(i, Math.abs(endPoint(Math.asin(p.getX(i) / 1.25), pos[1] + p.getY(i), sign, -.009)[2]) - Math.abs(pos[2]));
@@ -684,12 +779,13 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
   const routePlate = group(detail, 'Route_plate', 0, plateY, browLower[2] + .161 * plateSlope + .012);
   routePlate.rotation.x = Math.atan(plateSlope);
   routePlate.userData.assembly = true;
-  box(routePlate, 'Route_plate_frame', [.423, .298, .012], [0, 0, 0], cream);
-  label('Route_front', line, [.404, .288], [0, 0, .008], 0, '#145488', '#fff8df', 0, routePlate);
+  const boardWidth = early ? .50 : .404;
+  box(routePlate, 'Route_plate_frame', [boardWidth + .019, .298, .012], [0, 0, 0], cream);
+  label('Route_front', line, [boardWidth, .288], [0, 0, .008], 0, '#145488', '#fff8df', 0, routePlate);
   label('Fleet_front', fleet, [.68, .23], [0, 1.17, 7.009], 0, null, '#d3b665', 1);
-  label('Destination', destination, [.62, .22], [0, 1.91, 6.82], 0, '#145488', '#fff8df', 2);
+  label('Destination', destination, [.62, .22], [0, 1.91, 6.82], 0, '#145488', early ? '#f8d765' : '#fff8df', 2);
   label('Fleet_rear', fleet, [.68, .23], [0, 1.22, -7.009], Math.PI, null, '#d3b665', 1);
-  label('Route_rear', line, [.29, .31], [0, 1.97, -6.92], Math.PI, '#e4ddc4', '#145488', 3);
+  label('Route_rear', line, [.29, .31], [0, early ? 1.91 : 1.97, -6.92], Math.PI, early ? '#253e83' : '#e4ddc4', early ? '#fff8df' : '#145488', 3);
   label('Route_mirror', line, [.22, .27], [-1.58, 2.53, 6.44], 0, '#145488', '#fff8df', 0);
   // The bogie cover warning uses the spare row of the lettering atlas.
   ctx.save(); ctx.translate(0, 400); ctx.scale(1024 / 72, 1);
@@ -705,11 +801,19 @@ export function makePhotoT3({ fleet = '6892', line = '23', destination = 'BŘEVN
     label('Bogie_warning', '', [.064, .085], [side * .809, .155, .325], side * Math.PI / 2, null, null, 4, b);
   }
   for (const side of [-1, 1]) {
-    label('Fleet_side', fleet, [.68, .23], [side * 1.257, 1.47, side < 0 ? 3.80 : 1.80], side * Math.PI / 2, null, '#d3b665', 1);
-    const indicator = group(detail, side < 0 ? 'Side_indicator_right' : 'Side_indicator_left', side * 1.269, 1.49, 4.35);
+    label('Fleet_side', fleet, early ? [.42,.16] : [.68,.23], [side * 1.257, early ? 1.26 : 1.47, side < 0 && !early ? 3.80 : 1.80], side * Math.PI / 2, null, '#d3b665', 1);
+    const indicator = group(detail, side < 0 ? 'Side_indicator_right' : 'Side_indicator_left', side * 1.269, early ? 2.25 : 1.49, early ? 2.96 : 4.35);
     indicator.userData.assembly = true;
     box(indicator, 'Side_indicator_base', [.025, .115, .10], [0, 0, 0], rubber);
-    box(indicator, 'Side_indicator_lens', [.045, .086, .075], [side * .012, 0, 0], amber);
+    if (early) mesh(indicator, 'Amber_domed_repeater', new THREE.SphereGeometry(.081,12,8), amber,side*.012,0,0).scale.set(.55,1,.82);
+    else box(indicator, 'Side_indicator_lens', [.045, .086, .075], [side * .012, 0, 0], amber);
+  }
+  if (early) {
+    for (const z of [-4.03,3.72]) {
+      label('Entry_lettering', 'VÝSTUP\nVSTUP', [.54,.33], [-1.257,1.40,z], -Math.PI/2, null, '#9b9389', 5);
+      label('Window_route_card', line+'   BŘEVNOV, Královka\n        Pražský hrad · Újezd\n        NOVÉ MĚSTO, Bílá labuť',
+        [.54,.29], [-1.237,2.43,z], -Math.PI/2, '#204c88','#f5d660',6);
+    }
   }
   tex.needsUpdate = true;
   const assemblies = [body, cabin, detail, ...rig.doors.flatMap(d => [d.node, ...d.pairs.flatMap(p => [p.outer, p.inner])]),
@@ -756,7 +860,7 @@ export function posePhotoT3(root, { doors = [0, 0, 0], bogies = [0, 0], wheelAng
     r.wipers[i].rotation.z = angle;
     if (linkage) { linkage.link.rotation.z = angle; linkage.carrier.rotation.z = -angle; }
   }
-  r.wipers[2].rotation.z = .65 * clamp(rearWiper, -1, 1);
+  if (r.wipers[2]) r.wipers[2].rotation.z = .65 * clamp(rearWiper, -1, 1);
   if (r.rearLink && r.rearCarrier) {
     r.rearLink.rotation.z = r.wipers[2].rotation.z;
     r.rearCarrier.rotation.z = -r.rearLink.rotation.z;
@@ -784,7 +888,7 @@ export function bindPhotoT3(root) {
     bogies: [1, 2].map(i => need(`Bogie_${i}`)),
     wheelsets: [1, 2].flatMap(i => [1, 2].map(j => need(`Wheelset_${i}_${j}`))),
     couplers: ['front', 'rear'].map(s => need(`Coupler_${s}`)),
-    wipers: ['right', 'left', 'rear'].map(s => need(`Wiper_${s}_pivot`)),
+    wipers: [need('Wiper_right_pivot'), need('Wiper_left_pivot'), root.getObjectByName('Wiper_rear_pivot')].filter(Boolean),
     frontWiperLinks: ['right', 'left'].map(side => {
       const link = root.getObjectByName(`Wiper_${side}_link`);
       return link && { link, carrier: need(`Wiper_${side}_carrier`) };

@@ -1,4 +1,4 @@
-# Tatra T3 6892 — original photo-based model
+# Prague Tatra T3 cars 6312 and 6892
 
 Created for [#437](https://github.com/jnd-cz/prague-transport-sim/issues/437).
 Original geometry and generated lettering; no meshes or textures from the classic or hybrid assets.
@@ -6,12 +6,19 @@ The model is a separate asset study. It does not replace a game model or change 
 
 Serve the checkout with `python tools/serve.py 8743`, then open
 <http://localhost:8743/tools/t3-model/>. Drag to orbit, scroll to zoom, and use the controls to inspect
-the moving assemblies. **Download GLB** exports the current pose. The supplied `tatra-t3-6892.glb`
-has closed doors and a raised collector. It imports into Blender and other glTF 2.0 applications as
+the moving assemblies. The car selector loads one model at a time. **Download GLB** exports the selected
+car in its current pose. Both supplied GLBs have closed doors and a raised collector. Each imports into Blender as
 rigid objects with local pivots; it does not need a skin or armature.
 The hosted studio is <https://tatra-t3-model-studio.jnd-cz.chatgpt.site>. Entry, running-gear,
-interior and collector camera buttons show the details at inspection distance. **6892 front** and
-**6312 photo angle** approximate the eye-level sightlines of 17823.jpg and 15609.jpg.
+interior and collector camera buttons show the details at inspection distance. **Front** and
+**Front quarter** approximate the eye-level sightlines of 17823.jpg and 15609.jpg.
+
+| Car | Studio | Neutral GLB | Rig manifest |
+|---|---|---|---|
+| 6312 | [View car](https://tatra-t3-model-studio.jnd-cz.chatgpt.site/?car=6312) | [6312](tatra-t3-6312.glb) | [6312 rig](rig-6312.json) |
+| 6892 | [View car](https://tatra-t3-model-studio.jnd-cz.chatgpt.site/?car=6892) | [6892](tatra-t3-6892.glb) | [6892 rig](rig.json) |
+
+![Both cars from matching front and rear camera positions](fleet-comparison.jpg)
 
 ## References and limits
 
@@ -41,6 +48,12 @@ The five user photographs supplied in the 2026-11-09 session are visual referenc
 | `17398.jpg`, `17399.jpg`, `17400.jpg` (2026-11-16 interior) | Red cushions, tall silver loop frames, round and electrical-box pedestals, pink-beige wall panels and ribbed floor |
 | `17402.jpg` (2026-11-16 interior) | Silver inner folding-door faces, black seals, long handles and amber warning lamp |
 | `18530.jpg`, `18531.jpg`, `18532.jpg`, `18535.jpg`, `18536.jpg` (2026-11-23) | 6312 saloon, single seats and their supports, facing pair, aisle poles, floor hatches and driver's partition. The number 6312 is visible above the cab gate. |
+| `20261122_120509.jpg`, `20261122_120525.jpg` | 6312 rear glazing, blue plate, paired horizontal tail lamps, roof paint boundary, folding-door hinges, route card and door-side lettering. |
+| `20261122_120722.jpg`, `20261122_120531.jpg` | 6312 front headlight spacing, fleet numerals, route board, brow and sill trim, roof disc, mirror stays and side repeaters. |
+
+6312 carries narrow red inserts in raised aluminium strips. The lower side strip is 60 mm wide and
+the strip below the windows is 30 mm wide. The cream front paint extends below the strip, while
+the red rear panel rises to meet it. [DPP repair specification, pp. 5–6](https://smlouvy.gov.cz/smlouva/soubor/40397664/R%C3%81MCOV%C3%81%20SMLOUVA%20O%20D%C3%8DLO%20p%C5%99%C3%ADloha3.pdf)
 
 The 874 mm floor height is corroborated by the
 [Bratislava T3 technical table](https://imhd.sk/ba/vehicle-type-description/20/%C4%8CKD-Tatra-T3).
@@ -50,8 +63,9 @@ small fittings are visual approximations. This is a reconstruction of the photog
 not a measured restoration model of every fitting on 6892.
 No source image or user photograph is embedded in the GLB or redistributed in this directory.
 
-The study combines the **6892 exterior and the 6312 saloon**. Separate vehicle variants are planned for later.
-The working 24-place layout puts 14 singles on the continuous window side and ten on the door side.
+6312 has red upholstered seats with silver loop frames. 6892 has moulded shells on a provisional
+24-place layout. Its seat colour, supports and exact seat arrangement await interior photographs of 6892.
+The working 6312 layout puts 14 singles on the continuous window side and ten on the door side.
 Four face forward between the middle and rear doors. Between the front and middle doors, five face
 forward and the chair on the front box faces them. Both the aisle and the rear platform are open.
 The full row count, placement of the facing pair, seat pitch and rear platform arrangement are modelling
@@ -78,7 +92,7 @@ cables, following the FC33 construction described in section 2.2.4 of
 [Ondřej Kocourek's 2015 VUT thesis](https://www.vut.cz/www_base/zav_prace_soubor_verejne.php?file_id=104984).
 Their detail dimensions remain estimates. They follow their bogies; brake application has no separate rig control yet.
 
-Fleet lettering is enlarged, wraps the curved ends, and shares one side height. The right number sits
+6892 fleet lettering wraps the curved ends. The right number sits
 behind the front doorway; the left sits farther aft as in the supplied side views. There is an amber
 repeater on each side. The end profile was also compared with
 [DPP's 6892 photograph by Anna Kettnerová](https://muzeum.dpp.cz/data/Photo%20muzeum/6892.jpg).
@@ -112,12 +126,13 @@ assemblies; movable groups retain their pivots and stable names. `userData` beco
 | `Pantograph_contact_head` | Y translation; stays level at both arm tips |
 | `Coupler_front`, `Coupler_rear` | Local Y yaw; shank pivot at z = ±6.25 m |
 | `Wiper_left/right` → `_pivot`, `_link`, `_carrier` | Two spindles below each front pane move its blade from the divider towards the centre. The carrier keeps the blade upright. |
-| `Wiper_rear` → `Wiper_rear_pivot` and `Wiper_rear_link` | Hand-operated from the rear driving position. Both arms park vertically and can be posed to either side (estimated ±0.65 rad). |
+| `Wiper_rear` → `Wiper_rear_pivot` and `Wiper_rear_link` (6892) | Hand-operated from the rear driving position. Both arms park vertically and can be posed to either side (estimated ±0.65 rad). 6312 has a clear rear window in the supplied view. |
 | `Wiper_rear_carrier` | Counter-rotates under the main arm to keep the blade upright. Link lengths and sweep are estimated from the parked position. |
 | `Route_plate` | Static plate and holder aligned to the front brow |
 | `Body` / `Interior` / `Exterior_details` | Static rigid assemblies |
 
-The source API returns a Three.js group with live references in `model.rig` (not serialized).
+`makePhotoT3({variant: '6312'})` or `makePhotoT3({variant: '6892'})` returns a Three.js group
+with live references in `model.rig`. Omitting the variant preserves the 6892 API default.
 `posePhotoT3(model, state)` sets an absolute pose, so repeated calls do not accumulate drift.
 State fields: `doors` (scalar or three values 0–1), `bogies` (two yaw angles), `wheelAngle`
 (radians), `pantograph` (0–1), `wipers` (front, 0–1), `rearWiper` (manual, −1 to +1, centred at 0),
@@ -125,13 +140,15 @@ State fields: `doors` (scalar or three values 0–1), `bogies` (two yaw angles),
 to defaults. The preview exercises these transforms; no timed animation clips are baked.
 
 For an imported GLB, call `bindPhotoT3(gltf.scene)` to reconnect the same pose API, or look up nodes
-by the names above. `rig.json` records their exported default transforms and parent hierarchy.
+by the names above. Each car's manifest records its exported default transforms and parent hierarchy.
 The exact linkage equations are in `posePhotoT3`; export the posed hierarchy or keyframe these rigid nodes in a DCC tool.
 The default collector position is a display pose, not a simulation of contact with a wire.
 
 ## Reproduce and check
 
-`python -P -E tools/test_t3photo.py --export` runs the short geometry/export checks.
+`python -P -E tools/test_t3photo.py --car 6312 --export` runs the geometry/export checks.
+Repeat with `--car 6892`. The report counts model triangles and reads frame draw calls at a fixed camera,
+then hides the car and subtracts the empty studio's draw calls to measure the car alone.
 For the full render sweep, use the shared queue:
 `python -I tools/heavy.py "T3 photo render sweep" -- python -P -E tools/test_t3photo.py --export --screenshots`.
 
@@ -148,8 +165,8 @@ The studio works without world data. Its first load needs the same CDN as the ga
 
 | Files | Author / origin | Licence |
 |---|---|---|
-| `tatra-t3-6892.glb`, generated lettering | Original model made for this project by Codex, 2026-11-09, revised 2026-11-23 | AGPL-3.0-or-later |
-| `rig.json`, `preview.png`, `doors-open.png` | Rig manifest and renders of the original model | AGPL-3.0-or-later |
+| `tatra-t3-6312.glb`, `tatra-t3-6892.glb`, generated lettering | Original models made for this project by Codex, revised 2026-11-23 | AGPL-3.0-or-later |
+| `rig-6312.json`, `rig.json`, `fleet-comparison.jpg`, `preview.png`, `doors-open.png` | Rig manifests and original studio renders | AGPL-3.0-or-later |
 | `../../src/t3photo.js` | Reproducible geometry and pose source | AGPL-3.0-or-later |
 
 Own-model licence follows the user's 2026-11-12 change recorded in
