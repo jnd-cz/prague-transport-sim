@@ -67,7 +67,7 @@ def read_log(path, chunk=1 << 16, most=1 << 23):
     linked, a "pr-link" entry's prNumber), read from its end in growing chunks up to `most` bytes, the cwd else from
     its first line; None for what it does not name. Only those two fields are read: no text of a message, a title or
     a prompt. (A Claude Code session started in the main checkout logs that folder as its cwd while it works in an
-    issue's worktree: its PR says which.)"""
+    issue's worktree: its PR says which. The PR number read too on the user's word, 2026-11-23, PR #827: "yes".)"""
     cwd = pr = None
 
     def look(line):
