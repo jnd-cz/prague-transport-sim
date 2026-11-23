@@ -47,10 +47,9 @@ START = """async (seed) => {
     .map(([k, s]) => [k, g.profile.overBridge(s)]);
   return { reads, missed, held: window.groundTiles.lookups.size, tiles: window.groundTiles.tiles.size,
     n: { roads: T.roads.length, lanes: T.laneList.length, walks: T.walks.length, doors: T.doors.length, lights: T.lightLanes.length,
-         pedCross: T.pedCross.length, heads: T.lights.count, pedHeads: T.pedLights.count },
+         pedCross: T.pedCross.length, heads: T.heads.length, pedHeads: T.pedHeads.length },
     lanes: T.laneList.map((l) => [l.k, l.dir, l.sel, mm(l.path.p[0][0]), mm(l.path.p[0][1]), l.path.p.length]),
-    poles: [T.lights, T.pedLights].map((L) => { const pole = L.group.children[0], M = new pole.matrix.constructor(), out = [];
-      for (let i = 0; i < L.count; i++) { pole.getMatrixAt(i, M); out.push(M.elements[13]); } return out; }),
+    poles: [T.heads, T.pedHeads].map((H) => H.map((h) => h.h)), // (the heights the heads' poles stand at, #228: the traffic's)
     ways: window.game.route.ground.wayEnds.size, stopLater,
     stops: window.game.stops.map((st) => ({ target: st.target, vienna: st.vienna, sign: st.sign.position.y })), inSpan };
 }"""
