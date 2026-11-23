@@ -387,6 +387,199 @@ class Queue(unittest.TestCase):
         # (a ticket written just after the board read the clock)
         self.assertEqual(baseline_store.describe(j, j["since"] - 1), "headless in transport-game-268, running 0 min")
 
+    def test_a_job_that_watches_itself_is_given_twice_the_idle_time(self):
+        other = subprocess.Popen([sys.executable, "-I", "-c", "import time; time.sleep(60)"])
+        self.addCleanup(lambda: (other.kill(), other.wait()))
+        time.sleep(0.5)  # (its start's CPU spent)
+        me = baseline_store.HeavyJob("me", wait=False)
+        for watch, ends in ((False, 600.0), (True, 1200.0)):
+            ahead, marks = [{"pid": other.pid, "state": "running", "watch": watch, "what": "x", "root": "r", "since": 0}], {}
+            self.assertIsNone(me._idle(ahead, marks, 0.0))
+            self.assertIsNone(me._idle(ahead, marks, ends - 1))
+            self.assertEqual(me._idle(ahead, marks, ends)[0]["pid"], other.pid)
+
+
+class Rules(unittest.TestCase):
+    """What a running job's watch warns of and when it ends the job (#815), on fake clocks and usage."""
+    def job(self, share=None, expect=None, limits=True):
+        j = baseline_store.HeavyJob("v", wait=False, share=share, expect=expect, limits=limits)
+        j.since, j.parent = 0.0, 4242
+        return j
+
+    def test_time_warns_past_twice_and_ends_only_once_calibrated(self):
+        j = self.job(expect=300.0)
+        self.assertEqual(j.verdict(500, 500, 1, 40, False), ([], None))  # (1.7×)
+        self.assertEqual(j.verdict(700, 700, 1, 40, False), (["LATE ×2.3"], None))
+        self.assertEqual(j.verdict(6000, 6000, 1, 40, False), (["LATE ×20"], None))  # (TIME_ENDS: not yet)
+        with mock.patch.object(baseline_store.HeavyJob, "TIME_ENDS", True):
+            self.assertIsNone(j.verdict(1300, 1300, 1, 40, False)[1])  # (×4.3 but 17 min over: not 30)
+            self.assertEqual(j.verdict(2400, 2400, 1, 40, False)[1], "time: running 40 min, expected 5")
+        self.assertEqual(self.job().verdict(1e6, 1e6, 1, 40, False), ([], None))  # (no expected time: no rule)
+
+    def test_memory_against_the_share(self):
+        j = self.job(share={"gb": 6, "cores": 4})
+        self.assertEqual(j.verdict(60, 60, 7, 40, False), ([], None))  # (1.17×)
+        self.assertEqual(j.verdict(120, 120, 8, 40, False), (["8 of 6 GB"], None))
+        self.assertEqual(j.verdict(180, 180, 13, 40, False), (["13 of 6 GB"], None))  # (over 2×: once)
+        self.assertEqual(j.verdict(240, 240, 13, 40, False)[1], "memory: 13.0 GB held, 6 declared")  # (twice)
+        j = self.job(share={"gb": 6, "cores": 4})
+        self.assertIsNone(j.verdict(60, 60, 7, 3, False)[1])  # (over 1× with 3 GB free, KEEP 8: once)
+        self.assertEqual(j.verdict(120, 120, 7, 3, False)[1], "memory: 7.0 GB held, 6 declared, 3.0 GB left free on the machine")
+        j = self.job(share={"gb": 6, "cores": 4})
+        for t in (60, 120, 180):
+            self.assertIsNone(j.verdict(t, t, 5, 3, False)[1])  # (within its share: the shortage is another's)
+
+    def test_memory_of_a_job_alone_against_the_machine(self):
+        j = self.job()
+        self.assertEqual(j.verdict(60, 60, 30, 7, False), (["7 GB free"], None))
+        self.assertIsNone(j.verdict(120, 120, 30, 3, False)[1])
+        self.assertEqual(j.verdict(180, 180, 30, 3, False)[1],
+                         "memory: 3.0 GB left free on the machine, 30.0 GB held by this job, which runs alone")
+        self.assertEqual(j.verdict(240, 240, 30, None, False), ([], None))  # (free memory unknown)
+
+    def test_idle_ends_after_its_time_and_work_moves_the_mark(self):
+        j = self.job()
+        self.assertIsNone(j.verdict(0, 10.0, 1, 40, False)[1])
+        self.assertIsNone(j.verdict(590, 11.5, 1, 40, False)[1])
+        self.assertIsNone(j.verdict(599, 13.0, 1, 40, False)[1])  # (3 s of CPU: the mark moves)
+        self.assertIsNone(j.verdict(1100, 14.0, 1, 40, False)[1])
+        self.assertEqual(j.verdict(1199, 14.9, 1, 40, False)[1], "idle: 1.9 s of CPU in 10 min")
+        j = self.job()
+        j.verdict(0, 50.0, 1, 40, False)
+        self.assertIsNone(j.verdict(700, 20.0, 1, 40, False)[1])  # (the sum fell: a child ended; a new mark)
+
+    def test_an_orphan_ends_and_without_limits_nothing_ends(self):
+        self.assertEqual(self.job().verdict(60, 60, 1, 40, True)[1], "orphan: the process that started it (pid 4242) is gone")
+        j = self.job(share={"gb": 1, "cores": 1}, limits=False)
+        self.assertEqual(j.verdict(60, 60, 9, 40, True), (["9 of 1 GB"], None))
+        self.assertEqual(j.verdict(120, 60, 9, 40, True), (["9 of 1 GB"], None))
+
+    def test_the_expected_time_is_the_median_of_the_kinds_full_runs(self):
+        rs = [{"kind": "k", "wall": w, "rc": rc, "ended": e} for w, rc, e in
+              ((100, 0, None), (300, None, None), (200, 0, None), (5000, 0, "memory: …"), (900, 1, None), (30, 0, None))]
+        self.assertEqual(baseline_store.expected("k", rs), 200)  # (not the ended, failed or short runs)
+        self.assertIsNone(baseline_store.expected("k", rs[:2]))  # (two runs: too few)
+        self.assertIsNone(baseline_store.expected("other", rs))
+        more = rs + [{"kind": "k", "wall": w, "rc": 0, "ended": None} for w in (400, 500, 600)]
+        self.assertEqual(baseline_store.expected("k", more, last=3), 500)  # (the last three)
+
+    def test_kind_and_duration(self):
+        self.assertEqual(baseline_store.kind_of(["python", "-P", "-E", "tools/ground_place.py", "--rings", "Karlovo",
+                                                 "--all", "--threads=4"]), "ground_place.py --all --rings --threads")
+        self.assertEqual(baseline_store.kind_of(["C:/Git/bin/bash.exe", "job.sh", "9"]), "job.sh")
+        self.assertEqual(baseline_store.kind_of(["C:/x/node.exe", "--max-old-space-size", "8"]), "node --max-old-space-size")
+        self.assertEqual([baseline_store.seconds(t) for t in ("90s", "20m", "1.5h", "20", "", "x", "0")],
+                         [90, 1200, 5400, 1200, None, None, None])
+
+    def test_the_board_sees_the_expected_time_the_warning_and_the_ends(self):
+        j = {"what": "trace heights", "root": "C:/x/transport-game-812", "state": "running", "since": 0, "expect": 300,
+             "share": {"gb": 6, "cores": 4}, "warn": "LATE ×20; 17 of 6 GB"}
+        self.assertEqual(baseline_store.describe(j, 6000), "trace heights in transport-game-812, running 100 min, "
+                                                          "expected 5 (shared: 6 GB, 4 cores): LATE ×20; 17 of 6 GB")
+        rs = [{"t": 0, "wall": 100, "ended": "idle: …"}, {"t": 0, "wall": 5000, "ended": None},
+              {"t": 1000, "wall": 600, "ended": "orphan: …"}]
+        self.assertEqual(baseline_store.recent_ends(1600 + 3600, records=rs), [rs[2]])
+
+
+# (a job that watches itself on the test's quick clock: argv[3] runs first and may set `share` and `body`, what it does
+# in its turn)
+WATCHED = ("import os, subprocess, sys, time; sys.path.insert(0, sys.argv[1]); import baseline_store as b\n"
+           "H = b.HeavyJob; H.POLL, H.EVERY, H.TICK = 0.1, 0.2, 0.1\n"
+           "H.FREE = staticmethod(lambda: 40.0); H.KEEP = 2.0\n"
+           "share, body = None, lambda: time.sleep(30)\n"
+           "exec(sys.argv[3])\n"
+           "with b.HeavyJob(sys.argv[2], share=share):\n"
+           "    print('in', flush=True)\n"
+           "    body()\n")
+KID = ("def body():\n"
+       "    kid = subprocess.Popen([sys.executable, '-I', '-c', 'import time; time.sleep(60)'])\n"
+       "    print(kid.pid, flush=True)\n"
+       "    time.sleep(30)\n")
+# (a process that starts a job and leaves it once it runs)
+MIDDLE = ("import subprocess, sys\n"
+          "p = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, text=True)\n"
+          "assert p.stdout.readline().strip() == 'in'\n"
+          "print(p.pid, flush=True)\n")
+
+
+class Watch(unittest.TestCase):
+    """A real job's watch ends it, and what it started, with the reason (#815); in a lock folder of the test's own."""
+    setUp, wait_for, states = Queue.setUp, Queue.wait_for, Queue.states
+
+    def watched(self, name, setup=""):
+        p = subprocess.Popen([sys.executable, "-I", "-c", WATCHED, TOOLS, name, setup], env=self.env,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.addCleanup(lambda: (p.kill(), p.wait(), p.stdout.close(), p.stderr.close()))
+        self.assertEqual(p.stdout.readline().strip(), "in")
+        return p
+
+    def ended(self, p, why):
+        self.assertEqual(p.wait(20), baseline_store.ENDED)
+        err = p.stderr.read()
+        self.assertRegex(err, rf"heavy jobs: \w+ ended by its watch after 0 min: {why}")
+        self.assertEqual(self.states(), [])
+        rec, = baseline_store.history()
+        self.assertRegex(rec["ended"], f"^{why}")
+        return err
+
+    def test_an_idle_job_ends_with_what_it_started(self):
+        p = self.watched("idle", "H.IDLE, H.IDLE_CPU = 1.5, 0.5\n" + KID)
+        kid = int(p.stdout.readline())
+        self.assertTrue(baseline_store.alive(kid))
+        self.ended(p, "idle: ")
+        self.wait_for(lambda: not baseline_store.alive(kid), 5)
+
+    def test_a_job_over_twice_its_memory_ends(self):
+        p = self.watched("big", "share = {'gb': 0.05, 'cores': 1}\n"
+                                "def body():\n    x = b'x' * 300_000_000\n    time.sleep(30)\n")
+        self.assertIn("warns: ", self.ended(p, "memory: 0.3 GB held, 0 declared"))
+
+    def test_a_job_whose_starter_is_gone_ends(self):
+        err = os.path.join(self.tmp.name, "orphan.err")
+        with open(err, "w", encoding="utf-8") as f:
+            mid = subprocess.Popen([sys.executable, "-I", "-c", MIDDLE, sys.executable, "-I", "-c", WATCHED, TOOLS,
+                                    "orphan", ""], env=self.env, stdout=subprocess.PIPE, stderr=f, text=True)
+            pid = int(mid.stdout.readline())
+            self.assertEqual(mid.wait(10), 0)
+            mid.stdout.close()
+        self.wait_for(lambda: not baseline_store.alive(pid), 20)
+        with open(err, encoding="utf-8") as f:
+            self.assertRegex(f.read(), r"orphan ended by its watch after 0 min: orphan: the process that started it "
+                                       rf"\(pid {mid.pid}\) is gone")
+
+    def test_a_stop_request_ends_it(self):
+        p = self.watched("asked", KID)
+        kid = int(p.stdout.readline())
+        r = subprocess.run([sys.executable, "-I", os.path.join(TOOLS, "heavy.py"), "--stop", str(p.pid)], env=self.env,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("asked in ", r.stderr)
+        self.assertIn("ended on request", r.stderr)
+        self.ended(p, r"stopped on request \(heavy.py --stop\)")
+        self.wait_for(lambda: not baseline_store.alive(kid), 5)
+
+    def test_a_job_at_work_within_its_limits_runs_to_its_end_and_is_recorded(self):
+        # (work and pauses: a look's process reads wait for the GIL, ~5 ms each, behind a main thread that never pauses)
+        p = self.watched("fine", "H.RECORD, H.IDLE, H.IDLE_CPU = 0.0, 1.0, 0.1\nshare = {'gb': 1, 'cores': 1}\n"
+                                 "def body():\n    t = time.time()\n"
+                                 "    while time.time() - t < 2: sum(range(99999)); time.sleep(0.005)\n")
+        self.assertEqual(p.wait(20), 0)
+        rec, = baseline_store.history()
+        self.assertEqual((rec["what"], rec["kind"], rec["rc"], rec["ended"]), ("fine", "-c", 0, None))
+        self.assertGreater(rec["wall"], 1.9)
+        self.assertGreater(rec["gb"], 0)
+
+    @unittest.skipUnless(os.name == "nt", "a Job Object: Windows")
+    def test_a_stopped_wrapper_stops_its_command(self):
+        w = subprocess.Popen([sys.executable, "-I", os.path.join(TOOLS, "heavy.py"), "wrapped", "--", sys.executable,
+                              "-I", "-c", "import os, time; print(os.getpid(), flush=True); time.sleep(60)"],
+                             env=self.env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        self.addCleanup(lambda: (w.kill(), w.wait(), w.stdout.close()))
+        kid = int(w.stdout.readline())
+        w.kill()  # (as a stopped task's shell would be: the wrapper alone)
+        w.wait(10)
+        self.wait_for(lambda: not baseline_store.alive(kid), 5)
+
 
 class Inputs(unittest.TestCase):
     """The user's facts are measured like the code: truth.json alone changes a baseline's key (#126)."""
