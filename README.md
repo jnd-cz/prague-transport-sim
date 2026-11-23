@@ -48,7 +48,7 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 
 | klávesa | co dělá |
 |---|---|
-| `W` / `↑` | k jízdě (stupně J1–J5; jednoduché: hned o stupeň, držením o další dva za sekundu, puštěná páka se stejně vrací k nule; pokročilé: ťuknutí o stupeň, držením dál) |
+| `W` / `↑` | k jízdě (stupně J1–J5; jednoduché: hned o stupeň, držením o další dva za sekundu, puštěná páka je na nule jako po N; pokročilé: ťuknutí o stupeň, držením dál) |
 | `S` / `↓` | k brzdě (B1–B5, stejně) |
 | `Mezerník` | nouzová a kolejnicové brzdy (držet) |
 | `N` nebo `0` | obě šlapky volné (výběh) |
@@ -98,8 +98,8 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
   Informační panel ukazuje napětí, měnírnu, palubní napětí a otáčky.
 - **Ovládání** (menu): *Jednoduché* posouvá páku po stupních a šlapky ovládá jako řidič, stojící vůz samo
   zabrzdí. Páka je na pružině: W/S ji hned posune o stupeň a držené o další dva za sekundu (za 2 s je na
-  stupni 5), puštěná se stejně rychle vrací k nule, takže ťuknutí dá stupeň na půl sekundy; 1–5 a
-  Shift+1–5 nastaví stupeň, který zůstane; *Pokročilé* ovládá přímo šlapky (ťuknutí o stupeň, držením dál rychlostí
+  stupni 5), puštěná je hned na nule jako po N (šlapka se zvedne za necelou půl sekundy), takže ťuknutí
+  dá stupeň jen na chvilku; 1–5 a Shift+1–5 nastaví stupeň, který zůstane; *Pokročilé* ovládá přímo šlapky (ťuknutí o stupeň, držením dál rychlostí
   20°/s; držené klávesy se zastaví na brzdném stupni 5) a R zabrzdí a odbrzdí zajišťovací brzdu; po
   zabrzdění se čelisti plně uvolní až jízdní šlapkou. Mezerník je v obou nouzová brzda.
 - Prázdný vůz zrychluje podle stupně 0,6–1,8 m/s², plný pomaleji; gravitace na sklonech (Chotkova ~7 %),

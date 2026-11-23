@@ -917,21 +917,21 @@ window.addEventListener('keyup', (e) => {
   if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
   if (ku === 'g') zoomTarget = 1;
   if (ku === 'l') lamps.held = false;
-  // (the emergency stop let go: brake step 5; in Simple controls the lever springs back from there)
+  // (the emergency stop let go: brake step 5; in Simple controls the lever, let go, is on 0 as after N)
   if (e.key === ' ' && command() === -6) { setStep(-5); if (arcade()) tram.eq.press(0); }
   const dir = { w: 1, arrowup: 1, s: -1, arrowdown: -1 }[ku];
   if (dir && game && arcade() && tram.eq.held === dir) tram.eq.press(0); // (let go: back to 0, #837)
   if (dir && pedalKey) pedalKey = null;
 });
 
-// The controls (#221): 'arcade' moves a sprung lever (W / S held step it on, let go it comes back to 0, #837; the number
-// keys set a step) and a helper works the pedals; 'advanced' moves the pedals (a tap to the next step's angle, held on at
+// The controls (#221): 'arcade' moves a sprung lever (W / S held step it on, let go it is on 0 as after N, #837; the
+// number keys set a step) and a helper works the pedals; 'advanced' moves the pedals (a tap to the next step's angle, held on at
 // 20°/s) and the ratchet (R) is the driver's
 function controlMode() { return $('optControls').value === 'advanced' ? 'advanced' : 'arcade'; }
 function arcade() { return tram.eq.mode === 'arcade'; }
 // what the driver has set: the lever (arcade, the helper moves the pedals on the next step) or the pedals' step
 function command() { return arcade() ? tram.eq.lever : tram.notch; }
-// (taken over from the autopilot the lever is on its step, with no hand on it: it springs back unless a key holds it)
+// (taken over from the autopilot no hand is on the lever: it is on 0, as let go, unless the key that took over holds it)
 function takeOver() {
   tram.eq.mode = controlMode();
   tram.eq.setLever(Math.max(-5, Math.min(5, tram.notch)));

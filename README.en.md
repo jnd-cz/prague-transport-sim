@@ -49,7 +49,7 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 
 | key | what it does |
 |---|---|
-| `W` / `↑` | towards drive (steps J1–J5; simple: a step at once, held two more a second, let go the lever comes back to 0 as fast; advanced: a tap to the next step, held on) |
+| `W` / `↑` | towards drive (steps J1–J5; simple: a step at once, held two more a second, let go the lever is on 0 as after N; advanced: a tap to the next step, held on) |
 | `S` / `↓` | towards brake (B1–B5, the same) |
 | `Space` | emergency and track brakes (held) |
 | `N` or `0` | both pedals released (coast) |
@@ -102,8 +102,8 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
   substation, the on-board voltage and the rpm.
 - **Controls** (menu): *Simple* moves a lever by steps and works the pedals as a driver would, parking
   whenever the car stands. The lever is sprung: W/S moves it a step at once and held two more a second (on
-  step 5 after 2 s), let go it comes back to 0 as fast, so a tap gives a step for half a second; 1–5 and
-  Shift+1–5 set a step that stays; *Advanced* moves the pedals themselves (a tap to the next
+  step 5 after 2 s), let go it is on 0 as after N (the pedal up in under half a second), so a tap gives a
+  step for a moment; 1–5 and Shift+1–5 set a step that stays; *Advanced* moves the pedals themselves (a tap to the next
   step, held on at 20°/s; held keys stop at brake step 5) and R parks and unparks the brake pedal; after
   parking the shoes release fully only with the drive pedal. Space is the emergency stop in both.
 - An empty car accelerates at 0.6–1.8 m/s² by step, a full car more slowly; gravity on gradients (Chotkova
