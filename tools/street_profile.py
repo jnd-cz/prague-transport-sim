@@ -1310,7 +1310,10 @@ def kerb_edges(dtm):
     carriageway), KERB_RUN_MIN or longer, sampled every 0.25 m along it, edge by edge as (the points on one edge, unit
     normals into the sidewalk read over ±KERB_TURN m along the run, the sidewalk's own surveyed height at each point,
     NaN along an edge an end of which has none, whether the edge may be a wall's top: WALL_EDGE_MIN), and the
-    sidewalks as one geometry. (Until #800 each edge 3 m or longer was a kerb of its own and a
+    sidewalks as one geometry; and each point's normal of its own edge, along which wall_tops reads the road and IPR:
+    the run's normal, turned at a corner, read IPR into a wall behind a wedge of sidewalk at Výtoň, line 17 (-763.4,
+    -2212.1), and made a wall's top of the corner's one plain kerb, the wedge filling at the wall's top 3.7 m over the
+    kerb). (Until #800 each edge 3 m or longer was a kerb of its own and a
     shorter one none: a kerb round a corner or along a bend is drawn in edges of 0.2-1.5 m, and its walkway had no
     plane, the fill following IPR's raster, which rounds the kerb away: 182 of the 202 sidewalk|road samples whose
     street surface had a flat kerb on ground batch D lay on such an edge.)"""
@@ -1358,7 +1361,10 @@ def kerb_edges(dtm):
                 e = np.searchsorted(cum, u, side="right") - 1
                 for j in np.unique(e):
                     k = e == j
-                    out.append((q[k], n[k], own[k], bool(cum[j + 1] - cum[j] >= WALL_EDGE_MIN)))
+                    d = (P[j + 1] - P[j]) / max(cum[j + 1] - cum[j], 1e-9)
+                    ne = np.array([-d[1], d[0]])
+                    ne = ne if (n[k] @ ne).sum() >= 0 else -ne
+                    out.append((q[k], n[k], own[k], bool(cum[j + 1] - cum[j] >= WALL_EDGE_MIN), np.tile(ne, (int(k.sum()), 1))))
     walk = shapely.union_all(polys) if polys else None
     if walk is not None:
         shapely.prepare(walk)
@@ -1668,11 +1674,14 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
         zr = np.asarray(road_z(*(q - n * 0.5).T), float)
         # (an edge standing over or under the road beyond it is a wall's, held below as a wall's edge: wall_tops, #779;
         # on an edge too short for a wall's, such a point has neither a kerb's plane nor a wall's hold)
+        # (read across the point's own edge: kerb_edges)
         if own:
-            g = q + n * SW_KERB_SMEAR
-            g1 = [q + n * v for v in KERB_NEAR]
-            top, segs = wall_tops(q, n, own[0][ok], zr, np.asarray(ipr.sample(g[:, 0] + F.E0, g[:, 1] + F.N0), float),
-                                  runs_in(walk, q, n, SW_KERB_SMEAR + 0.5),
+            ne = own[2][ok] if len(own) > 2 else n
+            g = q + ne * SW_KERB_SMEAR
+            g1 = [q + ne * v for v in KERB_NEAR]
+            ze = zr if ne is n else np.asarray(road_z(*(q - ne * 0.5).T), float)
+            top, segs = wall_tops(q, ne, own[0][ok], ze, np.asarray(ipr.sample(g[:, 0] + F.E0, g[:, 1] + F.N0), float),
+                                  runs_in(walk, q, ne, SW_KERB_SMEAR + 0.5),
                                   np.column_stack([np.asarray(ipr.sample(v[:, 0] + F.E0, v[:, 1] + F.N0), float) for v in g1]))
             if top.any():
                 if wall_ok:

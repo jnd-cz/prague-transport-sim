@@ -188,6 +188,10 @@ class Sidewalks(unittest.TestCase):
         self.assertAlmostEqual(float(n[mid] @ np.array([math.sqrt(0.5), math.sqrt(0.5)])), 1.0, delta=0.01)
         self.assertAlmostEqual(float(own[mid]), 200.1)
         self.assertTrue(np.isnan(own[-1]))   # (the 0.3 m edge's far end has no height)
+        # (and each point's normal of its own edge, into the sidewalk: the 10 m edge's straight across it to its ends)
+        ne = np.concatenate([e[4] for e in edges])
+        self.assertTrue(shapely.contains_xy(walk, *(q + ne * 0.2).T).all())
+        self.assertTrue(np.allclose(edges[6][4], [0.0, 1.0]))
 
     def test_held_at_the_kerb_and_rising_with_the_ground(self):
         # a 20 m by 4 m sidewalk beside a flat road at 200 m, the ground rising 2 % away from the kerb: within the
