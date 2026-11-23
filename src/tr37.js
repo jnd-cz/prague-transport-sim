@@ -321,12 +321,19 @@ export class TR37 {
   // 0 from the other side; held 2 s it is on step 5. Let go (dir 0), it is on 0 at once, as N puts it: the helper lifts the
   // pedal at twice footRate, from drive step 5 in 0.4 s, from brake step 5 in 0.26 s (the user, 2026-11-23: "the rate the
   // current game simple controls goes when going from full power to neutral on neutral key press"). A tap drives or
-  // brakes for as long as the finger is down. (The emergency stop, −6, is a step 5 under it.)
+  // brakes for as long as the finger is down. (While the emergency stop is held, −6, drive or brake held waits for it.)
   press(dir) {
     this.leverT = 0;
     this.held = dir;
-    if (!dir) { if (this.lever > -6) this.lever = 0; return; }
-    this.lever = this.lever <= -6 ? -5 : Math.max(-5, Math.min(5, this.lever + dir));
+    if (this.lever <= -6) return;
+    this.lever = dir ? Math.max(-5, Math.min(5, this.lever + dir)) : 0;
+  }
+  // the emergency stop (Space / STOP) held, −6; let go, brake step 5 where brake is held, else 0 (drive held steps on from
+  // there): the user, 2026-11-23, "If player wants to brake after emergency he will hold the brake button while letting go
+  // of emergency brake button"
+  emergency(on) {
+    this.leverT = 0;
+    this.lever = on ? -6 : this.held < 0 ? -5 : 0;
   }
   // a number key or a trigger: the lever on step n, where it stays
   setLever(n) {

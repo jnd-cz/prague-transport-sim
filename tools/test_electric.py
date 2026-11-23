@@ -186,7 +186,14 @@ RUN = """async () => {
     e.setLever(2); run(t, 3); sp.set = e.lever;
     e.press(-1); sp.through = [e.lever]; run(t, 0.6); sp.through.push(e.lever); run(t, 0.5); sp.through.push(e.lever);
     e.setLever(0); e.press(1); e.lever = 0; run(t, 1.5, { doorsOpen: true }); sp.doors = [e.lever]; run(t, 0.6); sp.doors.push(e.lever);
-    e.setLever(-6); run(t, 1); sp.emergency = [e.lever]; e.setLever(-5); e.press(0); sp.emergency.push(e.lever);
+    e.emergency(true); run(t, 1); sp.emergency = [e.lever]; e.emergency(false); sp.emergency.push(e.lever);
+    // (brake held before the emergency stop or pressed while it is held: it waits for the stop, and the stop let go is
+    // brake step 5 while brake is held; drive held, 0 and on from there)
+    e.press(-1); e.emergency(true); run(t, 0.6); sp.brakeBefore = [e.lever]; e.emergency(false); sp.brakeBefore.push(e.lever);
+    run(t, 1); sp.brakeBefore.push(e.lever); e.press(0); sp.brakeBefore.push(e.lever);
+    e.emergency(true); e.press(-1); run(t, 0.6); sp.brakeDuring = [e.lever]; e.emergency(false); sp.brakeDuring.push(e.lever); e.press(0);
+    e.emergency(true); e.press(1); run(t, 0.6); sp.driveDuring = [e.lever]; e.emergency(false); sp.driveDuring.push(e.lever);
+    run(t, 0.6); sp.driveDuring.push(e.lever); e.press(0);
     out.sprung = sp;
   }
   // the wire, on a made-up straight line: substations at km 1 and km 5
@@ -275,6 +282,10 @@ def checks(o):
     want(sp["set"] == 2 and sp["through"] == [1, 0, -1], f"a number key's step stays, brake held steps through 0: {sp}")
     want(sp["doors"] == [0, 1], f"drive held with the doors open stays at 0, then steps on: {sp['doors']}")
     want(sp["emergency"] == [-6, 0], f"the emergency stop held, then let go: {sp['emergency']}")
+    # (the user, 2026-11-23: "If player wants to brake after emergency he will hold the brake button while letting go of
+    # emergency brake button")
+    want(sp["brakeBefore"] == [-6, -5, -5, 0] and sp["brakeDuring"] == [-6, -5] and sp["driveDuring"] == [-6, 0, 1],
+         f"the emergency stop with brake held before it, brake pressed during it, drive during it: {sp}")
     f = o["feed"]
     want(f["n"] == 2, f"the far substation should not feed this line: {f['n']} feeds")
     want(f["at1000"]["ref"] == "a" and f["at4800"]["ref"] == "b" and f["at1000"]["r"] < f["at1500"]["r"] < f["at2500"]["r"], f"the feeds and their resistance: {f}")

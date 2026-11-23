@@ -880,7 +880,7 @@ window.addEventListener('keydown', (e) => {
   switch (k) {
     case 'w': case 'arrowup': control(+1, e.repeat); break;
     case 's': case 'arrowdown': control(-1, e.repeat); break;
-    case ' ': setStep(-6); break;
+    case ' ': if (arcade()) tram.eq.emergency(true); else setStep(-6); break;
     case 'n': setStep(0); break;
     case 'r': if (!arcade()) tram.eq.park(); break; // the brake pedal's ratchet (arcade parks by itself)
     case 'd': game.toggleDoors(); break;
@@ -917,8 +917,8 @@ window.addEventListener('keyup', (e) => {
   if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
   if (ku === 'g') zoomTarget = 1;
   if (ku === 'l') lamps.held = false;
-  // (the emergency stop let go: brake step 5; in Simple controls the lever, let go, is on 0 as after N)
-  if (e.key === ' ' && command() === -6) { setStep(-5); if (arcade()) tram.eq.press(0); }
+  // (the emergency stop let go: brake step 5; in Simple controls 0 as after N, or brake step 5 while S / ▼ is held)
+  if (e.key === ' ' && command() === -6) { if (arcade()) tram.eq.emergency(false); else setStep(-5); }
   const dir = { w: 1, arrowup: 1, s: -1, arrowdown: -1 }[ku];
   if (dir && game && arcade() && tram.eq.held === dir) tram.eq.press(0); // (let go: back to 0, #837)
   if (dir && pedalKey) pedalKey = null;

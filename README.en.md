@@ -105,7 +105,8 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
   step 5 after 2 s), let go it is on 0 as after N (the pedal up in under half a second), so a tap gives a
   step for a moment; 1–5 and Shift+1–5 set a step that stays; *Advanced* moves the pedals themselves (a tap to the next
   step, held on at 20°/s; held keys stop at brake step 5) and R parks and unparks the brake pedal; after
-  parking the shoes release fully only with the drive pedal. Space is the emergency stop in both.
+  parking the shoes release fully only with the drive pedal. Space is the emergency stop in both; in Simple,
+  let go, the lever is on 0, and to brake on, hold S (▼) while letting go: then it is on brake step 5.
 - An empty car accelerates at 0.6–1.8 m/s² by step, a full car more slowly; gravity on gradients (Chotkova
   ~7 %), curve resistance, rolling back when the brake is released on a hill, lateral comfort in curves.
 - Weather: dry / rain / autumn leaves sets wheel–rail adhesion. Too much power spins the wheels, too much

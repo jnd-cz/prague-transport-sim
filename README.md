@@ -101,7 +101,8 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
   stupni 5), puštěná je hned na nule jako po N (šlapka se zvedne za necelou půl sekundy), takže ťuknutí
   dá stupeň jen na chvilku; 1–5 a Shift+1–5 nastaví stupeň, který zůstane; *Pokročilé* ovládá přímo šlapky (ťuknutí o stupeň, držením dál rychlostí
   20°/s; držené klávesy se zastaví na brzdném stupni 5) a R zabrzdí a odbrzdí zajišťovací brzdu; po
-  zabrzdění se čelisti plně uvolní až jízdní šlapkou. Mezerník je v obou nouzová brzda.
+  zabrzdění se čelisti plně uvolní až jízdní šlapkou. Mezerník je v obou nouzová brzda; v jednoduchém je
+  puštěný páka na nule, a kdo chce brzdit dál, drží při puštění S (▼): pak je na brzdném stupni 5.
 - Prázdný vůz zrychluje podle stupně 0,6–1,8 m/s², plný pomaleji; gravitace na sklonech (Chotkova ~7 %),
   odpor v obloucích, couvání po uvolnění brzdy v kopci, boční pohodlí v obloucích.
 - Počasí: sucho / déšť / podzimní listí určuje adhezi kola a kolejnice. Příliš velký proud protočí kola,

@@ -2,7 +2,7 @@
 """On-screen controls and the viewport-sized mirror (#79): python -P -E tools/test_touch.py [--line 17]
 (its own server on a free port). On a phone (390 x 844, touch) a shift is driven by the buttons only:
 doors closed, ▲ touched a step while the finger is down, ▲ held steps the lever on and the tram moves, let go the lever is
-on 0 (#837), S held the same, the emergency brake held and let go; the outside view turns by a
+on 0 (#837), S held the same, the emergency brake held and let go, and let go with S held (brake step 5); the outside view turns by a
 drag. On desktops the buttons stay hidden and the mirror frame grows with the viewport, its aspect fixed.
 Full screen (#485): a phone asks once; "Not now" keeps a start in the page, "Full screen" enters it and so does each later
 start after leaving it; a desktop isn't asked. In landscape (844 x 390, 740 x 360) the controller is a column at the right
@@ -168,6 +168,14 @@ def main():
             r["held"] = page.evaluate("window.game.tram.eq.lever")
             page.mouse.up()
             r["released"] = page.evaluate("window.game.tram.eq.lever")
+            # brake held while the emergency stop is let go: brake step 5, until brake is let go too (the user, 2026-11-23)
+            page.keyboard.down("Space")
+            page.keyboard.down("s")
+            r["stopBrake"] = [page.evaluate(lever)]
+            page.keyboard.up("Space")
+            r["stopBrake"].append(page.evaluate(lever))
+            page.keyboard.up("s")
+            r["stopBrake"].append(page.evaluate(lever))
             tap("v")
             page.wait_for_timeout(600)
             a = page.evaluate("[camera.position.x, camera.position.z]")
@@ -281,6 +289,8 @@ def main():
         fails.append(f"S held, its repeat, 1.2 s on, let go: lever {r['key']} (want -1, -3 to -5, 0)")
     if r["held"] != -6 or r["released"] != 0:
         fails.append(f"emergency brake held {r['held']}, released {r['released']} (want -6, 0)")
+    if r["stopBrake"] != [-6, -5, 0]:
+        fails.append(f"Space and S held, Space let go, S let go: lever {r['stopBrake']} (want [-6, -5, 0])")
     if r["orbit"] < 5:
         fails.append("a drag does not turn the outside view")
     if r["phoneErrors"]:
