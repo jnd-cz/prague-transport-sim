@@ -28,6 +28,13 @@ def table_rows(readme):
     return len(lines) - 2 * sum(1 for x in lines if re.match(r"^\|[\s:|-]+\|\s*$", x))
 
 
+def nested_items(readme):
+    """The guide's list items inside another list item (indented bullets) between its help markers."""
+    text = open(os.path.join(ROOT, readme), encoding="utf-8").read()
+    part = text.split("<!-- help -->", 1)[1].split("<!-- /help -->", 1)[0]
+    return sum(1 for x in part.split("\n") if re.match(r"^ +- ", x))
+
+
 SIZES = {"phone": ((390, 844), True), "desktop": ((1280, 800), False)}
 WORDS = {"cs": ("Vaše směna", "Zavřít"), "en": ("Your shift", "Close")}
 
@@ -99,7 +106,7 @@ class Help(unittest.TestCase):
                     self.assertLessEqual(r["over"], 0, f"{name} {lang}: wider than its card")
                     self.assertTrue(r["scrolls"])
                     self.assertEqual(r["rows"], table_rows("README.md" if lang == "cs" else "README.en.md"))
-                    self.assertEqual(r["nested"], 3)
+                    self.assertEqual(r["nested"], nested_items("README.md" if lang == "cs" else "README.en.md"))
                     self.assertGreater(r["heads"], 8)
                     self.assertFalse(r["raw"], "Markdown left in the text")
                     self.assertFalse(r["run"], "the developer's part in the help")
