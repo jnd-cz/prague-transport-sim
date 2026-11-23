@@ -321,6 +321,128 @@ class StepCacheTest(unittest.TestCase):
         self.assertEqual(self.build(), ["skip", "skip"])
 
 
+# (steps that read data/truth.json as the build steps do, each writing what it read to data/<name>.out, #816)
+READER = '''import json, os, sys
+from pathlib import Path
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TRUTH = os.path.join(ROOT, "data", "truth.json")
+{body}
+open(os.path.join(ROOT, "data", os.path.basename(__file__)[:-3] + ".out"), "w", encoding="utf-8").write(json.dumps(out))
+'''
+READERS = {
+    # (build_line: one section through json.load and .get)
+    "signs": 'out = json.load(open(TRUTH, encoding="utf-8")).get("stopSigns", {}).get("signs", [])',
+    # (track_styles, line_heights: Path.read_text, json.loads and [])
+    "kerbs": 'out = json.loads(Path(TRUTH).read_text(encoding="utf-8"))["kerbFacts"]',
+    # (a section the file does not hold: its absence is the key)
+    "none": 'out = json.load(open(TRUTH, encoding="utf-8")).get("noSuchSection")',
+    # (the whole file read: its items)
+    "every": 'out = sorted(k for k, v in json.load(open(TRUTH, encoding="utf-8")).items())',
+    # (the text read without a parse)
+    "raw": 'out = len(open(TRUTH, encoding="utf-8").read())',
+    # (parsed, no section read)
+    "nothing": 'out = bool(json.load(open(TRUTH, encoding="utf-8")))',
+    # (copied whole, then one section read from the copy)
+    "copied": 'out = dict(json.load(open(TRUTH, encoding="utf-8")))["stopSigns"]',
+}
+# (a step whose multiprocessing children read the file when they import it, as street_profile's workers do)
+POOL = '''import json, os
+from concurrent.futures import ProcessPoolExecutor
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+with open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8") as fh:
+    GEOMETRY = json.load(fh)["streetGeometry"]
+
+
+def work(n):
+    return GEOMETRY["radius"] * n
+
+
+if __name__ == "__main__":
+    with ProcessPoolExecutor(2) as ex:
+        out = list(ex.map(work, [1, 2]))
+    open(os.path.join(ROOT, "data", "pool.out"), "w", encoding="utf-8").write(json.dumps(out))
+'''
+TRUTH = {"readers": {"stopSigns": "signs"}, "stopSigns": {"signs": [1]}, "kerbFacts": {"places": [2]},
+         "streetGeometry": {"radius": 3}, "groundPlaces": {"places": [{"name": "a"}]}}
+
+
+class TruthSectionsTest(unittest.TestCase):
+    """#816: a step is keyed by the sections of data/truth.json it read, not by the whole file."""
+    write, restore = StepCacheTest.write, StepCacheTest.restore
+
+    def setUp(self):
+        StepCacheTest.setUp(self)
+        for n, body in READERS.items():
+            self.write(f"tools/{n}.py", READER.format(body=body))
+        self.write("tools/pool.py", POOL)
+        self.truth(TRUTH)
+
+    def truth(self, t):
+        self.write("data/truth.json", json.dumps(t, indent=2))
+
+    def run_all(self, names=(*READERS, "pool")):
+        fail, times = rebuild.run_steps("9", [[f"{n}.py"] for n in names])
+        self.assertIsNone(fail, open(os.path.join(self.root, "reports", "rebuild", f"line9.{fail[:-3]}.log")).read() if fail else "")
+        return {t[0][:-3]: t[2] for t in times}, {t[0][:-3]: t[3] for t in times}
+
+    def changed(self, section, value):
+        t = json.loads(open(os.path.join(self.root, "data", "truth.json"), encoding="utf-8").read())
+        t[section] = value
+        self.truth(t)
+
+    def test_a_section_the_step_did_not_read_leaves_it_skipped(self):
+        self.assertEqual(set(self.run_all()[0].values()), {0})
+        self.assertEqual(set(self.run_all()[0].values()), {"skip"})
+        self.changed("groundPlaces", {"places": [{"name": "a"}, {"name": "b"}]})  # (a ground PR's new place)
+        codes, why = self.run_all()
+        self.assertEqual(codes, {"signs": "skip", "kerbs": "skip", "none": "skip", "pool": "skip",
+                                 "every": 0, "raw": 0, "nothing": 0, "copied": 0})
+        self.assertEqual(why["every"], "data/truth.json changed")
+        self.changed("stopSigns", {"signs": [1, 5]})
+        codes, why = self.run_all()
+        self.assertEqual((codes["signs"], codes["kerbs"], codes["copied"]), (0, "skip", 0))
+        self.assertEqual(why["signs"], "data/truth.json: stopSigns changed")
+        self.assertEqual(json.load(open(os.path.join(self.root, "data", "signs.out"), encoding="utf-8")), [1, 5])
+        self.changed("noSuchSection", {"now": "there"})
+        codes, why = self.run_all(["none", "signs"])
+        self.assertEqual((codes, why["none"]), ({"none": 0, "signs": "skip"}, "data/truth.json: noSuchSection there"))
+
+    def test_the_record_holds_the_sections_read(self):
+        _, times = rebuild.run_steps("9", [["kerbs.py"], ["every.py"], ["pool.py"]])
+        kerbs, every, pool = (t[5] for t in times)
+        self.assertTrue(kerbs["inputs"]["data/truth.json"].startswith(stepcache.SECTIONS))
+        self.assertEqual(kerbs["sections"], {"data/truth.json": {"kerbFacts": stepcache.section_hash(TRUTH["kerbFacts"])}})
+        self.assertEqual(every["inputs"]["data/truth.json"], rebuild.CACHE.hashes.state("data/truth.json"))
+        self.assertNotIn("sections", every)
+        self.assertEqual(set(pool["sections"]["data/truth.json"]), {"streetGeometry"})  # (read by the step and its children)
+        self.changed("streetGeometry", {"radius": 4})
+        self.assertEqual(self.run_all(["pool"])[0], {"pool": 0})
+        self.assertEqual(json.load(open(os.path.join(self.root, "data", "pool.out"), encoding="utf-8")), [4, 8])
+
+    def test_a_truth_gone_runs_the_step_and_an_old_checkout_does_not_take_the_record(self):
+        self.run_all(["signs"])
+        os.remove(os.path.join(self.root, "data", "truth.json"))
+        name = rebuild.CACHE.name("line9", "signs.py", [])
+        self.assertEqual(rebuild.CACHE.match(name, env=rebuild.step_env("line"))[1], "data/truth.json not there")
+        self.truth(TRUTH)
+        rec = rebuild.CACHE.records(rebuild.CACHE.name("line9", "signs.py", []))[0]
+        # (a checkout from before #816 compares the value with the file's hash: never equal, so it runs the step)
+        self.assertNotEqual(rec["inputs"]["data/truth.json"], rebuild.CACHE.hashes.state("data/truth.json"))
+
+    def test_the_noting_dict_reads_as_the_dict(self):
+        seen = []
+        s = stepcache.Sections({"a": 1, "b": {"c": 2}}, seen.append)
+        self.assertEqual((s["a"], s.get("b"), "x" in s, s.get("x", 9)), (1, {"c": 2}, False, 9))
+        self.assertTrue(s)
+        self.assertEqual(seen, ["a", "b", "x", "x"])
+        for whole in (lambda: list(s), lambda: dict(s), lambda: {**s}, lambda: json.dumps(s), len, lambda: s == {},
+                      lambda: s.items(), lambda: __import__("copy").deepcopy(s), lambda: __import__("pickle").dumps(s)):
+            seen.clear()
+            whole() if whole is not len else len(s)
+            self.assertIn(None, seen, whole)
+        self.assertEqual(type(__import__("pickle").loads(__import__("pickle").dumps(s))), dict)
+
+
 # (a made-up step of a line's chain by the real step's name: it reads its files (a CRC of each, so it sees a stamped file
 # as another) and writes its own, or adds to the line file as the writers after build_line do)
 FAKE = '''import json, os, sys, zlib

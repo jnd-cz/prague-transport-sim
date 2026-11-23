@@ -83,11 +83,12 @@ class Drives(unittest.TestCase):
 
     def test_two_or_three_of_a_seed_are_one_drive(self):
         jobs = [("9", c, s) for c in ("u3", "redruns", "stops", "traffic") for s in (1, 2)] + [("9", "lint", 0)]
-        self.assertEqual(headless.merge_drives(jobs),
-                         [("9", "drive", 1), ("9", "drive", 2), ("9", "traffic", 1), ("9", "traffic", 2), ("9", "lint", 0)])
-        # (two of them: still one drive, in the place of the first asked)
+        self.assertEqual(headless.merge_drives(jobs), [("9", "drive", 1), ("9", "drive", 2), ("9", "lint", 0)])
+        # (two of them: still one drive, in the place of the first asked; traffic rides on it since #722)
         self.assertEqual(headless.merge_drives([("9", "redruns", 1), ("9", "traffic", 1), ("9", "stops", 1)]),
-                         [("9", "drive", 1), ("9", "traffic", 1)])
+                         [("9", "drive", 1)])
+        self.assertEqual(headless.merge_drives([("9", "traffic", 1), ("9", "lint", 0), ("9", "u3", 1)]),
+                         [("9", "drive", 1), ("9", "lint", 0)])
 
     def test_one_alone_and_other_lines_and_seeds_stay(self):
         jobs = [("9", "stops", 1), ("9", "u3", 2), ("17", "u3", 1), ("17", "autumn", 1), ("17", "u3", 3), ("17", "redruns", 3)]
@@ -96,7 +97,7 @@ class Drives(unittest.TestCase):
 
     def test_the_drive_calls_every_watcher(self):
         call = headless.CALLS["drive"]
-        for name in ("redrunsWatch", "stopsWatch", "u3: r", "redruns: red", "stops"):
+        for name in ("redrunsWatch", "stopsWatch", "trafficWatch", "u3: r", "redruns: red", "stops", "traffic"):
             self.assertIn(name, call)
 
 

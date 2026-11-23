@@ -83,12 +83,12 @@ sys.stdout.reconfigure(encoding="utf-8")
 CALLS = {
     "u3": "const { run } = await import('/tools/bench/u3.js'); return await run(SEED);",
     "redruns": "const { run } = await import('/tools/bench/redruns.js'); return await run(SEED);",
-    # u3, redruns and stops drive the same trip with the same seed: one drive, their watchers (#205, #708), reported
-    # as each one asked (DRIVE). A watcher only reads, so the counts are those of the checks run alone.
+    # u3, redruns, stops and traffic drive the same trip with the same seed: one drive, their watchers (#205, #708,
+    # #722), reported as each one asked (DRIVE). A watcher only reads, so the counts are those of the checks run alone.
     "drive": "const { run } = await import('/tools/bench/u3.js'); const { redrunsWatch } = await import('/tools/bench/redruns.js');"
-             "const { stopsWatch } = await import('/tools/bench/stops.js');"
-             "const r = await run(SEED, { also: [redrunsWatch, stopsWatch] }); const [red, stops] = r.also; delete r.also;"
-             "return { u3: r, redruns: red, stops };",
+             "const { stopsWatch } = await import('/tools/bench/stops.js'); const { trafficWatch } = await import('/tools/traffic_lint.js');"
+             "const r = await run(SEED, { also: [redrunsWatch, stopsWatch, trafficWatch] }); const [red, stops, traffic] = r.also; delete r.also;"
+             "return { u3: r, redruns: red, stops, traffic };",
     "stops": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED);",
     "autumn": "const { run } = await import('/tools/bench/stops.js'); return await run(SEED, { weather: 'leaves', full: true });",
     # (the other weathers the game has: rain lowers the grip everywhere, snow packs ice into the rails at the crossings, #242)
@@ -117,7 +117,7 @@ CALLS = {
               "const { run } = await import('/tools/bench/speedLimits.js'); return run();",
 }
 SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights", "limits"}
-DRIVE = ("u3", "redruns", "stops")  # the checks one drive serves: two or more of a line and seed run as one "drive"
+DRIVE = ("u3", "redruns", "stops", "traffic")  # the checks one drive serves: two or more of a line and seed run as one "drive"
 
 
 def merge_drives(jobs):
@@ -287,6 +287,7 @@ def counts(check, r):
         out["finished"] = int(bool((r.get("stats") or {}).get("finished")))
         out["cyclesBroken"] = (r.get("stats") or {}).get("cyclesBroken", 0)  # (#154: a car on the track left a deadlock)
         out["junctionCircles"] = (r.get("stats") or {}).get("junctionCircles", 0)  # (#607: a car let through a junction whose holds ran in a circle)
+        out["walkersLeft"] = (r.get("stats") or {}).get("walkersLeft", 0)  # (#366: walkers with nowhere to go that left)
     return out
 
 

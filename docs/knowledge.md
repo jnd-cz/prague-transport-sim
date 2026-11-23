@@ -298,10 +298,16 @@ Sections:
   track only. Under the lidar the same holds with a smaller margin: where an older record lies 0.2-1.5 m under it on
   paved track, DI lies with the lidar at 694 of 725 samples (within 0.1 m of it at 90 %, median -0.1 cm), and at 176 of
   184 even where the survey agrees with the archive; on track of unknown construction DI lies with the lidar too (868 of
-  871) but over it by a ballast bed's height (median +5 cm, p90 +23 cm), so the rule keeps to paved track both ways.
+  871; over it by a median +5 cm, p90 +23 cm, a ballast bed's height), so under the lidar the rule holds on paved track
+  and on track of unknown construction, over it on paved track only.
   `archive_before_lidar`: network-wide the over side moves Bertramka (445 m of track) and one track at Letenské
   náměstí (a record of 2013 on a 1.0 m plateau for 25 m beside a track on the lidar; the user, 2026-11-22: "both track
-  at the same height ... there shouldn't be 1m step anywhere near").
+  at the same height ... there shouldn't be 1m step anywhere near"); both sides 1,214 heights of 5 m in 37 places.
+  The stretch takes the lidar plus the network's rail offset (+1 cm), not the offset of the heights around it: the
+  archive's own are the ones in doubt, and DI's stood 0.2 m over the lidar at Sokolovská's junction (line 37), which
+  set the junction's moved tracks 0.15-0.24 m over their neighbours. A track within 7 m of a stretch taken goes with
+  it where its own record lies over 0.1 m off the lidar the same way: left behind, three short tracks of that junction
+  had their rails 11-15 cm under their neighbours' beds (ground batch D, 2026-11-23).
 - **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
   user's photos show the paving following the slope. Held at 500 m, Malovanka's curves lay up to 40 cm off the 1 m lidar
   and its junction still needed 355 m (meeting points metres apart). The archive put Královka's arms 15-78 cm above the

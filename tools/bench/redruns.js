@@ -8,21 +8,15 @@
 // Also counted: passes while the GO blinks (warn: allowed), our own signal penalties, controller holds.
 // It stops when our tram is stuck (tools/bench/stuck.js, as u3).
 import { stuckWatch, stuckScene } from './stuck.js';
-import { startShift } from './shift.js';
 
 export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
-  window.runSeed = seed >>> 0; // the run's seeded stream (src/random.js)
-  const $ = (id) => document.getElementById(id);
-  $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
-  // (nothing from the real weather: the menu's default temperature is today's Prague forecast, which sets
-  // the autopilot's heaters and flap, #205; autumn as tools/traffic_lint.js)
-  $('selTrip').value = String(trip); $('optWeather').value = 'dry'; $('optObst').value = 'normal'; $('optTemp').value = 'autumn';
   window.headless = true;
-  const game = await startShift(), traffic = window.traffic, camera = window.camera;
-  const { Autopilot } = await import('/src/autopilot.js');
-  const pilot = new Autopilot();
+  // the run (src/run.js, #226) as u3's: its seeded stream, the first stop, the autopilot; nothing from the real weather:
+  // the menu's default temperature is today's Prague forecast, which sets the autopilot's heaters and flap (#205)
+  const run = await window.startRun({ seed: seed >>> 0, startStop: 0, trip, weather: 'dry', obstacles: 'normal', temp: 'autumn', autopilot: true });
+  const { game, traffic, pilot } = run, camera = window.camera;
   const stuck = stuckWatch(game);
-  game.autopilot = true; game.paused = false;
+  game.paused = false;
   const R = window._res = { seed, done: false, t0: performance.now() };
   const watch = redrunsWatch(game, traffic);
   const h = 1 / 30;
@@ -31,10 +25,11 @@ export async function run(seed = 1, { trip = 40, chunk = 400 } = {}) {
       for (let k = 0; k < chunk; k++) {
         if (game.finished || game.tram.s > game.route.length - 5) { R.done = true; break; }
         const before = watch.before();
-        // (headless nothing moves the camera, and road cars spawn around it: keep it at the cab)
+        // (headless nothing moves the camera: keep it at the cab for the once-a-second draw; road cars spawn round the
+        // tram's front whatever it shows, traffic.focus, #722)
         const q = game.route.at(game.tram.s);
         camera.position.set(q.x, game.profile.height(game.tram.s) + 2.6, -q.y);
-        pilot.step(game, h); game.update(h, pilot.input); traffic.update(h, camera);
+        run.step(h, null, camera);
         watch.after(before);
       }
       R.tramS = Math.round(game.tram.s);
