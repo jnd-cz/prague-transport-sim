@@ -821,15 +821,17 @@ export class Game {
       this.objects.add(mesh);
       this.obstacles.push(ob);
     }
-    // jaywalkers at some unsignalised pedestrian crossings
-    for (const s of this.data.crossings) {
-      if (s < this.stops[this.opts.startStop].target + 50 || this.rand() > p * 0.15) continue;
-      if (this.profile.overBridge(s)) continue; // the crossing is on the road under the bridge
+    // jaywalkers at some unsignalised pedestrian crossings, none on the road under a bridge (the build's answer:
+    // tools/network.py over_bridge. Asked here, the ground under the span was past the window at Start, #823)
+    const under = new Set(this.data.network?.overBridgeCrossings);
+    this.data.crossings.forEach((s, k) => {
+      if (s < this.stops[this.opts.startStop].target + 50 || this.rand() > p * 0.15) return;
+      if (under.has(k)) return;
       const mesh = makePerson(Math.floor(this.rand() * 8));
       mesh.visible = false;
       this.objects.add(mesh);
       this.obstacles.push({ type: 'pedestrian', s, lat: this.rand() < 0.5 ? -6 : 6, mesh, state: 'idle', timer: 0, rung: false, speed: 1.3 });
-    }
+    });
   }
 
   // Wheel/rail adhesion along the line. Rain lowers it everywhere; in autumn, crushed wet
