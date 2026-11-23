@@ -69,6 +69,21 @@ class Ties(unittest.TestCase):
         self.assertEqual(ti.tolist(), [0])
         self.assertAlmostEqual(float(d[0]), 1.0)
 
+    def test_across_picks_the_edge_the_triangle_lies_along(self):
+        # (two edges meeting at (0, 0); a corner 0.7 m past the vertex, its triangle's centre nearly on the first edge's
+        # line run on: both edges are as near the corner, the first edge's line runs 0.05 m from the centre, as at the
+        # sidewalk under Letná's wall, line 17 (-176.28, 582.61), #812)
+        a = np.array([[-0.49, 0.27], [0.0, 0.0]])
+        b = np.array([[0.0, 0.0], [0.04, 0.12]])
+        c = np.array([0.602, -0.389])
+        d = ties.across(np.full(2, c[0]), np.full(2, c[1]), a, b)
+        self.assertLess(d[0], 0.06)
+        self.assertGreater(d[1], 0.6)
+        self.assertEqual(int(np.argmin(d)), 0)
+        # (a zero-length segment: the distance to its point)
+        z = ties.across(np.array([3.0]), np.array([4.0]), np.zeros((1, 2)), np.zeros((1, 2)))
+        self.assertAlmostEqual(float(z[0]), 5.0)
+
     def test_empty(self):
         self.assertEqual(len(ties.rank(np.zeros(0))), 0)
         self.assertEqual(len(ties.by_place([])), 0)

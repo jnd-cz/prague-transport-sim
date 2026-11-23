@@ -45,6 +45,20 @@ def by_place(geoms, *keys):
     return rank(b[:, 0], b[:, 1], b[:, 2], b[:, 3], first[:, 0], first[:, 1], shapely.length(g), shapely.area(g), *keys)
 
 
+def across(px, py, a, b):
+    """The distance of points (px, py) from the lines through segments a -> b (unclamped: past a segment's end too).
+    Of wall edges equally near a corner (both at the vertex they share), the one whose line runs nearest the corner's
+    triangle is the edge the triangle lies along: the tie a rule settles by meaning before it falls back on place. Two
+    stretches meeting at a stairwell's corner by street-over-an-underpass (line 17 (-1446.6, -9111.2)) are both 0.461 m
+    from a corner, its triangle 0.195 m from one's line and 0.44 m from the other's, whose first level is a spike
+    (216.76 m against 210.5 m along it); taken by place the corner stood 4.9 m over the stairwell floor (#812)."""
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    e = b[:, :2] - a[:, :2]
+    n = np.hypot(e[:, 0], e[:, 1])
+    cr = np.abs(e[:, 0] * (np.asarray(py, float) - a[:, 1]) - e[:, 1] * (np.asarray(px, float) - a[:, 0]))
+    return np.where(n > 1e-12, cr / np.maximum(n, 1e-12), np.hypot(np.asarray(px, float) - a[:, 0], np.asarray(py, float) - a[:, 1]))
+
+
 def firsts(pi, *keys):
     """Of pairs (pi: the point of each), per point the first by keys (np.lexsort's order: the last key the most
     significant): the pairs' indices, one per point, in the order of the points."""

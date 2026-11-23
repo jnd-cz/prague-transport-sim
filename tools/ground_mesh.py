@@ -943,18 +943,21 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     t = np.clip(raw, 0, 1)
     d = np.hypot(*(P - A[si] - t[:, None] * v).T)
     past = ((raw < -1e-9) & END[si, 0]) | ((raw > 1 + 1e-9) & END[si, 1])
-    # (of segments as near, the first by where they lie and their levels, ties.py: two stretches laid over one wall in
-    # opposite directions, 0.343 m from a corner by lattice-cell (line 23 (-742.1, 903.0)), went by the tree's order,
-    # 228.78 or 228.81 m with the box's extent, #812)
+    # (of segments as near, the one whose line runs nearest the corner's triangle (ties.across), then the first by where
+    # they lie and their levels: they went by the tree's order, which the box's extent moves, #812. Two stretches
+    # laid over one wall in opposite directions, 0.343 m from a corner by lattice-cell (line 23 (-742.1, 903.0)), took
+    # 228.78 or 228.81 m; at a stairwell's corner by street-over-an-underpass, line 17 (-1446.6, -9111.2), by place the
+    # corner took the other stretch's spike, 4.9 m over the floor its triangle lies on)
     rk = ties.segments(A, B, ZL[:, 0], ZL[:, 1], ZR[:, 0], ZR[:, 1], GL[:, 0], GR[:, 0], OUT)[si]
+    along = ties.across(tx[idx[pi]], ty[idx[pi]], A[si], B[si])
     # (whether a corner lies past a stretch's end is its nearest segment of that stretch's to say: 1 m beyond the end it
     # is still within WALL_HOLD of the stretch's second segment, which has no end to be past)
-    o = np.lexsort((rk, d, SID[si], pi))
+    o = np.lexsort((rk, along, d, SID[si], pi))
     lead = np.concatenate([[True], (pi[o][1:] != pi[o][:-1]) | (SID[si[o]][1:] != SID[si[o]][:-1])])
     near = o[lead][np.cumsum(lead) - 1]
     gtip = np.empty(len(pi), bool)
     gtip[o] = ((raw[near] < -1e-9) & LAST[si[near], 0]) | ((raw[near] > 1 + 1e-9) & LAST[si[near], 1])
-    order = np.lexsort((rk, d, past, pi))  # (per corner the nearest segment it is not past first)
+    order = np.lexsort((rk, along, d, past, pi))  # (per corner the nearest segment it is not past first)
     first = np.concatenate([[True], pi[order][1:] != pi[order][:-1]])
     k = order[first]
     # (a corner at or beyond its segment's end, at a bend or where two stretches meet: its triangle lies on one of the
@@ -966,7 +969,7 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     dc = np.hypot(*(C - A[si] - np.clip(rawc, 0, 1)[:, None] * v).T)
     dmin = np.full(len(idx), np.inf)
     np.minimum.at(dmin, pi, np.where(past, np.inf, d))
-    order2 = np.lexsort((rk, dc, (rawc < -1e-9) | (rawc > 1 + 1e-9), d > dmin[pi] + WALL_JOIN, past, pi))
+    order2 = np.lexsort((rk, along, dc, (rawc < -1e-9) | (rawc > 1 + 1e-9), d > dmin[pi] + WALL_JOIN, past, pi))
     k2 = order2[np.concatenate([[True], pi[order2][1:] != pi[order2][:-1]])]
     k = np.where(((raw[k] < 1e-9) | (raw[k] > 1 - 1e-9)) & ~past[k], k2, k)
     c, s, t, d, raw, gtip = idx[pi[k]], si[k], t[k], d[k], raw[k], gtip[k]
@@ -1122,6 +1125,31 @@ WALL_SIDE = 0.75  # m: a sidewalk's corner this near a wall's outline reads the 
 # its own side (the surface's cells are 0.5 m: a reading 0.75 m out lies between four cells of that side)
 
 
+def out_of(a, b, t, x, y, tx, ty):
+    """Per corner (x, y) in a triangle with centre (tx, ty) and an outline edge a -> b ((n, 2+)) it is near, its nearest
+    point on the edge at parameter t (clamped): (fx, fy, ux, uy), that point and the unit direction out from it to the
+    corner's side. Square to the edge, on its triangle's side; where the point is the edge's end (within WALL_ON), from
+    that end towards the corner (towards its triangle's centre for a corner on it): past a wall's corner the side is
+    the wedge between its two edges, and each edge's square read the other's face or what lies beyond it. Both edges
+    then give one point out, and the tie between them is gone. Under Letná's wall, line 17 (-176.28, 582.61), a
+    sidewalk's corner 0.72 m past the vertex two edges share read square to one of them the sidewalk on the wall's top,
+    193.13 m for 186.30, and the other's square or the corner's own direction its own sidewalk (#812)."""
+    e = b[:, :2] - a[:, :2]
+    L = np.maximum(np.hypot(e[:, 0], e[:, 1]), 1e-12)
+    fx, fy = a[:, 0] + e[:, 0] * t, a[:, 1] + e[:, 1] * t
+    nx, ny = -e[:, 1] / L, e[:, 0] / L
+    side = np.where((tx - fx) * nx + (ty - fy) * ny >= 0, 1.0, -1.0)
+    ux, uy = side * nx, side * ny
+    first = t * L <= WALL_ON
+    vx, vy = np.where(first, a[:, 0], b[:, 0]), np.where(first, a[:, 1], b[:, 1])
+    on = np.hypot(x - vx, y - vy) <= WALL_ON
+    gx, gy = np.where(on, tx, x), np.where(on, ty, y)
+    r = np.hypot(gx - vx, gy - vy)
+    end = (first | ((1 - t) * L <= WALL_ON)) & (r > 1e-9)
+    rr = np.maximum(r, 1e-12)
+    return (np.where(end, vx, fx), np.where(end, vy, fy), np.where(end, (gx - vx) / rr, ux), np.where(end, (gy - vy) / rr, uy))
+
+
 def own_side(walls, x, y, tx, ty, z, own):
     """Heights z of a sidewalk's corners (x, y), each in a triangle with centre (tx, ty), with those within WALL_SIDE
     of a wall's outline (walls: outline_edges of wall_areas, and street_profile.strip_edges)
@@ -1146,19 +1174,19 @@ def own_side(walls, x, y, tx, ty, z, own):
     e = b[si] - a[si]
     l2 = np.maximum((e ** 2).sum(1), 1e-12)
     t = np.clip(((x[s][pi] - a[si, 0]) * e[:, 0] + (y[s][pi] - a[si, 1]) * e[:, 1]) / l2, 0, 1)
-    fx, fy = a[si, 0] + e[:, 0] * t, a[si, 1] + e[:, 1] * t
-    d = np.hypot(x[s][pi] - fx, y[s][pi] - fy)
     c = s[pi]
-    nx, ny = -e[:, 1] / np.sqrt(l2), e[:, 0] / np.sqrt(l2)
-    side = np.where((tx[c] - fx) * nx + (ty[c] - fy) * ny >= 0, 1.0, -1.0)  # (the corner's triangle's side of the edge)
-    qx, qy = fx + side * nx * WALL_SIDE, fy + side * ny * WALL_SIDE
+    fx, fy, ux, uy = out_of(a[si], b[si], t, x[c], y[c], tx[c], ty[c])  # (the corner's side of the edge)
+    d = np.hypot(x[c] - fx, y[c] - fy)
+    qx, qy = fx + ux * WALL_SIDE, fy + uy * WALL_SIDE
     sees = np.ones(len(c), bool)
     li, _ = tree.query(shapely.linestrings(np.stack([np.column_stack([tx[c], ty[c]]), np.column_stack([qx, qy])], 1)),
                        predicate="intersects")
     sees[np.unique(li)] = False
-    # (of edges as near, the first by where they lie, ties.py: a corner on the vertex two edges share read one side's
-    # surface or the other's by the tree's order, at lattice-cell (line 23 (-805.44, 964.86)) 230.21 or 230.37 m, #812)
-    o = np.lexsort((ties.segments(a, b)[si], d, ~sees, pi))  # (per corner, its nearest edge with a clear point out)
+    # (of edges as near, the one whose line runs nearest the corner's triangle, then the first by where they lie
+    # (ties.py), not by the tree's order: a corner by the vertex two edges share read one side's surface or the other's
+    # by it, at lattice-cell (line 23 (-805.44, 964.86)) 230.21 or 230.37 m, #812. Past a shared vertex both edges
+    # read one point out (out_of); the tie left is a corner as near two edges' insides.)
+    o = np.lexsort((ties.segments(a, b)[si], ties.across(tx[c], ty[c], a[si], b[si]), d, ~sees, pi))  # (per corner, its nearest edge with a clear point out)
     o = o[np.r_[True, pi[o][1:] != pi[o][:-1]]]
     o = o[sees[o]]
     c, qx, qy = c[o], qx[o], qy[o]
@@ -1394,12 +1422,10 @@ def off_the_smear(walls, x, y, tx, ty, z, own, lidar=None):
     e = b[si] - a[si]
     l2 = np.maximum((e ** 2).sum(1), 1e-12)
     t = np.clip(((x[s][pi] - a[si, 0]) * e[:, 0] + (y[s][pi] - a[si, 1]) * e[:, 1]) / l2, 0, 1)
-    fx, fy = a[si, 0] + e[:, 0] * t, a[si, 1] + e[:, 1] * t
-    d = np.hypot(x[s][pi] - fx, y[s][pi] - fy)
     c = s[pi]
-    nx, ny = -e[:, 1] / np.sqrt(l2), e[:, 0] / np.sqrt(l2)
-    side = np.where((tx[c] - fx) * nx + (ty[c] - fy) * ny >= 0, 1.0, -1.0)  # (the corner's triangle's side of the edge)
-    qx, qy = fx + side * nx * WALL_HOLD, fy + side * ny * WALL_HOLD
+    fx, fy, ux, uy = out_of(a[si], b[si], t, x[c], y[c], tx[c], ty[c])  # (the corner's side of the edge)
+    d = np.hypot(x[c] - fx, y[c] - fy)
+    qx, qy = fx + ux * WALL_HOLD, fy + uy * WALL_HOLD
     moved = np.zeros(len(c), bool)
     rk = ties.segments(a, b)  # (of edges as near, the first by where they lie, not by the tree's order: #812)
     for _ in range(2):
@@ -1416,13 +1442,14 @@ def off_the_smear(walls, x, y, tx, ty, z, own, lidar=None):
     li, _ = tree.query(shapely.linestrings(np.stack([np.column_stack([tx[c], ty[c]]), np.column_stack([qx, qy])], 1)),
                        predicate="intersects")
     sees[np.unique(li)] = False
-    o = np.lexsort((rk[si], d, ~sees, pi))  # (per corner, its nearest edge with a clear point out)
+    # (of edges as near, the one whose line runs nearest the corner's triangle, then by place: own_side's tie, #812)
+    o = np.lexsort((rk[si], ties.across(tx[c], ty[c], a[si], b[si]), d, ~sees, pi))  # (per corner, its nearest edge with a clear point out)
     o = o[np.r_[True, pi[o][1:] != pi[o][:-1]]]
     o = o[sees[o]]
-    c, fx, fy, nx, ny, side, d, qx, qy, moved =(v[o] for v in (c, fx, fy, nx, ny, side, d, qx, qy, moved))
+    c, fx, fy, ux, uy, d, qx, qy, moved = (v[o] for v in (c, fx, fy, ux, uy, d, qx, qy, moved))
     zq = np.asarray(own(qx, qy), float)
     with np.errstate(invalid="ignore"):
-        g = (zq - np.asarray(own(fx + side * nx * 2 * WALL_HOLD, fy + side * ny * 2 * WALL_HOLD), float)) / WALL_HOLD
+        g = (zq - np.asarray(own(fx + ux * 2 * WALL_HOLD, fy + uy * 2 * WALL_HOLD), float)) / WALL_HOLD
         g = np.where((np.abs(g) <= ROAD_GRADE) & ~moved, g, 0.0)
     zn = zq + g * (WALL_HOLD - d)
     with np.errstate(invalid="ignore"):
