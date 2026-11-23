@@ -269,7 +269,22 @@ class Stairs(unittest.TestCase):
     def test_a_point_under_a_deck_is_not_judged(self):
         deck = {"c": "road", "l": 1, "r": [[1.5, 4, 106.0], [3, 4, 106.0], [3, 11, 106.0], [1.5, 11, 106.0]]}
         sh = gm.StairsHeights({"areas": [self.BESIDE, deck]}, self.LINES, self.flight_lidar)
-        self.assertEqual([q[2] for q in sh.outline(self.BESIDE)], [100.0, 100.0, 98.5, 98.5, 105.0, 102.5])
+        # (the deck's two keep 98.5 m; the corner between (0, 0) at 100 m and (2, 5) at 98.5 m, 4/29 of the way along)
+        np.testing.assert_allclose([q[2] for q in sh.outline(self.BESIDE)], [100.0, 100.0 - 1.5 * 4 / 29, 98.5, 98.5, 105.0, 102.5])
+
+    def test_a_sides_heights_along_a_wall_stay_a_ramp(self):
+        # (line 17 area 1063: a flight's side on a wall's line rising with it, 1 m under the raster smeared by the wall;
+        # the nearest kept point's height made shelves of it, 222.0, 225.3, 225.6 m along 8 m)
+        wall = {"c": "stairs", "l": 0, "r": [[0, 0, 100.0], [2, 0, 100.0], [2, 2, 100.0], [2, 4, 101.0], [2, 6, 102.0],
+                                             [2, 8, 103.0], [2, 10, 104.0], [0, 10, 105.0], [0, 5, 102.5]]}
+        lines = [("other", np.array([[2, 1, 0.0], [2, 9, 0.0]]))]
+        sh = gm.StairsHeights({"areas": [wall]}, lines, self.flight_lidar)
+        r = sh.outline(wall)
+        z = np.array([q[2] for q in r])
+        self.assertTrue((np.diff(z[1:7]) > 0).all())   # (a ramp, no shelves)
+        np.testing.assert_allclose(z[2:7], [101.0, 102.0, 103.0, 104.0, 105.0], atol=0.2)   # (the flight's own slope)
+        self.assertEqual((sh.areas, sh.points), (1, 5))
+        self.assertIsNotNone(gm.flight({**wall, "r": r}))
 
     def test_a_walls_top_between_two_jumps_takes_the_stairs_heights(self):
         # (line 9 area 5615: the foot's edge at the top's height after a jump of 6.5 m within 0.4 m, a reversed ramp)

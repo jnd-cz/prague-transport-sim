@@ -189,19 +189,24 @@ class StairsHeights:
 
     An outline point on another feature's edge (a building's, a structure's or a wall's line, not the stairs' own
     boundary, STAIRS_EDGES: either edge, so a corner where the stairs meet a building is judged), or on an outline with
-    two jumps or more, that stands STAIRS_OFF or more off the
-    lidar STAIRS_INSET inside the area takes the height of the nearest outline point that does not: steps are level
-    across a flight. The lidar only picks which of the survey's heights are the stairs'. A point under a level-1 survey
+    two jumps or more, that stands STAIRS_OFF or more off the lidar STAIRS_INSET inside the area takes its height from
+    the outline's kept points on either side of its run, by where it lies along the line from one to the other: steps
+    are level across a flight, and a side along a wall rises with the flight. The lidar only picks which of the survey's
+    heights are the stairs'. A point under a level-1 survey
     area (a deck, a bridge) is not judged: the raster reads the deck there (the stairs under the bridge on line 17 at
     (1418, 2497) and (1457, 2503); the National Theatre's under Národní, line 9 (-620, -565)). A point on the stairs' own
     boundary keeps its height: the 1 m raster does not see a narrow flight (the user, 2026-11-23: "the narrow places
     can't be properly seen by the lidar sampling").
 
     Judged on the user's 24 answers (data/truth.json stairsReview): one flight 5615 34 -> 0 m² steeper than 1:1 (one
-    plane now), 5662 11.5 -> 0, 5663 22 -> 0.6, 582 11 -> 0; flights that turn 1998 20 -> 0.8; no stairs, line 37
-    (4001, 1412), 10 -> 0 (the sidewalk's level). The lines' stairs: 1,223 -> 709 m² (183 areas better, 25 worse by
-    0.5 m²). STAIRS_OFF 1.0 left 745 m² (154 / 24): a building's foot 0.9 m under a flight 2 m wide kept its height and
-    the flight leant across (groundPlaces stairs-beside-a-building); 0.5 left 694 m² but 41 worse."""
+    plane now), 5662 11.5 -> 0, 5663 22 -> 0, 582 11 -> 0, 439 27 -> 0; flights that turn 1998 20 -> 3.3, 1022 12 -> 0;
+    no stairs, line 37 (4001, 1412), 10 -> 0 (the sidewalk's level). The lines' stairs: 1,223 -> 621 m² (199 areas
+    better, 13 worse by 0.5 m², 16 m² in all: a side on a wall's line partly past STAIRS_OFF moves and the rest keeps
+    its noses, a shelf where they meet, line 22 area 518; both sides on the side walls' tops, line 9 area 5653). The
+    nearest kept point's height left 709 m² (183 / 25: shelves along walls, line 17 area 1063). STAIRS_OFF 1.0 left
+    745 m² (154 / 24): a building's foot 0.9 m under a flight 2 m wide kept its height and the flight leant across
+    (groundPlaces stairs-beside-a-building); 0.5 left 694 m² but 41 worse. Moving nothing where the lidar is off most
+    of the outline left 914 m²: it kept the folds of 1998, 1022, 582, 439 and line 37's."""
 
     def __init__(self, D, lines, lidar):
         self.lidar = lidar
@@ -246,9 +251,17 @@ class StairsHeights:
         moved = judged & (np.abs(P[:, 2] - zl) >= STAIRS_OFF)
         if not moved.any() or moved.all():
             return None
-        K = P[~moved]
-        for k in np.flatnonzero(moved):
-            P[k, 2] = K[np.argmin(np.hypot(K[:, 0] - P[k, 0], K[:, 1] - P[k, 1])), 2]
+        # (between the kept points on either side of a run, by where a point lies along the line from one to the other:
+        # the nearest kept point's height made shelves of a flight's side along a wall, line 17 area 1063: 222.1 -> 225.2
+        # m over 8 m became 222.0, 225.3, 225.6; the length round the outline counted a flight's foot and top edges too)
+        n = len(P)
+        o = (np.flatnonzero(~moved)[0] + np.arange(n + 1)) % n   # (the ring from a kept point round to it)
+        kp = np.flatnonzero(~moved[o])
+        j = np.flatnonzero(moved[o])
+        A, B = P[o[kp[np.searchsorted(kp, j) - 1]]], P[o[kp[np.searchsorted(kp, j)]]]
+        d = B[:, :2] - A[:, :2]
+        t = np.clip(((P[o[j], :2] - A[:, :2]) * d).sum(1) / np.maximum((d * d).sum(1), 1e-9), 0, 1)
+        P[o[j], 2] = A[:, 2] + (B[:, 2] - A[:, 2]) * t
         self.areas += 1
         self.points += int(moved.sum())
         return P.tolist()
