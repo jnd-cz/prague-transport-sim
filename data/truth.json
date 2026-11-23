@@ -6256,6 +6256,63 @@
     }
    ]
   },
+  "repy-parking-kerb": {
+   "line": "9",
+   "at": [
+    -8655.0,
+    -1214.3
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a parking area beside a sidewalk in Řepy (line 9, 50.0659, 14.3039): the survey's parking area 8704 on its outline, the sidewalk 8627 behind it",
+   "source": "measured 2026-11-23 on ground batch D (#800): IPR rises 0.13 m from the bay 1.5 m off the kerb (357.87 m) to the sidewalk 1.5 m on it (358.00 m); the ground had the bay on its outline 6-8 cm over IPR and the sidewalk on the fill to IPR, level at the kerb (357.97 m either side)",
+   "sections": [
+    {
+     "name": "from the bay across the kerb onto the sidewalk, 4 m",
+     "from": [
+      -8655.31,
+      -1216.25
+     ],
+     "to": [
+      -8654.65,
+      -1212.31
+     ],
+     "expect": {
+      "rise m at least": 0.08,
+      "largest step m at least": 0.07
+     },
+     "why": "IPR rises 0.13 m across the kerb: the sidewalk stands a kerb over the bay, as over a road"
+    }
+   ]
+  },
+  "vystaviste-flush-parking": {
+   "line": "17",
+   "at": [
+    1175.5,
+    1908.8
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a parking area level with the sidewalk beside it by Výstaviště (line 17, 50.1058, 14.4340): the survey's parking area 3557 and sidewalk 3507, their shared edge flagged a kerb",
+   "source": "measured 2026-11-23 on ground batch D (#800): IPR falls 3 cm a metre from the bay (192.85 m 2 m off the edge) across the edge (192.80 m) onto the sidewalk (192.75 m 3 m on), with no step: -0.04 m from 1 m out to 1 m in",
+   "sections": [
+    {
+     "name": "from the bay across its edge onto the sidewalk, 5 m",
+     "from": [
+      1176.73,
+      1907.24
+     ],
+     "to": [
+      1173.7,
+      1911.22
+     ],
+     "expect": {
+      "largest step m": 0.04
+     },
+     "why": "IPR reads no kerb here: a bay level with the sidewalk keeps none (street_profile.flush_parking)"
+    }
+   ]
+  },
   "stairs-reversed-ramp": {
    "line": "9",
    "at": [

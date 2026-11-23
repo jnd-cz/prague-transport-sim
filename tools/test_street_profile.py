@@ -164,6 +164,25 @@ class CrownReach(unittest.TestCase):
         self.assertGreater(float(width[20].min()), 7.0)
 
 
+class Parking(unittest.TestCase):
+    def test_a_parking_area_is_in_the_roads_fill_unless_under_a_deck(self):
+        # three level-0 car parks: one in the open, one 40 % under a deck, one 20 % under it; and one on level 1:
+        # the open one and the one 20 % under the deck join the road's fill (#800)
+        import shapely
+        from shapely.geometry import box
+
+        def area(x0, c="parking", lv=0):
+            return {"c": c, "l": lv, "r": [[x0, 0, 200], [x0 + 10, 0, 200], [x0 + 10, 10, 200], [x0, 10, 200]]}
+        dtm = {"areas": [area(0), area(20), area(40), area(60, lv=1), area(80, c="road"),
+                         area(26, c="deck", lv=1), area(48, c="deck", lv=1)]}
+        _, cover = sp.street_areas(dtm)
+        park = sp.parking_area(dtm, cover)
+        inside = shapely.contains_xy(park, [5, 25, 45, 65, 85], [5] * 5).tolist()
+        self.assertEqual(inside, [True, False, True, False, False])
+        self.assertAlmostEqual(park.area, 200.0)
+        self.assertTrue(sp.parking_area({"areas": [area(0)]}, None).equals(box(0, 0, 10, 10)))
+
+
 class Sidewalks(unittest.TestCase):
     def test_a_kerb_round_a_corner_in_short_edges_is_a_kerb(self):
         # a sidewalk whose kerb turns a corner in edges of 0.77 m (a quarter circle of radius 4 m round (4, 4)), then

@@ -61,7 +61,9 @@ CLASS_IDS = {"terrain": 0, "survey": 1, "bed": 2, "plot": 3, "wall": 4}
 RAISED = {"sidewalk", "island", "median", "platform"}  # (src/world.js RAISED: they keep their height over a bed)
 from kerbs import LOWERS as LOWERED  # noqa: E402 (the raised classes a lowered kerb is in: platforms keep their step)
 CARRIAGEWAY = {"road", "tram", "parking"}  # (the classes a lowered kerb stands over: tools/bench/surfaces.js ROAD)
-STREETS_ROAD, STREETS_WALK = {"road", "tram"}, {"sidewalk"}  # (the classes the generated street surface covers, #512)
+# (the classes the generated street surface covers, #512; the parking areas in the road's fill, but a car park mostly
+# under a deck: street_profile.parking_area, #800. Where it has none, an area keeps the lidar or its outline)
+STREETS_ROAD, STREETS_WALK = {"road", "tram", "parking"}, {"sidewalk"}
 # m: a face's height differing from the weld's by more than this at a shared vertex stays a step (to measure: the
 # report counts every pair's differences)
 # (a step's pairs: the water stands level, a wall up to what stands over it (a quay's survey, a bed: "water") and down

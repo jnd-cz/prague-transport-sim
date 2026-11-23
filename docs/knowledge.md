@@ -675,6 +675,18 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   level-1 areas) fit there while IPR inside them is the bridges: on the lidar they raised the place's steep faces
   from 379 to 640 m². Paved yards under a cover are judged as before (34 on the five lines lie on the lidar with
   over a third under a level-1 area, 0.8 ha).
+- **A parking area is the road's to a kerb** (#800, measured 2026-11-23 on ground batch D). The street surface covered
+  the road and tram areas only, so beside a parking area the sidewalk's kerb had no plane: its walkway lay on the fill
+  to IPR, which rounds the kerb away, and the bay on its outline, 6-8 cm over IPR at line 9 (-8655, -1214), met it
+  level. 138 of batch D's flat kerb samples drawn from an outline lay between a sidewalk and a parking area, and 72
+  more spread into a ramp. The road's fill now takes the parking areas as it takes a junction's middle
+  (`street_profile.parking_area`; a car park over a third under a cover keeps its sheet), and the sidewalk stands a
+  kerb over a bay as over a road, unless IPR reads the two flush. IPR's step from 1 m out to 1 m in, its median over
+  ±1 m along the edge, is under 0.03 m at 26 % of the 25.6 km of sidewalk kerb beside parking on the five lines and
+  at 10 % beside a road or tram area (medians +0.092 and +0.114 m). The excess beside parking is 16-17 points at
+  every threshold from 0.03 to 0.07 m, so the flush bays read under 0.03 (`PARK_FLUSH`). Read less the ground's slope
+  1.5-2.5 m either side, the step tells them apart worse (26 % of the road's kerbs under 0.03): the road's camber and
+  the sidewalk's crossfall enter it.
 - **A wall the survey has only as a strip** (#770, measured 2026-11-20). The tram's cutting north of Ohrada (line 37
   (3400, 1)) runs between two upright concrete walls of 4.7 and 5.8 m with a ledge at each foot (the user's photos
   from the footbridge, 2026-11-20). The survey has no `Zeď` line, no wall area and Geoportál no wall there: only a

@@ -176,6 +176,33 @@ def street_areas(dtm):
     return shapely.union_all(road), shapely.union_all(cover) if cover else None
 
 
+PARKING_UNDER_COVER = 1 / 3  # (tools/zps_inside.py UNDER_COVER: a car park mostly under a deck keeps its own sheet)
+
+
+def parking_area(dtm, cover):
+    """The survey's level-0 parking areas as one geometry, but for those with over PARKING_UNDER_COVER of their area
+    under a cover: the road's fill (junctions()) takes them as it takes a junction's middle, and a sidewalk beside one
+    stands a kerb over it, as beside a road, unless IPR reads them flush (flush_parking, #800). A parking area is a
+    carriageway to a kerb (tools/kerbs.py CARR), but
+    the street surface had no road beyond it: the sidewalk's kerb had no plane, its walkway lay on the fill to IPR's
+    raster, which rounds the kerb away, and the bay on its outline (height class 5, a mean error of 0.35 m) met it level,
+    6-8 cm over IPR at line 9 (-8655, -1214); 138 of ground batch D's flat kerb samples drawn from an outline lay
+    between a sidewalk and a parking area. Under a cover IPR reads the deck (the car parks under the Magistrála at
+    Hlavní nádraží, #806)."""
+    import shapely
+    from shapely.geometry import Polygon
+    out = []
+    for a in dtm["areas"]:
+        if a["l"] != 0 or a["c"] != "parking" or len(a["r"]) < 3:
+            continue
+        g = Polygon([p[:2] for p in a["r"]], [[p[:2] for p in h] for h in a.get("h", []) if len(h) >= 3])
+        g = g if g.is_valid else g.buffer(0)
+        if g.is_empty or (cover is not None and g.intersection(cover).area > PARKING_UNDER_COVER * g.area):
+            continue
+        out.append(g)
+    return shapely.union_all(out) if out else shapely.Polygon()
+
+
 def clean_stretches(F, ipr, ln):
     """The line's clean car stretches: [{name, highway, s, z (IPR), xy}] at least MIN_LEN long, at most PIECE."""
     import shapely
@@ -1215,7 +1242,7 @@ def contours(cs, F, ipr, svy, road, field, at, radius, out_dir, cell=0.25, step=
 def pilot_report(at, radius, ln, out_dir):
     ctx = context(ln)
     cs, dtm, F, ipr, road = pilot(at, radius, ln, out_dir, ctx)
-    field = junctions(cs, F, ipr, road, [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)])
+    field = junctions(cs, F, ipr, ctx["carriageway"], [(at[0] - radius, at[1] - radius), (at[0] + radius, at[1] + radius)])
     tris = ctx["tris"]
 
     def svy(x, y):
@@ -1641,6 +1668,34 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
     return top, np.stack([np.column_stack([q[top] - t, z]), np.column_stack([q[top] + t, z])], 1)
 
 
+PARK_FLUSH = 0.03  # m: IPR's step across a kerb to a parking area (1 m into the sidewalk less 1 m out) under which the
+# two lie flush. On the five lines' sidewalk kerbs it is under 0.03 at 10 % of the points beside a road or tram area
+# (median +0.114 m) and 26 % beside a parking area (+0.091 m): a bay paved at the sidewalk's level, as at line 17 (1176,
+# 1909), where IPR falls 3 cm a metre from the bay across the sidewalk with no step. A plain kerb reads +11-12 cm, a
+# lowered one +6 cm (docs/knowledge.md, #303)
+PARK_ALONG = 9  # points (0.25 m apart) along an edge over which the step's median is read: ±1 m
+
+
+def flush_parking(ctx, box, q, n):
+    """Which kerb points (q, normals n into the sidewalk) lie flush with a parking area beyond them: IPR's step across
+    under PARK_FLUSH, its median over PARK_ALONG points along the edge (#800). Elsewhere the sidewalk stands a kerb over
+    the bay as over a road (parking_area)."""
+    import shapely
+    from scipy.ndimage import median_filter
+    out = np.zeros(len(q), bool)
+    if ctx.get("parking") is None or not len(q):
+        return out
+    o = q - n * 0.5
+    on = shapely.contains_xy(near_box(ctx, "parking", box), o[:, 0], o[:, 1])
+    if not on.any():
+        return out
+    F, ipr = ctx["F"], ctx["ipr"]
+    a, b = q + n * 1.0, q - n * 1.0
+    st = np.asarray(ipr.sample(a[:, 0] + F.E0, a[:, 1] + F.N0), float) - np.asarray(ipr.sample(b[:, 0] + F.E0, b[:, 1] + F.N0), float)
+    st = median_filter(np.where(np.isfinite(st), st, 1.0), size=PARK_ALONG, mode="nearest")
+    return on & (st < PARK_FLUSH)
+
+
 def sidewalks(ctx, road_z, box, cell=SW_CELL):
     """The sidewalks around the generated road. The walkway, up to SW_WALK from the kerb, is a plane: at the kerb the
     road's surface 0.5 m beyond it plus KERB (tools/kerbs.py, the measured step), rising across at IPR's crossfall held
@@ -1672,6 +1727,7 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
             continue
         q, n = q[ok], n[ok]
         zr = np.asarray(road_z(*(q - n * 0.5).T), float)
+        flush = flush_parking(ctx, box, q, own[2][ok] if len(own) > 2 else n)
         # (an edge standing over or under the road beyond it is a wall's, held below as a wall's edge: wall_tops, #779;
         # on an edge too short for a wall's, such a point has neither a kerb's plane nor a wall's hold)
         # (read across the point's own edge: kerb_edges)
@@ -1686,9 +1742,11 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
             if top.any():
                 if wall_ok:
                     tops.append(segs)
-                q, n, zr = q[~top], n[~top], zr[~top]
+                q, n, zr, flush = q[~top], n[~top], zr[~top], flush[~top]
                 if not len(q):
                     continue
+        # (a sidewalk flush with a parking area beyond has no kerb's plane: its walkway follows the fill, as the bay does)
+        zr = np.where(flush, np.nan, zr)
         # (each kerb point's walkway: its width inwards and IPR's crossfall across it, past the kerb's smear)
         d = np.arange(0.25, SW_WALK + 1e-6, 0.25)
         P = q[:, None, :] + n[:, None, :] * d[None, :, None]
@@ -1852,6 +1910,11 @@ def context(ln):
     shapely.prepare(road)
     if cover is not None:
         shapely.prepare(cover)
+    # (the road's fill covers the parking areas too: parking_area; the streets' widths stay the road's)
+    park = parking_area(dtm, cover)
+    carriageway = road if park.is_empty else shapely.union_all([road, park])
+    shapely.prepare(carriageway)
+    shapely.prepare(park)
     tris, _ = surface_tris(dtm["areas"], {"road", "tram"})
     sw_tris, _ = surface_tris(dtm["areas"], {"sidewalk"})
     edges, walk = kerb_edges(dtm)
@@ -1865,7 +1928,8 @@ def context(ln):
 
     def lidar(x, y):
         return np.asarray(ipr.sample(np.asarray(x) + F.E0, np.asarray(y) + F.N0), float)
-    ctx = {"F": F, "ipr": ipr, "dtm": dtm, "L": L, "road": road, "cover": cover, "tris": tris,
+    ctx = {"F": F, "ipr": ipr, "dtm": dtm, "L": L, "road": road, "carriageway": carriageway, "parking": park,
+           "cover": cover, "tris": tris,
            "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
            "rings": outlines(dtm), "wall_edges": wall_edges(dtm, walls), "wall_levels": WallLevels(dtm, walls),
            "strip_edges": lambda box: strip_edges(ln, near_box(ctx, "walk", box), box, lidar) if walk is not None else None}
@@ -1977,7 +2041,7 @@ def wide_square(ln, cell, ij, raised_xy, ctx=None):
                 n += int(near.sum())
                 r += int(c["raised"][near].any(1).sum())
         out["raised"].append((n, r))
-    field = junctions(cs, F, ipr, road, box)
+    field = junctions(cs, F, ipr, ctx.get("carriageway", road), box)
     xg, yg = np.meshgrid(np.arange(at[0] - radius, at[0] + radius, 0.5), np.arange(at[1] + radius, at[1] - radius, -0.5))
     x, y = xg.ravel(), yg.ravel()
     inner = shapely.contains_xy(near_box(ctx, "road inside", box), x, y)
@@ -2034,14 +2098,14 @@ def wide_square(ln, cell, ij, raised_xy, ctx=None):
 
 def surface_raster(ctx, cs, road, field, swf, box, F, ipr, cell=SW_CELL):
     """The generated street surface on a `cell` m grid over a square (rows north to south, from its north-west
-    corner): heights where the road (road and tram areas) or a sidewalk is, NaN elsewhere; IPR on every cell (NaN
-    where it has none, filled with the street's or the square's mean for a mesher)."""
+    corner): heights where the road (road and tram areas, and the parking areas: parking_area) or a sidewalk is, NaN
+    elsewhere; IPR on every cell (NaN where it has none, filled with the street's or the square's mean for a mesher)."""
     import shapely
     (x0, y0), (x1, y1) = box
     xs, ys = np.arange(x0 + cell / 2, x1, cell), np.arange(y1 - cell / 2, y0, -cell)
     xg, yg = np.meshgrid(xs, ys)
     x, y = xg.ravel(), yg.ravel()
-    on_road = shapely.contains_xy(near_box(ctx, "road", box), x, y)
+    on_road = shapely.contains_xy(near_box(ctx, "carriageway" if "carriageway" in ctx else "road", box), x, y)
     walk = near_box(ctx, "walk", box) if ctx.get("walk") is not None else None
     on_walk = shapely.contains_xy(walk, x, y) & ~on_road if walk is not None else np.zeros(len(x), bool)
     z = np.full(len(x), np.nan)
@@ -2177,7 +2241,7 @@ def build_square(ln, cell, ij, ctx=None):
     cs, _, F, ipr, road = pilot(at, radius, ln, None, ctx)
     if not cs:
         return None
-    field = junctions(cs, F, ipr, road, box)
+    field = junctions(cs, F, ipr, ctx.get("carriageway", road), box)
     swf = sidewalks(ctx, lambda a, b: generated(cs, np.asarray(a, float), np.asarray(b, float), road, field), box)
     sr = surface_raster(ctx, cs, road, field, swf, box, F, ipr)
     on_road, on_walk = sr["road"], sr["street"] & ~sr["road"]
@@ -2253,7 +2317,7 @@ def build(ln, cell=300.0, jobs=None, root=ROOT):
                       "half a grid in), then the int16 heights of the road cells and the sidewalk cells in row order, "
                       "each as the difference to the one before (the first to 0), the square's scale m over its base"}
     meta["provenance"] = sources.stamp("street_profile.py", {
-        "road": sources.entry("streets", [n_road, 0, 0], "cells (0.5 m, the survey's road and tram areas)"),
+        "road": sources.entry("streets", [n_road, 0, 0], "cells (0.5 m, the survey's road, tram and parking areas)"),
         "sidewalk": sources.entry("streets", [n_walk, 0, 0], "cells (0.5 m, the survey's sidewalks)"),
         "heights": sources.entry("terrain", [n_road + n_walk, 0, 0], "cells (profiles fitted to IPR)")})
     meta["attribution"] = sources.attribution(meta["provenance"])
