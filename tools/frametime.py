@@ -2,6 +2,7 @@
 """The frame time and the draw calls with each tram model (tools/bench/frametime.js), in a headed Chromium.
 
 Usage: python -P -E tools/frametime.py [--line 17] [--models t3h,t3,t3simple] [--fov 62,22.75] [--frames 600] [--headless]
+                                        [--traffic 60] [--stop 3] [--params boxcars]
        python -P -E tools/frametime.py --models t3h,t3h:sample.t3h-blue   # a model wearing a livery (#529)
 
 Its own server on a free port; for each model a fresh page at 1280 x 720 loads the line, starts the first
@@ -10,7 +11,9 @@ interval is what a frame costs, not the display's 60 Hz); `--fov` measures each 
 (the cab's 62°, the zoom key's 22.75°: #382). Headed by default: headless Chromium draws in
 software, so its times say nothing about a GPU (#205); `--headless` only checks that the bench runs. Run it
 on a quiet machine, the window in front: it waits its turn among the heavy jobs (tools/baseline_store.py).
-Prints a table and writes reports/frametime.json.
+Prints a table and writes reports/frametime.json. `--traffic` steps the traffic that many seconds first (its cars in the
+streets, #250), `--stop` measures at that stop of the trip, `--params` adds to the page's address (`boxcars`: the box
+cars instead of the street vehicles' models, to measure the models against them).
 """
 import argparse
 import faulthandler
@@ -40,7 +43,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 OLD = {"detailed": "t3h", "classic": "t3", "simple": "t3simple"}  # (the models' names before #455)
 
 
-def measure(line, models, frames, headless, warm=120, fovs=(None,)):
+def measure(line, models, frames, headless, warm=120, fovs=(None,), traffic=0, stop=0, params=""):
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=ROOT))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_port}"
@@ -57,13 +60,15 @@ def measure(line, models, frames, headless, warm=120, fovs=(None,)):
                 page = browser.new_page(viewport={"width": 1280, "height": 720}, device_scale_factor=1)
                 errors = []
                 page.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
-                page.goto(f"{base}/?line={line}", timeout=300000)
+                page.goto(f"{base}/?line={line}" + "".join(f"&{q}" for q in params.split("&") if q), timeout=300000)
                 page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
                 r = page.evaluate("async (o) => { const { run } = await import('/tools/bench/frametime.js'); return await run(o); }",
-                                  {"model": model, "frames": frames, "warm": warm, "fov": fov, "livery": livery or None})
+                                  {"model": model, "frames": frames, "warm": warm, "fov": fov, "livery": livery or None, "traffic": traffic, "stop": stop})
                 r["errors"] = errors[:3]
                 if livery:
                     r["model"] = f"{model}:{livery}"
+                if params:
+                    r["model"] += f" ?{params}"
                 out.append(r)
                 page.close()
             browser.close()
@@ -73,12 +78,14 @@ def measure(line, models, frames, headless, warm=120, fovs=(None,)):
 
 
 def table(rows):
-    lines = ["| model | field (°) | frame median / p95 (ms) | fps | render CPU median / p95 (ms) | of it matrices (ms) | draw calls | triangles | nodes (scene / our set) | AI sets (m: level) |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| model | field (°) | frame median / p95 (ms) | fps | render CPU median / p95 (ms) | of it matrices (ms) | draw calls | triangles | nodes (scene / our set) | AI sets (m: level) | cars (drawn near / far) |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         sets = ", ".join(f"{s['far']}: {s['level']}" for s in r["sets"])
+        c = r.get("cars")
+        cars = f"{r.get('trafficCars')} ({c['near']} / {c['far']})" if c else f"{r.get('trafficCars')} (boxes)"
         lines.append(f"| {r['model']} ({r['kind']}) | {r.get('fov')} | {r['frameMedian']} / {r['frameP95']} | {r['fps']} | {r['renderMedian']} / {r['renderP95']} | "
-                     f"{r.get('matrixMedian')} | {r.get('calls')} | {r.get('triangles'):,} | {r.get('nodes'):,} / {r.get('tramNodes')} | {sets} |")
+                     f"{r.get('matrixMedian')} | {r.get('calls')} | {r.get('triangles'):,} | {r.get('nodes'):,} / {r.get('tramNodes')} | {sets} | {cars} |")
     return "\n".join(lines)
 
 
@@ -89,6 +96,9 @@ def main():
     ap.add_argument("--fov", default="", help="vertical fields to measure each model at, e.g. 62,22.75 (default: the camera's)")
     ap.add_argument("--frames", type=int, default=600)
     ap.add_argument("--headless", action="store_true", help="headless, on the GPU where there is one (else SwiftShader): checks the bench runs")
+    ap.add_argument("--traffic", type=float, default=0, help="seconds the traffic steps before the measurement (its cars in the streets)")
+    ap.add_argument("--stop", type=int, default=0, help="the stop of the trip to measure at (its index in the menu)")
+    ap.add_argument("--params", default="", help="added to the page's address, e.g. boxcars")
     args = ap.parse_args()
     if not os.path.exists(os.path.join(ROOT, "data", f"line{args.line}.json")):
         sys.exit(f"no data/line{args.line}.json: python -I tools/snapshot.py data-fetch")
@@ -97,7 +107,8 @@ def main():
     with HeavyJob("frametime"):  # (frame times need the machine to itself: it waits for the heavy jobs, #280)
         faulthandler.dump_traceback_later(1800, exit=True)  # page.evaluate has no time limit
         fovs = [float(f) for f in args.fov.split(",") if f] or [None]
-        rows = measure(args.line, [OLD.get(m, m) for m in args.models.split(",")], args.frames, args.headless, fovs=fovs)
+        rows = measure(args.line, [OLD.get(m, m) for m in args.models.split(",")], args.frames, args.headless, fovs=fovs,
+                       traffic=args.traffic, stop=args.stop, params=args.params)
         faulthandler.cancel_dump_traceback_later()
     os.makedirs(os.path.join(ROOT, "reports"), exist_ok=True)
     with open(os.path.join(ROOT, "reports", "frametime.json"), "w", encoding="utf-8", newline="") as f:

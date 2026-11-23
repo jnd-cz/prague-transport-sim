@@ -655,7 +655,7 @@ go into a "Findings" section of the PR.
 - A test that needs `data/` or `raw/` skips without them, saying what to fetch.
 
 **Dev switches:** `?line=N`, `?inspect`, `?review` (findings on the map), `?bot`, `?keepgeo`, `?notunnels`,
-`?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile
+`?boxpeople` (the box figures instead of the pedestrian models, #251), `?boxcars` (the box cars instead of the street vehicles' models, #250), `?profile=<name>` (a trial height profile
 from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N,
 replayed up to route s and handed over paused: a stuck scene as it was, #157).
 
