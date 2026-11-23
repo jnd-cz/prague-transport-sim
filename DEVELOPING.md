@@ -585,6 +585,11 @@ the pinned #291 and only proposes.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
   started with a clean environment: a job never waits for a process that started it (#585). A job that waits
   with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
+- A chain of heavy steps (a build per line, then the places) goes into the queue as one job, its steps in its
+  turn: `heavy.py --expect <their sum> "what" -- python -I chain.py`; or each step is queued at the start. A loop
+  that calls one heavy tool after another sends each step to the back of the queue, behind every job queued
+  while the last one ran (the user, 2026-11-23: "even if it's bunch of 5 minute jobs"; #800's last of five
+  5-min street builds still waited at 14:17, nearly 4 h after the first was done).
 - Each job prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
   (`tools/sysinfo.py`). `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
 - A job in its own turn watches itself (#815; on 2026-11-22 a trace expected to take 5 min ran 100 min and held
