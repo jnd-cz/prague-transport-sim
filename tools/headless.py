@@ -74,6 +74,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P lea
 from sysinfo import workers  # noqa: E402
 import gpu  # noqa: E402
 import baseline_store  # noqa: E402
+import snapshot  # noqa: E402
 from baseline_store import MEASURED, HeavyJob  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -862,6 +863,7 @@ def main():
     jobs = [(line.strip(), c, s) for line in a.lines.split(",") for c in checks
             for s in ([0] if c in SEEDLESS else seeds_of(a.seeds))]
     lines = sorted({j[0] for j in jobs})
+    snapshot.require_current_data()  # (#835: a merge of main moves the manifest, not the files)
     if a.baseline:
         # (measured on what is committed and published, or the baseline would name the wrong trees)
         dirty = baseline_store.dirty()
