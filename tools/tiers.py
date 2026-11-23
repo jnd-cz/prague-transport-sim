@@ -50,7 +50,7 @@ KINDS = [
                  "src/vehicles.js", "src/t3simple.js", "src/cabframe.js", "src/mirror.js", "src/weather.js",
                  "src/landmarks.js", "src/ledPanels.js", "src/indicators.js", "src/boxes.js", "src/nearbatch.js",
                  "src/catenary.js", "src/speedSigns.js", "src/packages.js", "src/packageRules.json", "src/audio.js",
-                 "src/perf.js", "src/groundFile.js", "src/groundWorker.js", "src/loading.js", "src/hud.js",
+                 "src/perf.js", "src/between.js", "src/groundFile.js", "src/groundWorker.js", "src/loading.js", "src/hud.js",
                  "src/panel.js", "src/panel.css", "src/help.js", "src/i18n.js", "src/touch.js", "src/gamepad.js",
                  "src/localFiles.js", "src/packagesMenu.js", "src/report.js", "src/debugOverlay.js", "src/inspect.js",
                  "src/provenance.js", "src/buildId.js", "src/main.js", "index.html", "app.webmanifest", "assets/*",
@@ -59,7 +59,7 @@ KINDS = [
      "with main's", "seeded checks"),
     ("simulation", ("src/traffic.js", "src/autopilot.js", "src/tram.js", "src/tr37.js", "src/electric.js",
                     "src/game.js", "src/people.js", "src/streetbot.js", "src/route.js", "src/speedRules.js",
-                    "src/consist.js", "src/articulated.js", "src/random.js", "src/geo.js", "src/main.js",
+                    "src/consist.js", "src/articulated.js", "src/random.js", "src/geo.js", "src/main.js", "src/run.js",
                     "tools/traffic_lint.js", "tools/autopilot.js", "tools/bench/*"),
      f"--checks {SEEDED} on every line, seeds 1-5, --compare; the tram or the autopilot: also test_traction, "
      "test_electric, test_drives", "the geometry checks"),
