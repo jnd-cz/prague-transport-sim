@@ -14,6 +14,9 @@ import { aiLineCurrent } from './electric.js';
 const OTHER_LINES = ['9', '15', '23', '2', '18', '13', '7', '4'];
 const MAX_CARS = 30, MAX_WALKERS = 90, FADE = 1.2;
 const TRACK_CLEAR = 2.8; // pedestrians and cars keep this far from a track centre line
+// a walker that turns back twice within TURN_ROOM m of walking, or keeps within STILL_R m of a place for STILL_T s
+// while not waiting at a kerb, has nowhere to go and leaves (_turnBack, _leave; #366, #269, #393)
+const TURN_ROOM = 3, STILL_R = 2, STILL_T = 10;
 
 // A polyline with arc length lookups (for roads and footways).
 class Path {
@@ -202,6 +205,7 @@ export class Traffic {
     this.cars = [];
     this.walkers = [];
     this.walkLoops = new Map(); // place "x,y" -> times a walker turned back there rather than round a loop (#496)
+    this.walkLeaves = new Map(); // "why x,y" -> times a walker with nowhere to go left there (_leave, #366)
     this.crowd = makeCrowd(MAX_WALKERS);
     this.group.add(this.crowd);
 
@@ -383,12 +387,23 @@ export class Traffic {
 
   dispose() { this.scene.remove(this.group); disposeModel(this.group); }
 
+  // The point the traffic lives round (#722): our tram's front, whatever the camera shows. Cars and walkers appear in a
+  // ring round it and go to sleep by their distance from it. Before, the camera's place: the cab and the chase view, or
+  // a free camera, gave different runs of one seed, and the benches put the camera at the cab to get this point.
+  focus() {
+    const p = this.route.at(this.game.tram.s);
+    return [p.x, p.y];
+  }
+
   // draw: false for a step whose result is not shown (inspect mode runs several steps per frame):
-  // cars and walkers move but are not posed (their height and matrices wait for the drawn step)
-  update(dt, camera, draw = true) {
+  // cars and walkers move but are not posed (their height and matrices wait for the drawn step). `view`: the camera,
+  // for what only the drawing reads (an AI tram's detailed model near it); nothing the run does depends on it.
+  // `focus`: the focus where the step began, taken before the game's step (the page and the benches do: they set the
+  // camera at the cab before it, and a focus after it, 0.3 m on at 10 m/s, gave another run of the seed).
+  update(dt, view, draw = true, focus = this.focus()) {
     const tram = this.game.tram;
-    const cx = camera.position.x, cy = -camera.position.z;
-    this.cam = [cx, cy];
+    const [cx, cy] = focus;
+    this.cam = view ? [view.position.x, -view.position.z] : [cx, cy];
     this._carsOnTracks();
     this._updateRoadCars(dt, cx, cy, draw);
     this._updateWalkers(dt, cx, cy, draw);
@@ -396,6 +411,17 @@ export class Traffic {
     this._updateOncoming(dt, tram);
     this._wireLoads(dt);
     this._clearAiTramCycles(dt);
+  }
+
+  // what the steps move, for the page to draw between the last two (src/between.js): the cars in sight (posed on a
+  // drawn step: update's draw) and the other trams' cars (placed every step). The walkers (1.1-1.6 m/s, 5 cm a step)
+  // stay where the step left them.
+  movers() {
+    const out = [];
+    for (const c of this.cars) if (c.alpha > 0) out.push(c.mesh);
+    for (const t of this.ahead) out.push(...t.mesh.userData.cars);
+    for (const t of this.oncoming) out.push(...t.mesh.userData.cars);
+    return out;
   }
 
   _carSlot() {
@@ -455,9 +481,8 @@ export class Traffic {
           // light at its start; a car spawned 16 m before such a red line at 11.2 m/s, line 9 s 15074, seed 3)
           const redAt = (l, d) => l.light && this.lightAspect(l.light) !== 'green' && d + l.path.length - l.light.back < 50;
           const redNear = redAt(lane, -s) || this.nextLanes(lane).some((b) => redAt(b, lane.path.length - s + (this.connector(lane, b)?.path.length || 0)));
-          // (and at least 50 m from the camera itself: the ring's point picks an index cell, and a cell
-          // can reach the camera; a car came in at 8 m/s 6 m before the track with the tram 4 m off,
-          // line 17 s 19919)
+          // (and at least 50 m from the focus itself, the tram's front: the ring's point picks an index cell, and a
+          // cell can reach it; a car came in at 8 m/s 6 m before the track with the tram 4 m off, line 17 s 19919)
           const sp = lane.path.at(s), close = Math.hypot(sp.x - cx, sp.y - cy) < 50;
           const c = redNear || close || cars.some((o) => o.active && o.path === lane.path && Math.abs(o.s - s) < 12) ? null : this._carSlot();
           if (c) Object.assign(c, { id: undefined, active: true, kind: 'road', lane, road: r, dir: lane.dir, conn: null, next: undefined, next2: undefined, next2From: null, lightGo: null, lightHold: null, lead: null, path: lane.path, s, v: 7 + this.rand() * 6, vNow: null, coast: null, hitTram: false, cycleT: 0, z: undefined, seen: null, why: null });
@@ -1062,7 +1087,8 @@ export class Traffic {
   // (it hides them until they are out) and, after a walk of 80-480 m on the footway network, go into
   // one they pass; the rest appear on a footway far enough away to fade in unseen (parks, squares).
   // At the end of a walk they go on along one of its links (not straight back where they came from if
-  // there is another way), turning back only at a dead end; they turn back before the tracks.
+  // there is another way), turning back only at a dead end; they turn back before the tracks. One with nowhere to go
+  // (turned back twice within a few metres, or held in one place) leaves, fading where it stands.
   _updateWalkers(dt, cx, cy, draw = true) {
     if (!this.slots) this.slots = new Array(MAX_WALKERS).fill(null);
     const free = this.slots.indexOf(null);
@@ -1073,8 +1099,10 @@ export class Traffic {
       else {
         const near = this._ringIndex(cx, cy, 'w', 30, 220);
         if (near) {
-          const [, k, s0] = near;
-          this.slots[free] = { walk: this.walks[k], s: s0 + this.rand() * 20, dir: this.rand() < 0.5 ? 1 : -1, v, side, alpha: 0, goal, walked: 0 };
+          const [, k, s0] = near, s = s0 + this.rand() * 20, dir = this.rand() < 0.5 ? 1 : -1, q = this.walks[k].path.at(s);
+          // (not by the tracks, where it would only turn back: three appeared on a crossing between the two tracks
+          // and stood there turning, line 17 s 2918, #366)
+          if (this.trackDist(q.x, q.y) >= TRACK_CLEAR || this.inLane(q.x, q.y)) this.slots[free] = { walk: this.walks[k], s, dir, v, side, alpha: 0, goal, walked: 0 };
         }
       }
     }
@@ -1103,12 +1131,13 @@ export class Traffic {
         // (it may have spawned past the end)
         if (w.s > w.walk.path.length) { w.s = w.walk.path.length; w.dir = -1; }
         if (w.s < 0) { w.s = 0; w.dir = 1; }
-        // turn back before the tracks, but never while standing in a car lane (finish crossing first: a
-        // walker turning back and forth there blocked the cars); after turning it commits to its way for
-        // a few seconds (a path ending by the tracks had it flip every frame, line 17 s 13756)
+        // turn back before the tracks: where its step ahead comes within TRACK_CLEAR of a track and nearer to it than
+        // where it stands (one walking along a track keeps on: turning back there flipped it every frame and it stood
+        // in a car's way for good, line 23 s 662, #366), but never while standing in a car lane (finish crossing first:
+        // a walker turning back and forth there blocked the cars). One with nowhere to go leaves (_turnBack, below).
         const here = pos(w.s), end = w.s + w.dir < 0 || w.s + w.dir > w.walk.path.length;
-        w.commit = Math.max(0, (w.commit || 0) - dt);
-        if (end) {
+        let dA;
+        if (w.leave) { /* it stands while it fades */ } else if (end) {
           // the way it is going (kept across link walks: a link's own direction is sideways)
           const H = w.walk.link && w.travel ? w.travel : { x: here.p.hx * w.dir, y: here.p.hy * w.dir };
           // how well each way on continues it: a link walk by its direction, a walk by its tangent there
@@ -1138,15 +1167,15 @@ export class Traffic {
             const nq = pick.walk.path.at(pick.s), len = pick.walk.path.length;
             w.prev = w.walk; w.walk = pick.walk; w.s = pick.s; w.travel = H;
             w.dir = pick.s < 0.5 ? 1 : pick.s > len - 0.5 ? -1 : nq.hx * H.x + nq.hy * H.y >= 0 ? 1 : -1;
-            w.commit = 2;
             // (its sideways offset is along the way's drawing direction: onto a way drawn the other way it
             // flipped sides, a 1.2 m hop at the join; keep the side nearer to where it stands)
             const pa = pos(w.s);
             w.side = -w.side;
             const pb = pos(w.s);
             if (Math.hypot(pa.x - here.x, pa.y - here.y) < Math.hypot(pb.x - here.x, pb.y - here.y)) w.side = -w.side;
-          } else { w.dir = -w.dir; w.commit = 4; w.travel = null; w.prev = null; w.trail = null; } // a dead end: back
-        } else if (!w.commit && this.trackDist(ahead.x, ahead.y) < TRACK_CLEAR && !this.inLane(here.x, here.y)) w.dir = -w.dir;
+          } else this._turnBack(w, here); // a dead end: back
+        } else if ((dA = this.trackDist(ahead.x, ahead.y)) < TRACK_CLEAR && dA < this.trackDist(here.x, here.y) - 0.05
+          && !this.inLane(here.x, here.y)) this._turnBack(w, here);
         // (B9) at the kerb, about to step into a car lane: wait while a car is coming (it would reach the
         // spot within 4 s); once in the lane, go on (cars stop for walkers on their path)
         else if (!this.inLane(here.x, here.y) && this.inLane(ahead.x, ahead.y)
@@ -1162,13 +1191,21 @@ export class Traffic {
             if (d) { w.s = d.s; w.door = { x: d.ix, y: d.iy, t: 0, out: false }; }
           }
         }
+        // the backstop: one that keeps within STILL_R of a place for STILL_T while not waiting at a kerb is held by
+        // something (a loop of walks, a turn) and leaves: a car on its way would wait for it for good, and the car's
+        // queue on our track held the tram (line 22 s 7656, #393; line 23 s 5059, #269)
+        if (!w.leave && !w.door) {
+          const a = w.still;
+          if (!a || w.waitKerb || Math.hypot(here.x - a.x, here.y - a.y) > STILL_R) w.still = { x: here.x, y: here.y, t: 0 };
+          else if ((a.t += dt) > STILL_T) this._leave(w, here, 'stuck');
+        }
         const pp = pos(w.s);
         x = pp.x; y = pp.y; hx = pp.p.hx * w.dir; hy = pp.p.hy * w.dir;
       }
       w.x = x; w.y = y;
-      const far = Math.hypot(x - cx, y - cy) > 260;
-      w.alpha = Math.max(0, Math.min(1, w.alpha + (far ? -dt : dt) / FADE));
-      if (far && w.alpha <= 0) { this.slots[i] = null; m.makeScale(0, 0, 0); this.crowd.setMatrixAt(i, m); continue; }
+      const going = w.leave || Math.hypot(x - cx, y - cy) > 260; // (far off, or leaving)
+      w.alpha = Math.max(0, Math.min(1, w.alpha + (going ? -dt : dt) / FADE));
+      if (going && w.alpha <= 0) { this.slots[i] = null; m.makeScale(0, 0, 0); this.crowd.setMatrixAt(i, m); continue; }
       if (!draw) continue;
       // fade by growing out of / sinking into the ground (instances share one material)
       const k = w.alpha;
@@ -1188,6 +1225,25 @@ export class Traffic {
     if (!draw) return;
     this.crowd.count = MAX_WALKERS;
     this.crowd.instanceMatrix.needsUpdate = true;
+  }
+
+  // A walker turns back (a dead end, a loop, the tracks ahead). One that turned back less than TURN_ROOM of walking ago
+  // has nowhere to go (the tracks or a dead end both ways: between the two tracks of a crossing, a short piece by a
+  // track; turning there flipped it every frame, line 17 s 2918, #366) and leaves.
+  // A turn frees the way back it came (the walk it left, its trail): on a link onto a crossing over a reserved track, the
+  // track ahead turned it back to the link's start, where only the walk it came from led on.
+  _turnBack(w, here) {
+    if (w.turnedAt !== undefined && w.walked - w.turnedAt < TURN_ROOM) { this._leave(w, here, 'turns'); return; }
+    w.turnedAt = w.walked; w.dir = -w.dir; w.waitKerb = false;
+    w.travel = null; w.prev = null; w.trail = null;
+  }
+
+  // a walker that leaves stands and sinks into the ground where it is, as one far off fades (cars see it until it is
+  // half gone); counted per place and why in walkLeaves (window.traffic): 'turns' (_turnBack), 'stuck' (STILL_T)
+  _leave(w, here, why) {
+    w.leave = true; w.waitKerb = false;
+    const k = `${why} ${Math.round(here.x)},${Math.round(here.y)}`;
+    this.walkLeaves.set(k, (this.walkLeaves.get(k) || 0) + 1);
   }
 
   // --------------------------------------------------------------------- other trams

@@ -322,8 +322,8 @@ python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic
     run then takes the latest checkpoint's.
 - **A seeded compare against a checkpoint is not a compare with main** (the note says "not with main"): read no
   move from it. #582's stops moved by up to 50 late seconds against W2 and were identical to main's.
-- **One drive a seed:** `u3`, `redruns` and `stops` asked together come from one drive of each line and seed, its
-  watchers reporting each (#205, #708; `--separate`: a drive each).
+- **One drive a seed:** `u3`, `redruns`, `stops` and `traffic` asked together come from one drive of each line and
+  seed, its watchers reporting each (#205, #708, #722; `--separate`: a drive each).
 
 For a combined GTFS run, independently check every logged pair and the built timetable against the
 pinned GTFS, including eligible pairs omitted from both the log and timetable:
@@ -353,12 +353,16 @@ await lint({ bot: true });  // + the street bot where DTM streets exist (about a
 await lint({ traffic: true }); // + the whole line driven headless with the real traffic (1–2 minutes)
 ```
 
-The traffic run (`tools/traffic_lint.js`) starts a shift at the first stop and lets the autopilot drive
-to the end with a fixed time step; the page's frame loop only draws meanwhile (`window.headless`).
-Every 0.2 s it records every visible car, walker and tram and counts: cars or walkers moving sideways
-(`slide`), teleporting (`jump`), vehicles intersecting (`overlap`, once per episode) and walkers inside
-a vehicle (`walkerHit`), each with its cause where known (next road, lane beside the tram, …). It is
-seeded and uses the first trip, autumn and dry weather, so a run on a **freshly loaded page** gives
+The traffic run (`tools/traffic_lint.js`) is a watcher on the `u3` drive (`tools/bench/u3.js`): the autopilot
+drives the whole line from the first stop with a fixed time step, trip 40, obstacles normal; the page's frame loop
+only draws meanwhile (`window.headless`). Before #722 it drove its own run (trip 0, no obstacles), so no traffic
+count is read across that change. Every 0.2 s it records every visible car, walker and tram and counts: cars or
+walkers moving sideways
+(`slide`), teleporting (`jump`), vehicles intersecting (`overlap`, once per episode), walkers inside
+a vehicle (`walkerHit`), each with its cause where known (next road, lane beside the tram, …), and
+walkers that keep within 2 m of one place for 30 s while not waiting at a kerb or in a door
+(`walkerStuck`: turning, round a loop of walks, or still; #366). It is
+seeded and uses autumn and dry weather, so a run on a **freshly loaded page** gives
 the same counts every time (a second run in the same page differs slightly).
 
 Reports go to `reports/lineN.json` (not in git). Regression checks use `tools/headless.py --compare`
