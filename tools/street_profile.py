@@ -1274,10 +1274,40 @@ def pilot_report(at, radius, ln, out_dir):
     return rep
 
 
+KERB_RUN_MIN = 0.5  # m: a run of kerb edges shorter than this is a jog where two outlines meet, not a kerb
+KERB_TURN = 0.5     # m either side of a point along a run over which its direction (and so its normal) is read
+
+
+def kerb_runs(ks):
+    """The runs of consecutive kerb edges round a ring (ks: per edge, whether a kerb): lists of edge indices in order,
+    a run through the ring's first vertex joined; all of them one run when every edge is a kerb."""
+    m = len(ks)
+    if not any(ks):
+        return []
+    if all(ks):
+        return [list(range(m))]
+    start = next(i for i in range(m) if not ks[i])  # (begin after an edge that is none: no run is cut in two)
+    runs, cur = [], []
+    for j in range(1, m + 1):
+        i = (start + j) % m
+        if ks[i]:
+            cur.append(i)
+        elif cur:
+            runs.append(cur)
+            cur = []
+    if cur:
+        runs.append(cur)
+    return runs
+
+
 def kerb_edges(dtm):
-    """The survey's level-0 sidewalks' kerb edges (`k`, shared with a carriageway) 3 m or longer, as (points every
-    0.25 m, unit normals into the sidewalk, the sidewalk's own surveyed height at each point, NaN where an end has
-    none), and the sidewalks as one geometry."""
+    """The survey's level-0 sidewalks' kerbs: each run of consecutive outline edges flagged `k` (shared with a
+    carriageway), KERB_RUN_MIN or longer, as (points every 0.25 m along it, unit normals into the sidewalk read over
+    ±KERB_TURN m along the run, the sidewalk's own surveyed height at each point, NaN along an edge an end of which
+    has none), and the sidewalks as one geometry. (Until #800 each edge 3 m or longer was a kerb of its own and a
+    shorter one none: a kerb round a corner or along a bend is drawn in edges of 0.2-1.5 m, and its walkway had no
+    plane, the fill following IPR's raster, which rounds the kerb away: 182 of the 202 sidewalk|road samples whose
+    street surface had a flat kerb on ground batch D lay on such an edge.)"""
     import shapely
     from shapely.geometry import Polygon
     out, polys = [], []
@@ -1288,22 +1318,33 @@ def kerb_edges(dtm):
         if not g.is_valid:
             g = g.buffer(0)
         polys.append(g)
+        shapely.prepare(g)
         for ring, ks in zip([a["r"]] + a.get("h", []), a.get("k", [])):
+            m = len(ring)
             xy = np.asarray([q[:2] for q in ring], float)
-            for i, k in enumerate(ks):
-                p0, p1 = xy[i], xy[(i + 1) % len(xy)]
-                L = float(np.hypot(*(p1 - p0)))
-                if not k or L < 3.0:
+            zv = np.asarray([np.nan if q[2] is None else q[2] for q in ring], float)
+            for run in kerb_runs(list(ks)[:m]):
+                vs = run + [(run[-1] + 1) % m]
+                P = xy[vs]
+                cum = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(P, axis=0).T))])
+                if cum[-1] < KERB_RUN_MIN:
                     continue
-                t = (p1 - p0) / L
-                n = np.array([-t[1], t[0]])
-                mid = (p0 + p1) / 2
-                if not g.contains(shapely.Point(*(mid + n * 0.5))):
+                line = shapely.LineString(P)
+                u = np.arange(0.125, cum[-1], 0.25)
+                q = shapely.get_coordinates(shapely.line_interpolate_point(line, u))
+                ta = shapely.get_coordinates(shapely.line_interpolate_point(line, np.maximum(u - KERB_TURN, 0.0)))
+                tb = shapely.get_coordinates(shapely.line_interpolate_point(line, np.minimum(u + KERB_TURN, cum[-1])))
+                t = tb - ta
+                ln_ = np.hypot(t[:, 0], t[:, 1])
+                ok = ln_ > 1e-6
+                if not ok.any():
+                    continue
+                q, u, t = q[ok], u[ok], t[ok] / ln_[ok, None]
+                n = np.column_stack([-t[:, 1], t[:, 0]])
+                # (the sidewalk lies on one side of a run: the side most of its points find it on)
+                if shapely.contains_xy(g, *(q + n * 0.25).T).sum() < shapely.contains_xy(g, *(q - n * 0.25).T).sum():
                     n = -n
-                u = np.arange(0.125, L, 0.25)
-                z0, z1 = ring[i][2], ring[(i + 1) % len(ring)][2]
-                own = z0 + (z1 - z0) * u / L if z0 is not None and z1 is not None else np.full(len(u), np.nan)
-                out.append((p0[None] + t[None] * u[:, None], np.tile(n, (len(u), 1)), own))
+                out.append((q, n, np.interp(u, cum, zv[vs])))
     walk = shapely.union_all(polys) if polys else None
     if walk is not None:
         shapely.prepare(walk)

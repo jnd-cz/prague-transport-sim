@@ -165,6 +165,28 @@ class CrownReach(unittest.TestCase):
 
 
 class Sidewalks(unittest.TestCase):
+    def test_a_kerb_round_a_corner_in_short_edges_is_a_kerb(self):
+        # a sidewalk whose kerb turns a corner in edges of 0.77 m (a quarter circle of radius 4 m round (4, 4)), then
+        # runs 10 m straight and 0.3 m on: one kerb, its normals turning with it into the sidewalk; a lone 0.3 m kerb
+        # edge is a jog, none (#800: such edges were none under 3 m each, and the walkway had no plane there)
+        import shapely
+        ang = np.linspace(math.pi, 1.5 * math.pi, 7)
+        arc = [(4 + 4 * math.cos(a), 4 + 4 * math.sin(a), 200.1) for a in ang]   # (0, 4) round to (4, 0)
+        ring = arc + [(14.0, 0.0, 200.1), (14.3, 0.0, None), (14.3, 8.0, 200.2), (0.0, 8.0, 200.2)]
+        k = [True] * 6 + [True, True, False, False, False]   # (the arc's six edges, the 10 m kerb, the 0.3 m edge)
+        jog = [[20, 0, 200.1], [20.3, 0, 200.1], [20.3, 5, 200.1], [20, 5, 200.1]]
+        dtm = {"areas": [{"c": "sidewalk", "l": 0, "r": [list(p) for p in ring], "k": [k]},
+                         {"c": "sidewalk", "l": 0, "r": jog, "k": [[True, False, False, False]]}]}
+        edges, walk = sp.kerb_edges(dtm)
+        self.assertEqual(len(edges), 1)
+        q, n, own = edges[0]
+        self.assertAlmostEqual(len(q) * 0.25, 2 * math.pi + 10.3, delta=0.3)  # (the arc 2 pi m, then 10.3 m)
+        self.assertTrue(shapely.contains_xy(walk, *(q + n * 0.2).T).all())   # (every normal into the sidewalk)
+        mid = np.argmin(np.hypot(*(q - (4 - 4 * math.sqrt(0.5), 4 - 4 * math.sqrt(0.5))).T))
+        self.assertAlmostEqual(float(n[mid] @ np.array([math.sqrt(0.5), math.sqrt(0.5)])), 1.0, delta=0.01)
+        self.assertAlmostEqual(float(own[mid]), 200.1)
+        self.assertTrue(np.isnan(own[-1]))   # (the 0.3 m edge's far end has no height)
+
     def test_held_at_the_kerb_and_rising_with_the_ground(self):
         # a 20 m by 4 m sidewalk beside a flat road at 200 m, the ground rising 2 % away from the kerb: within the
         # sidewalks' range, the walkway takes it
