@@ -49,8 +49,8 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 
 | key | what it does |
 |---|---|
-| `W` / `↑` | towards drive (steps J1–J5; advanced: a tap to the next step, held on) |
-| `S` / `↓` | towards brake (B1–B5) |
+| `W` / `↑` | towards drive (steps J1–J5; simple: a step at once, held two more a second, let go the lever comes back to 0 as fast; advanced: a tap to the next step, held on) |
+| `S` / `↓` | towards brake (B1–B5, the same) |
 | `Space` | emergency and track brakes (held) |
 | `N` or `0` | both pedals released (coast) |
 | `1`–`5` | a drive step; with `Shift` a brake step |
@@ -100,8 +100,10 @@ The dead-man pedal, when it is on in the menu, is `Shift` held.
   series motor runs with the voltage: so the tone falls as you pull away, and falls too when the shoes' release
   magnets load the dynamo; the regulator holds the on-board 26 V. The info panel shows the voltage, the
   substation, the on-board voltage and the rpm.
-- **Controls** (menu): *Simple* moves a lever by steps (W/S, 1–5, Shift+1–5) and works the pedals as a
-  driver would, parking whenever the car stands; *Advanced* moves the pedals themselves (a tap to the next
+- **Controls** (menu): *Simple* moves a lever by steps and works the pedals as a driver would, parking
+  whenever the car stands. The lever is sprung: W/S moves it a step at once and held two more a second (on
+  step 5 after 2 s), let go it comes back to 0 as fast, so a tap gives a step for half a second; 1–5 and
+  Shift+1–5 set a step that stays; *Advanced* moves the pedals themselves (a tap to the next
   step, held on at 20°/s; held keys stop at brake step 5) and R parks and unparks the brake pedal; after
   parking the shoes release fully only with the drive pedal. Space is the emergency stop in both.
 - An empty car accelerates at 0.6–1.8 m/s² by step, a full car more slowly; gravity on gradients (Chotkova
@@ -254,7 +256,7 @@ tram, dark glass is the game.
 On-screen buttons, shown on a touch screen by default and switched by 🎮 in the menu (remembered per
 device; switched off, 🎮 brings them back during a shift too). They send the keyboard's keys:
 
-- the row above the dashboard (sideways, a column at the right): ▼ brake, 0 neutral, ▲ drive (a step each), STOP (the emergency brake, held),
+- the row above the dashboard (sideways, a column at the right): ▼ brake, 0 neutral, ▲ drive (held, as `S` / `W`), STOP (the emergency brake, held),
   and the dead-man button when that option is on;
 - the left column: doors, bell, sand (held), look left / right (held), 🔍 zoom (held), view, mirror, pause;
 - Panel (where ⋯ was) opens the panel in tabs: side wall, panel, switches, wing and game. The controls are where
@@ -283,7 +285,7 @@ your finger. The tram starts with the parking brake on: Y releases it before the
 |---|---|
 | right trigger | drive step 1–5, by how far it is pressed |
 | left trigger | brake step 1–5, by how far it is pressed (over the right one); both released: both pedals free |
-| D-pad ↑ / ↓ | a step towards drive / brake (as `W` / `S`) |
+| D-pad ↑ / ↓ | towards drive / brake, held (as `W` / `S`) |
 | D-pad ← / → | indicators left / right |
 | A / ✕ | doors |
 | B / ○ | bell |

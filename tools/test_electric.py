@@ -168,6 +168,22 @@ RUN = """async () => {
     e.lever = -6; run(t, 0.1); seen.emergency = { notch: t.notch, track: e.brakeAngle };
     out.lever = seen;
   }
+  // the lever sprung (#837): held, a step at once and one each 0.5 s to step 5; let go, back to 0 at the same rate; a tap,
+  // one step for 0.5 s; through 0 from the other side; a number key's step stays; doors open, no step into drive
+  {
+    const t = new Tram(1), e = t.eq, sp = {};
+    run(t, 1);
+    e.press(1); sp.tap = [e.lever]; e.press(0); run(t, 0.4); sp.tap.push(e.lever); run(t, 0.2); sp.tap.push(e.lever);
+    e.press(1); run(t, 1.9); sp.held = [e.lever]; run(t, 0.2); sp.held.push(e.lever); run(t, 2); sp.held.push(e.lever);
+    e.press(0); run(t, 0.4); sp.letGo = [e.lever]; run(t, 2.2); sp.letGo.push(e.lever); sp.kmh = +t.kmh.toFixed(1);
+    e.press(-1); run(t, 2.1); sp.brake = [e.lever]; e.press(0); run(t, 2.6); sp.brake.push(e.lever);
+    e.setLever(2); run(t, 3); sp.set = e.lever;
+    e.press(-1); sp.through = [e.lever]; run(t, 0.6); sp.through.push(e.lever); run(t, 0.5); sp.through.push(e.lever);
+    e.setLever(0); e.press(1); e.lever = 0; run(t, 1.5, { doorsOpen: true }); sp.doors = [e.lever]; run(t, 0.6); sp.doors.push(e.lever);
+    e.setLever(-6); run(t, 1); sp.emergency = [e.lever]; e.setLever(-5); e.press(0); run(t, 0.4); sp.emergency.push(e.lever);
+    run(t, 2.2); sp.emergency.push(e.lever);
+    out.sprung = sp;
+  }
   // the wire, on a made-up straight line: substations at km 1 and km 5
   {
     const route = { samples: Array.from({ length: 800 }, (_, i) => [i * 10, 0, i * 10, i]) };
@@ -242,6 +258,13 @@ def checks(o):
     want(v["stand"]["parked"] and v["drive"]["notch"] == 2 and v["drive"]["kmh"] > 5 and not v["drive"]["parked"], f"the lever, away: {v}")
     want(v["coast"]["notch"] == 0 and v["brake"]["notch"] == -3 and v["brake"]["decel"] > 0.4, f"the lever, coasting and braking: {v}")
     want(v["stopped"]["parked"] and v["doors"]["kmh"] == 0 and v["after"]["notch"] == 3 and v["after"]["kmh"] > 2 and v["emergency"]["notch"] == -6, f"the lever, parked, doors, on, emergency: {v}")
+    sp = o["sprung"]
+    want(sp["tap"] == [1, 1, 0], f"the sprung lever tapped: {sp['tap']}, want a step for 0.5 s ([1, 1, 0])")
+    want(sp["held"] == [4, 5, 5] and sp["letGo"] == [5, 0] and sp["kmh"] > 3, f"the sprung lever held 1.9, 2.1, 4.1 s, then let go: {sp}")
+    want(sp["brake"] == [-5, 0], f"the sprung lever held towards brake 2.1 s, then let go 2.6 s: {sp['brake']}")
+    want(sp["set"] == 2 and sp["through"] == [1, 0, -1], f"a number key's step stays, brake held steps through 0: {sp}")
+    want(sp["doors"] == [0, 1], f"drive held with the doors open stays at 0, then steps on: {sp['doors']}")
+    want(sp["emergency"] == [-6, -5, 0], f"the emergency stop held, then let go: {sp['emergency']}")
     f = o["feed"]
     want(f["n"] == 2, f"the far substation should not feed this line: {f['n']} feeds")
     want(f["at1000"]["ref"] == "a" and f["at4800"]["ref"] == "b" and f["at1000"]["r"] < f["at1500"]["r"] < f["at2500"]["r"], f"the feeds and their resistance: {f}")

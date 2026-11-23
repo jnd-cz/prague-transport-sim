@@ -37,6 +37,8 @@ export const TR37_SPEC = {
   br1Angle: 9.5,             // BK9 opens between brake steps 2 and 3
   pedalRate: 20,             // °/s a held key moves a pedal (0 to the stop in 2 s)
   footRate: 45,              // °/s a pedal goes to the step asked for: a firm press, ≈0.5 s to brake step 5 [assumed]
+  leverRate: 2,              // steps/s the Simple controls' lever moves held, and back to 0 let go (the user, 2026-11-23:
+                             // "Let's try 2 notches per second", #837)
   // currents (A, car)
   driveCurrent: [220, 290, 360, 420, 480],   // [ckd03] p. 4
   brakeCurrent: [160, 211, 262, 306, 350],   // step 5 [ckd26] p. 4; steps 1–4 from the wiring diagram (§ 8.2)
@@ -183,7 +185,10 @@ export class TR37 {
     this.kind = 'pedals';  // which controls and HUD (src/hud.js pedal bar)
     this.mode = 'arcade';  // 'arcade': the lever and the helper; 'advanced': the pedals as they are
     this.lever = 0;        // arcade: −5…+5 steps, −6 the emergency stop
-    this.pedal = { drive: 0, brake: 0 }; // degrees
+    this.held = 0;         // arcade: +1 drive or −1 brake held (press), 0 neither
+    this.sprung = false;   // arcade: let go, the lever steps back to 0 (not after a number key or a trigger)
+    this.leverT = 0;       // s towards the lever's next step
+    this.pedal ={ drive: 0, brake: 0 }; // degrees
     this.goal = null;      // { drive, brake }: where setStep sends the pedals, reached at footRate
     this.parked = true;    // the brake pedal in its ratchet (the car starts at a stop)
     this.p = C.pMin;       // accelerator position 1…99
@@ -311,6 +316,34 @@ export class TR37 {
     this.goal = null;
     if (on) this.pedal.drive = 0;
     else this.pedal.brake = 0;
+  }
+
+  // arcade: the lever is sprung (#837). Drive or brake held (dir +1 / −1) moves it a step at once and on at leverRate, through
+  // 0 from the other side; let go (dir 0), it steps back to 0 at the same rate. A tap is one step for 1 / leverRate s, held
+  // 2 s it is on step 5. (The emergency stop, −6, is a step 5 under it.)
+  press(dir) {
+    this.leverT = 0;
+    if (!dir) { this.held = 0; this.sprung = true; return; }
+    this.held = dir;
+    this.sprung = false;
+    this.lever = this.lever <= -6 ? -5 : Math.max(-5, Math.min(5, this.lever + dir));
+  }
+  // a number key or a trigger: the lever on step n, where it stays
+  setLever(n) {
+    this.lever = n;
+    this.held = 0;
+    this.sprung = false;
+    this.leverT = 0;
+  }
+  // (with the doors open it doesn't step into drive: the helper wouldn't drive, and the step would come as they close)
+  _lever(dt, doorsOpen) {
+    const L = this.lever, dir = this.held || (this.sprung ? -Math.sign(L) : 0);
+    const to = Math.max(-5, Math.min(doorsOpen ? Math.max(0, Math.min(5, L)) : 5, L + dir));
+    if (L <= -6 || to === L) { this.leverT = 0; if (!L) this.sprung = false; return; }
+    this.leverT += dt;
+    if (this.leverT < 1 / C.leverRate) return;
+    this.leverT -= 1 / C.leverRate;
+    this.lever = to;
   }
 
   // arcade: the lever's step on the pedals, with what a driver does without thinking: off one pedal before
@@ -513,7 +546,7 @@ export class TR37 {
   // (magnet pairs), current (A, the ammeter, negative braking), line (A drawn from the line, all cars),
   // dissipated (W in the resistors) }
   update(dt, { v = 0, voltage = C.lineVoltage, doorsOpen = false, rescue = false, forcedStop = false } = {}) {
-    if (this.mode === 'arcade') this._arcade(doorsOpen, v);
+    if (this.mode === 'arcade') { this._lever(dt, doorsOpen); this._arcade(doorsOpen, v); }
     this._foot(dt);
     const k = this.cars, speed = Math.abs(v);
     const b = this.brakeAngle, d = this.pedal.drive;

@@ -22,8 +22,9 @@ const fsAble = () => !!(document.fullscreenEnabled || document.webkitFullscreenE
 const touchDevice = () => navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches;
 // (started from the home screen: full screen already, the browser's bars gone)
 const standalone = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
-// [key, label, hold] — a held button sends keyup on release (sand, look, zoom, the emergency brake)
-const MAIN = [['Shift', 'tb.deadman', true, 'dm'], ['s', '▼', false, 'brake'], ['n', '0', false, 'neutral'], ['w', '▲', false, 'drive'], [' ', 'tb.stop', true, 'emerg']];
+// [key, label, hold] — a held button sends keyup on release (▼ ▲: the Simple controls' lever steps on while held and comes
+// back to 0 let go, #837; sand, look, zoom, the emergency brake)
+const MAIN = [['Shift', 'tb.deadman', true, 'dm'], ['s', '▼', true, 'brake'], ['n', '0', false, 'neutral'], ['w', '▲', true, 'drive'], [' ', 'tb.stop', true, 'emerg']];
 const SIDE = [['d', 'tb.doors'], ['b', 'tb.bell'], ['a', 'tb.sand', true], ['q', '◀', true], ['e', '▶', true], ['g', '🔍', true], ['v', 'tb.view'], ['z', 'tb.mirror'], ['p', 'II']];
 
 export class TouchControls {
