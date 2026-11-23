@@ -43,7 +43,7 @@ CHECK = """async () => {
   checks.twelveDoorLeaves = r.doors.flatMap(d => d.pairs.flatMap(p => [p.outer, p.inner])).length === 12;
   checks.doorBottomAtFirstStep = r.doors.every(d => {
     const b = new THREE.Box3().setFromObject(d.node);
-    return b.min.y >= T3_PHOTO.entryFloor && b.min.y < T3_PHOTO.entryFloor + .025 && near(b.max.y, 2.65);
+    return b.min.y >= T3_PHOTO.entryFloor && b.min.y < T3_PHOTO.entryFloor + .025 && near(b.max.y, 2.63);
   });
   const interior = m.getObjectByName('Interior');
   const seats = interior.userData.passengerSeats;
@@ -71,7 +71,7 @@ CHECK = """async () => {
   }
   checks.seatFramesClearActualPanels = frameClearance > .04 && frameClearance < .3;
   const cushions = []; interior.traverse(o => {
-    if (o.isMesh && o.material.name === (early ? 'Red_seat_cushion' : 'Red_moulded_seat')) cushions.push(o);
+    if (o.isMesh && (early ? o.material.name === 'Red_seat_cushion' : o.material.name.endsWith('_moulded_seat'))) cushions.push(o);
   });
   const doorSide = seats.filter(p => p.x < 0), windowSide = seats.filter(p => p.x > 0);
   const frontBay = doorSide.filter(p => p.z > T3_PHOTO.doors[1]).sort((a, b) => b.z - a.z);
@@ -99,9 +99,22 @@ CHECK = """async () => {
   }));
   const floors = []; interior.traverse(o => { if (o.isMesh && o.material.name === 'Floor') floors.push(o); });
   checks.closedStairRisers = T3_PHOTO.doors.every(z => [.48, .72].every((y, i) => {
-    const h = hit([-2, y, z], [1, 0, 0], floors), expected = (-1.035 + i * .22) * (1 - .10 * Math.max(0, Math.abs(z) - 4.65));
+    const h = hit([-2, y, z], [1, 0, 0], floors), expected = (i === 0 ? -.925 : -.56) * (1 - .10 * Math.max(0, Math.abs(z) - 4.65));
     return h && Math.abs(h.point.x - expected) < .025;
   }));
+  checks.seatColours = early ? cushions.length === 1 : new Set(cushions.map(o => o.material.name)).size === 2;
+  checks.treadsClearDoorSweep = true;
+  for (let n=0; n<=24; n++) {
+    s.pose(m,{doors:n/24}); m.updateMatrixWorld(true);
+    for (const door of r.doors) for (const pair of door.pairs) for (const leaf of [pair.outer,pair.inner]) {
+      for (const across of [0,.085,.17,.26,.345]) for (const face of [-.014,.014]) {
+        const q = leaf.localToWorld(new THREE.Vector3(face,0,-pair.sign*across));
+        const h = hit([q.x,1,q.z],[0,-1,0],floors);
+        if (h && h.point.y >= q.y) checks.treadsClearDoorSweep = false;
+      }
+    }
+  }
+  s.pose(m,{}); m.updateMatrixWorld(true);
   checks.solidWheelFaces = r.wheelsets.every(w => [-1, 1].every(side => [0, .08, .17, .26, .33].every(radius => {
     const p = pos(w), h = hit([side * 1.4, p.y + radius, p.z], [-side, 0, 0], [w]);
     return h?.object.material.name === (radius > .32 ? 'Wheel_running_tread' : 'Wheel_brown_dust');
@@ -157,7 +170,7 @@ CHECK = """async () => {
   }));
   checks.endCurvatureAtCheeks = [-1, 1].every(end => {
     const depth = x => Math.abs(hit([x, 1.28, end * 8], [0, 0, -end], [redShell]).point.z);
-    return depth(0) - depth(.55) < .022 && depth(.72) - depth(.94) > .10;
+    return depth(0) - depth(.55) > .035 && depth(0) - depth(.55) < .09 && depth(.72) - depth(.94) > .10;
   });
   checks.roundedQuarterLightOpenings = [-1, 1].every(side => {
     const at = (y, z) => hit([side * 2, y, z], [-side, 0, 0], frontMaterials)?.object;

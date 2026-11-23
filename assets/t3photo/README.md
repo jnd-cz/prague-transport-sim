@@ -64,7 +64,9 @@ not a measured restoration model of every fitting on 6892.
 No source image or user photograph is embedded in the GLB or redistributed in this directory.
 
 6312 has red upholstered seats with silver loop frames. 6892 has moulded shells on a provisional
-24-place layout. Its seat colour, supports and exact seat arrangement await interior photographs of 6892.
+24-place layout. Photos `20261121_123814.jpg`, `123807` and `123838` show the dished red and
+grey shells, open slots and tubular grab rails. The model alternates colours along each bank.
+The complete seat order and pitch are estimates.
 The working 6312 layout puts 14 singles on the continuous window side and ten on the door side.
 Four face forward between the middle and rear doors. Between the front and middle doors, five face
 forward and the chair on the front box faces them. Both the aisle and the rear platform are open.
@@ -82,7 +84,10 @@ corroborates the padded leatherette seats fitted to early T3 cars 6102–6323.
 The revised shells have a longer plan taper and rounder end sections with matching domed caps.
 Long faces are split at both shoulders before tapering, so the central walls and floor keep their
 full width. The seat-frame check measures clearance against the actual side panels.
-Steps have closed risers and side walls; door leaves end just above the first tread and fold to 84°.
+The view down through the end window (`20261121_124445.jpg`) supplies the broad centre bow before
+the tighter corners. The stair photograph (`20261122_121753.jpg`) shows a projecting middle tread
+with clipped corners. Both cars use that profile. Door tops align with the 2.63 m window heads.
+The test samples the lower edges of every leaf at 25 angles through the 84° opening.
 The 84° stop is a visual interpretation of the user's “a bit less” than 90°, not a factory dimension.
 Each wheel has a solid disc, a separate tyre and a single central hex nut. The side frame, layered suspension
 pack, flared cover and inboard housings occupy the space above the brake. The two 8053 views establish their

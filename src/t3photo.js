@@ -131,7 +131,8 @@ export function makePhotoT3({ variant = '6892', fleet = variant, line = '23',
   const steel = material('Steel', '#525b60', .42, .75), chrome = material('Aluminium', '#b4b8b6', .28, .75);
   const dark = material('Underframe', '#303737', .77, .3), floorMat = material('Floor', '#ffffff', .92);
   const glass = material('Window_glass', '#729293', .12, .28, { transparent: true, opacity: early ? .35 : .57, depthWrite: false });
-  const seatMat = material(early ? 'Red_seat_cushion' : 'Red_moulded_seat', early ? '#ae3436' : '#a93b31', early ? .62 : .3);
+  const seatMat = material(early ? 'Red_seat_cushion' : 'Red_moulded_seat', early ? '#ae3436' : '#c32630', early ? .62 : .3);
+  const greySeat = early ? null : material('Grey_moulded_seat', '#bab8bd', .28);
   const poleMat = material('Handrails', '#a3a7a5', .46, .45);
   const wallMat = material('Interior_laminate', '#bc9f94', .84);
   // Small repeatable rubber ribs, with metre-based UVs shared by the floor and stair blocks.
@@ -228,7 +229,7 @@ export function makePhotoT3({ variant = '6892', fleet = variant, line = '23',
     // Wide central pane, tight cheek returns. This form of sqrt(1 - sin(a)^8)
     // keeps regular samples and a finite tangent all the way to the side jamb.
     const s2 = Math.sin(a) ** 2, c = Math.max(0, Math.cos(a));
-    const reach = c * Math.sqrt((1 + s2) * (1 + s2 * s2)) * (1 - .012 * s2);
+    const reach = c * Math.sqrt((1 + s2) * (1 + s2 * s2)) * (1 - .16 * s2);
     const belly = y >= .85 && y <= 1.66 ? .035 * ((y - 1.24) / .42) ** 2 : 0;
     const x = r * Math.sin(a), z = 5.99 + reach * (1.01 - rake - inset - belly);
     return [x, y, sign * z];
@@ -396,7 +397,7 @@ export function makePhotoT3({ variant = '6892', fleet = variant, line = '23',
   // The single-seat layout was reconstructed from the 6312 saloon photos (#437).
   floorBox('Saloon_floor', [1.70, .08, 11.75], [.305, .834, -.03]);
   let floorStart = -5.905;
-  for (const [a, b] of [...T3_PHOTO.doors.map(z => [z - .70, z + .70]).sort((a, b) => a[0] - b[0]), [5.845, 5.845]]) {
+  for (const [a, b] of [...T3_PHOTO.doors.map(z => [z - .76, z + .76]).sort((a, b) => a[0] - b[0]), [5.845, 5.845]]) {
     if (a > floorStart) floorBox('Floor_at_side', [.61, .08, a - floorStart], [-.85, .834, (a + floorStart) / 2]);
     floorStart = b;
   }
@@ -449,11 +450,19 @@ export function makePhotoT3({ variant = '6892', fleet = variant, line = '23',
         V(.235, 1.39, -.26), V(.235, 1.23, -.15), V(.235, 1.23, .15)], .016, chrome, false, 28);
     } else {
       // One dished shell sweeps up into the backrest. Roll the exposed edges under.
-      const profile = [[.21,1.29,.19],[.20,1.32,.21],[.11,1.32,.23],[-.11,1.29,.22],
-        [-.18,1.32,.20],[-.208,1.42,.19],[-.245,1.64,.196],[-.27,1.73,.183],[-.28,1.74,.15]];
-      surface(seat, 'Moulded_seat', profile.map(([z,y,w]) =>
-        [-1.02,-1,-.76,0,.76,1,1.02].map(u => [w*u, y + .026*u*u - (Math.abs(u) > 1 ? .015 : 0), z+.018*u*u])), seatMat);
-      box(seat, 'Seat_mounting_plate', [.20,.055,.18], [0,1.267,-.045], poleMat);
+      const finish = i % 2 ? seatMat : greySeat;
+      const profile = [[.235,1.30,.205],[.20,1.32,.225],[.08,1.315,.23],[-.10,1.29,.225],
+        [-.16,1.31,.222],[-.19,1.355,.217],[-.21,1.414,.21],[-.25,1.61,.198],[-.29,1.745,.178],[-.29,1.755,.158]];
+      const rows = profile.map(([z,y,w]) => [-1.02,-1,-.65,0,.65,1,1.02].map(u =>
+        [w*u, y + .032*u*u - (Math.abs(u)>1 ? .012 : 0), z + .035*u*u]));
+      // The low back slot is open right through the coloured shell.
+      surface(seat, 'Seat_pan', rows.slice(0,6), finish);
+      for (const start of [0,4]) surface(seat, 'Slot_side', rows.slice(5,7).map(row => row.slice(start,start+3)), finish);
+      surface(seat, 'Seat_back', rows.slice(6), finish);
+      tube(seat, 'Shell_grab_rail', [V(-.19,1.26,.06), V(-.207,1.29,-.16), V(-.21,1.43,-.23),
+        V(-.174,1.77,-.31), V(-.13,1.835,-.33), V(.13,1.835,-.33), V(.174,1.77,-.31),
+        V(.21,1.43,-.23), V(.207,1.29,-.16), V(.19,1.26,.06)], .013, poleMat, false, 20);
+      box(seat, 'Seat_mounting_plate', [.20,.055,.18], [0,1.254,-.045], poleMat);
     }
     if (base === 'box') {
       const housing = new THREE.ExtrudeGeometry(rr(-.205, -.18, .41, .36, .06),
@@ -476,14 +485,24 @@ export function makePhotoT3({ variant = '6892', fleet = variant, line = '23',
   }
   for (const z of T3_PHOTO.doors) {
     for (const dz of [-.77, .77]) rod(cabin, 'Door_stanchion', V(-.85, .9, z + dz), V(-.85, 2.55, z + dz), .018, poleMat);
-    for (let i = 0; i < 3; i++) {
-      const top = T3_PHOTO.entryFloor + i * (T3_PHOTO.floor - T3_PHOTO.entryFloor) / 2;
-      floorBox('Closed_entry_step', [.25, top - .28, 1.39], [-1.13 + i * .22, (top + .28) / 2, z]);
-      box(cabin, 'Step_nosing', [.025, .018, 1.39], [-1.24 + i * .22, top + .009, z], chrome);
+    // The raised tread projects into the centre of the opening. Its clipped
+    // corners leave a deeper bottom landing where the pairs fold at each jamb.
+    floorBox('Entry_landing', [.715,.11,1.52], [-.8975,.335,z]);
+    for (const [a,b,outerA,outerB] of [[-.76,-.30,-.77,-.925],[-.30,.30,-.925,-.925],[.30,.76,-.925,-.77]]) {
+      const step = floorBox('Middle_tread', [1,.242,b-a], [0,.511,z+(a+b)/2]);
+      const p = step.geometry.attributes.position, uv = step.geometry.attributes.uv;
+      for (let j=0; j<p.count; j++) {
+        const x = p.getX(j)>0 ? -.54 : (p.getZ(j)>0 ? outerB : outerA);
+        p.setX(j,x); uv.setX(j,x/.064);
+      }
+      step.geometry.computeVertexNormals();
+      rod(cabin, 'Tread_edge', V(outerA,.633,z+a), V(outerB,.633,z+b), .007, steel, 6);
     }
-    for (const dz of [-.705, .705]) floorBox('Stair_well_cheek', [.69, .594, .035], [-.91, .577, z + dz]);
-    box(cabin, 'Door_header', [.16, .18, 1.42], [-1.13, 2.70, z], cream);
-    mesh(cabin, 'Door_warning_lamp', new THREE.SphereGeometry(.055, 12, 6), amber, -1.04, 2.60, z).scale.y = .55;
+    box(cabin, 'Landing_edge', [.016,.006,1.52], [-.551,.876,z], steel);
+    floorBox('Landing_riser', [.02,.242,1.52], [-.55,.753,z]);
+    for (const dz of [-.78,.78]) floorBox('Stair_well_cheek', [.69,.594,.035], [-.91,.577,z+dz]);
+    box(cabin, 'Door_header', [.15,.085,1.46], [-1.16,2.691,z], cream);
+    mesh(cabin, 'Door_warning_lamp', new THREE.SphereGeometry(.045,12,6), amber,-1.06,2.70,z).scale.y=.55;
   }
   box(cabin, 'Driver_console', [1.40, .15, .56], [.1, 1.63, 6.16], dark);
   box(cabin, 'Driver_seat', [.48, .12, .47], [.36, 1.30, 5.63], rubber);
@@ -503,7 +522,7 @@ export function makePhotoT3({ variant = '6892', fleet = variant, line = '23',
       const outer = group(d, `Door_${i + 1}_${sign < 0 ? 'rear' : 'front'}_outer`, 0, 0, sign * .69);
       const inner = group(outer, `Door_${i + 1}_${sign < 0 ? 'rear' : 'front'}_inner`, 0, 0, -sign * .345);
       for (const leaf of [outer, inner]) {
-        const panel = rr(0, 0, .345, 2.248, .018);
+        const panel = rr(0, 0, .345, 2.228, .018);
         panel.holes.push(rr(.065, .18, .215, .89, .065), rr(.065, 1.20, .215, .96, .065));
         const shell = group(leaf, leaf.name + '_panel'); shell.rotation.y = sign > 0 ? Math.PI / 2 : -Math.PI / 2;
         plate(shell, 'Door_enamel', panel, cream, 0, 0, -sign * .006);
@@ -521,7 +540,7 @@ export function makePhotoT3({ variant = '6892', fleet = variant, line = '23',
           plate(shell, 'Door_glass', s, glass, 0, 0, .002);
           rim(shell, 'Door_window_gasket', s, rubber, [0, 0, .008], 0, .012);
         }
-        rod(shell, 'Door_leaf_seal', V(0, .014, .003), V(0, 2.234, .003), .014, rubber);
+        rod(shell, 'Door_leaf_seal', V(0, .014, .003), V(0, 2.213, .003), .014, rubber);
         if (leaf === inner) tube(shell, 'Door_inner_handle', [V(.29, .32, sign * .019),
           V(.26, .38, sign * .085), V(.10, 1.06, sign * .085), V(.08, 1.12, sign * .019)], .012, chrome);
       }
@@ -691,7 +710,7 @@ export function makePhotoT3({ variant = '6892', fleet = variant, line = '23',
   for (const side of [-1, 1]) {
     const x = side * .32, y = 1.744;
     const w = group(root, side < 0 ? 'Wiper_right' : 'Wiper_left', x, y, endPoint(Math.asin(x / (1.25 * taper(7))), y, 1, -.008)[2]);
-    w.rotation.set(-Math.atan(.43), side * .025, 0, 'YXZ');
+    w.rotation.set(-Math.atan(.43), side * .13, 0, 'XYZ');
     box(detail, 'Wiper_mount', [.096, .022, .023],
       [(x + side * .017) / taper(w.position.z), y, w.position.z - .003], rubber).rotation.copy(w.rotation);
     const pivot = group(w, w.name + '_pivot'); pivot.userData.axis = 'Z';
