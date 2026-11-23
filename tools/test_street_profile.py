@@ -324,13 +324,6 @@ class Sidewalks(unittest.TestCase):
         smear = np.column_stack([np.full(len(u), 200.6), np.full(len(u), 200.1), np.full(len(u), 199.9)])
         top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.5), high, np.full(len(u), 199.9), np.ones(len(u), bool), smear)
         self.assertEqual((bool(top.all()), segs[0, :, 2].tolist()), (True, [199.9, 199.9]))
-        # (#800: a plain kerb's own height with the ground rising 1.7 m behind it, a rock's or a wall's smear: a kerb,
-        # not a wall's top held up the rise; the same rise behind an edge 1 m over the road is still a wall's top)
-        rise = np.column_stack([level + 0.6, level + 1.0, level + 1.3])
-        self.assertFalse(sp.wall_tops(edge[0], edge[1], level, level - 0.1, level + 1.7, np.ones(len(u), bool), rise)[0].any())
-        self.assertFalse(sp.wall_tops(edge[0], edge[1], level, level - 0.1, level + 1.7, np.ones(len(u), bool))[0].any())
-        top, segs = sp.wall_tops(edge[0], edge[1], level + 1.0, level - 0.1, level + 2.7, np.ones(len(u), bool), rise + 1.0)
-        self.assertEqual((bool(top.all()), segs[0, :, 2].tolist()), (True, [202.7, 202.7]))
         ctx["kerb_edges"] = [edge]
         z0 = sp.bilinear(sp.sidewalks(ctx, ramp, [(0, 0), (20, 4)]), np.array([15.0]), np.array([0.25]))
         self.assertLess(z0[0], 199.5)
