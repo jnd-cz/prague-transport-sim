@@ -36,6 +36,7 @@ from playwright.sync_api import Error as PlaywrightError, sync_playwright
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing
 import gpu
+import snapshot
 from data_reference import ROOT, checkout, digest, git
 
 
@@ -259,6 +260,11 @@ def main(argv=None, root=ROOT):
     a = ap.parse_args(argv)
     if a.overlay and not a.overlay.is_dir():
         ap.error(f'--overlay: no folder {a.overlay}')
+    if a.view == 'review' and a.weather != 'dry':
+        ap.error('--weather: the review view paints the surface classes and draws no weather; --view cab or chase shows it')
+    snapshot.require_current_data(str(root))  # (#835; a reference revision's data is fetched from the store)
+    if a.ref and Path(a.ref).is_dir():
+        snapshot.require_current_data(str(Path(a.ref).resolve()))
     at = None
     if a.at:
         try:

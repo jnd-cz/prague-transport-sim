@@ -51,6 +51,7 @@ class Publish(unittest.TestCase):
             self.assertEqual(result['built_at_commit'], 'abc123')
             self.assertEqual(result['files']['line9.json']['size'], len(LINE))
             self.assertEqual(len(store.files), 1)
+            self.assertNotIn(b'\r', manifest.read_bytes(), "the manifest is written with LF, as git commits it (#829)")
 
 
     def publish_with_drift(self, drift, **kw):

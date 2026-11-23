@@ -10,8 +10,7 @@ ROOT = os.path.dirname(TOOLS)
 sys.path.insert(0, TOOLS)
 import tiers  # noqa: E402
 
-BUILD = {"tools/rebuild.py", "tools/build_line.py", "tools/track_styles.py", "tools/heavy.py", "tools/stepcache.py",
-         "tools/ground_mesh.py"}
+BUILD = {"tools/rebuild.py", "tools/build_line.py", "tools/track_styles.py", "tools/ground_mesh.py"}
 
 
 class Rows(unittest.TestCase):
@@ -33,7 +32,8 @@ class Rows(unittest.TestCase):
         self.assertEqual(k("AGENTS.md", "src/traffic.js"), ["simulation"])  # (docs beside code: the code's checks)
         self.assertEqual(k("tools/build_line.py"), ["world"])
         self.assertEqual(k("tools/ground_mesh.py"), ["ground rule"])  # (a ground rule: no line rebuilt, #757)
-        self.assertEqual(k("tools/heavy.py", "tools/stepcache.py"), ["tool"])  # (the queue and the cache: no output)
+        queue = ("tools/heavy.py", "tools/stepcache.py", "tools/board.py")  # (the queue, the cache, the label: no output)
+        self.assertEqual(list(tiers.kinds(queue)), ["tool"])
         self.assertEqual(k("tools/line_heights.py"), ["track heights"])
         self.assertEqual(k("src/main.js"), ["drawing", "simulation"])  # (the loop: both)
         self.assertEqual(k("src/review.js"), ["review"])

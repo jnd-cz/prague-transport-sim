@@ -104,7 +104,7 @@ things are done, and why a rule exists, is in the files it points to:
   background and let it wait; never start a second beside it. **Never start a job detached** (`Start-Process`,
   `start`, `nohup … &`): it ends as orphaned (the user, 2026-11-22, #815). End a background command with something
   after its last program (`; echo "exit $?"`), so that a stop reaches it.
-- **The heaviest work runs at night** (22:00 to 07:00) or on the user's word (the user, 2026-11-21): a rebuild of
+- **The heaviest work runs at night** (23:00 to 07:00) or on the user's word (the user, 2026-11-21; from 23:00 since 2026-11-23): a rebuild of
   every line, a seeded compare of every line, a checkpoint's run. By day: the place loop, tests, one-line runs.
 - **A long job pins its checkout:** work on another issue meanwhile in its own worktree.
 - **Reading a compare** (DEVELOPING.md, Baselines): every mean outside main's seed spread, every stuck, unfinished

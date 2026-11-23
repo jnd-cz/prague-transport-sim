@@ -148,9 +148,9 @@ TOOLS = os.path.dirname(os.path.abspath(__file__))
 # `spin` for what it does meanwhile, the queue's constants)
 JOB = ("import os, sys, time; sys.path.insert(0, sys.argv[1]); import baseline_store as b\n"
        "b.HeavyJob.POLL = 0.1\n"
-       "share, spin = None, lambda: time.sleep(0.05)\n"
+       "share, expect, spin = None, None, lambda: time.sleep(0.05)\n"
        "exec(sys.argv[4])\n"
-       "with b.HeavyJob(sys.argv[2], share=share):\n"
+       "with b.HeavyJob(sys.argv[2], share=share, expect=expect):\n"
        "    print('in', flush=True)\n"
        "    while not os.path.exists(sys.argv[3]): spin()\n")
 # (a machine of the test's own: 8 cores, 40 GB free, 2 kept)
@@ -246,6 +246,56 @@ class Queue(unittest.TestCase):
         self.assertEqual(c.stdout.readline().strip(), "in")
         open(release_c, "w").close()
         self.assertEqual((x.wait(10), c.wait(10)), (0, 0))
+
+    def test_a_short_shared_job_goes_before_a_timing_that_waits_for_a_long_one(self):
+        """Backfilling (#829): the timing cannot start before a's expected end, so c, ending sooner, runs beside a;
+        d, whose 1.5× its time would end after a's, keeps its turn behind the timing."""
+        a, release_a = self.job("a", MACHINE + "share = {'gb': 4, 'cores': 2}; expect = 3600")
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        x, release_x = self.job("timing")
+        self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting")])
+        c, release_c = self.job("c", MACHINE + "share = {'gb': 4, 'cores': 2}; expect = 600")
+        self.assertEqual(c.stdout.readline().strip(), "in")  # (now + 900 s before a's end at 3600)
+        d, release_d = self.job("d", MACHINE + "share = {'gb': 4, 'cores': 2}; expect = 3000")
+        self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting"), ("c", "running"),
+                                                ("d", "waiting")])
+        time.sleep(0.5)
+        self.assertEqual(self.states()[-1], ("d", "waiting"))
+        e, release_e = self.job("e", MACHINE + "share = {'gb': 4, 'cores': 2}; expect = 300")
+        self.assertEqual(e.stdout.readline().strip(), "in")  # (past d too: d waits behind the timing all the same)
+        for r in (release_c, release_e, release_a):
+            open(r, "w").close()
+        self.assertEqual(x.stdout.readline().strip(), "in")  # (alone, once a, c and e ended)
+        open(release_x, "w").close()
+        self.assertEqual(d.stdout.readline().strip(), "in")
+        open(release_d, "w").close()
+        self.assertEqual([k.wait(10) for k in (a, x, c, d, e)], [0, 0, 0, 0, 0])
+
+    def test_no_backfill_without_known_times(self):
+        """A running job with no expected time: the timing's start is not known, so no shared job goes before it."""
+        a, release_a = self.shared("a")
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        x, release_x = self.job("timing")
+        self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting")])
+        c, release_c = self.job("c", MACHINE + "share = {'gb': 4, 'cores': 2}; expect = 60")
+        self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting"), ("c", "waiting")])
+        time.sleep(0.5)
+        self.assertEqual(self.states()[-1], ("c", "waiting"))
+        for r in (release_a, release_x, release_c):
+            open(r, "w").close()
+        self.assertEqual([k.wait(10) for k in (a, x, c)], [0, 0, 0])
+
+    def test_backfills(self):
+        run = [{"since": 1000.0, "expect": 3600.0, "kind": "a.py"}]
+        self.assertTrue(baseline_store.backfills(600, run, 1.5, now=2000.0, records=[]))  # (2900 <= 4600)
+        self.assertFalse(baseline_store.backfills(1800, run, 1.5, now=2000.0, records=[]))  # (4700 > 4600)
+        self.assertFalse(baseline_store.backfills(None, run, 1.5, now=2000.0, records=[]))
+        self.assertFalse(baseline_store.backfills(60, [], 1.5, now=2000.0, records=[]))
+        self.assertFalse(baseline_store.backfills(60, run + [{"since": 1500.0, "kind": "new.py"}], 1.5, now=2000.0,
+                                                  records=[]))
+        self.assertFalse(baseline_store.backfills(60, run, 1.5, now=4600.0, records=[]))  # (a past its time)
+        self.assertTrue(baseline_store.backfills(60, [{"since": 1000.0, "kind": "b.py"}], 1.5, now=1100.0,
+                                                 records=[{"kind": "b.py", "wall": 900.0, "rc": 0}]))
 
     def test_a_shared_job_waits_for_an_older_tools_job(self):
         # (a ticket with no share, as a checkout from before #728 writes it: a job alone)
@@ -559,14 +609,17 @@ class Watch(unittest.TestCase):
         self.wait_for(lambda: not baseline_store.alive(kid), 5)
 
     def test_a_job_at_work_within_its_limits_runs_to_its_end_and_is_recorded(self):
-        # (work and pauses: a look's process reads wait for the GIL, ~5 ms each, behind a main thread that never pauses)
-        p = self.watched("fine", "H.RECORD, H.IDLE, H.IDLE_CPU = 0.0, 1.0, 0.1\nshare = {'gb': 1, 'cores': 1}\n"
-                                 "def body():\n    t = time.time()\n"
-                                 "    while time.time() - t < 2: sum(range(99999)); time.sleep(0.005)\n")
-        self.assertEqual(p.wait(20), 0)
+        # (the work in a child, which the watch counts as the job's, and the main thread waiting: the watch's looks
+        # never wait for the GIL. The idle limit at 5 % of a core, the real one 0.3 %: the job ended as idle at 10 %
+        # with its work and pauses in one thread on a busy machine, 0 of 5 pass on two cores beside 4 busy, #829)
+        p = self.watched("fine", "H.RECORD, H.IDLE, H.IDLE_CPU = 0.0, 2.0, 0.1\nshare = {'gb': 1, 'cores': 1}\n"
+                                 "def body():\n    subprocess.run([sys.executable, '-I', '-c', "
+                                 "'import time\\nt = time.time()\\nwhile time.time() - t < 3: pass'], check=True)\n")
+        rc = p.wait(30)
+        self.assertEqual(rc, 0, p.stderr.read())  # (the watch's reason when it ended the job)
         rec, = baseline_store.history()
         self.assertEqual((rec["what"], rec["kind"], rec["rc"], rec["ended"]), ("fine", "-c", 0, None))
-        self.assertGreater(rec["wall"], 1.9)
+        self.assertGreater(rec["wall"], 2.9)
         self.assertGreater(rec["gb"], 0)
 
     @unittest.skipUnless(os.name == "nt", "a Job Object: Windows")
