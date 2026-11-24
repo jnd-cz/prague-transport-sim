@@ -107,7 +107,10 @@ things are done, and why a rule exists, is in the files it points to:
   `start`, `nohup … &`): it ends as orphaned (the user, 2026-11-22, #815). End a background command with something
   after its last program (`; echo "exit $?"`), so that a stop reaches it.
 - **The heaviest work runs at night** (23:00 to 07:00) or on the user's word (the user, 2026-11-21; from 23:00 since 2026-11-23): a rebuild of
-  every line, a seeded compare of every line, a checkpoint's run. By day: the place loop, tests, one-line runs.
+  every line, a seeded compare of every line, a checkpoint's run. By day: the place loop, tests, one-line runs. The
+  queue holds it to that (#851): by day a job expected over 30 min, or of unknown time (`--expect` states it), waits
+  for 23:00 and holds no one up; the user's word runs it by day (`heavy.py --day`, `TRAM_HEAVY_DAY=1`). Jobs of
+  10 min or less go first.
 - **A long job pins its checkout:** work on another issue meanwhile in its own worktree.
 - **Reading a compare** (DEVELOPING.md, Baselines): every mean outside main's seed spread, every stuck, unfinished
   or penalty run and every seedless move needs a reason tied to the change.

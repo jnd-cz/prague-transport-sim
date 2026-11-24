@@ -157,6 +157,78 @@ JOB = ("import os, sys, time; sys.path.insert(0, sys.argv[1]); import baseline_s
 MACHINE = "b.HeavyJob.FREE = staticmethod(lambda: 40.0); b.HeavyJob.CORES = 8; b.HeavyJob.KEEP = 2.0; "
 
 
+class DayAndNight(unittest.TestCase):
+    """#851: by day a long job, or one of unknown time, waits for the night and stands ahead of none meanwhile; a short
+    one goes before longer ones queued earlier, but not before one that has waited PASS_MAX."""
+    def at(self, h, m=0):
+        lt = time.localtime()
+        return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, h, m, 0, 0, 0, -1))
+
+    def job(self, **kw):
+        with mock.patch.dict(os.environ):
+            os.environ.pop(baseline_store.DAY, None)
+            return baseline_store.HeavyJob("j", wait=False, kind="a kind never run", **kw)
+
+    def ticket(self, what, pid, t, **kw):
+        return {"what": what, "root": "C:/x/transport-game-1", "pid": pid, "t": t, "state": "waiting", "since": t,
+                "share": None, **kw}
+
+    def test_the_night_hours(self):
+        self.assertEqual([baseline_store.night(self.at(h)) for h in (6, 7, 12, 22, 23, 2)],
+                         [True, False, False, False, True, True])
+        self.assertEqual(baseline_store.night_starts(self.at(14)), self.at(23))
+        self.assertEqual(baseline_store.night_starts(self.at(23, 30)), self.at(23, 30))
+
+    def test_by_day_a_long_job_or_one_of_unknown_time_waits_for_the_night(self):
+        noon, late = self.at(12), self.at(23, 30)
+        self.assertIn("expected 40 min, over 30 by day", self.job(expect=2400).night_hold(noon, []))
+        self.assertIn("its time is not known", self.job().night_hold(noon, []))
+        self.assertEqual(self.job(expect=1500).night_hold(noon, []), "")  # (the suite with the page tests: 24 min)
+        self.assertEqual(self.job(expect=2400).night_hold(late, []), "")
+        self.assertEqual(self.job(expect=2400, day=True).night_hold(noon, []), "")
+        with mock.patch.dict(os.environ, {baseline_store.DAY: "1"}):
+            self.assertTrue(baseline_store.HeavyJob("j", wait=False).day)  # (TRAM_HEAVY_DAY=1: the user's word)
+
+    def test_the_short_ones_first_but_not_before_one_waiting_two_hours(self):
+        now = self.at(12)
+        long = self.ticket("long", 1, now - 600, expect=3600)
+        short = self.ticket("short", 2, now - 60, expect=300)
+        unknown = self.ticket("unknown", 3, now - 900)
+        rank = lambda j: baseline_store.rank(j, now, [])  # noqa: E731
+        self.assertLess(rank(short), rank(long))
+        self.assertLess(rank(short), rank(unknown))
+        self.assertLess(rank(unknown), rank(long))  # (first come first among the longer ones)
+        self.assertLess(rank(dict(long, t=now - 7300)), rank(short))
+
+    def test_a_held_job_stands_ahead_of_none_and_the_board_shows_it(self):
+        now = time.time()
+        held = self.ticket("long", 1, now - 600, expect=3600, held=True)
+        me = self.job(expect=60)
+        me.t = now
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [held]), \
+                mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual(me.ahead(), [])
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [dict(held, held=False, expect=60)]), \
+                mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual([j["what"] for j in me.ahead()], ["long"])  # (not held, as short and first: ahead)
+        self.assertTrue(baseline_store.describe(held, now).endswith(", held for the night"))
+        noon = self.at(12)
+        got = baseline_store.schedule([dict(held, t=noon - 600, since=noon - 600), self.ticket("b", 2, noon - 60, expect=300)],
+                                      noon, records=[])
+        self.assertEqual({j["what"]: j["start"] for j in got}, {"long": self.at(23), "b": noon})
+
+    def test_a_held_job_starts_when_the_night_comes(self):
+        out, nights = io.StringIO(), iter([False, False, True])
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d), \
+                mock.patch.object(baseline_store, "night", lambda t=None: next(nights, True)), \
+                mock.patch.multiple(baseline_store.HeavyJob, POLL=0.01, WATCH=False), mock.patch.dict(os.environ):
+            for k in (baseline_store.DAY, baseline_store.HELD, "TRAM_HEAVY_NOWAIT"):
+                os.environ.pop(k, None)
+            with baseline_store.HeavyJob("long", out=out, expect=2400) as j:
+                self.assertEqual((j.parked, j.state), ("", "running"))
+        self.assertIn("long waits for the night (23:00): expected 40 min", out.getvalue())
+
+
 class Queue(unittest.TestCase):
     """Heavy jobs take turns, first come first served (#280), in a lock folder of the test's own."""
     def setUp(self):
@@ -170,6 +242,11 @@ class Queue(unittest.TestCase):
         self.env = {**os.environ, "TMP": self.tmp.name, "TEMP": self.tmp.name, "TMPDIR": self.tmp.name}
         self.env.pop(baseline_store.HELD, None)
         self.env.pop("TRAM_HEAVY_NOWAIT", None)
+        # (the order of the turns, not the hour: a job of unknown time is not held for the night here, #851)
+        self.env[baseline_store.DAY] = "1"
+        day = mock.patch.dict(os.environ, {baseline_store.DAY: "1"})
+        day.start()
+        self.addCleanup(day.stop)
         self.kids = []
 
     def job(self, name, setup=""):
@@ -277,7 +354,8 @@ class Queue(unittest.TestCase):
         self.assertEqual(a.stdout.readline().strip(), "in")
         x, release_x = self.job("timing")
         self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting")])
-        c, release_c = self.job("c", MACHINE + "share = {'gb': 4, 'cores': 2}; expect = 60")
+        # (900 s: longer than SHORT, which would go before the timing as the short ones do, #851)
+        c, release_c = self.job("c", MACHINE + "share = {'gb': 4, 'cores': 2}; expect = 900")
         self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting"), ("c", "waiting")])
         time.sleep(0.5)
         self.assertEqual(self.states()[-1], ("c", "waiting"))

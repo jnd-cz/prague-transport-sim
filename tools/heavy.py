@@ -7,6 +7,7 @@
     python -I tools/heavy.py "#516 options" -- bash job.sh
     python -I tools/heavy.py --shared 4,2 "#707 pictures" -- bash shots.sh   # beside other counts and builds (#728)
     python -I tools/heavy.py --expect 20m "#812 trace" -- python -P -E trace.py   # its expected time (#815)
+    python -I tools/heavy.py --day --expect 2h "#800 places" -- bash all.sh   # long, by day, on the user's word (#851)
     python -I tools/heavy.py --stop PID      # asks a job of this checkout to end, with all it started
     python -I tools/heavy.py --history       # the finished jobs' times per kind: the time rule's calibration
 
@@ -25,6 +26,11 @@ and exits 86 with one line saying why. --expect DURATION (90s, 20m, 1.5h; plain:
 the median of the same command's last runs. --no-limit keeps the warnings and ends nothing, for a run the user lets go
 on. --stop PID ends a job that lost its owner (a stopped background task whose command outlived it); a job of another
 checkout only with --force.
+
+By day (07:00-23:00) a job expected over 30 min, or whose time is not known, waits for the night (#851; the user,
+2026-11-24): it stands ahead of no other job meanwhile, and the board shows it held. --day (or TRAM_HEAVY_DAY=1 for a
+tool that takes its own turn) runs it by day, on the user's word only. A waiting job of 10 min or less goes before
+longer ones queued earlier, but not before one that has waited 2 h.
 """
 import atexit
 import os
@@ -101,12 +107,14 @@ def shared(text):
 
 
 def options(argv, seconds):
-    """(--shared, --expect and --no-limit before the job's name as HeavyJob's share, expect and limits; the rest), or
-    (None, the rest) when one of them is wrong."""
-    o = {"share": None, "expect": None, "limits": None}
+    """(--shared, --expect, --no-limit and --day before the job's name as HeavyJob's share, expect, limits and day; the
+    rest), or (None, the rest) when one of them is wrong."""
+    o = {"share": None, "expect": None, "limits": None, "day": None}
     while argv and argv[0].startswith("--") and argv[0] != "--":
         if argv[0] == "--no-limit":
             o["limits"], argv = False, argv[1:]
+        elif argv[0] == "--day":
+            o["day"], argv = True, argv[1:]
         elif argv[0] in ("--shared", "--expect") and len(argv) > 1:
             name, v = ("share", shared(argv[1])) if argv[0] == "--shared" else ("expect", seconds(argv[1]))
             if v is None:
@@ -183,7 +191,7 @@ def main(argv):
         print(__doc__.split("\n\n")[1].rstrip(), file=sys.stderr)
         return 2
     what, cmd = argv[0], program(argv[2:])
-    with b.HeavyJob(what, share=o["share"], expect=o["expect"], kind=b.kind_of(cmd), limits=o["limits"]) as job:
+    with b.HeavyJob(what, share=o["share"], expect=o["expect"], kind=b.kind_of(cmd), limits=o["limits"], day=o["day"]) as job:
         t = time.time()
         print(f"heavy.py: {what} starts {time.strftime('%H:%M:%S')}", file=sys.stderr, flush=True)
         rc = subprocess.call(cmd)

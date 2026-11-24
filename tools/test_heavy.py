@@ -33,6 +33,7 @@ class Queue(unittest.TestCase):
         self.env = {**os.environ, "TMP": self.tmp.name, "TEMP": self.tmp.name, "TMPDIR": self.tmp.name}
         self.env.pop(heavy.HELD, None)
         self.env.pop("TRAM_HEAVY_NOWAIT", None)
+        self.env["TRAM_HEAVY_DAY"] = "1"  # (the turns, not the hour: a job of unknown time is not held for the night, #851)
         self.locks = os.path.join(self.tmp.name, "tram-heavy")
 
     def tearDown(self):
@@ -147,9 +148,11 @@ class Queue(unittest.TestCase):
     def test_options_before_the_name(self):
         """#815: --expect DURATION and --no-limit beside --shared, in any order."""
         self.assertEqual(heavy.options(["--expect", "20m", "--no-limit", "--shared", "4,2", "x", "--", "c"], baseline_store.seconds),
-                         ({"share": {"gb": 4.0, "cores": 2}, "expect": 1200.0, "limits": False}, ["x", "--", "c"]))
+                         ({"share": {"gb": 4.0, "cores": 2}, "expect": 1200.0, "limits": False, "day": None}, ["x", "--", "c"]))
+        self.assertEqual(heavy.options(["--day", "--expect", "2h", "x", "--", "c"], baseline_store.seconds),
+                         ({"share": None, "expect": 7200.0, "limits": None, "day": True}, ["x", "--", "c"]))  # (#851)
         self.assertEqual(heavy.options(["x", "--", "c", "--no-limit"], baseline_store.seconds)[0],
-                         {"share": None, "expect": None, "limits": None})  # (the command's own options stay its own)
+                         {"share": None, "expect": None, "limits": None, "day": None})  # (the command's own options stay its own)
         for bad in (["--expect", "soon", "x"], ["--expect"], ["--fast", "x"]):
             self.assertIsNone(heavy.options(bad, baseline_store.seconds)[0], bad)
 
@@ -269,6 +272,7 @@ class Shell(unittest.TestCase):
                "PATH": os.pathsep.join([*path, os.path.join(root, "cmd")])}
         env.pop(heavy.HELD, None)
         env.pop("TRAM_HEAVY_NOWAIT", None)
+        env["TRAM_HEAVY_DAY"] = "1"  # (not held for the night by day, #851)
         r = subprocess.run([sys.executable, "-I", str(TOOLS / "heavy.py"), "a script", "--", "bash", "-c",
                             'echo "$BASH_VERSION $(uname -s)"; exit 4'], env=env, capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 4, r.stderr)
