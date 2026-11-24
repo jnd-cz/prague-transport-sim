@@ -660,7 +660,10 @@ class HeavyJob:
                 self.state, self.since = state, time.time()
             tmp = f"{self.path}.{state}.tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"what": self.what, "root": ROOT, "pid": os.getpid(), "t": self.t, "state": state,
+                # (held for the night, its ticket says it was queued at the night's start: a checkout from before #851
+                # orders by it, and so does not wait for it; its own place comes back when it is let go)
+                json.dump({"what": self.what, "root": ROOT, "pid": os.getpid(),
+                           "t": night_starts() if self.parked else self.t, "state": state,
                            "since": self.since, "share": self.share, "kind": self.kind, "expect": self.expect_s,
                            "warn": self.warn, "gb": self.gb, "watch": bool(self.thread) and self.limits,
                            "stops": bool(self.thread), "in": self.within, "held": bool(self.parked),

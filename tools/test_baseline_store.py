@@ -217,6 +217,20 @@ class DayAndNight(unittest.TestCase):
                                       noon, records=[])
         self.assertEqual({j["what"]: j["start"] for j in got}, {"long": self.at(23), "b": noon})
 
+    def test_a_held_jobs_ticket_is_queued_at_the_night_so_an_older_checkout_passes_it(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            j = self.job(expect=2400)
+            j.t, j.parked = time.time(), "expected 40 min"
+            j._write("waiting")
+            got, = baseline_store.queue()
+            j.parked = ""
+            j._write("waiting")
+            back, = baseline_store.queue()
+            os.remove(j.path)
+        self.assertTrue(got["held"])
+        self.assertEqual(got["t"], baseline_store.night_starts())
+        self.assertEqual((back["held"], back["t"]), (False, j.t))
+
     def test_a_held_job_starts_when_the_night_comes(self):
         out, nights = io.StringIO(), iter([False, False, True])
         with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d), \
