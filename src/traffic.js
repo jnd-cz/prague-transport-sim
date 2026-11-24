@@ -12,7 +12,11 @@ import { junctionTurns } from './indicators.js';
 import { t as tx } from './i18n.js'; // (t is the trams' loop variable here)
 import { aiLineCurrent } from './electric.js';
 import { carTypeOf } from './carTypes.js';
+import { circles, chainHead, kindOf, whyOf, speedOf, STAND_V } from './waits.js';
 
+// a chain of agents standing behind one head this long (s) is listed with its head (this.longChains, #560; openOMSI's
+// stats name every car standing over a minute with its chain's head)
+const LONG_CHAIN = 60;
 const OTHER_LINES = ['9', '15', '23', '2', '18', '13', '7', '4'];
 const MAX_CARS = 30, FADE = 1.2;
 export const MAX_WALKERS = 90;
@@ -458,6 +462,69 @@ export class Traffic {
     this._updateOncoming(dt, tram);
     this._wireLoads(dt);
     this._clearAiTramCycles(dt);
+    this._noteWaits(dt);
+  }
+
+  // The waits-for graph after a step (#560, src/waits.js). Our tram, standing, waits for what stands nearest before it
+  // within 30 m: a car on our track or on a crossing of it, an AI tram ahead (else for no one: a signal, a stop). Then:
+  // - this.waitCircles: each circle once while it lasts, with its members, their holds and their class: 'rules' (cars
+  //   held by junction or tram rules only), 'followers' (cars behind each other only) or 'tangled' (both, or a tram
+  //   or a walker in it);
+  // - this.longChains: each head of a standing chain once it has stood LONG_CHAIN s at its head, with its kind and why
+  //   (a walker crossing, a red light, a stop...); the checks count both by kind.
+  _noteWaits(dt) {
+    const g = this.game, ours = g.tram, clock = g.clock;
+    ours.waitFor = null; ours.why = null;
+    if ((ours.v ?? 0) < STAND_V) {
+      let best = null;
+      for (const o of [...(g.carsOnTrack || []), ...(g.carsCrossing || [])]) { const d = o.s - ours.s; if (d > -1 && d < 30 && (!best || d < best.d)) best = { d, a: o.car }; }
+      for (const t of this.ahead) { const d = t.s - t.length - ours.s; if (d > -1 && d < 30 && (!best || d < best.d)) best = { d, a: t }; }
+      if (best) { ours.waitFor = best.a; ours.why = best.a.kind === 'road' ? 'car' : 'tram'; } else ours.why = g.pilot?.stopWhy ?? null;
+    }
+    const agents = [ours, ...this.cars.filter((c) => c.kind === 'road' && c.active), ...this.ahead, ...this.oncoming, ...(this.slots || []).filter(Boolean)];
+    const name = (a) => { const k = kindOf(a, ours); return k === 'car' ? `car${a.id}` : k === 'walker' ? `walker${this.slots.indexOf(a)}` : k === 'tram' ? `tram${a.id}` : k; };
+    // circles, each once while it lasts
+    this.waitCircles ||= [];
+    const rings = new Map();
+    for (const ring of circles(agents)) rings.set(ring.map(name).join('>'), ring);
+    this._rings ||= new Map();
+    for (const k of this._rings.keys()) if (!rings.has(k)) this._rings.delete(k);
+    for (const [k, ring] of rings) {
+      if (this._rings.has(k)) continue;
+      this._rings.set(k, clock);
+      const holds = ring.map((a) => whyOf(a, ours));
+      const cars = ring.every((a) => kindOf(a, ours) === 'car');
+      const cls = !cars ? 'tangled' : holds.every((h) => h === 'junction' || h === 'tram') ? 'rules' : holds.every((h) => h === 'lead') ? 'followers' : 'tangled';
+      this.waitCircles.push({ clock: Math.round(clock), circle: k, holds, class: cls });
+      if (this.waitCircles.length > 50) this.waitCircles.shift();
+      this.waitCircleCount = this.waitCircleCount || {};
+      this.waitCircleCount[cls] = (this.waitCircleCount[cls] || 0) + 1;
+    }
+    // the heads of the chains of agents standing LONG_CHAIN s or more (an agent standing for no one heads its own), each
+    // listed once while it heads one: who holds them (walkers taking turns in front of one car are each a head)
+    const now = new Map();
+    for (const a of agents) {
+      a.stood = speedOf(a, ours) < STAND_V ? (a.stood || 0) + dt : 0;
+      if (a.stood < LONG_CHAIN || !a.waitFor) continue; // (one standing for no one, at a red light or a stop, is no chain)
+      const h = chainHead(a, ours);
+      if (h.circle) continue; // (a circle has no head: counted above)
+      const e = now.get(h.head);
+      if (!e || e.length < h.length) now.set(h.head, h);
+    }
+    // (a head stays listed until it has headed none for 5 s: walkers taking turns in front of a car came back to it)
+    this._heads ||= new Map();
+    for (const [k, t] of this._heads) if (!now.has(k) && clock - t > 5) this._heads.delete(k);
+    this.longChains ||= [];
+    for (const [head, h] of now) {
+      const listed = this._heads.has(head);
+      this._heads.set(head, clock);
+      if (listed) continue;
+      const kind = h.kind === 'car' && h.why === 'light' ? 'light' : h.kind;
+      this.longChains.push({ clock: Math.round(clock), head: name(head), kind, why: h.why, length: h.length });
+      if (this.longChains.length > 50) this.longChains.shift();
+      this.longChainCount = this.longChainCount || {};
+      this.longChainCount[kind] = (this.longChainCount[kind] || 0) + 1;
+    }
   }
 
   // a car slot (reused once its car has faded out); its model, one of ten looks, drawn from the run's stream when the
@@ -626,7 +693,8 @@ export class Traffic {
         // stop, someone crossing): stop or follow behind
         const ob = c.seen;
         let gapFor = lead;
-        if (ob && (gap === null || ob.gap < gap)) { gap = ob.gap; vLead = ob.v; gapFor = ob.car || ob.tram || (ob.what === 'our tram' ? tram : null); }
+        // (whom it follows, for the waits-for graph: a walker too, #560: a chain behind a walker had no head)
+        if (ob && (gap === null || ob.gap < gap)) { gap = ob.gap; vLead = ob.v; gapFor = ob.car || ob.tram || ob.walker || (ob.what === 'our tram' ? tram : null); }
         c.xing = xs.find((x) => x.rt === this.route) || null; // (our track's: the checks read it)
         for (const x of xs) {
           if (c.z !== undefined && x.sOurs !== null && Math.abs(c.z - this.ground.profile.height(x.sOurs)) > LEVEL_APART) continue;
@@ -1233,16 +1301,25 @@ export class Traffic {
     return false;
   }
 
-  // a moving car that would reach (x, y) within 4 s (a walker at the kerb waits for it)
+  // a moving car that would reach (x, y) within 4 s (a walker at the kerb waits for it), or null
   _carComing(x, y) {
     for (const c of this.cars) {
       if (!c.active || (c.vNow ?? 0) < 1) continue;
       const p = c.path.at(c.s, PA), dx = x - p.x, dy = y - p.y, d = Math.hypot(dx, dy);
       if (d > 40 || d < 0.5) continue;
       // coming towards the spot (within ~25° of its heading) and close in time
-      if ((dx * p.hx + dy * p.hy) / d > 0.9 && d / c.vNow < 4) return true;
+      if ((dx * p.hx + dy * p.hy) / d > 0.9 && d / c.vNow < 4) return c;
     }
-    return false;
+    return null;
+  }
+
+  // (B9) what a walker about to step into a car lane at `ahead` waits for, noted for the waits-for graph (#560): its red
+  // (w.why 'light') or a car coming (w.why 'car', w.waitFor that car); false when nothing holds it
+  _kerbWait(w, ahead, here) {
+    if (this._pedRed(ahead.x, ahead.y, here.p.hx * w.dir, here.p.hy * w.dir)) { w.why = 'light'; return true; }
+    const car = this._carComing(ahead.x, ahead.y);
+    if (car) { w.why = 'car'; w.waitFor = car; }
+    return !!car;
   }
 
   // a random door at a distance between rMin and rMax from (cx, cy), or null
@@ -1295,6 +1372,7 @@ export class Traffic {
     for (let i = 0; i < MAX_WALKERS; i++) {
       const w = this.slots[i];
       if (!w) continue;
+      w.why = null; w.waitFor = null; // (what it waits for: only at the kerb, _kerbWait)
       const pos = (s) => {
         const p = w.walk.path.at(s), off = w.walk.off + w.side;
         return { x: p.x + p.hy * off, y: p.y - p.hx * off, p };
@@ -1363,8 +1441,7 @@ export class Traffic {
           && !this.inLane(here.x, here.y)) this._turnBack(w, here);
         // (B9) at the kerb, about to step into a car lane: wait while a car is coming (it would reach the
         // spot within 4 s); once in the lane, go on (cars stop for walkers on their path)
-        else if (!this.inLane(here.x, here.y) && this.inLane(ahead.x, ahead.y)
-          && (this._pedRed(ahead.x, ahead.y, here.p.hx * w.dir, here.p.hy * w.dir) || this._carComing(ahead.x, ahead.y))) w.waitKerb = true; // (D2: and for its red)
+        else if (!this.inLane(here.x, here.y) && this.inLane(ahead.x, ahead.y) && this._kerbWait(w, ahead, here)) w.waitKerb = true; // (D2: and for its red)
         else {
           w.waitKerb = false;
           const s0 = w.s;

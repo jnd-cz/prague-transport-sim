@@ -115,18 +115,22 @@ class TrafficScenes(unittest.TestCase):
 
     def test_walkers_round_a_ring_of_walks_no_longer_hold_a_car(self):
         # (#496: before #608 the walkers circled the ring for good and the car stood behind them)
-        jam = self.play('walkerRing', fixOff=True)
+        jam = self.play('walkerRing', fixOff=True, t=90)
         self.assertIsNone(jam['past'])
+        # (the waits-for graph names the jam's heads: the walkers taking turns in front of the car, #560)
+        self.assertEqual(set(jam['heads']), {'walker'})
         r = self.play('walkerRing')
         self.clean(r)
         self.assertIsNotNone(r['past'])
         self.assertLess(r['past'], 40)
         self.assertTrue(r['walkLoops'])
+        self.assertEqual(r['heads'], {})
 
     def test_walkers_caught_on_one_spot_no_longer_hold_a_car(self):
         # (#393: walkers stepping round four short pieces on the spot held the car for good)
-        jam = self.play('walkerSpot', fixOff=True)
+        jam = self.play('walkerSpot', fixOff=True, t=90)
         self.assertIsNone(jam['past'])
+        self.assertEqual(set(jam['heads']), {'walker'})  # (#560)
         r = self.play('walkerSpot')
         self.clean(r)
         self.assertIsNotNone(r['past'])

@@ -141,7 +141,9 @@ export function run(T, { t = 60, tram = null, each = null, focus = [0, 0], trace
     if (traceEvery && k % Math.round(traceEvery / STEP) === 0) trace.push(state(T));
   }
   return { clock: Math.round(g.clock * 10) / 10, hits: g.hits, overlaps: [...worst.values()], cars: state(T).cars, trace,
-    walkLoops: [...T.walkLoops.entries()], walkLeaves: [...T.walkLeaves.entries()] };
+    walkLoops: [...T.walkLoops.entries()], walkLeaves: [...T.walkLeaves.entries()],
+    // (the waits-for graph, #560: heads of chains standing a minute or more by kind, circles by class)
+    heads: T.longChainCount || {}, circles: T.waitCircleCount || {}, longChains: T.longChains || [] };
 }
 
 // every car and walker, rounded: what the order test compares and the scenes report
@@ -325,9 +327,10 @@ export const SCENES = {
   },
 };
 
-// run scene `name` (with its args): run()'s result and the scene's own report
+// run scene `name` (with its args; args.t: for so many seconds instead of the scene's own): run()'s result and the
+// scene's own report
 export function play(name, args = {}) {
   const sc = SCENES[name](args);
-  const r = run(sc.T, { t: sc.t, tram: sc.tram ?? null, each: sc.each });
+  const r = run(sc.T, { t: args.t ?? sc.t, tram: sc.tram ?? null, each: sc.each });
   return { ...r, ...sc.report() };
 }

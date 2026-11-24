@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev check helpers (not part of the game) for the benches that drive a whole line (u3, redruns): when
 // our tram counts as stuck, and what stood in front of it then.
+import { chainHead } from '../../src/waits.js';
 
 // A function to call once per chunk: our tram's position once it has not got on for 10 minutes, else
 // null. A scheduled wait at a stop is not a deadlock: the clock starts at departure. Getting on is
@@ -23,20 +24,25 @@ export function stuckScene(game, traffic, pilot) {
   const tr = game.tram, plan = pilot.step(game, 0) || {}, st = game.stops[game.nextStop];
   // (a walker: where it stands and why: waiting at the kerb for a car, crossing, on the pavement)
   const walker = (w) => ({ walker: true, state: w.leave ? 'leaving' : w.waitKerb ? 'waits at the kerb' : w.door ? 'at a door' : 'walking', v: +(w.v ?? 0).toFixed(1), dir: w.dir, ...(w.still ? { stillFor: +w.still.t.toFixed(1) } : {}) });
-  const id = (o) => !o ? null : o === tr ? 'our tram' : o.kind === 'road' ? `car${o.id}` : `${traffic.ahead.includes(o) ? 'ahead' : 'oncoming'}${o.id}`;
+  const id = (o) => !o ? null : o === tr ? 'our tram' : o.kind === 'road' ? `car${o.id}` : o.walk !== undefined ? `walker${(traffic.slots || []).indexOf(o)}`
+    : `${traffic.ahead.includes(o) ? 'ahead' : 'oncoming'}${o.id}`;
   const seen = (o) => !o ? null : o.car ? id(o.car) : o.tram ? id(o.tram) : o.walker ? walker(o.walker) : o.what;
+  // (the chain from one agent: each with what holds it; a walker in it is a chain's head unless it waits at the kerb;
+  // the head of the whole chain and why it stands, as the waits-for graph finds it, #560)
   const waits = (car) => {
     const out = [], visited = new Set();
     for (let c = car; c && !visited.has(c) && out.length < 40; c = c.waitFor) {
       visited.add(c);
+      if (c.walk !== undefined) { out.push({ id: id(c), why: c.why ?? null, for: id(c.waitFor), ...walker(c) }); continue; }
       out.push({ id: id(c), v: +(c.kind === 'road' ? c.vNow ?? 0 : c.v).toFixed(1),
-        why: c.kind === 'road' ? c.why ?? null : c.stop?.why ?? null, for: id(c.waitFor),
+        why: c.kind === 'road' || c === tr ? c.why ?? null : c.stop?.why ?? null, for: id(c.waitFor),
         ...(c.kind === 'road' ? { gap: c.seen && +c.seen.gap.toFixed(1), seen: seen(c.seen), conn: !!c.conn,
           yielding: !!c.yielding, keepClear: !!c.keepClear, light: c.lane?.light ? traffic.lightAspect(c.lane.light) : null, junction: c.jBlock ?? null }
           : { s: Math.round(c.s), stopAt: c.stop && Math.round(c.stop.s), dwell: Math.max(0, c.dwell || 0) }) });
     }
     return out;
   };
+  const head = (a) => { const h = chainHead(a, tr); return { id: id(h.head), kind: h.kind, why: h.why, length: h.length, circle: h.circle }; };
   const sig = game.signals.find((q) => q.s > tr.s);
   const junction = game.signals.reduce((a, q) => !a || Math.abs(q.cross - tr.s) < Math.abs(a.cross - tr.s) ? q : a, null);
   const centre = game.route.at(junction?.cross ?? tr.s);
@@ -44,14 +50,16 @@ export function stuckScene(game, traffic, pilot) {
     nextStop: st && { name: st.name, d: Math.round(st.target - tr.s), served: st.served, waiting: st.waiting, runners: (game.runners || []).length },
     signal: sig && { d: Math.round(sig.s - tr.s), state: sig.state, demand: !!sig.demand, t: sig.t },
     // (with their chains: line 23 at 10 % load, seed 1, stood for good behind two cars on the track 8 and 9 m ahead, distances only)
-    carsOnTrack: (game.carsOnTrack || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), v: c.car?.vNow ?? c.v, waits: c.car ? waits(c.car) : [] })),
-    carsCrossing: (game.carsCrossing || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), onTrack: c.onTrack, v: c.car.vNow, light: c.car.lane?.light ? traffic.lightAspect(c.car.lane.light) : null, waits: waits(c.car) })),
+    carsOnTrack: (game.carsOnTrack || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), v: c.car?.vNow ?? c.v, waits: c.car ? waits(c.car) : [], head: c.car ? head(c.car) : null })),
+    carsCrossing: (game.carsCrossing || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), onTrack: c.onTrack, v: c.car.vNow, light: c.car.lane?.light ? traffic.lightAspect(c.car.lane.light) : null, waits: waits(c.car), head: head(c.car) })),
     tramAhead: game.tramAheadGap ? game.tramAheadGap() : null,
-    aiTrams: [...traffic.ahead, ...traffic.oncoming].map((t) => ({ id: id(t), waits: waits(t), cycleSeconds: t.cycleT || 0 })),
+    aiTrams: [...traffic.ahead, ...traffic.oncoming].map((t) => ({ id: id(t), waits: waits(t), head: head(t), cycleSeconds: t.cycleT || 0 })),
     junction: { s: Math.round(junction?.cross ?? tr.s), cars: traffic.cars.filter((c) => {
       if (!c.active || !c.path) return false;
       const p = c.path.at(c.s); return Math.hypot(p.x - centre.x, p.y - centre.y) < 100;
-    }).map((c) => ({ id: id(c), lane: c.lane?.id, waits: waits(c) })) },
+    }).map((c) => ({ id: id(c), lane: c.lane?.id, waits: waits(c), head: head(c) })) },
     recoveredCycles: game.trafficCycles || [],
+    // (#560: the heads of chains standing a minute or more, and the circles of waits, the last of each)
+    longChains: (traffic.longChains || []).slice(-10), circlesSeen: (traffic.waitCircles || []).slice(-10),
     obstacles: (game.obstacles || []).filter((o) => o.state !== 'gone' && o.s > tr.s && o.s - tr.s < 100).map((o) => ({ d: Math.round(o.s - tr.s), lat: o.lat, type: o.type, state: o.state })) };
 }
