@@ -607,8 +607,12 @@ export class Traffic {
           const gFront = x.g.dC - CAR_HALF, wait = gFront > 0 ? gFront : front;
           // (a car already across the group's first track goes on over the rest: waiting before the next one it stood on the
           // one behind it, and a tram there waited for it; line 37 s 4714, seed 5: our tram, a car on our track waiting for an
-          // oncoming tram, which waited for a car on its track, which waited for ours. It stops only for a tram's body there.
-          // Not where it would wait on a lane along the rails before it, _goesOn)
+          // oncoming tram, which waited for a car on its track, which waited for ours. It stops for a tram's body there, and for
+          // a tram coming that would reach the place before the car is across it, with no margin: line 17 s 9950, seed 14 on
+          // #833, a car held at a junction on the opposite track's band pulled out across ours with our tram 32 m off at
+          // 45 km/h. One standing on the opposite track is seen by its trams, which stop behind cars on their track; a tram
+          // standing, as in the deadlock above, is not coming. Not where it would wait on a lane along the rails before it,
+          // _goesOn)
           const across = gFront <= 0 && x.g.dC < x.dC && this._goesOn(x, xs);
           // (braking up to 5 m/s2; a car standing or crawling stays where it is: one held by the queue
           // 0.9 m from the band, inside YIELD_GAP, counted as committed and pulled out in front of the
@@ -631,7 +635,7 @@ export class Traffic {
               const onBody = hi > t.s - t.length - 2 && lo < t.s + 2;
               const tA = (lo - t.s - 2) / Math.max(t.v, 0.1), tC = x.kind === 'cross' || against ? tCw : tCs;
               const coming = t.v > 0.5 && lo >= t.s && (lo - t.s < 16 || tA < tC + (c.bold ? 0.5 : 2.5) || (along && lo - t.s < (t.v * t.v) / 2 + t.v * 2 + 20));
-              if (onBody || (coming && !across)) { holds = t; break; }
+              if (onBody || (coming && (!across || tA < tC))) { holds = t; break; }
             }
             if (holds) break;
           }
