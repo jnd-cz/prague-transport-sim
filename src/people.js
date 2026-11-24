@@ -188,15 +188,17 @@ export class People {
     this.recs.push({ key, m: this._matrix(this.recs.length), x: p.x, y: p.y, z: p.z, shirt: g.children[1]?.material?.color || FAR_SHIRT, n, box: g });
   }
 
-  // after the game's and the traffic's step, before drawing
-  sync(camera, traffic, game) {
+  // after the game's and the traffic's step, before drawing; the traffic and the game as drawn (src/trafficView.js,
+  // src/gameView.js)
+  sync(camera, trafficView, gameView) {
     this.recs.length = 0;
-    if (traffic) this._crowd(traffic.crowd, traffic.slots || [], 'w');
+    if (trafficView) this._crowd(trafficView.crowd, trafficView.traffic.slots || [], 'w');
+    const game = gameView?.game;
     if (game) {
-      this._crowd(game.crowd, null, 's');
-      game.runners.forEach((r, k) => this._box(r.mesh, r, 1000 + k));
-      game.obstacles.forEach((o, k) => { if (o.type === 'pedestrian') this._box(o.mesh, o, 2000 + k); });
-      if (game.action?.driver) this._box(game.action.driver, game.action, 3000);
+      this._crowd(gameView.crowd, null, 's');
+      game.runners.forEach((r, k) => this._box(gameView.meshOf(r), r, 1000 + k));
+      game.obstacles.forEach((o, k) => { if (o.type === 'pedestrian') this._box(gameView.meshOf(o), o, 2000 + k); });
+      if (gameView.driver) this._box(gameView.driver, game.action, 3000);
     }
     const t = game ? game.clock : 0, sweep = ++this.sweep;
     // how far each one moved since the last drawn frame: speed, walk phase, and the box figures' heading

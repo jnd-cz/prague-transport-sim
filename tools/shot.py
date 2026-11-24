@@ -36,6 +36,7 @@ from playwright.sync_api import Error as PlaywrightError, sync_playwright
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from atomic import replacing
 import gpu
+import snapshot
 from data_reference import ROOT, checkout, digest, git
 
 
@@ -77,10 +78,10 @@ def site(root, overlay=None):
 
 
 HIDE = 'body > :not(#view):not(#gl):not(#cab) { display:none !important }'
-# The game internals this tool drives (src/main.js, traffic.js, review.js); a renamed one fails here
+# The game internals this tool drives (src/main.js, run.js, review.js); a renamed one fails here
 # by name instead of as a timeout or a blank picture.
 HOOKS = {'game': ['window.game.route.at', 'window.game.route.heading', 'window.game.tram',
-                  'window.traffic.dispose', 'window.drawCount'],
+                  'window.run.trafficView.dispose', 'window.drawCount'],
          'review': ['window.review.ready', 'window.review.T', 'window.review._render', 'window.review.camera']}
 BAR = 36  # label strip above the pair
 
@@ -140,7 +141,7 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
               const g = window.game;
               if (s < 0 || s > g.route.length) throw new Error(`s ${s} outside route 0..${g.route.length}`);
               g.tram.s = s; g.tram.v = 0; g.tram.a = 0; g.paused = true;
-              window.traffic.dispose(); window.traffic.update = () => {};
+              window.run.trafficView.dispose(); window.traffic.update = () => {};
               const p = g.route.at(s), h = g.route.heading(s);
               return {x: p.x, y: p.y, yaw: Math.atan2(h.hx, h.hy) * 180 / Math.PI};
             }''', s)
@@ -259,6 +260,11 @@ def main(argv=None, root=ROOT):
     a = ap.parse_args(argv)
     if a.overlay and not a.overlay.is_dir():
         ap.error(f'--overlay: no folder {a.overlay}')
+    if a.view == 'review' and a.weather != 'dry':
+        ap.error('--weather: the review view paints the surface classes and draws no weather; --view cab or chase shows it')
+    snapshot.require_current_data(str(root))  # (#835; a reference revision's data is fetched from the store)
+    if a.ref and Path(a.ref).is_dir():
+        snapshot.require_current_data(str(Path(a.ref).resolve()))
     at = None
     if a.at:
         try:

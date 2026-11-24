@@ -48,8 +48,8 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 
 | klávesa | co dělá |
 |---|---|
-| `W` / `↑` | k jízdě (stupně J1–J5; pokročilé: ťuknutí o stupeň, držením dál) |
-| `S` / `↓` | k brzdě (B1–B5) |
+| `W` / `↑` | k jízdě (stupně J1–J5; jednoduché: hned o stupeň, držením o další dva za sekundu, puštěná páka je na nule jako po N; pokročilé: ťuknutí o stupeň, držením dál) |
+| `S` / `↓` | k brzdě (B1–B5, stejně) |
 | `Mezerník` | nouzová a kolejnicové brzdy (držet) |
 | `N` nebo `0` | obě šlapky volné (výběh) |
 | `1`–`5` | jízdní stupeň; se `Shift` brzdný |
@@ -96,10 +96,13 @@ Bdělostní pedál, je-li v menu zapnutý, je držený `Shift`.
   Motorgenerátor s oběma ventilátory je na jedné hřídeli a jeho sériový motor se točí podle napětí: proto
   tón klesne, když se rozjíždíte, a klesne i přidržením čelistí na dynamu; palubních 26 V regulátor drží.
   Informační panel ukazuje napětí, měnírnu, palubní napětí a otáčky.
-- **Ovládání** (menu): *Jednoduché* posouvá páku po stupních (W/S, 1–5, Shift+1–5) a šlapky ovládá jako
-  řidič, stojící vůz samo zabrzdí; *Pokročilé* ovládá přímo šlapky (ťuknutí o stupeň, držením dál rychlostí
+- **Ovládání** (menu): *Jednoduché* posouvá páku po stupních a šlapky ovládá jako řidič, stojící vůz samo
+  zabrzdí. Páka je na pružině: W/S ji hned posune o stupeň a držené o další dva za sekundu (za 2 s je na
+  stupni 5), puštěná je hned na nule jako po N (šlapka se zvedne za necelou půl sekundy), takže ťuknutí
+  dá stupeň jen na chvilku; 1–5 a Shift+1–5 nastaví stupeň, který zůstane; *Pokročilé* ovládá přímo šlapky (ťuknutí o stupeň, držením dál rychlostí
   20°/s; držené klávesy se zastaví na brzdném stupni 5) a R zabrzdí a odbrzdí zajišťovací brzdu; po
-  zabrzdění se čelisti plně uvolní až jízdní šlapkou. Mezerník je v obou nouzová brzda.
+  zabrzdění se čelisti plně uvolní až jízdní šlapkou. Mezerník je v obou nouzová brzda; v jednoduchém je
+  puštěný páka na nule, a kdo chce brzdit dál, drží při puštění S (▼): pak je na brzdném stupni 5.
 - Prázdný vůz zrychluje podle stupně 0,6–1,8 m/s², plný pomaleji; gravitace na sklonech (Chotkova ~7 %),
   odpor v obloucích, couvání po uvolnění brzdy v kopci, boční pohodlí v obloucích.
 - Počasí: sucho / déšť / podzimní listí určuje adhezi kola a kolejnice. Příliš velký proud protočí kola,
@@ -247,7 +250,7 @@ tmavé sklo je hra.
 Tlačítka na obrazovce, na dotykové obrazovce zobrazená automaticky, přepínaná 🎮 v menu (pamatuje si je
 zařízení; vypnutá je 🎮 vrátí i za jízdy). Posílají klávesy klávesnice:
 
-- řada nad panelem řidiče (na šířku sloupec vpravo): ▼ brzda, 0 neutrál, ▲ jízda (po stupni), STOP (nouzová brzda, držet) a tlačítko
+- řada nad panelem řidiče (na šířku sloupec vpravo): ▼ brzda, 0 neutrál, ▲ jízda (držet, jako `S` / `W`), STOP (nouzová brzda, držet) a tlačítko
   bdělosti, je-li ta volba zapnutá;
 - levý sloupec: dveře, zvonec, písek (držet), pohled vlevo / vpravo (držet), 🔍 přiblížení (držet), pohled, zrcátko, pauza;
 - Pult (kde bývalo ⋯) otevře pult v záložkách bočnice, pult, spínače, křídlo a hra. Ovladače jsou tam, kde jsou na
@@ -275,7 +278,7 @@ vašem prstu. Vůz stojí na zajišťovací brzdě: Y ji odbrzdí, teprve pak j�
 |---|---|
 | pravá spoušť | jízdní stupeň 1–5 podle toho, jak hluboko je stisknutá |
 | levá spoušť | brzdný stupeň 1–5 podle toho, jak hluboko je stisknutá (přebije pravou); obě puštěné: obě šlapky volné |
-| křížový ovladač ↑ / ↓ | o stupeň k jízdě / k brzdě (jako `W` / `S`) |
+| křížový ovladač ↑ / ↓ | k jízdě / k brzdě, držet (jako `W` / `S`) |
 | křížový ovladač ← / → | směrovky vlevo / vpravo |
 | A / ✕ | dveře |
 | B / ○ | zvonec |

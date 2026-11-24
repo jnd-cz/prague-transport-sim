@@ -57,8 +57,26 @@ class Schedule(unittest.TestCase):
     def test_mixed_alone_waits_for_all_and_shared_wait_for_it(self):
         s = {"gb": 2, "cores": 2}
         got = times([job(1, "running", since=NOW, share=s, expect=600), job(2, "waiting", expect=300),
-                     job(3, "waiting", share=s, expect=100)])
-        self.assertEqual(got, {1: (0, 600, False), 2: (600, 900, False), 3: (900, 1000, False)})
+                     job(3, "waiting", share=s, expect=500)])  # (1.5 × 500 ends after 1: in its turn)
+        self.assertEqual(got, {1: (0, 600, False), 2: (600, 900, False), 3: (900, 1400, False)})
+
+    def test_a_short_shared_job_goes_before_the_alone_ones(self):
+        """Backfilling (#829), as on 2026-11-23: two alone jobs wait for a long shared one; the short shared jobs
+        behind them run beside it, and the one too long for that keeps its turn."""
+        s = {"gb": 4, "cores": 2}
+        got = times([job(1, "running", since=NOW - 600, share=s, expect=4200), job(2, "waiting", expect=1380),
+                     job(3, "waiting", expect=360), job(4, "waiting", share=s, expect=180),
+                     job(5, "waiting", share=s, expect=360), job(6, "waiting", share=s, expect=3000)])
+        # (3, alone and short, goes before 2, alone and longer: the short ones first, #851)
+        self.assertEqual(got, {1: (-600, 3600, False), 2: (3960, 5340, False), 3: (3600, 3960, False),
+                               4: (0, 180, False), 5: (0, 360, False), 6: (5340, 8340, False)})
+
+    def test_a_short_shared_job_passes_one_of_no_known_time_behind_an_alone_one(self):
+        """2 waits for 1 (alone); 3 (no known time) waits behind 2, so 4 passing it delays neither (#829)."""
+        s = {"gb": 4, "cores": 2}
+        got = times([job(1, "running", since=NOW, share=s, expect=3600), job(2, "waiting", expect=600),
+                     job(3, "waiting", share=s, kind="new.py"), job(4, "waiting", share=s, expect=360)])
+        self.assertEqual(got, {1: (0, 3600, False), 2: (3600, 4200, False), 3: (4200, None, False), 4: (0, 360, False)})
 
     def test_shared_with_nothing_running_starts_whatever_its_memory(self):
         got = times([job(1, "waiting", share={"gb": 64, "cores": 32}, expect=60)], free=4.0)
@@ -67,7 +85,8 @@ class Schedule(unittest.TestCase):
     def test_late_ends_now_and_unknown_leaves_the_rest_unknown(self):
         got = times([job(1, "running", since=NOW - 600, expect=60), job(2, "waiting", kind="new.py"),
                      job(3, "waiting", expect=60)])
-        self.assertEqual(got, {1: (-600, 0, True), 2: (0, None, False), 3: (None, None, False)})
+        # (3, short, goes before 2, whose time is not known: #851; after 2 nothing would be known)
+        self.assertEqual(got, {1: (-600, 0, True), 2: (60, None, False), 3: (0, 60, False)})
 
     def test_board_says_the_finish(self):
         j = baseline_store.schedule([job(1, "running", since=NOW - 60, expect=600), job(2, "waiting", expect=300)], NOW, [])

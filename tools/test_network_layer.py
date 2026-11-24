@@ -4,7 +4,8 @@ is done), a shift started. Start reads no lookup of a tile the window does not h
 heights: every one goes through the lookup), and fewer lookups are held than the file has tiles. The traffic's network
 is the file's (data/lineN.network.json, tools/network.py): its roads, lanes, walks, doors, bound lanes, heads and
 crossings, each lane where the file starts it, the heads on the file's heights and the bridges' and road tunnels' ways
-between the file's ends (#682). Line 17 has every part: OSM's stop lines and signalled crossings, medians.
+between the file's ends (#682). Line 17 has every part: OSM's stop lines and signalled crossings, medians, crossings on
+the road under a bridge (the file's, #823; Start's seed draws one).
 
     python -P -E tools/test_network_layer.py
 A browser test (about 30 s). Skipped without line 17's network (python -I tools/snapshot.py data-fetch).
@@ -21,8 +22,12 @@ import gpu  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = "17"
+# Start's seed: its jaywalker draw picks Čechův most's crossing (s 14900), inside the bridge's span. Before #823 Start
+# asked Profile.overBridge there and read the ground under the span, past the window: with a fresh seed the test failed
+# on about one Start in six (line 17 has four crossings inside a span)
+SEED = 12
 
-START = """async () => {
+START = """async (seed) => {
   const lk = window.groundTiles.lookup, reads = {}, missed = {};
   const undo = ['height', 'survey', 'kind', 'bedOffSurvey', 'covered'].map((k) => {
     const f = lk[k];
@@ -33,16 +38,20 @@ START = """async () => {
   const gl = lk.g, later = gl.later, stopLater = [];
   gl.later = function (x, y, fn) { if (/buildStop/.test(new Error().stack)) stopLater.push([x, y]); return later.call(this, x, y, fn); };
   const { startShift } = await import('/tools/bench/shift.js');
-  try { await startShift({ timeout: 300 }); } finally { for (const u of undo) u(); gl.later = later; }
-  const T = window.traffic, mm = (v) => Math.round(v * 1000);
+  window.runSeed = seed;
+  try { await startShift({ timeout: 300 }); } finally { for (const u of undo) u(); gl.later = later; delete window.runSeed; }
+  const T = window.traffic, mm = (v) => Math.round(v * 1000), g = window.game;
+  // (the crossings inside a span, past the window still: what Start's own overBridge answered there before #823)
+  const spans = g.profile.bridges;
+  const inSpan = g.data.crossings.map((s, k) => [k, s]).filter(([, s]) => spans.some(([a, b]) => s > a + 8 && s < b - 8))
+    .map(([k, s]) => [k, g.profile.overBridge(s)]);
   return { reads, missed, held: window.groundTiles.lookups.size, tiles: window.groundTiles.tiles.size,
     n: { roads: T.roads.length, lanes: T.laneList.length, walks: T.walks.length, doors: T.doors.length, lights: T.lightLanes.length,
-         pedCross: T.pedCross.length, heads: T.lights.count, pedHeads: T.pedLights.count },
+         pedCross: T.pedCross.length, heads: T.heads.length, pedHeads: T.pedHeads.length },
     lanes: T.laneList.map((l) => [l.k, l.dir, l.sel, mm(l.path.p[0][0]), mm(l.path.p[0][1]), l.path.p.length]),
-    poles: [T.lights, T.pedLights].map((L) => { const pole = L.group.children[0], M = new pole.matrix.constructor(), out = [];
-      for (let i = 0; i < L.count; i++) { pole.getMatrixAt(i, M); out.push(M.elements[13]); } return out; }),
+    poles: [T.heads, T.pedHeads].map((H) => H.map((h) => h.h)), // (the heights the heads' poles stand at, #228: the traffic's)
     ways: window.game.route.ground.wayEnds.size, stopLater,
-    stops: window.game.stops.map((st) => ({ target: st.target, vienna: st.vienna, sign: st.sign.position.y })) };
+    stops: window.game.stops.map((st) => ({ target: st.target, vienna: st.vienna, sign: window.run.gameView.meshOf(st).position.y })), inSpan };
 }"""
 
 
@@ -65,7 +74,7 @@ class StartReadsNoSurvey(unittest.TestCase):
                     page, cls.errors, load = load_page(browser, url, LINE, 600, {"keepgeo": False})
                     if isinstance(load, dict):
                         raise RuntimeError(f"line {LINE}: the load failed: {load} {cls.errors[:3]}")
-                    cls.r = page.evaluate(START)
+                    cls.r = page.evaluate(START, SEED)
                 finally:
                     browser.close()
         finally:
@@ -102,6 +111,12 @@ class StartReadsNoSurvey(unittest.TestCase):
         self.assertTrue(vienna)  # (line 17 has two)
         for st, N in vienna:
             self.assertLess(abs(st["sign"] - N["zs"] / 100), 0.001)
+
+    def test_crossings_over_bridges_are_the_files(self):
+        """No jaywalker waits at a crossing on the road under a bridge: the build's list (overBridgeCrossings) is what
+        the page's Profile.overBridge answers at each crossing inside a span, so the draws stay as they were (#823)."""
+        self.assertTrue(self.r["inSpan"])  # (line 17: Modřany, the culvert at s 5816, Čechův most)
+        self.assertEqual([k for k, over in self.r["inSpan"] if over], self.net["overBridgeCrossings"])
 
     def test_no_page_errors(self):
         self.assertEqual(self.errors, [])

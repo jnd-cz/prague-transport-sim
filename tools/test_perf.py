@@ -231,7 +231,8 @@ def main():
                     runs.append(r)
                     print(f"run {i + 1}: {r['fps']} fps, over 20/33/50 ms {r['over']['20']}/{r['over']['33']}/{r['over']['50']} %, "
                           f"p50/p90/p99 {r['ms']['p50']}/{r['ms']['p90']}/{r['ms']['p99']} ms, gpu {r.get('gpuMs')} ms, "
-                          f"{r['calls']['mean']} calls, {r['triangles']['mean'] / 1e6:.2f} M triangles, heap {r.get('heapMB')} MB")
+                          f"{r['calls']['mean']} calls, {r['triangles']['mean'] / 1e6:.2f} M triangles, heap {r.get('heapMB')} MB"
+                          + (f", first 300 m over 33 ms {r['first300']['over33']} % of {r['first300']['frames']}" if r.get("first300") else ""))
                     watch.step(f"run {i + 1}")
                     page.click("#ptMenu")
                 fps = [r["fps"] for r in runs]

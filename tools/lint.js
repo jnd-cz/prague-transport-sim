@@ -132,14 +132,15 @@ function consistAtStops(g) {
   return check('consist-coupled', g.stops.length, bad);
 }
 
-// Signal heads standing along a platform (an island-tip pole or a head on the wire is fine).
+// Signal heads standing along a platform (an island-tip pole or a head on the wire is fine). (The heads as drawn: the
+// game's view, src/gameView.js)
 function signalsInPlatforms(g) {
-  const bad = [];
+  const bad = [], V = window.run.gameView;
   for (const sg of g.signals) {
-    const p = sg.mesh.position, n = g.route.nearest(p.x, -p.z);
+    const head = V.meshOf(sg), p = head.position, n = g.route.nearest(p.x, -p.z);
     if (!n) continue;
     for (const st of g.stops) {
-      if (st.p0 == null || n.s <= st.p0 || n.s >= st.p1 || sg.mesh.userData.hung || sg.mesh.userData.tip) continue;
+      if (st.p0 == null || n.s <= st.p0 || n.s >= st.p1 || head.userData.hung || head.userData.tip) continue;
       bad.push({ stop: st.name, s: Math.round(n.s), x: p.x, y: -p.z, mag: Math.min(n.s - st.p0, st.p1 - n.s), info: `${(st.p1 - n.s).toFixed(1)} m before the platform end` });
     }
   }
@@ -266,8 +267,8 @@ function bridgesWithoutDeck(g) {
 // Signals and signs inside the space the tram sweeps: up to the roof (3.6 m above the rails) the
 // body width plus the overhang in curves (tramClearance), above it the pantograph (±1 m, to 5.8 m).
 function mountedInEnvelope(g) {
-  const objs = [...g.signals.map((x) => x.mesh)];
-  g.objects.traverse((o) => { if (o.userData.boardTop !== undefined && !objs.includes(o)) objs.push(o); });
+  const V = window.run.gameView, heads = g.signals.map((x) => V.meshOf(x)), objs = [...heads];
+  V.objects.traverse((o) => { if (o.userData.boardTop !== undefined && !objs.includes(o)) objs.push(o); });
   const bad = [], box = new THREE.Box3(), c = new THREE.Vector3();
   for (const o of objs) {
     box.setFromObject(o);
@@ -284,7 +285,7 @@ function mountedInEnvelope(g) {
       if (box.min.y - z0 < 3.6) worst = Math.max(worst, body - lat);
       else if (box.min.y - z0 < 5.8) worst = Math.max(worst, 1.0 - lat);
     }
-    if (worst > 0.05) bad.push({ s: Math.round(n.s), x: c.x, y: -c.z, mag: worst, info: `${o.userData.hung ? 'hung ' : ''}${o.userData.boardTop !== undefined && !g.signals.some((x) => x.mesh === o) ? 'sign' : 'signal'} ${worst.toFixed(2)} m inside the tram's envelope` });
+    if (worst > 0.05) bad.push({ s: Math.round(n.s), x: c.x, y: -c.z, mag: worst, info: `${o.userData.hung ? 'hung ' : ''}${o.userData.boardTop !== undefined && !heads.includes(o) ? 'sign' : 'signal'} ${worst.toFixed(2)} m inside the tram's envelope` });
   }
   return check('mounted-clear-of-tram', objs.length, bad);
 }

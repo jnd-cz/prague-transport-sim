@@ -46,6 +46,7 @@ The file, data/lineN.network.json, positions in cm, a path's points `p` in mm (f
 - `pedCross`: each signalled crossing's node `p`, its walking direction `c` (×10⁴), `sig`, `along` and `heads`;
   `pedHeads`: their heads' `p` and `face`;
 - `overBridge`: the signals (data.signals' indexes) over a bridge, on the road under it: the game leaves them out;
+  `overBridgeCrossings`: the pedestrian crossings (data.crossings' indexes) there: no jaywalker waits at them;
 - `platforms`: each placed OSM platform's index `i` in data.platforms, its `name` and whether the survey draws it
   (`surveyed`: no strip of the page's);
 - `stops`: each of our stops (data.stops): `stand`, whether its stand-in platform is drawn, and `outer`, the shelter's
@@ -70,7 +71,8 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-VERSION = 3  # (2: the heights Start stands things on, #682; 3: our stops' one record each, with their heights, #694)
+VERSION = 4  # (2: the heights Start stands things on, #682; 3: our stops' one record each, with their heights, #694;
+# 4: the crossings over a bridge, #823)
 
 
 # ---------------------------------------------------------------- the page's arithmetic
@@ -1392,6 +1394,9 @@ class Signals:
         self.bind_peds()
         # (the signals over a bridge on the road under it: the game leaves them out)
         self.over = [k for k, d in enumerate(self.data.get("signals") or []) if not d.get("drop") and self.over_bridge(d["cross"])]
+        # (the pedestrian crossings over a bridge, on the road under it: no jaywalker there, src/game.js _initObstacles.
+        # Asked at Start, the ground under the span was past the window: line 17's Čechův most and Modřany, #823)
+        self.over_crossings = [k for k, s in enumerate(self.data.get("crossings") or []) if self.over_bridge(s)]
 
     def bind_peds(self):
         """_bindPedHeads(): at each OSM signalled crossing (data.osmSignals.peds) of one of the game's signals (its
@@ -1780,6 +1785,7 @@ def build(ln, log=print):
             "pedHeads": [{"p": [cm(x), cm(y)], "z": cm(h), "face": js_round(f * 1000)}
                          for (x, y, f), h in zip(sg.ped_heads, z["pedHeads"])],
             "overBridge": sg.over,
+            "overBridgeCrossings": sg.over_crossings,
             "platforms": [platform_record(p, z["platforms"].get(p["i"])) for p in st.platforms if not p.get("shared")],
             "stops": [stop_record(s, h) for s, h in zip(st.stops, z["stops"])],
             "fitted": fitted}

@@ -53,9 +53,8 @@ export async function run() {
   // the game's heads against the surveyed poles of the same label (where the survey has one within 20 m)
   const near = (x, y, l) => { let b = null; for (const p of by(l)) { const d = Math.hypot(p.x - x, p.y - y); if (d < 20 && (!b || d < b)) b = d; } return b; };
   const gCar = [], gTram = [];
-  const hm = traffic.lights?.group.children[0], M = new (window.THREE_?.Matrix4 || (await import('three')).Matrix4)();
-  for (let i = 0; hm && i < hm.count; i++) { hm.getMatrixAt(i, M); const x = M.elements[12], y = -M.elements[14], d = near(x, y, 'car'); if (d !== null) gCar.push(d); }
-  for (const s of tramSigs) { const v = s.mesh.getWorldPosition(s.mesh.position.clone()), d = near(v.x, -v.z, 'tram'); if (d !== null) gTram.push(d); }
+  for (const h of traffic.heads || []) { const d = near(h.x, -h.z, 'car'); if (d !== null) gCar.push(d); }
+  for (const s of tramSigs) { const m = window.run.gameView.meshOf(s), v = m.getWorldPosition(m.position.clone()), d = near(v.x, -v.z, 'tram'); if (d !== null) gTram.push(d); }
   const report = {
     heads: pts.length, poles: poles.length,
     labels: Object.fromEntries(['tram', 'car', 'ped', 'other'].map((l) => [l, by(l).length])),

@@ -27,7 +27,7 @@ RUN = """async () => {
   const { Autopilot } = await import('/src/autopilot.js');
   const g = window.game, tr = g.tram, traffic = window.traffic, ap = new Autopilot(), dt = 1 / 30;
   g.audio.setMuted?.(true);
-  const step = () => { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt, { position: { x: 0, z: 0 } }); };
+  const step = () => { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt); };
   const out = [];
   let T = 0;
   for (const ahead of [60, 35]) {

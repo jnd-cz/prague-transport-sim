@@ -1,0 +1,49 @@
+{
+ "schema": 1,
+ "issue": 447,
+ "line": "37",
+ "title": "Stairs: what kind stands here",
+ "findings": [
+  {
+   "kind": "stairs",
+   "id": "stairs-50.10481-14.47405",
+   "line": "37",
+   "lines": [
+    "37"
+   ],
+   "x": 4001.3,
+   "y": 1409.1,
+   "mag": 10.3,
+   "status": "review",
+   "place": [
+    50.1048146,
+    14.4740539
+   ],
+   "marks": [
+    {
+     "x": 4000.7,
+     "y": 1413.3,
+     "label": "lowest 182.66 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": 4000.6,
+     "y": 1405.3,
+     "label": "highest 186.93 m",
+     "color": "#ffffff"
+    }
+   ],
+   "options": [
+    "one flight, or flights in a straight line with landings",
+    "flights that turn (a dog-leg, a U, round a tower)",
+    "sunk: steps down between walls, below the ground round them",
+    "a wide step or steps between two levels side by side (a terrace's edge)",
+    "more than stairs: a wall, a bed or a ramp inside the area",
+    "a structure: stairs in the air, on a bridge or on a building",
+    "no stairs here",
+    "unsure"
+   ],
+   "info": "A survey stairs area of 19 m², its outline from 182.66 m to 186.93 m (27 points; area 2169 of line 37 in this build). The game draws it on the outline's triangles, 10.3 m² of it steeper than 1:1, which no stair is. What stands here? The pins are the outline's lowest and highest points. Asked in #447: a flight's 14 step noses lead 4 m down along a building's wall, the sidewalk's level on the other side; the lidar shows only the sidewalk's level (#447, 2026-11-20)."
+  }
+ ]
+}

@@ -34,7 +34,8 @@ document.addEventListener('keydown', e => {if (e.key === 'v') chase = true});
 btnStart.onclick = () => {
   window.game = {paused:false, tram:{s:0,v:0,a:0}, route:{length:10000,
     at:s=>({x:s,y:s/2}), heading:()=>({hx:0,hy:1})}};
-  window.traffic = {dispose() {}, update() {}};
+  window.traffic = {update() {}};
+  window.run = {trafficView: {dispose() {}, }};
   menu.classList.add('hidden');
 };
 if (params.has('review')) {
@@ -134,7 +135,7 @@ class Shots(unittest.TestCase):
 
     def test_a_missing_game_hook_is_named(self):
         (self.root / 'index.html').write_text(HTML.replace('dispose() {}, ', ''), encoding='utf-8')
-        with self.assertRaisesRegex(RuntimeError, 'window.traffic.dispose'):
+        with self.assertRaisesRegex(RuntimeError, 'window.run.trafficView.dispose'):
             capture(self.browser, self.root, 17, 5064, 'cab', self.root / 'x.png', 10)
         self.assertFalse((self.root / 'x.png').exists())
 
@@ -165,6 +166,13 @@ class Shots(unittest.TestCase):
             shot.main(['--line','17','--s','5064','--weather','snow','--out',str(output)], self.root)
         self.assertEqual(seen, ['snow', 'snow'])
         self.assertTrue((output/'line17-s5064-cab-snow-pair.png').exists())
+
+    def test_the_review_view_refuses_weather(self):
+        """It paints the surface classes: a weather's pictures would be the same on both sides (#707, #835)."""
+        with patch.object(shot, 'capture') as capture_, self.assertRaises(SystemExit) as e:
+            shot.main(['--line','17','--s','5064','--view','review','--weather','snow'], self.root)
+        self.assertEqual(e.exception.code, 2)
+        capture_.assert_not_called()
 
 
 class SameCheckout(unittest.TestCase):

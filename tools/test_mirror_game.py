@@ -43,7 +43,7 @@ def main():
             page.wait_for_function('window.game && window.mirror',timeout=60000)
             page.evaluate('''() => {
               game.tram.s = Math.min(5064,game.route.length); game.tram.v=0; game.tram.a=0; game.paused=true;
-              traffic.dispose(); traffic.update=()=>{}; window.headless=false;
+              run.trafficView.dispose(); traffic.update=()=>{}; window.headless=false;
             }''')
             page.add_style_tag(content='#pausePanel,#msgs {display:none !important}')
             for width,height in ((1280,720),(3840,2160),(390,844)):
