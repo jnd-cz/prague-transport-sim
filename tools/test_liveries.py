@@ -135,7 +135,7 @@ GAME = r"""async ({ secs, seed }) => {
   $('optCars').value = 'auto'; $('optObst').value = 'off'; $('optAuto').checked = false;
   const out = { menu: $('optLivery').value, menuRow: !$('liveryRow').hidden, options: [...$('optLivery').options].map((o) => o.value) };
   window.headless = true;
-  const g = await startShift(), tr = window.traffic, ap = new Autopilot(), dt = 1 / 30;
+  const g = await startShift(), tr = window.traffic, view = window.run.trafficView, ap = new Autopilot(), dt = 1 / 30;
   g.audio.setMuted(true);
   out.ours = window.tramModel.userData.livery;
   const seen = new Map();
@@ -144,10 +144,10 @@ GAME = r"""async ({ secs, seed }) => {
   while (T < secs && !g.finished) {
     ap.step(g, dt); g.update(dt, ap.input);
     const p = g.route.at(g.tram.s); camera.position.x = p.x; camera.position.z = -p.y;
-    tr.update(dt, camera); T += dt;
-    for (const t of [...tr.ahead, ...tr.oncoming]) if (!seen.has(t.mesh)) {
-      let map = null; t.mesh.traverse((o) => { if (!map && o.name === 'body') map = o.material.map; });
-      seen.set(t.mesh, { livery: t.mesh.userData.livery, map });
+    tr.update(dt); view.sync(camera); T += dt;
+    for (const m of [...tr.ahead, ...tr.oncoming].map((t) => view.meshOf(t))) if (!seen.has(m)) {
+      let map = null; m.traverse((o) => { if (!map && o.name === 'body') map = o.material.map; });
+      seen.set(m, { livery: m.userData.livery, map });
     }
   }
   window.headless = false; delete window.runSeed;

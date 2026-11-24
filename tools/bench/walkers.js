@@ -13,7 +13,7 @@ export function run(seconds = 180) {
   const st = { outs: 0, ins: 0, fadedFar: 0, links: 0, deadEnds: 0, uTurns: 0, metres: 0 };
   for (let k = 0; k < seconds * 30; k++) {
     const pre = traffic.slots ? traffic.slots.map((w) => w && { w, walk: w.walk, dir: w.dir, door: w.door }) : [];
-    traffic.update(h, camera, k % 4 === 0);
+    traffic.update(h);
     traffic.slots.forEach((w, i) => {
       const b = pre[i];
       if (b && b.w !== w) { if (b.door && !b.door.out) st.ins++; else st.fadedFar++; }

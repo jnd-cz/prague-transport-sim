@@ -20,10 +20,7 @@ export async function autopilot(startStop, untilStop, { obstacles = 'off', weath
   while (T < maxT && g.nextStop < untilStop && !g.finished) {
     const { vt, stopAt, notch } = ap.step(g, dt);
     g.update(dt, ap.input);
-    if (window.traffic) {
-      const p = g.route.at(tr.s);
-      window.traffic.update(dt, { position: { x: p.x, z: -p.y } });
-    }
+    if (window.traffic) window.traffic.update(dt);
     T += dt;
     if (trace && Math.floor(T) !== Math.floor(T - dt)) trace.push([Math.floor(T), g.nextStop, Math.round(tr.s), +tr.kmh.toFixed(1), +(vt * 3.6).toFixed(1), notch, stopAt && Math.round(stopAt), g.doorState]);
     for (const m of g.messages) {

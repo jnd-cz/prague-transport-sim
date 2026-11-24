@@ -44,21 +44,23 @@ const inBox = (b, x, y) => {
 // heading of an object whose rotation.y = atan2(hx, -hy) (cars, tram cars, walkers)
 const head = (ry) => [Math.sin(ry), -Math.cos(ry)];
 
-// everything visible now: vehicles as rectangles, walkers as points
-function snapshot(g, tr) {
+// everything visible now, as drawn (view: the traffic's models, src/trafficView.js): vehicles as rectangles, walkers as points
+function snapshot(g, tr, view) {
   const out = { veh: [], walk: [] };
   for (const [i, c] of tr.cars.entries()) {
-    if (c.alpha < 0.5) continue;
-    const p = c.mesh.position, [hx, hy] = head(c.mesh.rotation.y);
+    const m = view.meshOf(c);
+    if (c.alpha < 0.5 || !m) continue;
+    const p = m.position, [hx, hy] = head(m.rotation.y);
     out.veh.push({ id: `car${i}`, kind: 'car', x: p.x, y: -p.z, z: p.y, hx, hy, l: CAR[0] / 2, w: CAR[1] / 2, src: c.kind, alpha: c.alpha,
       state: c.coast && !c.active ? 'coast' : c.conn ? 'junction' : 'lane', road: c.road, dir: c.dir });
   }
   for (const [list, kind] of [[tr.ahead, 'tram ahead'], [tr.oncoming, 'tram oncoming']]) {
     for (const t of list) {
-      if ((t.alpha ?? 0) < 0.5) continue;
-      t.mesh.userData.cars.forEach((m, k) => {
+      const set = view.meshOf(t);
+      if ((t.alpha ?? 0) < 0.5 || !set) continue;
+      set.userData.cars.forEach((m, k) => {
         const [hx, hy] = head(m.rotation.y);
-        out.veh.push({ id: `${t.mesh.uuid}/${k}`, group: t.mesh.uuid, kind, x: m.position.x, y: -m.position.z, z: m.position.y, hx, hy, l: TRAM[0] / 2, w: TRAM[1] / 2 });
+        out.veh.push({ id: `${set.uuid}/${k}`, group: set.uuid, kind, x: m.position.x, y: -m.position.z, z: m.position.y, hx, hy, l: TRAM[0] / 2, w: TRAM[1] / 2 });
       });
     }
   }
@@ -68,10 +70,10 @@ function snapshot(g, tr) {
     const s = g.tram.s - 0.6 - 7.6 - k * CAR_PITCH, p = g.route.at(s), h = g.route.heading(s, 3);
     out.veh.push({ id: `us/${k}`, group: 'us', kind: 'our tram', x: p.x, y: p.y, z: g.route.ground.profile.height(s), hx: h.hx, hy: h.hy, l: TRAM[0] / 2, w: TRAM[1] / 2 });
   }
-  const M = new tr.crowd.matrix.constructor();
+  const M = new view.crowd.matrix.constructor();
   for (const [i, w] of (tr.slots || []).entries()) {
     if (!w || w.alpha < 0.5) continue;
-    tr.crowd.getMatrixAt(i, M);
+    view.crowd.getMatrixAt(i, M);
     const e = M.elements;
     out.walk.push({ id: `w${i}`, x: e[12], y: -e[14], z: e[13], hx: e[8], hy: -e[10], walk: w }); // w: the slot's walker (new object on respawn)
   }
@@ -81,7 +83,8 @@ function snapshot(g, tr) {
 // The traffic check as a watcher on a whole-line drive (tools/bench/u3.js run, opts.also; #722, the user's "agree" on
 // #708): it rides on the one drive of a line and seed that u3, redruns and stops share, so the tier drives each line
 // and seed once. It only reads. Every `sample` s of game time it records what the player would see (snapshot).
-export function trafficWatch(g, tr, { sample = 0.2, dt = 1 / 30 } = {}) {
+// (view: the run's traffic as drawn, src/trafficView.js)
+export function trafficWatch(g, tr, { sample = 0.2, dt = 1 / 30, view = window.run?.trafficView } = {}) {
   const slides = [], jumps = [], overlaps = [], hits = [], knobs = [], redRuns = [], stuckWalkers = [];
   const still = new Map(); // walker -> { x, y, t: since when within STILL_R of (x, y), flips, walks, dir, walk, rec }
   const lastS = new Map(); // oncoming tram -> its position at the previous step
@@ -113,7 +116,7 @@ export function trafficWatch(g, tr, { sample = 0.2, dt = 1 / 30 } = {}) {
       if (T < nextSample) return;
       nextSample = T + step;
       samples++;
-      const snap = snapshot(g, tr);
+      const snap = snapshot(g, tr, view);
       seenVeh += snap.veh.length; seenWalk += snap.walk.length;
       const now = new Map();
       // slide / jump: motion between two samples of the same visible object

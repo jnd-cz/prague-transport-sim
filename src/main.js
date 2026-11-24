@@ -604,7 +604,7 @@ async function start(extra = {}, o = menuOpts()) {
     scene.add(tramModel);
   }
   if (game) { scene.remove(game.objects); disposeModel(game.objects); }
-  if (traffic) traffic.dispose();
+  if (run) run.trafficView.dispose();
   applyWeather(o.weather);
   sWas = null; carry = 0; between.clear(); // (the steps start afresh with the shift: fixedSteps, drawnS, src/between.js)
   run = createRun({ scene, data, route, ground, audio }, {
@@ -1157,7 +1157,7 @@ window.between = between; // (tools/test_frame_rate.py)
 // after a step the page draws from: where what it moved stands (a step the traffic did not take, paused or the shift
 // over, moved none of it)
 function recordStep(moved) {
-  if (moved) between.record([...traffic.movers(), ...game.movers()]);
+  if (moved) between.record([...run.trafficView.movers(), ...game.movers()]);
   else between.hold();
 }
 function fixedSteps(span) {
@@ -1246,7 +1246,7 @@ function frame(now) {
   if (draw) {
     // (the movers between the last two steps, as our tram; back where the steps left them after the draw, below)
     if (game && !inspect.active && !window.headless) between.show(Math.min(1, carry / STEP));
-    if (people && game) people.sync(camera, traffic, game);
+    if (people && game) people.sync(camera, run.trafficView, game);
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }

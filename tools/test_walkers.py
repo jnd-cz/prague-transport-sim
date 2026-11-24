@@ -28,7 +28,7 @@ FIXTURE = '''async () => {
   window.fixture = ({ tracks = [], lane = () => false, red = false, walk, w = {} } = {}) => {
     const tr = Object.create(Traffic.prototype);
     tr.trackDist = (x, y) => Math.min(100, ...tracks.map((ty) => Math.abs(y - ty)));
-    tr.inLane = lane; tr.rand = () => 0.99; tr.crowd = { setMatrixAt() {} }; tr.ground = { surface: () => 0 };
+    tr.inLane = lane; tr.rand = () => 0.99; tr.ground = { surface: () => 0 };
     tr.walkLoops = new Map(); tr.walkLeaves = new Map();
     tr._pedRed = () => red; tr._carComing = () => false; tr._ringDoor = () => null; tr._ringIndex = () => null;
     tr.walks = walk ? [walk] : [];
@@ -40,7 +40,7 @@ FIXTURE = '''async () => {
   window.run = (tr, secs) => {
     let lo = Infinity, hi = -Infinity;
     for (let k = 0; k < secs * 30; k++) {
-      tr._updateWalkers(1 / 30, 0, 0, false);
+      tr._updateWalkers(1 / 30, 0, 0);
       const o = tr.slots[0];
       if (o?.y !== undefined) { lo = Math.min(lo, o.y); hi = Math.max(hi, o.y); }
     }
@@ -141,7 +141,7 @@ class Walkers(unittest.TestCase):
           const at = (y) => {
             const tr = fixture({ tracks: [0, 3.2] });
             tr.walks = [walk(-50, y, 1, 0, 100)]; tr.rand = () => 0.1; tr._ringIndex = () => ['w', 0, 40];
-            tr._updateWalkers(1 / 30, 0, 0, false);
+            tr._updateWalkers(1 / 30, 0, 0);
             return tr.slots.filter(Boolean).length;
           };
           return [at(1.6), at(8)];''')

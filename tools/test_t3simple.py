@@ -136,7 +136,7 @@ MEASURE = r"""async () => {
   out.lamps = { head: [mean(lamp.head, 0), mean(lamp.head, 1)], headZ: Math.max(...lamp.head.map((p) => p[2])) - Math.min(...lamp.head.map((p) => p[2])),
     corner: [Math.min(...lamp.corner.map((p) => p[1])), Math.max(...lamp.corner.map((p) => p[1]))], cornerX: mean(lamp.corner, 0) };
   // faded in as an AI tram: the fleet numbers stay a blended decal, the body opaque
-  const { setOpacity } = await import('/src/traffic.js');
+  const { setOpacity } = await import('/src/models.js');
   setOpacity(t3m, 0); setOpacity(t3m, 0.5); setOpacity(t3m, 1);
   const tc = t3m.userData.cars[0], fm = named(tc, 'fleet').material, bm = named(tc, 'body').material;
   out.fleet.faded = { transparent: fm.transparent, depthWrite: fm.depthWrite, opacity: fm.opacity, body: bm.transparent };

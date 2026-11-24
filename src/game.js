@@ -1511,7 +1511,7 @@ export class Game {
       if (!ai.hit && tram.s > rear - 0.3 && tram.s < ai.s) {
         ai.hit = true;
         tram.s = rear - 0.4;
-        this._collision(t('obj.tramAhead', { line: ai.mesh.userData.line ?? '?' }), 400);
+        this._collision(t('obj.tramAhead', { line: ai.line ?? '?' }), 400);
       }
       if (tram.s < rear - 5) ai.hit = false;
     }
