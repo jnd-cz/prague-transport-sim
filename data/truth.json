@@ -6351,7 +6351,7 @@
    ],
    "reach": 25,
    "issue": 800,
-   "what": "a survey sidewalk 3.8 m wide between the street and a building (line 17, 50.0872, 14.4163): its kerb edge surveyed 0.3-0.46 m under the road; IPR at the road's level 0.5 m in, 1.8-1.9 m under it from 1.5 m in to the building. IPR 1 m in bears 0.38-0.82 of that step along the edge",
+   "what": "a survey sidewalk 3.8 m wide between the street and a building (line 17, 50.0872, 14.4163): its kerb edge surveyed 0.3-0.46 m under the road; IPR at the road's level 0.5 m in, 1.8-1.9 m under it from 1.5 m in to the building. IPR 1 m in bears 0.28-0.82 of that step along its 82 m",
    "said": "D street has a wall and lower sidewalk next to the building.",
    "source": "the user's answer to PR #834's question 1 (A-D: a wall at the kerb, or a plain kerb with the ground falling behind?), 2026-11-24, #800. The wall rule of d5e1402 (IPR 1 m in bearing half of the step) took 11 of its 24 m for a kerb",
    "sections": [

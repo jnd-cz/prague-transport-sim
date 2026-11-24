@@ -431,11 +431,12 @@ WALL_SEEN = 0.5  # of a wall's step at a kerb edge (the walkway's level less the
 # (-885, 1105); line 37 (9065, 1055)) are of this kind: a walkway at the road's level with the step 1-3 m behind it, or
 # none. (Not IPR 1 m out: under a deck it reads the ground, not the road, and on Modřanská, line 17 (-2495, -8295), the
 # walkway under the road's deck rose 3.5 m to it)
-WALL_SEEN_RUN = 0.35  # the same where the walkway's level is IPR's own 1.5 m in, on a sidewalk the survey draws on
+WALL_SEEN_RUN = 0.25  # the same where the walkway's level is IPR's own 1.5 m in, on a sidewalk the survey draws on
 # unbroken past it: the step is IPR's and the survey has no line at it, so it stands at the kerb, IPR 1 m in only leaning
 # its way. The four walls the user confirmed are of this kind: three bear 0.60-1.01, and the one with the walkway lower
 # beside a building, line 17 (-360, 30) (the user, 2026-11-24: "street has a wall and lower sidewalk next to the
-# building"), 0.38-0.82, its wall some 0.7 m in. 93 % of such walls' metres bear 0.5 or more, 2 % under 0.35
+# building"), 0.28-0.82 along its 82 m, its wall 0.7-1.2 m in: at 0.35 its weakest metres were kerbs, and the walkway
+# rose between them. 93 % of such walls' metres bear 0.5 or more, under 1 % less than 0.25
 SEEN_ALONG = 1.0  # m either side along a kerb edge over which a wall's point takes the median of what IPR bears
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
 USUAL = 20  # samples (m) either side over which a street's usual width is its running median (a mouth is shorter)
@@ -1666,7 +1667,7 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
     1.5 m in, and was held 0.66 m under the car park: IPR has the verge at the car park's level there and falling 0.2 m
     a metre towards the road, and the user sees a slope with grass and bushes (2026-11-23, #834). Where the walkway's
     level is IPR's 1.5 m in, IPR 1 m in need only lean its way, WALL_SEEN_RUN: beside a building on line 17 (-360, 30)
-    the user sees a wall at the street and the walkway lower, and IPR 1 m in bears 0.38-0.82 of it (2026-11-24, #834).
+    the user sees a wall at the street and the walkway lower, and IPR 1 m in bears 0.28-0.82 of it (2026-11-24, #834).
     Without `near`: any step."""
     from kerbs import KERB
     level = np.asarray(own, float)
