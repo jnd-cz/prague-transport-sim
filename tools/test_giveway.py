@@ -52,7 +52,7 @@ LOOP = r"""async () => {
   const r = (v) => Math.round(v * 10) / 10;
   const read = (T, pts, d = 0) => {
     const xs = T._wayCrossings([[new Route(pts), -d, false]], Infinity);
-    return xs.map((x) => ({ rt: x.rt === T.route ? 'ours' : 'back', kind: x.kind, along: x.along, against: x.against, lo: r(x.spans[0].lo), hi: r(x.spans[0].hi), spans: x.spans.map((o) => [r(o.lo), r(o.hi)]),
+    return xs.map((x) => ({ rt: x.rt === T.route ? 'ours' : 'back', kind: x.kind, along: x.along, against: x.against, lo: r(x.spans[0].lo), hi: r(x.spans[0].hi), spans: x.spans.map((o) => [r(o.lo), r(o.hi), o.along, o.against]),
       dC: r(x.dC), gdC: r(x.g.dC), group: xs.indexOf(xs.find((o) => o.g === x.g)), goesOn: T._goesOn(x, xs) }));
   };
   return {
@@ -65,6 +65,8 @@ LOOP = r"""async () => {
     groupCross: read(traffic(ours, back), [[60, 15], [60, -15]], 11.5),
     // across a street our route takes out and back (east at y 0, round, west at y 3.5): both tracks are ours, two places
     twice: read(traffic(twice, null), [[60, 15], [60, -15]]),
+    // onto the eastward rails with the trams, 40 m on them, then left across the westward track of the same route
+    twiceRails: read(traffic(twice, null), [[100, -8], [110, 0.3], [150, 0.3], [160, 8]]),
   };
 }"""
 
@@ -148,6 +150,16 @@ class GiveWay(unittest.TestCase):
         self.assertLess(back_[1] - back_[0], 6)
         self.assertLess(abs(out_[0] - 60), 3)
         self.assertLess(abs(out_[1] - 60), 3)
+        # (onto the rails with the trams, then across the same route's other track: the first part is along the rails, its
+        # turn-in point only; the other is against the trams, whole. Each part's own direction sets the time the car takes
+        # to clear it, not the place's: line 9 s 27291, seed 4)
+        [w] = r['twiceRails']
+        self.assertEqual((w['rt'], w['kind'], w['along'], w['against']), ('ours', 'rails', True, True))
+        first, other = sorted(w['spans'])
+        self.assertEqual(first[0], first[1])
+        self.assertEqual(first[2:], [True, False])
+        self.assertGreater(other[0], 240)
+        self.assertEqual(other[2:], [False, True])
 
     def test_measured_not_judged(self):
         ok, line = judge('giveway', {'checks': {'waits': 3, 'waitInBody': {'count': 2, 'at': [], 'byRule': {'band': 2}},

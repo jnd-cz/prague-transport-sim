@@ -618,15 +618,16 @@ export class Traffic {
           // (the stretches of track the place takes up, lo to hi: the body on any of them holds the car, and the car is let
           // go once the tram's tail is past their far ends; a car let go when the tail passed the point where its way came
           // in still had the body over its way further on, #602)
-          // (the time to clear it: across the band, or over the whole stretch where the car crosses along it, or goes along
-          // it towards the trams)
-          const zone = x.kind === 'cross' || x.against ? Math.max(TRACK_ZONE, x.dOut - x.dC) : TRACK_ZONE;
-          const tC = (Math.max(0, front) + zone + 2 * CAR_HALF) / Math.max(v, 2.5);
+          // (the time to clear it, per stretch: across the band, or over the whole place where the car crosses along it, or
+          // goes along it towards the trams. Not a part along the rails with the trams because another part of the route is
+          // against them: line 9 s 27291, seed 4, a lane onto our rails whose way crosses the outbound track further on, #602)
+          const tCs = (Math.max(0, front) + TRACK_ZONE + 2 * CAR_HALF) / Math.max(v, 2.5);
+          const tCw = (Math.max(0, front) + Math.max(TRACK_ZONE, x.dOut - x.dC) + 2 * CAR_HALF) / Math.max(v, 2.5);
           for (const t of ours ? [tram, ...this.ahead] : this.oncoming) {
             if (!t || (t !== tram && (t.alpha ?? 0) < 0.3)) continue;
-            for (const { lo, hi, along } of x.spans) {
+            for (const { lo, hi, along, against } of x.spans) {
               const onBody = hi > t.s - t.length - 2 && lo < t.s + 2;
-              const tA = (lo - t.s - 2) / Math.max(t.v, 0.1);
+              const tA = (lo - t.s - 2) / Math.max(t.v, 0.1), tC = x.kind === 'cross' || against ? tCw : tCs;
               const coming = t.v > 0.5 && lo >= t.s && (lo - t.s < 16 || tA < tC + (c.bold ? 0.5 : 2.5) || (along && lo - t.s < (t.v * t.v) / 2 + t.v * 2 + 20));
               if (onBody || (coming && !across)) { holds = t; break; }
             }
@@ -922,7 +923,7 @@ export class Traffic {
   // comes in on), or, never in it, where it comes within NEAR and leaves that. Its kind: 'rails' (on them RAILS_RUN m and
   // more: a lane along the rails), 'cross' (out on the other side, or over the centre line), 'reach' (beside the track,
   // within a passing body's reach); one clear of the body is no place. spans: the stretches of track it takes up, [{ lo, hi,
-  // along, slo, shi }], one per part of the route it comes near (where the car turns onto the rails with the trams, only that point; a way
+  // along, against, slo, shi }], one per part of the route it comes near (where the car turns onto the rails with the trams, only that point; a way
   // over a street the route takes out and back, one for each way: line 9 s 907 and 27560, seed 4, taken as one stretch,
   // the car watched only the second and was hit on the first, #602); against: the car goes along it towards the trams.
   // One place seen twice (a loop of the route) counts once; places with no room for a car between them are one group,
@@ -972,8 +973,8 @@ export class Traffic {
       // whole. slo and shi: the whole stretch on each part, where a car on it is)
       const first = spans.find((o) => x.sx >= o.lo && x.sx <= o.hi);
       x.along = x.kind === 'rails' && !!first && first.a - first.b <= 2;
-      x.spans = spans.map((o) => (o === first && x.along ? { lo: x.sx, hi: x.sx, along: true, slo: o.lo, shi: o.hi }
-        : { lo: o.lo, hi: o.hi, along: false, slo: o.lo, shi: o.hi }));
+      x.spans = spans.map((o) => (o === first && x.along ? { lo: x.sx, hi: x.sx, along: true, against: false, slo: o.lo, shi: o.hi }
+        : { lo: o.lo, hi: o.hi, along: false, against: o.a - o.b > 2, slo: o.lo, shi: o.hi }));
       out.push(x);
     }
     out.sort((a, b) => a.dC - b.dC);
