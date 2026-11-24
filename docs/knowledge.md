@@ -1465,12 +1465,19 @@ Review these when realism matters; most move into the build in M2.
   late (line 17 seed 5, line 22 s 4211; #394). A longer hold was turned down (the user, 2026-11-10: "that would slow up the cycle and cause potential jams").
 - **AI tram gridlocks** (#168): line 37 seed 4 at Balabenka closes an oncoming tram → car 307 →
   car 295 → car 297 → that tram cycle before ours arrives. The #154 recovery covered only a car
-  immediately ahead of our tram. `Traffic._clearAiTramCycles` follows each vehicle's `waitFor`
-  (the controlling stop reason) and fades one car after the same closed cycle stands for 30 s.
-  Signal waits, boarding and moving vehicles end the chain. This is recovery for cars that cannot
+  immediately ahead of our tram. Since #560 both are one rule on the waits-for graph (`src/waits.js`):
+  `Traffic._tramCircles` finds the circles through a tram, ours or an AI one, and fades the car the tram
+  waits for after the same circle has stood 30 s, every agent of it standing. Boarding, a signal wait
+  (no `waitFor`) and moving vehicles open the circle. This is recovery for cars that cannot
   reverse out in the present model. `window.game.trafficCycles` records the removed car, cycle and
   reasons; the traffic check retains those events. `tools/bench/stuck.js` names both AI directions
-  and the nearby junction cars, including their `why`, `seen` and actual wait chains.
+  and the nearby junction cars, including their `why`, `seen`, actual wait chains and chain heads.
+- **Circles of cars** (#560): one graph per step over what each car sees, the car it followed and what held it.
+  Of each circle of cars only (up to 12), one goes at once (`Traffic._letGo`): of those a rule holds, the one with
+  none of the circle coming from its right (the user, 2026-11-24, on PR #850: "the traffic rule that car on the
+  right should go first"), else the one that has stood longest. It replaced three walks in which the lowest id went
+  (#607 and the lines it cites). A car standing 200 s, no red light holding it, more than 100 m from the focus is
+  taken off (`givenUp` in the traffic check), the last net after openOMSI.
 
 ## Checks and what they measure
 

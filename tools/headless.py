@@ -252,10 +252,12 @@ def judge(check, r):
             bad.append(f"did not finish (stop {st.get('nextStop')}, {st.get('simSeconds')} s): a jam")
         more = ", ".join(f"{k} {v.get('count') if isinstance(v, dict) else v}" for k, v in (r.get("checks") or {}).items())
         # (the waits-for graph, #560: heads of chains standing a minute or more by kind, circles by class; measured)
-        heads, rings = st.get("chainHeads") or {}, st.get("waitCircles") or {}
-        if heads or rings:
+        heads, rings, let = st.get("chainHeads") or {}, st.get("waitCircles") or {}, st.get("circlesLetGo") or {}
+        if heads or rings or let or st.get("givenUp") or st.get("cyclesBroken"):
             more += (f"; chain heads {', '.join(f'{k} {v}' for k, v in sorted(heads.items())) or 0}"
-                     f"; circles {', '.join(f'{k} {v}' for k, v in sorted(rings.items())) or 0}")
+                     f"; circles {', '.join(f'{k} {v}' for k, v in sorted(rings.items())) or 0}"
+                     f"; let go {', '.join(f'{k} {v}' for k, v in sorted(let.items())) or 0}"
+                     f"; through a tram broken {st.get('cyclesBroken', 0)}; given up {st.get('givenUp', 0)}")
     else:  # lint
         more = ", ".join(f"{k} {v.get('count')}" for k, v in (r.get("checks") or {}).items()
                          if isinstance(v, dict) and "count" in v)
@@ -312,7 +314,11 @@ def counts(check, r):
     if check == "traffic":
         out["finished"] = int(bool((r.get("stats") or {}).get("finished")))
         out["cyclesBroken"] = (r.get("stats") or {}).get("cyclesBroken", 0)  # (#154: a car on the track left a deadlock)
-        out["junctionCircles"] = (r.get("stats") or {}).get("junctionCircles", 0)  # (#607: a car let through a junction whose holds ran in a circle)
+        # (#560: of a circle of cars, one let go, by class: every car held by a rule, none, both; cars taken off after 200 s
+        # standing out of sight, the last net)
+        for cls in ("rules", "followers", "tangled"):
+            out["let go " + cls] = ((r.get("stats") or {}).get("circlesLetGo") or {}).get(cls, 0)
+        out["givenUp"] = (r.get("stats") or {}).get("givenUp", 0)
         out["walkersLeft"] = (r.get("stats") or {}).get("walkersLeft", 0)  # (#366: walkers with nowhere to go that left)
         # (#560: the heads of chains standing a minute or more, by kind; the circles of waits, by class)
         st = r.get("stats") or {}

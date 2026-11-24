@@ -37,46 +37,61 @@ export function whyOf(a, ours) {
   return a.stop?.why ?? null;
 }
 
-// The graph of agents `as` (each with .waitFor: another agent or null): its circles of two or more, each the list of
-// its agents in the order of their waits, by Tarjan's algorithm (iterative: a chain may be long)
-export function circles(as) {
+// the one agent a waits for, as noted (the default edges of the graph)
+const waitsFor = (a) => (a.waitFor ? [a.waitFor] : []);
+
+// The graph of agents `as`, an edge from each to every agent next(a) lists (by default its .waitFor): its circles of two
+// or more, by Tarjan's algorithm (iterative: a chain may be long). A circle of one wait each is listed in the order of
+// its waits from the agent with the lowest id; one where an agent waits for two of it, by id (the same circle reads the
+// same way each step).
+export function circles(as, next = waitsFor) {
   const index = new Map(), low = new Map(), on = new Set(), stack = [], out = [];
   let n = 0;
   const inGraph = new Set(as);
+  const id = (a) => a.id ?? 0;
   for (const root of as) {
     if (index.has(root)) continue;
-    const work = [[root, false]];
+    const work = [[root, next(root), 0]];
+    index.set(root, n); low.set(root, n); n++; stack.push(root); on.add(root);
     while (work.length) {
-      const [v, back] = work.pop();
-      if (!back) {
-        if (index.has(v)) continue;
-        index.set(v, n); low.set(v, n); n++;
-        stack.push(v); on.add(v);
-        work.push([v, true]);
-        const w = v.waitFor;
-        if (w && inGraph.has(w)) {
-          if (!index.has(w)) work.push([w, false]);
-          else if (on.has(w)) low.set(v, Math.min(low.get(v), index.get(w)));
-        }
-      } else {
-        const w = v.waitFor;
-        if (w && inGraph.has(w) && on.has(w)) low.set(v, Math.min(low.get(v), low.get(w)));
-        if (low.get(v) === index.get(v)) {
-          const part = [];
-          let x;
-          do { x = stack.pop(); on.delete(x); part.push(x); } while (x !== v);
-          if (part.length > 1) {
-            // (in the order of their waits, from the one with the lowest id: the same circle reads the same way each step)
-            const start = part.reduce((a, b) => ((a.id ?? 0) <= (b.id ?? 0) ? a : b));
-            const ring = [start];
-            for (let y = start.waitFor; y && y !== start && ring.length < part.length; y = y.waitFor) ring.push(y);
-            out.push(ring);
-          }
-        }
+      const top = work[work.length - 1], [v, ws] = top;
+      if (top[2] < ws.length) {
+        const w = ws[top[2]++];
+        if (!w || !inGraph.has(w)) continue;
+        if (!index.has(w)) {
+          index.set(w, n); low.set(w, n); n++; stack.push(w); on.add(w);
+          work.push([w, next(w), 0]);
+        } else if (on.has(w)) low.set(v, Math.min(low.get(v), index.get(w)));
+        continue;
       }
+      work.pop();
+      if (work.length) { const u = work[work.length - 1][0]; low.set(u, Math.min(low.get(u), low.get(v))); }
+      if (low.get(v) !== index.get(v)) continue;
+      const part = [];
+      let x;
+      do { x = stack.pop(); on.delete(x); part.push(x); } while (x !== v);
+      if (part.length < 2) continue;
+      const set = new Set(part), start = part.reduce((a, b) => (id(a) <= id(b) ? a : b));
+      const ring = [start];
+      for (let y = start; ring.length <= part.length;) {
+        const ins = next(y).filter((w) => set.has(w));
+        if (ins.length !== 1 || ins[0] === start) break;
+        ring.push((y = ins[0]));
+      }
+      out.push(ring.length === part.length ? ring : part.sort((a, b) => id(a) - id(b)));
     }
   }
   return out;
+}
+
+// Does o come from c's right (#560, the user, 2026-11-24: "the traffic rule that car on the right should go first")? Their
+// poses { x, y, hx, hy }: o heads across c's way from right to left (its heading turned left of c's by 0.5 to π − 0.5,
+// read as turnOf in src/traffic.js reads a turn) and stands on c's right, within `near` m.
+export function fromRight(c, o, near = 25) {
+  const dx = o.x - c.x, dy = o.y - c.y;
+  if (Math.hypot(dx, dy) > near) return false;
+  const ang = Math.atan2(c.hx * o.hy - c.hy * o.hx, c.hx * o.hx + c.hy * o.hy);
+  return ang > 0.5 && ang < Math.PI - 0.5 && c.hx * dy - c.hy * dx < 0;
 }
 
 // The head of the chain of waits from agent a: { head, why, kind, length, circle } where circle is true when the waits

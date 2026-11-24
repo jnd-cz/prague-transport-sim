@@ -126,6 +126,37 @@ class TrafficScenes(unittest.TestCase):
         self.assertTrue(r['walkLoops'])
         self.assertEqual(r['heads'], {})
 
+    def test_of_a_circle_of_cars_the_one_with_nobody_on_its_right_goes(self):
+        # (#560, the user, 2026-11-24: "the traffic rule that car on the right should go first"; a junction at 0,0, the
+        # cars 6 m before it on their lanes, 1.75 m right of the roads' middles)
+        r = self.page.evaluate('''async () => {
+          const { Traffic } = await import('/src/traffic.js');
+          const make = () => { const tr = Object.create(Traffic.prototype); tr.game = { clock: 100 }; tr._seq = (c) => [[c.path, 0]]; return tr; };
+          const car = (id, x, y, hx, hy, stood) => ({ id, kind: 'road', active: true, why: 'junction', s: 0, stood,
+            path: { at: () => ({ x, y, hx, hy }) } });
+          const S = () => car(1, 1.75, -6, 0, 1, 30), E = () => car(2, 6, 1.75, -1, 0, 10);
+          const N = () => car(3, -1.75, 6, 0, -1, 10), W = () => car(4, -6, -1.75, 1, 0, 20);
+          const goes = (tr, cars) => [...tr._letGo(cars).keys()].map((c) => c.id);
+          const out = {};
+          // two cars from the south and the east, each held by the other: the east one has nobody on its right
+          { const tr = make(), s = S(), e = E(); s.waitFor = e; e.waitFor = s; out.two = goes(tr, [s, e]); out.cls = tr.circlesLetGo; }
+          // every arm taken, each waiting for the one on its right: the one that has stood longest
+          { const tr = make(), cs = [S(), E(), N(), W()]; cs.forEach((c, i) => { c.waitFor = cs[(i + 1) % 4]; }); cs[3].stood = 40; out.four = goes(tr, cs); }
+          // the east car follows the south one on its way (not a rule's hold): the south one goes
+          { const tr = make(), s = S(), e = E(); s.waitFor = e; e.why = 'lead'; e.seen = { car: s }; s.path = e.path; out.follower = goes(tr, [s, e]); }
+          // the build's lanes are on the right of their roads as fromRight reads it: a car heading +x stands at y < 0
+          const S2 = window.S, T = S2.build({ roads: [{ p: [[-60, 0], [0, 0]] }, { p: [[0, 0], [60, 0]] }] });
+          const p = S2.laneOf(T, 0, 1).path.at(20);
+          out.right = { hx: Math.round(p.hx), y: Math.round(p.y * 100) / 100 };
+          return out;
+        }''')
+        self.assertEqual(r['two'], [2])
+        self.assertEqual(r['cls'], {'rules': 1})
+        self.assertEqual(r['four'], [4])
+        self.assertEqual(r['follower'], [1])
+        self.assertEqual(r['right']['hx'], 1)
+        self.assertLess(r['right']['y'], 0)
+
     def test_walkers_caught_on_one_spot_no_longer_hold_a_car(self):
         # (#393: walkers stepping round four short pieces on the spot held the car for good)
         jam = self.play('walkerSpot', fixOff=True, t=90)

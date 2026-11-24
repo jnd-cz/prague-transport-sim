@@ -53,7 +53,7 @@ export function stuckScene(game, traffic, pilot) {
     carsOnTrack: (game.carsOnTrack || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), v: c.car?.vNow ?? c.v, waits: c.car ? waits(c.car) : [], head: c.car ? head(c.car) : null })),
     carsCrossing: (game.carsCrossing || []).filter((c) => c.s > tr.s && c.s - tr.s < 120).map((c) => ({ d: Math.round(c.s - tr.s), onTrack: c.onTrack, v: c.car.vNow, light: c.car.lane?.light ? traffic.lightAspect(c.car.lane.light) : null, waits: waits(c.car), head: head(c.car) })),
     tramAhead: game.tramAheadGap ? game.tramAheadGap() : null,
-    aiTrams: [...traffic.ahead, ...traffic.oncoming].map((t) => ({ id: id(t), waits: waits(t), head: head(t), cycleSeconds: t.cycleT || 0 })),
+    aiTrams: [...traffic.ahead, ...traffic.oncoming].map((t) => ({ id: id(t), waits: waits(t), head: head(t), circleSeconds: +([...(traffic._tramRings || new Map()).values()].find((e) => e.ring.includes(t))?.t || 0).toFixed(1) })),
     junction: { s: Math.round(junction?.cross ?? tr.s), cars: traffic.cars.filter((c) => {
       if (!c.active || !c.path) return false;
       const p = c.path.at(c.s); return Math.hypot(p.x - centre.x, p.y - centre.y) < 100;

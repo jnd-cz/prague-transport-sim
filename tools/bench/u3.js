@@ -146,7 +146,9 @@ export async function run(seed = 1, opts = {}) {
           if (d > 0 && d < 100 && tr.v > 0.5) crossed.add(xc.car.id);
           if (xc.onTrack && d > 0 && tr.v > 2 && d < (tr.v * tr.v) / 2 + 10 && !cut.has(xc.car.id)) {
             cut.add(xc.car.id);
-            R.cuts.push({ s: Math.round(tr.s), d: Math.round(d), v: +(tr.v * 3.6).toFixed(0), bold: !!xc.car.bold });
+            R.cuts.push({ s: Math.round(tr.s), d: Math.round(d), v: +(tr.v * 3.6).toFixed(0), bold: !!xc.car.bold,
+              // (#560: seconds since a circle of cars let it go, if within a minute)
+              letGo: game.clock - (xc.car.letGoAt ?? -Infinity) < 60 ? Math.round(game.clock - xc.car.letGoAt) : null });
           }
         }
       }
