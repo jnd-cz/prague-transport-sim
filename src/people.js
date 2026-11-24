@@ -7,7 +7,9 @@
 // with or without it. The box figures stay in the scene on a camera layer nothing draws: their
 // `visible` is the game's (an obstacle pedestrian appears by it) and they come back with ?boxpeople.
 // An animated figure is one primitive, one draw call (its shirt, trousers and the rest were three before), and only
-// people in view are animated (the slots went by distance alone, to people behind the camera too).
+// people in view are animated (the slots went by distance alone, to people behind the camera too): in the camera's view,
+// or in the right mirror's near the tram (people boarding, running for the doors; the user, 2026-11-24: "The main use
+// of mirrors in player's vehicle is to check is people finished boarding").
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { bindPose, middleBody, withStyle, styleOf, STYLES, SKIN_COLOR, HAT_COLOR } from './figures.js';
@@ -23,6 +25,10 @@ const NEAR_MAX = 64, NEAR_IN = 80, NEAR_OUT = 88, KEEP = 5, FULL_IN = 40, FULL_O
 // in view: the camera's frustum against a sphere round the figure (its bounds, BODY_R), VIEW_IN m larger to come in and
 // VIEW_OUT m to stay (as src/cars.js: the change happens off the screen's edge)
 const BODY_R = 1.45, VIEW_IN = 3, VIEW_OUT = 4;
+// in the mirror's view (src/mirror.js: 30 degrees, a picture about 300 px tall, 30 times a second) within MIRROR_IN m of
+// its camera, kept to MIRROR_OUT: a figure at 50 m is about 20 px tall there, as one at 80 m on a 1080 px screen. Those
+// seen only there are the middle figure (the full one's face is a pixel or two in it)
+const MIRROR_IN = 50, MIRROR_OUT = 55;
 // one Walk cycle covers 16/15 m, one Run cycle 2.15 m (the lab's catalog.json); faster than RUN: running
 const STRIDE = { Walk: 16 / 15, Run: 2.15 }, RUN = 2.4, STILL = 0.25;
 const FAR_MAX = 320;
@@ -164,6 +170,7 @@ export class People {
     this.colors = [];
     this.cam = new THREE.Vector3();
     this._f = new THREE.Frustum(); this._pv = new THREE.Matrix4(); this._sp = new THREE.Sphere();
+    this._mf = new THREE.Frustum(); this.mcam = new THREE.Vector3();
     this.sweep = 0;
     this.stats = { near: 0, far: 0, people: 0, figures: 0 };
   }
@@ -222,8 +229,8 @@ export class People {
   }
 
   // after the game's and the traffic's step, before drawing; the traffic and the game as drawn (src/trafficView.js,
-  // src/gameView.js)
-  sync(camera, trafficView, gameView) {
+  // src/gameView.js); mirror: the right mirror's camera, posed for this frame, while the mirror is shown (else null)
+  sync(camera, trafficView, gameView, mirror = null) {
     this.recs.length = 0;
     if (trafficView) this._crowd(trafficView.crowd, trafficView.traffic.slots || [], 'w');
     const game = gameView?.game;
@@ -254,27 +261,36 @@ export class People {
       rescale(r.m, r.w, r.h);
     }
     for (const [k, s] of this.track) if (s.seen !== sweep) this.track.delete(k);
-    // the nearest ones in view (a near one keeps its place): animated figures; the rest: the far batch
+    // the nearest ones in view (a near one keeps its place): animated figures; the rest: the far batch. In the camera's
+    // view, or else in the mirror's (by their distance to its camera)
     const c = camera.getWorldPosition(this.cam);
     camera.updateMatrixWorld();
     this._f.setFromProjectionMatrix(this._pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const mc = mirror && mirror.getWorldPosition(this.mcam);
+    if (mirror) { mirror.updateMatrixWorld(); this._mf.setFromProjectionMatrix(this._pv.multiplyMatrices(mirror.projectionMatrix, mirror.matrixWorldInverse)); }
     for (const r of this.recs) {
       const was = this.near.has(r.key);
       r.raw = Math.hypot(r.x - c.x, r.y - c.y, r.z - c.z); r.d = r.raw - (was ? KEEP : 0);
       this._sp.center.set(r.x, r.y + 0.9, r.z);
       this._sp.radius = BODY_R + (was ? VIEW_OUT : VIEW_IN);
       r.view = r.d < (was ? NEAR_OUT - KEEP : NEAR_IN) && this._f.intersectsSphere(this._sp);
+      r.mirror = false;
+      if (!r.view && mc) {
+        const dm = Math.hypot(r.x - mc.x, r.y - mc.y, r.z - mc.z);
+        if (dm < (was ? MIRROR_OUT : MIRROR_IN) && this._mf.intersectsSphere(this._sp)) { r.view = r.mirror = true; r.d = dm - (was ? KEEP : 0); }
+      }
     }
     const near = this.recs.filter((r) => r.view).sort((a, b) => a.d - b.d).slice(0, NEAR_MAX);
     const keep = new Set(near.map((r) => r.key));
     for (const [k, f] of this.near) if (!keep.has(k)) { f.root.visible = false; this.pool.push(f); this.near.delete(k); }
-    let full = 0;
+    let full = 0, mirrored = 0;
     for (const r of near) {
       let f = this.near.get(r.key);
-      const level = r.raw < (f?.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'middle';
+      const level = !r.mirror && r.raw < (f?.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'middle';
       if (!f) { f = this._figure(); this.near.set(r.key, f); }
       this._pose(f, r, t, level);
       if (level === 'full') full++;
+      if (r.mirror) mirrored++;
     }
     let n = 0;
     const pants = this.far.geometry.attributes.instanceTrousers, hair = this.far.geometry.attributes.instanceHair;
@@ -291,7 +307,7 @@ export class People {
     this.far.instanceMatrix.needsUpdate = true;
     this.far.instanceColor.needsUpdate = true;
     pants.needsUpdate = hair.needsUpdate = true;
-    Object.assign(this.stats, { near: near.length, full, middle: near.length - full, far: n, people: this.recs.length });
+    Object.assign(this.stats, { near: near.length, full, middle: near.length - full, mirror: mirrored, far: n, people: this.recs.length });
   }
 
   _pose(f, r, t, level) {

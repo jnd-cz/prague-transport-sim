@@ -6,7 +6,8 @@ become animated figures (at most 64, in within 80 m, out beyond 88 m; the full f
 simplified one further out, which must be the far figure's body unbaked), walk or run by their speed and
 keep the crowd's shirt colours, with hair colours and styles of their own; the rest go to the far batch and
 the box crowd is hidden. Each animated figure is one draw call, and only people in view are animated: with
-the camera turned away from the row, none. Part 2, in the game (needs data/lineN.json; skipped without): after a short autopilot drive the
+the camera turned away from the row, none; with the right mirror's camera looking along it, those within 50 m of
+the mirror, as the simplified figure, one draw call each in its picture. Part 2, in the game (needs data/lineN.json; skipped without): after a short autopilot drive the
 walkers and the stop crowd are drawn by figures, the box meshes are on the hidden layer, and ?boxpeople
 leaves the box figures."""
 import argparse
@@ -79,6 +80,17 @@ SYNTHETIC = """async () => {
   for (const g of parts) { g.computeBoundingBox(); box.union(g.boundingBox); }
   people.far.geometry.computeBoundingBox();
   out.middleBoxGap = Math.max(box.min.distanceTo(people.far.geometry.boundingBox.min), box.max.distanceTo(people.far.geometry.boundingBox.max));
+  // the mirror (src/mirror.js's camera: 30 deg, 150:190) at the camera's place looking along the row, the camera turned
+  // away: the row every 2 m from x = 1; first without the mirror (only the camera's margin: x 1, 3, 5), then with it
+  const mirror = new THREE.PerspectiveCamera(30, 150 / 190, 0.3, 300);
+  mirror.position.set(0, 2.1, 0); mirror.rotation.set(0, -Math.PI / 2, 0);
+  row(1, 2); cam.rotation.set(0, Math.PI / 2, 0); cam.position.set(0, 1.6, 0); cam.updateMatrixWorld();
+  const sync = (m) => { game.clock += 0.5; people.sync(cam, { crowd, traffic: { slots } }, gameView, m); };
+  sync(null); sync(null); out.noMirror = { ...people.stats };
+  sync(mirror); sync(mirror); out.mirror = { ...people.stats };
+  const ren2 = new THREE.WebGLRenderer(); ren2.setSize(150, 190);
+  ren2.info.reset(); ren2.render(scene, mirror); out.mirrorCalls = ren2.info.render.calls;
+  ren2.dispose();
   return out;
 }"""
 
@@ -154,6 +166,10 @@ def main():
                 # (the figure's sphere, 1.45 m, and the 4 m kept: those within 5.45 m behind the camera stay, 9 of the row)
                 "none animated out of view (beyond the 5.45 m margin)": (s["away"]["near"], s["away"]["far"]) == (9, 91),
                 "animated again in view": s["back"]["near"] == 64,
+                "turned away, no mirror: the camera's margin only (3)": (s["noMirror"]["near"], s["noMirror"]["mirror"]) == (3, 0),
+                "the mirror: those within 50 m of it animated (3 + 22), the simplified figure":
+                    (s["mirror"]["near"], s["mirror"]["mirror"]) == (25, 22) and s["mirror"]["full"] <= 3,
+                "the mirror's picture: one draw call a figure (25 + the far batch)": s["mirrorCalls"] == 26,
             }
             fails += [f"synthetic: {k}" for k, ok in want.items() if not ok]
             if data and not args.synthetic:

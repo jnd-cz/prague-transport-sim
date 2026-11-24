@@ -1245,7 +1245,10 @@ function frame(now) {
   if (draw) {
     // (the movers between the last two steps, as our tram; back where the steps left them after the draw, below)
     if (game && !inspect.active && !window.headless) between.show(Math.min(1, carry / STEP));
-    if (people && game) people.sync(camera, run.trafficView, run.gameView);
+    // (the right mirror's camera, posed for this frame while the mirror is shown: the people it shows near the tram are
+    // animated too, src/people.js)
+    const mirrorCam = game && mirrorShown() ? (poseMirror(mirror.camera), mirror.camera) : null;
+    if (people && game) people.sync(camera, run.trafficView, run.gameView, mirrorCam);
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }
