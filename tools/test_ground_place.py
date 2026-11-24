@@ -194,6 +194,23 @@ class Many(unittest.TestCase):
         self.assertIn("bad failed", err)
         self.assertEqual(lines[1:], ["done: holds", "bad: Traceback (a test)"])
 
+    def test_a_worker_keeps_what_its_place_prints_though_a_tool_reconfigures_stdout(self):
+        from unittest import mock
+
+        def place(name, pl, **kw):  # (street_profile.py does this when the build first imports it)
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            print(f"{name}: Dobeška holds")
+        with mock.patch.object(gpl, "run", place):
+            self.assertEqual(gpl.one(("p", {}, {})), ("p", True, "p: Dobeška holds\n"))
+
+        def broken(name, pl, **kw):
+            print("built half")
+            raise SystemExit("no raw/")
+        with mock.patch.object(gpl, "run", broken):
+            name, ok, text = gpl.one(("q", {}, {}))
+        self.assertEqual((name, ok), ("q", False))
+        self.assertTrue(text.startswith("built half\nTraceback") and "no raw/" in text, text)
+
     def test_the_turn_is_shared_and_takes_what_its_places_do(self):
         import baseline_store
         from unittest import mock

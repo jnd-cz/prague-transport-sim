@@ -426,14 +426,16 @@ def one(job):
     import io
     import traceback
     name, pl, kw = job
-    buf, ok = io.StringIO(), True
+    # (a text stream over bytes, not a StringIO: tools imported during the build reconfigure sys.stdout, #843)
+    buf, ok = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", errors="replace", newline="\n"), True
     with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
         try:
             run(name, pl, **kw)
         except (Exception, SystemExit):  # (a SystemExit would end the worker and leave its place unanswered)
             traceback.print_exc()
             ok = False
-    return name, ok, buf.getvalue()
+    buf.flush()
+    return name, ok, buf.buffer.getvalue().decode("utf-8", "replace")
 
 
 def many(todo, a, work=one, out=None):
@@ -447,13 +449,16 @@ def many(todo, a, work=one, out=None):
     gb = PLACE_GB[1 if a.rings else 0]
     kw = dict(ring=a.ring, mesh=a.mesh, threads=a.threads, rings=a.rings, over=a.overlay)
     n = max(1, min(a.jobs, len(todo)))
-    heavy = HeavyJob("ground places", share={"gb": gb * n, "cores": n})
+    est = {k: estimate(k, a.rings) for k in todo}
+
+    def expect(n):  # (n at once, the longest first: the board's and the watch's time, and the backfill's)
+        return sum(est.values()) / n + max(est.values())
+    heavy = HeavyJob("ground places", share={"gb": gb * n, "cores": n}, expect=expect(n))
     with heavy:
         room = heavy.room()
         n = max(1, min(n, int(room["gb"] // gb), int(room["cores"])))
         heavy.claim(gb=gb * n, cores=n)
-        est = {k: estimate(k, a.rings) for k in todo}
-        heavy.expect(sum(est.values()) / n + max(est.values()))  # (its watch's time: n at once, the longest first)
+        heavy.expect(expect(n))
         if n == 1:
             for k, v in todo.items():
                 run(k, v, log=lambda s: print(s, file=out, flush=True), **kw)
