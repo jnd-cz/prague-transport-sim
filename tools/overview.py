@@ -189,12 +189,13 @@ def row_out(r):
 
 
 def heavy(now, records=None, jobs=None, free=None):
-    jobs = baseline_store.queue() if jobs is None else jobs
+    # (the machine's queue: an older checkout's steps are found in its process table, #844)
+    parents = baseline_store.ticket_parents(jobs := baseline_store.queue()) if jobs is None else None
     free = sysinfo.available_gb() if free is None else free
     keep = ("what", "root", "pid", "state", "since", "t", "share", "gb", "warn", "kind", "expect", "expectFrom",
-            "start", "finish", "late")
+            "start", "finish", "late", "steps")
     out = []
-    for j in baseline_store.schedule(jobs, now, records, free=free):
+    for j in baseline_store.schedule(jobs, now, records, free=free, parents=parents):
         j = {k: j.get(k) for k in keep}
         j["root"] = os.path.basename(os.path.normpath(j["root"] or ""))
         out.append(j)
