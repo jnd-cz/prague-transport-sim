@@ -44,7 +44,7 @@ class Rows(unittest.TestCase):
 
     def test_the_commands(self):
         c = "\n".join(tiers.commands(tiers.kinds(["src/tram.js"], BUILD)))
-        self.assertIn("--checks u3,redruns,stops,traffic,lint --seeds 1-5 --compare", c)
+        self.assertIn("--checks u3,redruns,stops,traffic,lint,giveway --seeds 1-5 --compare", c)
         self.assertIn("--checks u3 --seeds 1 --player", "\n".join(tiers.commands(tiers.kinds(["src/groundWorker.js"], BUILD))))
         self.assertIn("-k test_traction", c)
         c = "\n".join(tiers.commands(tiers.kinds(["tools/tiers.py", "tools/test_tiers.py"], BUILD)))

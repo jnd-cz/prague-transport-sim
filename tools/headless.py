@@ -9,6 +9,7 @@
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks crossing           # pedestrian surfaces over rails
     python -P -E tools/headless.py --lines 17 --checks heights   # top of rail against the staged heights, junctions (#197)
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks limits   # the speed limits and what sets them (#211)
+    python -P -E tools/headless.py --lines 9,17,22,23,37 --checks giveway  # cars giving way against the trams' bodies (#602)
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3 --seeds 1 --player --gpu   # as a player loads (#710)
 
 Each run gets a fresh page (`/?line=N&keepgeo`), waits for the loading screen to finish, imports the
@@ -124,8 +125,11 @@ CALLS = {
                "const { run } = await import('/tools/bench/heights.js'); return run();",
     "limits": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
               "const { run } = await import('/tools/bench/speedLimits.js'); return run();",
+    # (the cars' ways against the tracks and the trams' bodies, as the give-way places the cars: static, #602)
+    "giveway": "await window.startRun({ seed: 1, startStop: 0, autopilot: true });"
+               "const { run } = await import('/tools/bench/giveway.js'); return run();",
 }
-SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights", "limits"}
+SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights", "limits", "giveway"}
 DRIVE = ("u3", "redruns", "stops", "traffic")  # the checks one drive serves: two or more of a line and seed run as one "drive"
 
 
@@ -234,6 +238,14 @@ def judge(check, r):
                 f"curves under 25 m {len(c.get('smallRadius') or [])}, limit lifts past a switch {c.get('liftPast')}, "
                 f"held there by {c.get('heldBy')}, km at the switch's speed {c.get('km15')}, past a curve's end {c.get('curveEnd')}, "
                 f"steep stretches {len(c.get('descents') or [])}")
+    elif check == "giveway":  # (measured, not judged yet: #602 sets its thresholds with the rule)
+        c = r.get("checks") or {}
+        more = (f"waits {c.get('waits')}: in a passing body {(c.get('waitInBody') or {}).get('count')} "
+                f"{(c.get('waitInBody') or {}).get('byRule')}, let go into it {(c.get('letGoInBody') or {}).get('count')} "
+                f"(further on {c.get('letGoLater')}); skipped entries crossing {(c.get('skippedCross') or {}).get('count')}, "
+                f"in the body's reach {(c.get('skippedReach') or {}).get('count')}, "
+                f"on the rails {(c.get('skippedRails') or {}).get('count')}; entries {c.get('entries')}, "
+                f"given way {c.get('covered')}; deepest {c.get('deepest')}")
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):
