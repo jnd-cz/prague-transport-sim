@@ -1257,6 +1257,7 @@ function frame(now) {
     if (game && !inspect.active && !window.headless) between.show(Math.min(1, carry / STEP));
     if (people && game) people.sync(camera, run.trafficView, run.gameView);
     if (cars && game) cars.sync(camera, run.trafficView, run.gameView);
+    if (debugOverlay.on) debugOverlay.update(game, traffic); // (what holds each standing car, #560)
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }

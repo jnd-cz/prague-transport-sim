@@ -483,15 +483,16 @@ export class Traffic {
     }
     const agents = [ours, ...this.cars.filter((c) => c.kind === 'road' && c.active), ...this.ahead, ...this.oncoming, ...(this.slots || []).filter(Boolean)];
     const name = (a) => { const k = kindOf(a, ours); return k === 'car' ? `car${a.id}` : k === 'walker' ? `walker${this.slots.indexOf(a)}` : k === 'tram' ? `tram${a.id}` : k; };
-    // circles, each once while it lasts
+    // circles, each once while it lasts (and for 5 s after: one the walks broke for a step formed again, 12 times in 2 s)
     this.waitCircles ||= [];
     const rings = new Map();
     for (const ring of circles(agents)) rings.set(ring.map(name).join('>'), ring);
     this._rings ||= new Map();
-    for (const k of this._rings.keys()) if (!rings.has(k)) this._rings.delete(k);
+    for (const [k, t] of this._rings) if (!rings.has(k) && clock - t > 5) this._rings.delete(k);
     for (const [k, ring] of rings) {
-      if (this._rings.has(k)) continue;
+      const listed = this._rings.has(k);
       this._rings.set(k, clock);
+      if (listed) continue;
       const holds = ring.map((a) => whyOf(a, ours));
       const cars = ring.every((a) => kindOf(a, ours) === 'car');
       const cls = !cars ? 'tangled' : holds.every((h) => h === 'junction' || h === 'tram') ? 'rules' : holds.every((h) => h === 'lead') ? 'followers' : 'tangled';
@@ -508,6 +509,9 @@ export class Traffic {
       if (a.stood < LONG_CHAIN || !a.waitFor) continue; // (one standing for no one, at a red light or a stop, is no chain)
       const h = chainHead(a, ours);
       if (h.circle) continue; // (a circle has no head: counted above)
+      // (a head moving, or a car nothing holds any more, is a queue clearing, each of its cars the head in turn as it
+      // starts: not a head that holds it; a walker holds one while walking, round a ring of walks in front of a car, #496)
+      if (h.kind !== 'walker' && (speedOf(h.head, ours) >= STAND_V || (h.kind === 'car' && !h.why))) continue;
       const e = now.get(h.head);
       if (!e || e.length < h.length) now.set(h.head, h);
     }
