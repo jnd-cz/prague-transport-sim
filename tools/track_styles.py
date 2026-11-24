@@ -449,11 +449,6 @@ def ballast_runs(data, terrain, step=2.0):
         def median(a, b, d=d, s=s):
             v = sorted(x for x, q in zip(d, s) if x is not None and a <= q <= b)
             return v[len(v) // 2] if len(v) >= 3 else None
-        # (an embedded section of its own whose rails stand in the band is a switch in open ballast, not paved: the
-        # user's open ballast keeps its switches, #503. A paved one has its rails at IPR's height: 1-3 % of the route's
-        # embedded stretches read in the band)
-        turned = [x for x in own if x[2] == "embedded" and (m := median(x[0], x[1])) is not None and lo <= m <= hi]
-        own = [x for x in own if x not in turned]
         med = []
         for k in range(len(d)):
             w = sorted(v for v in d[max(0, k - h):k + h + 1] if v is not None)
@@ -476,9 +471,6 @@ def ballast_runs(data, terrain, step=2.0):
                  and lo <= m <= hi]
         bal = [[a, b, "ballast"] for r0, r1 in runs for a, b in minus(r0, r1, cover) if b - a >= BALLAST_SHORT]
         bal = [[a, b, "ballast"] for a, b in union([(x[0], x[1]) for x in bal])]
-        # (a turned switch's section stays embedded where no ballast takes it)
-        own += [[round(a, 1), round(b, 1), "embedded"] for x in turned
-                for a, b in minus(x[0], x[1], [{"s0": q[0], "s1": q[1]} for q in bal]) if b - a >= 1]
         laid += sum(b - a for a, b, _ in bal)
         secs = sorted(own + [[round(a, 1), round(b, 1), st] for a, b, st in bal])
         if secs:
