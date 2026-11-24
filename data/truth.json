@@ -6343,6 +6343,82 @@
     }
    ]
   },
+  "wall-above-a-lower-walkway": {
+   "line": "17",
+   "at": [
+    -363.0,
+    29.4
+   ],
+   "reach": 25,
+   "issue": 800,
+   "what": "a survey sidewalk 3.8 m wide between the street and a building (line 17, 50.0872, 14.4163): its kerb edge surveyed 0.3-0.46 m under the road; IPR at the road's level 0.5 m in, 1.8-1.9 m under it from 1.5 m in to the building. IPR 1 m in bears 0.38-0.82 of that step along the edge",
+   "said": "D street has a wall and lower sidewalk next to the building.",
+   "source": "the user's answer to PR #834's question 1 (A-D: a wall at the kerb, or a plain kerb with the ground falling behind?), 2026-11-24, #800. The wall rule of d5e1402 (IPR 1 m in bearing half of the step) took 11 of its 24 m for a kerb",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the walkway, 4 m, east",
+     "from": [
+      -342.9,
+      28.4
+     ],
+     "to": [
+      -343.3,
+      24.4
+     ],
+     "expect": {
+      "largest step m at least": 1.2,
+      "rise m": -1.2
+     },
+     "why": "a wall between the street and the walkway beside the building, 1.8 m lower (the road 190.50 m 0.5 m out, IPR 188.62 m 2 m in): held at two-thirds of IPR's drop"
+    },
+    {
+     "name": "from the road across the kerb onto the walkway, 4 m, west",
+     "from": [
+      -383.8,
+      32.3
+     ],
+     "to": [
+      -384.2,
+      28.3
+     ],
+     "expect": {
+      "largest step m at least": 1.2,
+      "rise m": -1.2
+     },
+     "why": "the same wall 41 m on (the road 190.74 m 0.5 m out, IPR 188.99 m 2 m in)"
+    }
+   ]
+  },
+  "belohorska-plain-kerb": {
+   "line": "22",
+   "at": [
+    -4169.5,
+    149.2
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "Bělohorská's sidewalk (line 22, 50.0836, 14.3634): its kerb edge surveyed 0.47 m over the road (320.87 m by 320.40 m); IPR 0.08 m over the road at the edge, rising 0.05-0.1 m a metre across the walkway (DMR 5G the same). Built with #800's parking rule (4d94176) the walkway stood at the survey's height, a 0.48 m wall over the road",
+   "said": "C is plain street with sidewalk kerb.",
+   "source": "the user's answer to PR #834's question 1 (A-D), 2026-11-24, #800",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk, 4 m",
+     "from": [
+      -4169.52,
+      150.2
+     ],
+     "to": [
+      -4169.44,
+      146.2
+     ],
+     "expect": {
+      "largest step m at least": 0.05,
+      "largest step m": 0.25
+     },
+     "why": "a plain kerb, the walkway rising from it with IPR: no wall at the edge"
+    }
+   ]
+  },
   "stairs-reversed-ramp": {
    "line": "9",
    "at": [

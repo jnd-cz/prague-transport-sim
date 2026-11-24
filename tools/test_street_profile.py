@@ -357,6 +357,19 @@ class Sidewalks(unittest.TestCase):
         self.assertFalse(sp.wall_tops(*args, verge)[0].any())
         # (half of it borne, IPR 1 m in 0.33 m under the car park: a wall)
         self.assertTrue(sp.wall_tops(*args, verge - 0.2)[0].all())
+        # (#834: a wall at the street with the walkway 1.8 m lower beside a building, line 17 (-360, 30). The walkway's
+        # level is IPR's 1.5 m in, on a sidewalk 4 m wide; the wall some 0.7 m in, IPR 1 m in bears 0.40 of the step:
+        # a wall. The same IPR 1 m in bearing 0.25: none)
+        run = (edge[0], edge[1], np.full(n, 190.26), np.full(n, 190.72), np.full(n, 188.92), np.ones(n, bool))
+        lean = np.column_stack([np.full(n, 190.57), np.full(n, 190.30), np.full(n, 190.00)])
+        self.assertTrue(sp.wall_tops(*run, lean)[0].all())
+        self.assertFalse(sp.wall_tops(*run, lean + np.array([0.0, 0.0, 0.27]))[0].any())
+        # (#834: Bělohorská, line 22 (-4159, 149), a street the user found plain. The walkway's level IPR's 1.5 m in,
+        # 2.34 m over the road, IPR 1 m in bearing 0.38 of it, but 0.5 m in 2.68 m under the road: no wall's smear)
+        up = (edge[0], edge[1], np.full(n, 320.87), np.full(n, 320.40), np.full(n, 322.74), np.ones(n, bool))
+        dip = np.column_stack([np.full(n, 317.72), np.full(n, 318.40), np.full(n, 321.30)])
+        self.assertFalse(sp.wall_tops(*up, dip)[0].any())
+        self.assertTrue(sp.wall_tops(*up, dip + np.array([2.70, 2.00, 0.0]))[0].all())
         ctx["kerb_edges"] = [edge]
         z0 = sp.bilinear(sp.sidewalks(ctx, ramp, [(0, 0), (20, 4)]), np.array([15.0]), np.array([0.25]))
         self.assertLess(z0[0], 199.5)

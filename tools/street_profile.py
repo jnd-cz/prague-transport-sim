@@ -425,11 +425,17 @@ KERB_OWN = 0.5  # m: a kerb edge's own height this near IPR inside the sidewalk 
 KERB_NEAR = (0.5, 0.75, 1.0)  # m in from a kerb edge: IPR's readings of a walkway at the edge's own height, past the
 # smear of a wall at the edge itself (a 1 m raster) and before a drop behind a walkway that narrow
 WALL_SEEN = 0.5  # of a wall's step at a kerb edge (the walkway's level less the road's surface beyond): what IPR 1 m in
-# must stand off that surface. On the five lines (#800) the three walls at the kerb the user confirmed bear 0.59-1.01 at
-# every point, the verge by a car park with none (line 22 (3449, -2602)) 0.15-0.44; 13-32 % of the walls' metres per
-# line bear less, mostly a walkway at the road's level with the step 1-3 m behind it, or none. (Not IPR 1 m out: under
-# a deck it reads the ground, not the road, and on Modřanská, line 17 (-2495, -8295), the walkway under the road's
-# deck rose 3.5 m to it)
+# must stand off that surface where the walkway's level is the edge's own surveyed height. On the five lines (#800) the
+# verge by a car park with no wall (line 22 (3449, -2602)) bears 0.15-0.44, and the three kerbs the user found plain or
+# with the wall further back (#834: Bělohorská, line 22 (-4170, 145); a park's wall behind the walkway, lines 22/23
+# (-885, 1105); line 37 (9065, 1055)) are of this kind: a walkway at the road's level with the step 1-3 m behind it, or
+# none. (Not IPR 1 m out: under a deck it reads the ground, not the road, and on Modřanská, line 17 (-2495, -8295), the
+# walkway under the road's deck rose 3.5 m to it)
+WALL_SEEN_RUN = 0.35  # the same where the walkway's level is IPR's own 1.5 m in, on a sidewalk the survey draws on
+# unbroken past it: the step is IPR's and the survey has no line at it, so it stands at the kerb, IPR 1 m in only leaning
+# its way. The four walls the user confirmed are of this kind: three bear 0.60-1.01, and the one with the walkway lower
+# beside a building, line 17 (-360, 30) (the user, 2026-11-24: "street has a wall and lower sidewalk next to the
+# building"), 0.38-0.82, its wall some 0.7 m in. 93 % of such walls' metres bear 0.5 or more, 2 % under 0.35
 SEEN_ALONG = 1.0  # m either side along a kerb edge over which a wall's point takes the median of what IPR bears
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
 USUAL = 20  # samples (m) either side over which a street's usual width is its running median (a mouth is shorter)
@@ -1658,10 +1664,13 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
     height. With `near`, a wall's edge is one IPR bears WALL_SEEN of: IPR 1 m in stands off the road's surface by that
     share of the step. By a car park on line 22 (3449, -2602) the verge's edge was surveyed at 211.38 m, 0.41 m off IPR
     1.5 m in, and was held 0.66 m under the car park: IPR has the verge at the car park's level there and falling 0.2 m
-    a metre towards the road, and the user sees a slope with grass and bushes (2026-11-23, #834). Without `near`: any
-    step."""
+    a metre towards the road, and the user sees a slope with grass and bushes (2026-11-23, #834). Where the walkway's
+    level is IPR's 1.5 m in, IPR 1 m in need only lean its way, WALL_SEEN_RUN: beside a building on line 17 (-360, 30)
+    the user sees a wall at the street and the walkway lower, and IPR 1 m in bears 0.38-0.82 of it (2026-11-24, #834).
+    Without `near`: any step."""
     from kerbs import KERB
     level = np.asarray(own, float)
+    ours = np.ones(len(q), bool)  # (the walkway's level is the edge's own height, not IPR's 1.5 m in)
     with np.errstate(invalid="ignore"):
         if ground is not None:
             ground = np.asarray(ground, float)
@@ -1678,15 +1687,21 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
             # (each point's share as the median of the wall's points within SEEN_ALONG along the edge: by a drop 1 m
             # behind the kerb, line 17 (-360, 30), it reads 0.4-0.6 from point to point)
             claim = level - np.asarray(zr, float)
-            z1 = np.asarray(near, float).reshape(len(level), -1)[:, KERB_NEAR.index(1.0)]
+            nr = np.asarray(near, float).reshape(len(level), -1)
+            z1 = nr[:, KERB_NEAR.index(1.0)]
             share = (z1 - np.asarray(zr, float)) * np.sign(claim) / np.maximum(np.abs(claim), 1e-6)
+            # (a wall's smear lies between its two levels: IPR 0.5 m in STEP_CUT or more past the road the other way is
+            # a hole or a structure, no wall's face. On Bělohorská, line 22 (-4159, 149), 1.7-2.7 m under the road, the
+            # walkway's level 2.3-4.2 m over it, on a street the user found plain, 2026-11-24)
+            dip = (nr[:, KERB_NEAR.index(0.5)] - np.asarray(zr, float)) * np.sign(claim) <= -STEP_CUT
+            share = np.where(dip, 0.0, share)
             share = np.where(off >= STEP_CUT, share, np.nan)
             ds = float(np.median(np.hypot(*np.diff(q, axis=0).T))) if len(q) > 1 else 1.0
             k = int(round(SEEN_ALONG / max(ds, 1e-3)))
             win = np.lib.stride_tricks.sliding_window_view(np.pad(share, k, constant_values=np.nan), 2 * k + 1)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", RuntimeWarning)  # (a window with no wall's point: none)
-                seen = np.nanmedian(win, axis=1) >= WALL_SEEN
+                seen = np.nanmedian(win, axis=1) >= np.where(ours, WALL_SEEN, WALL_SEEN_RUN)
             off = np.where(seen, off, np.nan)
         top = (off >= STEP_CUT) if np.isfinite(off).any() and np.nanmax(off) >= KERB_WALL else np.zeros(len(q), bool)
     t = np.column_stack([n[top, 1], -n[top, 0]]) * 0.125

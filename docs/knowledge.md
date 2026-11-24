@@ -1012,6 +1012,17 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
     (-4170, 145): IPR and DMR 5G +0.07 m at the kerb, the survey's edge +0.48 m). IPR 1 m out is no witness of the
     road: under a deck it reads the ground. Read as one, it took the walls of short edges under Modřanská's deck,
     line 17 (-2495, -8295), and their kerbs' planes lifted the walkway 3.5 m, 194.75 m to 198.23 m.
+    The user on four of the cut places (2026-11-24, #834): Bělohorská "is plain street with sidewalk kerb"; at lines
+    22/23 (-885, 1105) "there is a wall and on lower level there's a park with footpaths" (the survey's sidewalk is
+    1.6 m wide, a survey wall area 1.6-2.7 m in, a footpath 2.5 m lower from 5.7 m); line 37 (9065, 1055) could not be
+    seen; and at line 17 (-360, 30) "street has a wall and lower sidewalk next to the building". There the survey's
+    sidewalk runs 3.8 m to the building with no line at the step, IPR drops 1.8 m between 0.5 and 1.5 m in, and IPR
+    1 m in bears 0.38-0.82 of it. The places the user found no wall at the kerb all take the walkway's level from the
+    edge's own height; the four walls take it from IPR 1.5 m in. So where the level is IPR's, IPR 1 m in needs only
+    `WALL_SEEN_RUN` (0.35) of the step, and IPR 0.5 m in must not lie STEP_CUT past the road the other way: by
+    Bělohorská, line 22 (-4157, 149), IPR has a pit some 11 m deep at the kerb, and the road's surface sinks 5 m into
+    it (on main too: on #732). The survey has no wall line (`Zeď`, `Hranice_zdi`, `Terénní_hrana`) within 3 m behind
+    the kerb at any of these places, the four walls included.
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
