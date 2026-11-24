@@ -9,6 +9,7 @@
 const BINS = 201;          // 1 ms bins of the frame interval, the last one 200 ms and over
 const GAP = 250;           // ms: a longer interval is a pause, a hidden tab or an idle redraw, not a frame
 const STRETCH = 100;       // m of route per bin of the slow frames' places
+const FIRST = 300;         // m: the first stretch of a log, counted apart (the tiles arriving after the start, #711)
 
 export class PerfLog {
   constructor() { this.reset(); }
@@ -21,6 +22,8 @@ export class PerfLog {
     this.slowAt = new Map(); // route bin -> frames over 33 ms
     this.calls = { sum: 0, max: 0 }; this.tris = { sum: 0, max: 0 };
     this.last = 0;
+    this.s0 = null; this.first = { n: 0, slow: 0 }; // (the frames of the first FIRST m from where the log starts)
+    this.tileFails = 0;
   }
 
   // one drawn frame while driving: now (ms), the tram's route position, the renderer's counts, the game time it
@@ -32,6 +35,10 @@ export class PerfLog {
     this.hist[Math.min(BINS - 1, Math.round(dt))]++;
     this.n++; this.sum += dt;
     if (sim !== null) { this.sim += sim * 1000; if (sim > 0.0505) this.multi++; }
+    if (Number.isFinite(s)) {
+      if (this.s0 === null) this.s0 = s;
+      if (s - this.s0 < FIRST) { this.first.n++; if (dt > 33.4) this.first.slow++; }
+    }
     if (dt > 33.4 && Number.isFinite(s)) {
       const k = Math.floor(s / STRETCH);
       this.slowAt.set(k, (this.slowAt.get(k) || 0) + 1);
@@ -41,6 +48,9 @@ export class PerfLog {
       this.tris.sum += info.triangles; this.tris.max = Math.max(this.tris.max, info.triangles);
     }
   }
+
+  // a ground tile failed to decode (src/groundFile.js, #711)
+  tileFailed() { this.tileFails++; }
 
   // the interval below which a share p of the frames fall (ms)
   pct(p) {
@@ -69,6 +79,9 @@ export class PerfLog {
       gameRate: Math.round((this.sim / this.sum) * 1000) / 1000, multiStep: Math.round((this.multi / this.n) * 1000) / 10,
       worst, calls: { mean: Math.round(this.calls.sum / this.n), max: this.calls.max },
       triangles: { mean: Math.round(this.tris.sum / this.n), max: this.tris.max },
+      // (the first 300 m: its frames and the share over 33 ms, %)
+      first300: { frames: this.first.n, over33: this.first.n ? Math.round((this.first.slow / this.first.n) * 1000) / 10 : 0 },
+      ...(this.tileFails ? { tileFails: this.tileFails } : {}),
       ...(mem ? { heapMB: Math.round(mem.usedJSHeapSize / 1e6) } : {}),
     };
   }

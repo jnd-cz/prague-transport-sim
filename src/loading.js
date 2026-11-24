@@ -209,6 +209,19 @@ export class Loader {
     console.log('load times (ms)', window.loadTimes);
   }
 
+  // a wait after the load (Start's ground window, #711): the loading screen with `label` and its bar at f (0-1);
+  // wait(null) hides it again
+  wait(label, f = 0) {
+    if (!this.el) return;
+    if (label === null) { this.el.classList.add('hidden'); return; }
+    this.el.classList.remove('hidden');
+    $('loadFiles').innerHTML = '';
+    $('loadBytes').textContent = '';
+    $('loadStep').textContent = label;
+    $('loadBar').style.width = `${(f * 100).toFixed(1)}%`;
+    $('loadPct').textContent = `${Math.floor(f * 100)} %`;
+  }
+
   fraction() {
     const files = [...this.files.values()].filter((d) => d.state !== 'missing' && d.state !== 'error');
     // a file whose size is not known yet counts as large as the average known one
