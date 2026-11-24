@@ -570,7 +570,8 @@ check before a PR, `/housekeeping` is the weekly pass (also every Monday at 06:3
 architecture review at a world checkpoint ([docs/housekeeping.md](docs/housekeeping.md)). Housekeeping posts on
 the pinned #291 and only proposes.
 
-**Heavy jobs** (`baseline_store.HeavyJob`, first come first served; #280, #536, #728):
+**Heavy jobs** (`baseline_store.HeavyJob`, first come first served, the short ones first, the long ones at night;
+#280, #536, #728, #851):
 - Every job that keeps several cores or GBs busy for over a minute waits for the machine's other heavy jobs and
   holds its turn, so that it does not spoil another's measurement (the user, 2026-11-12, #516). These take their
   turn themselves: `headless.py`, `rebuild.py`, `frametime.py`, `city_terrain.py`, `ground_mesh.py`;
@@ -593,6 +594,18 @@ the pinned #291 and only proposes.
   not known it keeps its turn; one that runs over delays a job alone but never runs beside it. A ticket from a
   checkout older than #728 is a job alone, and such a checkout's jobs wait for every job as before. A tool becomes shared when its peak is measured
   and written at its `HeavyJob(...)`.
+- By day (07:00-23:00) a job expected over 30 min, or whose time is not known, waits for the night (#851; the user,
+  2026-11-24: "I thought it will go faster and heavy testing will be left for night unattended runs"; on that day
+  three 6-min test suites waited 27-97 min behind a 95-min job of #800, and #800's chains of 56-182 min ran by day).
+  Its time is its `--expect`, its tool's plan (`headless.py`, `ground_place.py`), or the median of its kind's last
+  runs (`heavy.py --history`); a chain named for the first time has none, so state it. While it waits it stands
+  ahead of no other job, and the board shows it "held for the night". On the user's word it runs by day:
+  `heavy.py --day`, or `TRAM_HEAVY_DAY=1` for a tool that takes its own turn; say so in the PR. A job already
+  running at 07:00 runs on. With the machine left free by day the user may start the night early: `heavy.py --night`
+  (until 07:00; `--night off` ends it) lets the held jobs take their turns, after the jobs running now, and the board
+  says so.
+- A waiting job of 10 min or less goes before longer ones queued earlier (the suites, a one-line run), but not
+  before one that has waited 2 h (`baseline_store.rank`, `SHORT`, `PASS_MAX`). It still waits for the jobs running.
 - A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that
   names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
