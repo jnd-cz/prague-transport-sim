@@ -583,6 +583,10 @@ class HeavyJob:
     OVER = (1.25, 2.0)  # (warns over 1.25× its declared memory; ends over 2×, or over 1× with the machine short)
     TWICE = 2  # (a memory breach ends the job when seen at this many looks in a row: not a moment's peak)
     RECORD = 60.0  # (a run this long or longer goes into the history; shorter ones only when their watch ended them)
+    # (a shared job goes before the alone jobs waiting ahead of it when BACKFILL× its expected time ends before the jobs
+    # running now are expected to: the alone ones could not start sooner. On 2026-11-23 three shared jobs of 3-6 min
+    # waited an hour behind two test_all runs that themselves waited for a shared ground_place run, #829)
+    BACKFILL = 1.5
 
     def __init__(self, what, wait=None, out=None, share=None, expect=None, kind=None, limits=None):
         self.path = os.path.join(LOCKS, f"{os.getpid()}.lock")
@@ -774,8 +778,9 @@ class HeavyJob:
 
     def ahead(self):
         """The jobs this one waits for. Alone: every ticket before it, and any job running now. Shared: the alone jobs
-        among those and the shared ones queued before it; with none, the shared jobs running while its cores or its
-        memory do not fit beside them (self.why says which)."""
+        among those and the shared ones queued before it, but when it backfills (backfills()) the waiting alone ones and
+        the shared ones queued behind the first of those;
+        with none, the shared jobs running while its cores or its memory do not fit beside them (self.why says which)."""
         me = (self.t, os.getpid())
         jobs = queue()
         others = [j for j in jobs if j["pid"] != os.getpid()]
@@ -787,6 +792,11 @@ class HeavyJob:
             return [j for j in others if first(j) or j["state"] == "running"]
         turn = [j for j in others if (first(j) or j["state"] == "running") and (not j.get("share") or j["state"] == "waiting")]
         beside = [j for j in others if j["state"] == "running"]
+        alone = [(j["t"], j["pid"]) for j in turn if not j.get("share") and j["state"] == "waiting"]
+        if alone and backfills(self.expect_s or expected(self.kind, least=1), beside, self.BACKFILL):
+            # (the waiting alone jobs, and the shared ones queued behind the first of them: none of those starts
+            # before the jobs running now end, and this one ends sooner)
+            turn = [j for j in turn if j["state"] == "running" or (j.get("share") and (j["t"], j["pid"]) < min(alone))]
         if turn or not beside:
             return turn
         room = self.room(jobs)
@@ -934,6 +944,23 @@ def describe(j, now=None):
             + (f": {j['warn']}" if j.get("warn") else ""))
 
 
+def backfills(mine, running, margin=HeavyJob.BACKFILL, now=None, records=None):
+    """Whether a shared job of `mine` s expected goes before the alone jobs waiting ahead of it: margin × mine ends
+    before every job `running` (queue() dicts) is expected to end, as an alone job needs. Nothing running (the alone
+    job starts now), its own time or a running job's not known, or one past its time: no."""
+    if not mine or not running:
+        return False
+    now = time.time() if now is None else now
+    records = history() if records is None else records
+    ends = []
+    for j in running:
+        e = j.get("expect") or (expected(j.get("kind"), records, least=1) if j.get("kind") else None)
+        if not e:
+            return False
+        ends.append((j.get("since") or j.get("t") or now) + e)
+    return now + margin * mine <= max(ends)
+
+
 def schedule(jobs, now=None, records=None, free=None, cores=None, keep=None):
     """The queue's expected times and estimated starts and finishes (#826), as queue()'s dicts (in its order) with
     expect (s or None), expectFrom ("ticket", "history" or None), start and finish (epoch s; None: not known) and late
@@ -942,7 +969,8 @@ def schedule(jobs, now=None, records=None, free=None, cores=None, keep=None):
     A job's expected time is its ticket's (the job stated it, or its run took it from the history), else the history's
     median of its kind over its runs to their end (expected() with a single run enough: an estimate, not a watch's
     limit). The jobs start as HeavyJob.ahead() lets them, in queue order: a job alone once nothing runs; a shared one
-    once no job alone runs and its cores and GB fit beside the shared ones running. The memory to share is the free
+    once no job alone runs and its cores and GB fit beside the shared ones running, or before the alone jobs placed
+    ahead of it when BACKFILL× its time ends before the jobs running now end (backfills()). The memory to share is the free
     memory now (`free` GB, None: unknown, no limit) plus what the running jobs hold now (their tickets' gb), less KEEP;
     a running shared job takes the larger of its share and its hold. A job after one with no known end has none."""
     now = time.time() if now is None else now
@@ -978,14 +1006,27 @@ def schedule(jobs, now=None, records=None, free=None, cores=None, keep=None):
         ivals.append([start, now if late else end, s, max(s["gb"], j.get("gb") or 0.0) if s else 0.0])
         out.append({**j, "expect": e, "expectFrom": src, "start": start, "finish": None if end == inf else max(end, now),
                     "late": late})
-    after = now
+    # (after: the latest start placed so far, none starts before it in its turn; bf: the latest start of a shared job
+    # before the first alone one waiting, or of one that went before it: a backfilling job starts no sooner)
+    after = bf = now
+    alone = False
+    backfill = bool(run) and all(est(j)[0] for j in run) and max(iv[1] for iv in ivals)
     for j in jobs:
         if j["state"] == "running":
             continue
         e, src = est(j)
-        start = next((t for t in sorted({after} | {iv[1] for iv in ivals if after < iv[1] < inf}) if fits(j, t)), inf)
+        frm = after
+        if j.get("share") and alone and e and backfill and bf + HeavyJob.BACKFILL * e <= backfill:
+            frm = bf  # (ends before the jobs running now: the ones ahead behind an alone job could not start sooner)
+        start = next((t for t in sorted({frm} | {iv[1] for iv in ivals if frm < iv[1] < inf}) if fits(j, t)), inf)
+        went = frm < after and start + HeavyJob.BACKFILL * e <= backfill
+        if frm < after and not went:  # (it fits only later: in its turn after all)
+            start = next((t for t in sorted({after} | {iv[1] for iv in ivals if after < iv[1] < inf}) if fits(j, t)), inf)
         end = start + e if e and start < inf else inf
-        after = start
+        after = max(after, start)
+        if j.get("share") and (not alone or went):
+            bf = max(bf, start)
+        alone = alone or not j.get("share")
         s = j.get("share")
         ivals.append([start, end, s, s["gb"] if s else 0.0])
         out.append({**j, "expect": e, "expectFrom": src, "start": None if start == inf else start,

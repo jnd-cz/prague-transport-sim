@@ -85,6 +85,36 @@ class Fetch(unittest.TestCase):
         self.assertTrue(self.there(old["path"]))
         self.assertEqual(snapshot.raw_drift(NOW)[1], [old["path"]])
 
+    def test_a_changed_unzipped_file_is_drift(self):
+        """A file unzipped from a listed archive is held to the archive's size and CRC-32 (#829)."""
+        import zipfile
+        z = self.root / "raw" / "ipr-dtm" / "DTM.zip"
+        z.parent.mkdir(parents=True)
+        with zipfile.ZipFile(z, "w") as zf:
+            zf.writestr("DTM/dtm_1m.tif", b"terrain" * 100)
+        data = z.read_bytes()
+        entry = {"path": "raw/ipr-dtm/DTM.zip", "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+        with open(self.root / "snapshots" / f"{NOW}.json", "w", encoding="utf-8") as f:
+            json.dump({"id": NOW, "groups": [{"name": "ipr_dtm", "unzip": True, "files": [entry]}]}, f)
+        tif = "raw/ipr-dtm/DTM/dtm_1m.tif"
+        with patch.object(snapshot, "scan_sources", return_value=[]):
+            self.assertEqual(snapshot.raw_drift(NOW)[0], [("missing", tif)])
+            self.file(tif, b"terrain" * 100)
+            self.assertEqual(snapshot.raw_drift(NOW)[0], [])
+            self.file(tif, b"terrain" * 99 + b"\0" * 7)  # (the full size, other contents: what the restart left)
+            self.assertEqual(snapshot.raw_drift(NOW)[0], [("changed", tif)])
+
+    def test_a_copy_reaches_the_disk_before_its_rename(self):
+        src = self.file("raw/a.bin", b"bytes")
+        dst = self.root / "raw" / "b.bin"
+        synced = []
+        real = snapshot.os.fsync
+        with patch.object(snapshot.os, "fsync", side_effect=lambda fd: (synced.append(fd), real(fd))):
+            snapshot.put(str(self.root / src["path"]), str(dst))
+        self.assertEqual(dst.read_bytes(), b"bytes")
+        self.assertEqual(len(synced), 1)
+        self.assertEqual(list((self.root / "raw").glob("*.part")), [])
+
     def test_only_an_older_snapshot_counts(self):
         # (fetching an older snapshot on purpose leaves the newer one's files alone)
         newer = self.file("raw/geoportal/cells/walls_a.json")

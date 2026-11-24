@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """On-screen controls and the viewport-sized mirror (#79): python -P -E tools/test_touch.py [--line 17]
 (its own server on a free port). On a phone (390 x 844, touch) a shift is driven by the buttons only:
-doors closed, two notches of power, the tram moves, the emergency brake; the outside view turns by a
+doors closed, ▲ touched a step while the finger is down, ▲ held steps the lever on and the tram moves, let go the lever is
+on 0 (#837), S held the same, the emergency brake held and let go, and let go with S held (brake step 5); the outside view turns by a
 drag. On desktops the buttons stay hidden and the mirror frame grows with the viewport, its aspect fixed.
 Full screen (#485): a phone asks once; "Not now" keeps a start in the page, "Full screen" enters it and so does each later
 start after leaving it; a desktop isn't asked. In landscape (844 x 390, 740 x 360) the controller is a column at the right
@@ -136,18 +137,45 @@ def main():
             step(6)
             r["doors"] = page.evaluate("window.game.doorState")
             tap("n")
-            tap("w")
-            tap("w")
-            r["notch"] = page.evaluate("window.game.tram.eq.lever")  # (arcade: the lever; the pedals follow on the next step)
-            step(4)
+            lever = "window.game.tram.eq.lever"  # (arcade: the lever; the pedals follow on the next step)
+            # ▲ touched: a step while the finger is down, 0 once it lifts; held: on a step each 0.5 s; let go, 0 as after N (#837)
+            drive = page.locator("#touch button[data-k='w']").bounding_box()
+            page.mouse.move(drive["x"] + 20, drive["y"] + 20)
+            page.mouse.down()
+            r["tap"] = [page.evaluate(lever)]
+            page.mouse.up()
+            r["tap"].append(page.evaluate(lever))
+            page.mouse.down()
+            step(1.2)
+            r["notch"] = page.evaluate(lever)
+            step(2)
+            page.mouse.up()
+            r["back"] = page.evaluate(lever)
+            step(3)
             r["kmh"] = round(page.evaluate("window.game.tram.v") * 3.6, 1)
-            # the emergency brake: held, then let go (back to brake step 5)
+            # the keyboard's S the same: a step at once, the key's repeat no step of its own, held on, let go 0
+            page.keyboard.down("s")
+            page.keyboard.down("s")  # (held: Playwright sends it as a repeat)
+            r["key"] = [page.evaluate(lever)]
+            step(1.2)
+            r["key"].append(page.evaluate(lever))
+            page.keyboard.up("s")
+            r["key"].append(page.evaluate(lever))
+            # the emergency brake: held, then let go (0, as any let go of the lever in the Simple controls)
             stop = page.locator("#touch button[data-k='space']").bounding_box()
             page.mouse.move(stop["x"] + 20, stop["y"] + 20)
             page.mouse.down()
             r["held"] = page.evaluate("window.game.tram.eq.lever")
             page.mouse.up()
             r["released"] = page.evaluate("window.game.tram.eq.lever")
+            # brake held while the emergency stop is let go: brake step 5, until brake is let go too (the user, 2026-11-23)
+            page.keyboard.down("Space")
+            page.keyboard.down("s")
+            r["stopBrake"] = [page.evaluate(lever)]
+            page.keyboard.up("Space")
+            r["stopBrake"].append(page.evaluate(lever))
+            page.keyboard.up("s")
+            r["stopBrake"].append(page.evaluate(lever))
             tap("v")
             page.wait_for_timeout(600)
             a = page.evaluate("[camera.position.x, camera.position.z]")
@@ -253,10 +281,16 @@ def main():
     print(json.dumps(r))
     if not r["buttons"]:
         fails.append("no on-screen controls on a phone")
-    if r["doors"] != "closed" or r["notch"] != 2 or r["kmh"] <= 1:
-        fails.append(f"the buttons did not drive the tram (doors {r['doors']}, notch {r['notch']}, {r['kmh']} km/h)")
-    if r["held"] != -6 or r["released"] != -5:
-        fails.append(f"emergency brake held {r['held']}, released {r['released']} (want -6, -5)")
+    if r["doors"] != "closed" or r["notch"] < 3 or r["kmh"] <= 1:
+        fails.append(f"the buttons did not drive the tram (doors {r['doors']}, ▲ held 1.2 s: lever {r['notch']}, {r['kmh']} km/h)")
+    if r["tap"] != [1, 0] or r["back"] != 0:
+        fails.append(f"the sprung lever: touched and lifted {r['tap']} (want [1, 0]), let go {r['back']} (want 0)")
+    if r["key"][0] != -1 or not -5 <= r["key"][1] <= -3 or r["key"][2] != 0:
+        fails.append(f"S held, its repeat, 1.2 s on, let go: lever {r['key']} (want -1, -3 to -5, 0)")
+    if r["held"] != -6 or r["released"] != 0:
+        fails.append(f"emergency brake held {r['held']}, released {r['released']} (want -6, 0)")
+    if r["stopBrake"] != [-6, -5, 0]:
+        fails.append(f"Space and S held, Space let go, S let go: lever {r['stopBrake']} (want [-6, -5, 0])")
     if r["orbit"] < 5:
         fails.append("a drag does not turn the outside view")
     if r["phoneErrors"]:

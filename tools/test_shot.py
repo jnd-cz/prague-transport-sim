@@ -167,6 +167,13 @@ class Shots(unittest.TestCase):
         self.assertEqual(seen, ['snow', 'snow'])
         self.assertTrue((output/'line17-s5064-cab-snow-pair.png').exists())
 
+    def test_the_review_view_refuses_weather(self):
+        """It paints the surface classes: a weather's pictures would be the same on both sides (#707, #835)."""
+        with patch.object(shot, 'capture') as capture_, self.assertRaises(SystemExit) as e:
+            shot.main(['--line','17','--s','5064','--view','review','--weather','snow'], self.root)
+        self.assertEqual(e.exception.code, 2)
+        capture_.assert_not_called()
+
 
 class SameCheckout(unittest.TestCase):
     """Two captures of the real game in one checkout at one camera are the same picture (#689: a pair once differed in

@@ -143,6 +143,223 @@ def climbs(a):
     return False
 
 
+STAIRS_OFF = 0.75    # m: an outline point this far off the lidar inside the stairs carries another height (StairsHeights)
+STAIRS_INSET = 0.5   # m: how far inside the stairs the lidar is read for an outline point
+STAIRS_ON = 0.05     # m: an outline edge whose middle lies this near a survey line lies on it
+STAIRS_EDGES = {"Hranice_budovy": "other", "Hranice_stavby": "other", "Zeď": "other", "Hranice_zdi": "other",
+                "Hranice_schodiště": "stairs"}  # (the survey's line kinds a stairs outline shares: another feature's, its own)
+
+
+def survey_edges(ln, box=None, root=ROOT):
+    """The survey's lines of line ln at level 0 a stairs outline can lie on ([(kind, (n, 3))], kind 'other' or 'stairs',
+    STAIRS_EDGES), those reaching a box (x0, y0, x1, y1) where one is given."""
+    path = os.path.join(root, "data", f"line{ln}.zps.json")
+    if not os.path.exists(path):
+        return []
+    key = (path, os.path.getmtime(path))
+    if survey_edges.kept[0] != key:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        out = []
+        for r in d["lines"]:
+            k = STAIRS_EDGES.get(d["kinds"][r[0]])
+            if k is None or r[1] != 0:
+                continue
+            p = np.array([[np.nan if v is None else v for v in r[i:i + 3]] for i in range(3, len(r), 3)], float)
+            if len(p) >= 2:
+                out.append((k, p))
+        survey_edges.kept = (key, out)
+    if box is None:
+        return survey_edges.kept[1]
+    x0, y0, x1, y1 = box
+    return [(k, p) for k, p in survey_edges.kept[1]
+            if p[:, 0].max() >= x0 and p[:, 0].min() <= x1 and p[:, 1].max() >= y0 and p[:, 1].min() <= y1]
+
+
+survey_edges.kept = (None, [])
+
+
+class StairsHeights:
+    """The stairs' own heights on a stairs area's outline (#447). A stairs outline that is not one flight (flight()) carries
+    heights that are not the stairs': where it shares an edge with a building or a structure, that one's foot (line 9
+    area 5662: the building side level at 224 m beside a flight rising 222.8 -> 227.4 m); where it jumps RISER within
+    RISER_RUN, a wall's top or another level between two jumps (line 9 area 5615: the foot's edge at 242.3 m, the top's
+    height, tipped the foot up). Triangulated, they fold: 1,223 m² of the five lines' stairs steeper than 1:1, 947 m² of
+    it on stairs with such edges or jumps (2026-11-22).
+
+    An outline point on another feature's edge (a building's, a structure's or a wall's line, not the stairs' own
+    boundary, STAIRS_EDGES: either edge, so a corner where the stairs meet a building is judged), or on an outline with
+    two jumps or more, that stands STAIRS_OFF or more off the lidar STAIRS_INSET inside the area takes its height from
+    the outline's kept points on either side of its run, by where it lies along the line from one to the other: steps
+    are level across a flight, and a side along a wall rises with the flight. The lidar only picks which of the survey's
+    heights are the stairs'. A point under a level-1 survey
+    area (a deck, a bridge) is not judged: the raster reads the deck there (the stairs under the bridge on line 17 at
+    (1418, 2497) and (1457, 2503); the National Theatre's under Národní, line 9 (-620, -565)). A point on the stairs' own
+    boundary keeps its height: the 1 m raster does not see a narrow flight (the user, 2026-11-23: "the narrow places
+    can't be properly seen by the lidar sampling").
+
+    Judged on the user's 24 answers (data/truth.json stairsReview): one flight 5615 34 -> 0 m² steeper than 1:1 (one
+    plane now), 5662 11.5 -> 0, 5663 22 -> 0, 582 11 -> 0, 439 27 -> 0; flights that turn 1998 20 -> 3.3, 1022 12 -> 0;
+    no stairs, line 37 (4001, 1412), 10 -> 0 (the sidewalk's level). The lines' stairs: 1,223 -> 621 m² (199 areas
+    better, 13 worse by 0.5 m², 16 m² in all: a side on a wall's line partly past STAIRS_OFF moves and the rest keeps
+    its noses, a shelf where they meet, line 22 area 518; both sides on the side walls' tops, line 9 area 5653). The
+    nearest kept point's height left 709 m² (183 / 25: shelves along walls, line 17 area 1063). STAIRS_OFF 1.0 left
+    745 m² (154 / 24): a building's foot 0.9 m under a flight 2 m wide kept its height and the flight leant across
+    (groundPlaces stairs-beside-a-building); 0.5 left 694 m² but 41 worse. Moving nothing where the lidar is off most
+    of the outline left 914 m²: it kept the folds of 1998, 1022, 582, 439 and line 37's."""
+
+    def __init__(self, D, lines, lidar):
+        self.lidar = lidar
+        self.kind = [k for k, p in lines for _ in range(len(p) - 1)]
+        segs = [shapely.LineString(p[j:j + 2, :2]) for _, p in lines for j in range(len(p) - 1)]
+        self.tree = shapely.STRtree(segs) if segs else None
+        up = [shapely.Polygon([q[:2] for q in a["r"]]) for a in D["areas"] if a.get("l", 0) >= 1 and len(a["r"]) >= 3]
+        up = [g if g.is_valid else shapely.make_valid(g) for g in up]
+        self.up = shapely.STRtree(up) if up else None
+        self.areas = self.points = 0  # (what it changed: the build's log)
+        self.kept = {}  # (an area's answer, by the area: the stairs' sides ask before the surface does, stairs_sides)
+
+    def outline(self, a):
+        """The area's outline [[x, y, z]] with the points that are not the stairs' at the stairs' heights; None where
+        none moves."""
+        k = id(a)
+        if k not in self.kept:
+            self.kept[k] = (a, self._outline(a))
+        return self.kept[k][1]
+
+    def _outline(self, a):
+        if any(q[2] is None for q in a["r"]) or len(a["r"]) < 3:
+            return None
+        P = np.array([q[:3] for q in a["r"]], float)
+        Q = np.roll(P, -1, 0)
+        run = np.hypot(Q[:, 0] - P[:, 0], Q[:, 1] - P[:, 1])
+        jumps = int(((run <= RISER_RUN) & (np.abs(Q[:, 2] - P[:, 2]) >= RISER)).sum())
+        on = collections.defaultdict(set)   # (the lines each edge, from its point to the next, lies on)
+        if self.tree is not None:
+            pi, si = self.tree.query(shapely.points((P[:, :2] + Q[:, :2]) / 2), predicate="dwithin", distance=STAIRS_ON)
+            for p, s in zip(pi, si):
+                on[int(p)].add(self.kind[s])
+        other = np.array([on[k] == {"other"} for k in range(len(P))], bool)
+        judged = (other | np.roll(other, 1)) | (jumps >= 2)
+        if not judged.any():
+            return None
+        g = shapely.Polygon(P[:, :2])
+        g = g if g.is_valid else shapely.make_valid(g)
+        inner = g.buffer(-STAIRS_INSET)
+        pts = shapely.points(P[:, :2])
+        probe = P[:, :2] if inner.is_empty else \
+            np.array([shapely.get_coordinates(shapely.ops.nearest_points(inner, p)[0])[0] for p in pts])
+        zl = np.asarray(self.lidar(probe[:, 0], probe[:, 1]), float)
+        if not np.isfinite(zl).all():
+            return None
+        if self.up is not None:
+            pi, _ = self.up.query(pts, predicate="covered_by")
+            judged[np.unique(pi)] = False
+        moved = judged & (np.abs(P[:, 2] - zl) >= STAIRS_OFF)
+        if not moved.any() or moved.all():
+            return None
+        # (between the kept points on either side of a run, by where a point lies along the line from one to the other:
+        # the nearest kept point's height made shelves of a flight's side along a wall, line 17 area 1063: 222.1 -> 225.2
+        # m over 8 m became 222.0, 225.3, 225.6; the length round the outline counted a flight's foot and top edges too)
+        n = len(P)
+        o = (np.flatnonzero(~moved)[0] + np.arange(n + 1)) % n   # (the ring from a kept point round to it)
+        kp = np.flatnonzero(~moved[o])
+        j = np.flatnonzero(moved[o])
+        A, B = P[o[kp[np.searchsorted(kp, j) - 1]]], P[o[kp[np.searchsorted(kp, j)]]]
+        d = B[:, :2] - A[:, :2]
+        t = np.clip(((P[o[j], :2] - A[:, :2]) * d).sum(1) / np.maximum((d * d).sum(1), 1e-9), 0, 1)
+        P[o[j], 2] = A[:, 2] + (B[:, 2] - A[:, 2]) * t
+        self.areas += 1
+        self.points += int(moved.sum())
+        return P.tolist()
+
+
+STAIRS_MEET = 0.3  # m: a stairs side's point whose ground this far out lies in a stairs area is where flights meet
+
+
+def stairs_sides(ln, D, stairs, box=None, root=ROOT):
+    """The survey's level-0 stairs' sides as wall lines (wall_lines.stretches `stairs`, #447): ([(n, 3)] runs of their
+    outlines at the stairs' own heights, [per run the side the stairs lie on, "l" or "r"]). A stretch stands where the
+    ground beside a side, read off IPR's raster as at any wall line, stands STEP or more over or under the stairs there:
+    a flight on a bank with a wall under its side, or sunk between walls below the ground round it. The survey's other
+    areas beside it share the side's points and heights, and a lawn or a yard on the lidar rose to the side or fell from
+    it as a slope: by the Belvedere (line 22 (-1051, 823), groundPlaces stairs-belvedere-wall) the flight's side was
+    pulled up 2.6 m to the raster's smear of a 5 m wall. The build keeps the stairs' corners on a stretch apart from the
+    ground beside, which the stretch holds at its level (hold_at_walls; a street keeps the survey's heights).
+    A side's own height is the stairs' (flight(), StairsHeights), never the raster read inside a flight: at a flight's
+    top the raster 2.5-4 m inside lay a metre and more under the landing beside it, and every top and foot stepped.
+    Left out: an outline's run on another feature's line (a building's, a structure's, a wall's: STAIRS_EDGES), within
+    wall_lines.PAIR of a wall line the walls know (the survey's, its wall areas' and strips' outlines, Geoportál's: that
+    wall stands already), where the ground beside lies in a stairs area (STAIRS_MEET: flights meeting), where the
+    stairs stand STAIRS_OFF or more over the raster inside them (in the air, a structure: line 23 (-2255, 641), 3 m
+    over it; sunk under it, the 1 m raster does not see into a narrow areaway, line 22 (4557, -2643)), and runs under
+    wall_lines.MIN_LEN. With wall_lines.STAIRS_SEEN, 140-1,030 m of stairs side a line stand as a face, 2026-11-24
+    (tools/stairs_review.py --table)."""
+    import wall_lines
+    areas = D.get("areas") or []
+    ids = []
+    for i, a in enumerate(areas):
+        if a.get("c") != "stairs" or a.get("l", 0) != 0 or len(a.get("r") or []) < 3 or any(q[2] is None for q in a["r"]):
+            continue
+        if box is not None:
+            x, y = [q[0] for q in a["r"]], [q[1] for q in a["r"]]
+            if max(x) < box[0] or min(x) > box[2] or max(y) < box[1] or min(y) > box[3]:
+                continue
+        ids.append(i)
+    if not ids:
+        return [], []
+    known = wall_lines.source_lines(ln, root, box) + wall_lines.wall_outlines(ln, root, box, strips=True)
+    known += wall_lines.geoportal_lines(ln, root, box, known)[0]
+    near = shapely.STRtree([shapely.LineString(np.asarray(q, float)[:, :2]) for q in known]) if known else None
+    oth = [p for k, p in survey_edges(ln, box, root) if k == "other"]
+    otree = shapely.STRtree([shapely.LineString(p[:, :2]) for p in oth]) if oth else None
+    polys = []
+    for a in areas:
+        if a.get("c") == "stairs" and a.get("l", 0) == 0 and len(a.get("r") or []) >= 3:
+            g = shapely.Polygon([q[:2] for q in a["r"]])
+            polys.append(g if g.is_valid else shapely.make_valid(g))
+    ptree = shapely.STRtree(polys)
+    lines, sides = [], []
+    for i in ids:
+        a = areas[i]
+        f = flight(a)
+        if f is not None:
+            x0, y0, (gx, gy, z0) = f
+            P = np.array([[q[0], q[1], z0 + gx * (q[0] - x0) + gy * (q[1] - y0)] for q in a["r"]], float)
+        else:
+            r = stairs.outline(a) if stairs is not None else None
+            P = np.array(r if r is not None else [q[:3] for q in a["r"]], float)
+        P = np.vstack([P, P[:1]])
+        x, y = P[:, 0], P[:, 1]
+        side = "l" if float((x[:-1] * y[1:] - x[1:] * y[:-1]).sum()) > 0 else "r"  # (anticlockwise: the stairs to the left)
+        S = wall_lines.sample(P)
+        if len(S) < 2:
+            continue
+        keep = np.ones(len(S), bool)
+        pts = shapely.points(S[:, 0], S[:, 1])
+        for tree, dist in ((otree, 2 * STAIRS_ON), (near, wall_lines.PAIR)):
+            if tree is not None:
+                qi, _ = tree.query(pts, predicate="dwithin", distance=dist)
+                keep[np.unique(qi)] = False
+        sgn = -1.0 if side == "l" else 1.0   # (out of the stairs: the normal is to the left)
+        qi, _ = ptree.query(shapely.points(S[:, 0] + sgn * S[:, 3] * STAIRS_MEET, S[:, 1] + sgn * S[:, 4] * STAIRS_MEET),
+                            predicate="within")
+        keep[np.unique(qi)] = False
+        if stairs is not None:  # (not over the lidar's ground there, as StairsHeights reads it: in the air)
+            g = shapely.Polygon(P[:, :2])
+            inset = min(STAIRS_INSET, g.area / max(g.length, 1e-9))   # (half a narrow strip's width)
+            zl = np.asarray(stairs.lidar(S[:, 0] - sgn * S[:, 3] * inset, S[:, 1] - sgn * S[:, 4] * inset), float)
+            with np.errstate(invalid="ignore"):
+                keep &= ~(S[:, 2] - zl >= STAIRS_OFF)
+        d = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(S[:, 0]), np.diff(S[:, 1])))])
+        edge = np.flatnonzero(np.diff(np.concatenate([[False], keep, [False]]).astype(int)))
+        for s0, s1 in zip(edge[::2], edge[1::2] - 1):
+            if d[s1] - d[s0] >= wall_lines.MIN_LEN:
+                lines.append(S[s0:s1 + 1, :3].copy())
+                sides.append(side)
+    return lines, sides
+
+
 TERRACE = 1.0  # m: a lidar-ground area's outline this far over the lidar (its points' median) beside a wall as high
 
 
@@ -399,14 +616,19 @@ def beside(D, ids, raised, lidar):
 
 class SurveySurface:
     """Each survey area's own surface: its outline's heights, triangulated (the page's DtmSurface); a stairs area that is
-    one flight, its plane (flight())."""
+    one flight, its plane (flight()); one that is not, on the stairs' own heights where `stairs` (StairsHeights) is given."""
 
-    def __init__(self, D, areas):
+    def __init__(self, D, areas, stairs=None):
         self.tris, self.area, self.flights = [], [], {}
         for i in sorted(set(areas)):
             a = D["areas"][i]
             if a["c"] == "stairs":
                 f = flight(a)
+                if f is None and stairs is not None:
+                    r = stairs.outline(a)
+                    if r is not None:
+                        a = {**a, "r": r}
+                        f = flight(a)
                 if f is not None:
                     self.flights[i] = f
             if any(q[2] is None for q in a["r"]):
@@ -880,12 +1102,13 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     and the lawn (the lidar has 272.6 m; the end joins the top line, so it is no free end, #770).
     It does not hold a street's corners (`street`): a street has its own surface up to the strip, and line 9 alone has
     7.4 km of such stretches (1,014 of them, 637 under 5 m: parapets, edgings, low walls) whose raster levels would
-    run through its sidewalks; the lidar's ground and the terrain have none and climbed the strip (#770).
+    run through its sidewalks; the lidar's ground and the terrain have none and climbed the strip (#770). Nor does a
+    stairs' side (`stairs`, stairs_sides): a street beside stairs keeps the survey's heights, as the stairs do.
     Returns (z, the corners held)."""
     held = np.zeros(len(cx), bool)
     if not walls or not eligible.any():
         return z, held
-    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP, SL, SR, SID, LAST = [], [], [], [], [], [], [], [], [], [], [], [], [], []
+    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP, SL, SR, SID, LAST, STAIRS = ([] for _ in range(15))
     wl = np.array([shapely.LineString(np.asarray(w["p"], float)[:, :2]) for w in walls], object)
     wtree = shapely.STRtree(wl)
     free = np.ones((len(walls), 2), bool)
@@ -914,6 +1137,7 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
         SID.append(np.full(n, len(SID)))
         ACROSS.append(np.full(n, bool(w.get("across"))))
         OUT.append(np.full(n, {"l": 1, "r": -1}.get(w.get("out"), 0)))
+        STAIRS.append(np.full(n, bool(w.get("stairs"))))
         e = np.zeros((n, 2), bool)  # (a segment's end that is its stretch's free end)
         e[0, 0], e[-1, 1] = free[len(END)]
         END.append(e)
@@ -923,8 +1147,8 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
         e = np.zeros((n, 2), bool)  # (a segment's end that is its stretch's end with no stretch running on from it)
         e[0, 0], e[-1, 1] = ~runs_on[len(LAST)]
         LAST.append(e)
-    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP, SL, SR, SID, LAST = (
-        np.concatenate(v) for v in (A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP, SL, SR, SID, LAST))
+    A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP, SL, SR, SID, LAST, STAIRS = (
+        np.concatenate(v) for v in (A, B, ZL, ZR, GL, GR, END, ACROSS, OUT, TIP, SL, SR, SID, LAST, STAIRS))
     tree = shapely.STRtree(shapely.linestrings(np.stack([A, B], 1)))
     idx = np.flatnonzero(eligible)
     pi, si = tree.query(shapely.points(cx[idx], cy[idx]), predicate="dwithin", distance=WALL_HOLD)
@@ -932,7 +1156,7 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
         keep = ~(ACROSS[si] & np.asarray(deck, bool)[idx[pi]])
         pi, si = pi[keep], si[keep]
     if street is not None and len(pi):
-        keep = ~((OUT[si] != 0) & np.asarray(street, bool)[idx[pi]])
+        keep = ~(((OUT[si] != 0) | STAIRS[si]) & np.asarray(street, bool)[idx[pi]])
         pi, si = pi[keep], si[keep]
     if not len(pi):
         return z, held
@@ -1863,8 +2087,12 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     abut = abutments([np.asarray(t["p"], float)[:, :2] for t in L.get("tracks") or [] if len(t.get("p") or []) > 1], outline,
                      lambda px, py: beds.surface_at(px, py, BED_REACH), lidar_w,
                      wall_lines.source_lines(ln, box=box.bounds), box.bounds, log, span_decks(L) or shapely.Polygon())
-    walls = wall_stretches = wall_lines.stretches(ln, box=box.bounds, lidar=lidar_w, extra=abut)
-    log(f"  {len(abut)} abutment lines, {len(walls)} wall stretches")
+    # (the stairs' own heights, and their sides where the ground beside steps: wall lines too, #447)
+    stairs = StairsHeights(D, survey_edges(ln, box.bounds), lidar_raw)
+    sides = stairs_sides(ln, D, stairs, box.bounds)
+    walls = wall_stretches = wall_lines.stretches(ln, box=box.bounds, lidar=lidar_w, extra=abut, stairs=sides)
+    log(f"  {len(abut)} abutment lines, {len(walls)} wall stretches ({sum(bool(w.get('stairs')) for w in walls)} on "
+        f"{len(sides[0])} stairs sides)")
     for w in walls:
         g = shapely.LineString(w["p"]).intersection(box)
         if not g.is_empty:
@@ -2016,7 +2244,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     prio = np.full(len(cx), 9.0)
     kind = np.full(len(cx), "", dtype=object)
     from track_styles import RANK
-    surface = SurveySurface(D, [pieces["survey"][owners[o][1]]["area"] for o in owner if owners[o][0] == "survey"])
+    surface = SurveySurface(D, [pieces["survey"][owners[o][1]]["area"] for o in owner if owners[o][0] == "survey"], stairs)
+    log(f"  stairs: {stairs.areas} on their own heights ({stairs.points} outline points moved, StairsHeights)")
     # terrain: the parent triangle's plane
     m = corner_cls == "terrain"
     par = np.array([owners[o][1] for o in owner])[corner_face[m]]
@@ -2294,6 +2523,20 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     c_wall = np.zeros(len(cx), bool)
     c_wall[sv_m] = is_wall & ~on_hill
     c_lift |= standing(cx, cy, zc, c_wall, is_street)
+    # (a stairs' corner on its side's stretch stands apart from the ground beside, which the stretch holds at its own
+    # level: an upright face between them, #447. Welded, a road's corner pulled the side down to it, and a lawn's
+    # corner rose to the side)
+    side_lines = [shapely.LineString(w["p"]) for w in wall_stretches if w.get("stairs")]
+    n_sides = 0
+    if side_lines:
+        st_c = np.flatnonzero(sc == "stairs")
+        if len(st_c):
+            qi, _ = shapely.STRtree(side_lines).query(shapely.points(cx[sv_m[st_c]], cy[sv_m[st_c]]), predicate="dwithin",
+                                                      distance=WALL_ON)
+            on_side = sv_m[st_c[np.unique(qi)]]
+            c_lift[on_side] = True
+            n_sides = len(on_side)
+    log(f"  {n_sides:,} stairs corners on their sides' stretches stand apart")
     zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"),
                                belt & (kind != "bed"))
     # vertex ids: (x, y, z in mm)
