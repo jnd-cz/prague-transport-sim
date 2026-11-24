@@ -1188,6 +1188,22 @@ def write_line(line, lookup, chs):
             covered += 1
     for _ in range(2):  # (a reference may move near its own end: once more settles it)
         join_ends(data['tracks'])
+    # (other tracks' open ballast where IPR reads it under their rails, their beds' widths and lift by it: #548)
+    import track_beds
+    import track_styles
+    if surface.terrain is None:
+        from import_track_heights import Terrain
+        surface.terrain = Terrain()
+    ballast = track_styles.ballast_runs(data, surface.terrain, OUT_STEP)
+    dp = ROOT / 'data' / f'line{line}.dtm.json'
+    dtm = json.loads(dp.read_text(encoding='utf-8')) if dp.exists() else None
+    beds = track_beds.beds(data, dtm)
+    for i, t in enumerate(data['tracks']):
+        if i in beds:
+            t['bed'] = beds[i]
+        else:
+            t.pop('bed', None)
+    track_styles.own_lifts(data, track_styles.offsets(json.loads((ROOT / 'data' / 'truth.json').read_text(encoding='utf-8'))))
     data['heights'] = heights
     data['heightSource'] = src_ranges
     # the user's structures no source maps that lie on the tracks this line draws, with their state (#670)
@@ -1207,6 +1223,7 @@ def write_line(line, lookup, chs):
              + sum(1 for t in data['tracks'] if len(t['p']) > 1 for z in (t.get('zs') or [None]) if z is None))
     print(f'line {line}: path and pathBack {total:.0f} m: ' + ', '.join(f'{k} {metres[k]:.0f} m' for k in LEVELS if metres[k])
           + f'; {covered} of {len(data["tracks"])} tracks with heights, {track_filled:.0f} m of them the surface; '
+          + f'other tracks\' open ballast from IPR {ballast:.0f} m; '
           + f'{nulls} samples without a height; wrote {dst.name} ({time.time() - t0:.0f} s)', flush=True)
     data['_nulls'] = nulls
     return heights, src_ranges, data

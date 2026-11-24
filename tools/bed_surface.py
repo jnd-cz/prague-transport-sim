@@ -9,7 +9,8 @@ when the page loads the ground (#509).
 Each drawn track (lineN.json `tracks`), along its points densified to SMOOTH m:
 - **top of rail** `zs` (tools/line_heights.py) at each point, by the length along `p` (world.js ownHeights);
 - **lift**, the rails over the bed: the route's `lift` at the nearest route s within 6 m, the other direction's
-  `liftBack` across the street by the lateral offset (src/terrain.js Profile.lift), 0 farther;
+  `liftBack` across the street by the lateral offset (src/terrain.js Profile.lift), farther the track's own `lift`
+  (its own styles' offsets, tools/track_styles.py own_lifts, #548), else 0;
 - **tilt**: half the rails' height difference, from the route's lean (`cant` and `crossLevel.path`, src/route.js
   rollAt) within 5 m of the route, signed by the track's direction against the route's;
 - **the bed's rows**: [x, y, nx, ny, offsets, heights] across each point: its right edge, right rail, left rail, left
@@ -169,9 +170,10 @@ class Beds:
         self.tracks = tracks
         self.smooth = [densify(t["p"]) for t in tracks]
         self.zBed, self.tilt, self.lift = [], [], []  # (top of rail = a rail's row z + lift + BED_BELOW)
-        for t, sm in zip(tracks, self.smooth):
+        for k, (t, sm) in enumerate(zip(tracks, self.smooth)):
             z = self._own_heights(t, sm, step)
-            lift = np.array([self._lift_at(x, y) for x, y in sm])
+            own, sk = series(t.get("lift")), poly_len(t["p"]) / (poly_len(sm) or 1)
+            lift = np.array([self._lift_at(x, y, own, a * sk) for (x, y), a in zip(sm, self.acc(k))])
             self.lift.append(lift)
             self.zBed.append(z - lift - BED_BELOW)
             self.tilt.append(self._tilt(sm))
@@ -197,9 +199,13 @@ class Beds:
             out[i] = za + (zb - za) * (f - i0)
         return out
 
-    def _lift_at(self, x, y):
+    def _lift_at(self, x, y, own=None, s=0.0):
+        """The rails over the bed: the route's within 6 m of it, else the track's own (its `lift` at s along its `p`,
+        tools/track_styles.py own_lifts, #548: another line's open ballast, 0.17 m)."""
         n = self.R.nearest(x, y)
-        return self.R.lift(n[1], self.R.lateral(n[1], x, y)) if n and n[0] < 6 else 0.0
+        if n and n[0] < 6:
+            return self.R.lift(n[1], self.R.lateral(n[1], x, y))
+        return float(own(s)) if own is not None else 0.0
 
     def _tilt(self, sm):
         out = np.zeros(len(sm))
