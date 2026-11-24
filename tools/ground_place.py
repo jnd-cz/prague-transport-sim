@@ -440,8 +440,8 @@ def one(job):
 
 def many(todo, a, work=one, out=None):
     """Several places in one shared turn of the heavy jobs (#843), a.jobs at once in worker processes, the longest
-    first. The turn declares what the workers take together, sizes them to what the queue leaves free once it comes
-    (HeavyJob.room) and claims that. Each place's lines print whole, in the list's order; a failure prints its place's
+    first. The turn queues for one place, then sizes the workers to what the queue leaves free once it comes
+    (HeavyJob.room) and claims what they take together. Each place's lines print whole, in the list's order; a failure prints its place's
     and stops the rest. a.jobs 1: one after another in this process."""
     import multiprocessing
     from baseline_store import HeavyJob
@@ -453,7 +453,9 @@ def many(todo, a, work=one, out=None):
 
     def expect(n):  # (n at once, the longest first: the board's and the watch's time, and the backfill's)
         return sum(est.values()) / n + max(est.values())
-    heavy = HeavyJob("ground places", share={"gb": gb * n, "cores": n}, expect=expect(n))
+    # (it queues for one place, so that it starts as soon as one fits beside the other shared jobs, and takes up to n
+    # of what they leave once its turn comes, as headless.py sizes its pages)
+    heavy = HeavyJob("ground places", share={"gb": gb, "cores": 1}, expect=expect(n))
     with heavy:
         room = heavy.room()
         n = max(1, min(n, int(room["gb"] // gb), int(room["cores"])))

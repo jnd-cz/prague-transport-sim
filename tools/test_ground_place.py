@@ -222,8 +222,25 @@ class Many(unittest.TestCase):
             return real(job, gb, cores)
         with mock.patch.object(baseline_store.HeavyJob, "claim", claim):
             self.many({"a": {"sleep": 0.0}, "b": {"sleep": 0.0}}, 4)
-        # (declared for the two places it has, not the four asked for: one core and PLACE_GB each)
-        self.assertEqual(seen, {"share": {"gb": 2 * gpl.PLACE_GB[0], "cores": 2}, "gb": 2 * gpl.PLACE_GB[0], "cores": 2})
+        # (queued for one place, so that it starts as soon as one fits; then it claims the two places it has, not the
+        # four asked for: one core and PLACE_GB each)
+        self.assertEqual(seen, {"share": {"gb": gpl.PLACE_GB[0], "cores": 1}, "gb": 2 * gpl.PLACE_GB[0], "cores": 2})
+
+    def test_beside_other_jobs_it_takes_only_the_places_that_fit(self):
+        import baseline_store
+        from unittest import mock
+        seen = {}
+        real = baseline_store.HeavyJob.claim
+
+        def claim(job, gb=None, cores=None):
+            seen.update(gb=gb, cores=cores)
+            return real(job, gb, cores)
+        # (the queue leaves 8 GB beside the jobs running: two places of 3.5 GB)
+        with mock.patch.object(baseline_store.HeavyJob, "claim", claim), \
+                mock.patch.object(baseline_store.HeavyJob, "room", lambda job, jobs=None: {"gb": 8.0, "cores": 20}):
+            lines, _ = self.many({k: {"sleep": 0.0} for k in "abcd"}, 4)
+        self.assertEqual(seen, {"gb": 2 * gpl.PLACE_GB[0], "cores": 2})
+        self.assertEqual(lines[0], "4 places, 2 at once, the longest first")
 
 
 class Sections(unittest.TestCase):

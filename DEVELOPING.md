@@ -159,9 +159,9 @@ the city limits go to `reports/city-terrain/`.
 `data/truth.json` `groundPlaces` (or `--line N --at X,Y`) with the line build's own code
 (`ground_mesh.build(within=...)`): the tiles its reach touches and one ring of tiles round them, in one to three
 minutes and 3 GB on one core, with no turn among the heavy jobs. `--all` (or several names) takes one shared turn
-and builds `--jobs` places at once (4), each in its own process: the turn declares 3.5 GB and a core a place (5 GB
-with `--rings`) and takes what the queue leaves free of that once it comes; `--jobs 1` builds them one after another
-(#843). Into `reports/places/NAME/` go its
+and builds `--jobs` places at once (4), each in its own process: it queues for one place (3.5 GB and a core; 5 GB
+with `--rings`) and takes up to `--jobs` of what the queue leaves once its turn comes; `--jobs 1` builds them one
+after another (#843). The 36 places of 2026-11-24 took 18.5 min at 4 at once, 64.8 min one after another. Into `reports/places/NAME/` go its
 measures inside the reach (the steps' walls by height, the steep faces that are no wall, the area per class), the
 same of the written file, both from above as pictures, and the **locality**: the place's middle tiles against
 `data/lineN.ground.*`, vertex for vertex and triangle for triangle. A tile's ground is meant to depend on the tile
