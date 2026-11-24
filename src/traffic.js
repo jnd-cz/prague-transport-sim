@@ -21,6 +21,9 @@ const TRACK_CLEAR = 2.8; // pedestrians and cars keep this far from a track cent
 // while not waiting at a kerb, has nowhere to go and leaves (_turnBack, _leave; #366, #269, #393)
 const TURN_ROOM = 3, STILL_R = 2, STILL_T = 10;
 
+// (the points a step reads once and lets go: Path.at's out)
+const PA = { x: 0, y: 0, hx: 0, hy: 0 }, PB = { x: 0, y: 0, hx: 0, hy: 0 };
+
 // A polyline with arc length lookups (for roads and footways).
 class Path {
   constructor(pts) {
@@ -29,13 +32,17 @@ class Path {
     for (let i = 1; i < pts.length; i++) this.s.push(this.s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
     this.length = this.s[this.s.length - 1];
   }
-  at(s) {
+  // the point s along it and its heading; into `out` when given (the steps' own calls: no garbage a call, #723), else a new
+  // object
+  at(s, out) {
     s = Math.max(0, Math.min(this.length, s));
     let lo = 0, hi = this.s.length - 1;
     while (hi - lo > 1) { const m = (lo + hi) >> 1; if (this.s[m] <= s) lo = m; else hi = m; }
     const a = this.p[lo], b = this.p[hi], seg = this.s[hi] - this.s[lo] || 1e-9, t = (s - this.s[lo]) / seg;
     const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
-    return { x: a[0] + dx * t, y: a[1] + dy * t, hx: dx / l, hy: dy / l };
+    if (!out) return { x: a[0] + dx * t, y: a[1] + dy * t, hx: dx / l, hy: dy / l };
+    out.x = a[0] + dx * t; out.y = a[1] + dy * t; out.hx = dx / l; out.hy = dy / l;
+    return out;
   }
   // speed (m/s) a car can take at each point: 2.5 m/s2 sideways on the curve through its
   // neighbours, at least 2.5 m/s (computed once)
@@ -535,7 +542,7 @@ export class Traffic {
     // the other cars as obstacles too (beyond following in one lane: turning across, waiting in
     // the mouth of a junction, lanes that touch)
     for (const o of live) {
-      const p = o.path.at(o.s);
+      const p = o.path.at(o.s, PA);
       obstacles.push({ car: o, x: p.x, y: p.y, z: o.z, hx: p.hx, hy: p.hy, l: o.half, w: o.halfW, vx: p.hx * (o.vNow ?? 0), vy: p.hy * (o.vNow ?? 0) });
     }
     // first pass: what each car sees ahead; when two cars see each other (crossing paths), the
@@ -756,7 +763,7 @@ export class Traffic {
         this._poseCar(c, k.x + k.hx * k.d, k.y + k.hy * k.d, k.hx, k.hy, c.lane.road.hf);
         continue;
       }
-      const p = c.path.at(c.s);
+      const p = c.path.at(c.s, PA);
       if (Math.hypot(p.x - cx, p.y - cy) > 420) c.active = false;
       this._poseCar(c, p.x, p.y, p.hx, p.hy, c.conn ? c.conn.hf : c.lane.road.hf);
       c.z = c.pose.z; // (its level: things more than LEVEL_APART above or below it are on another level)
@@ -809,7 +816,7 @@ export class Traffic {
     const on = (rt, n, p, c) => n && (n.d < RAILS || (n.d < BODY_W + c.half + 1 && boxesApart({ x: p.x, y: p.y, hx: p.hx, hy: p.hy, l: c.half, w: c.halfW }, bodyAt(rt, n.s)) < SIDE_BY_SIDE));
     for (const c of this.cars) {
       if (!c.active || c.alpha < 0.5 || !c.path) continue;
-      const p = c.path.at(c.s);
+      const p = c.path.at(c.s, PA);
       // only cars going the tram's way hold it up (one facing it waits for the tram instead)
       const n = this.route.nearestOnHeading(p.x, p.y, p.hx, p.hy, CAR_ALIGN);
       // (a car on the road under our bridge, or on a bridge over the track, is not on it)
@@ -1061,7 +1068,7 @@ export class Traffic {
   // the first obstacle on a car's path within 40 m: gap to it (bumper to bumper) and its speed
   // along the car's heading
   _obstacleAhead(c, seq, obstacles) {
-    const p0 = c.path.at(c.s);
+    const p0 = c.path.at(c.s, PA);
     // (something whose centre is behind the car can never be in its way: a car beside the front of
     // a tram waited for it while the tram waited for the car)
     // (nor something on another level: the bridge above, the road below)
@@ -1072,7 +1079,7 @@ export class Traffic {
       let q = null;
       for (const [path, off] of seq) {
         const ls = d - off;
-        if (ls >= 0 && ls <= path.length) { q = path.at(ls); break; }
+        if (ls >= 0 && ls <= path.length) { q = path.at(ls, PB); break; }
       }
       if (!q) return null;
       for (const o of near) {
@@ -1210,7 +1217,7 @@ export class Traffic {
   _carComing(x, y) {
     for (const c of this.cars) {
       if (!c.active || (c.vNow ?? 0) < 1) continue;
-      const p = c.path.at(c.s), dx = x - p.x, dy = y - p.y, d = Math.hypot(dx, dy);
+      const p = c.path.at(c.s, PA), dx = x - p.x, dy = y - p.y, d = Math.hypot(dx, dy);
       if (d > 40 || d < 0.5) continue;
       // coming towards the spot (within ~25° of its heading) and close in time
       if ((dx * p.hx + dy * p.hy) / d > 0.9 && d / c.vNow < 4) return true;
