@@ -999,6 +999,18 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
     street level to the ramp going down to the river" (under Vyšehrad, line 17 (-764.1, -2356.4)); "a wall next to
     sidewalk" (Žižkov, line 9 (2217.7, -671.0)). A rule taking such an edge's own height as the walkway's was tried
     and dropped; the three are places in `data/truth.json`.
+  - **A wall at a kerb edge is one IPR sees** (#800, the user, 2026-11-23). By a car park on line 22 (3449, -2602)
+    the verge's edge is surveyed at 211.38 m, 0.41 m off IPR 1.5 m in, and the test held it 0.66 m under the car
+    park. IPR has the verge at the car park's level at the edge, falling 0.2 m a metre towards the road, and the user
+    sees "grass and bushes on what would otherwise be sidewalk" and a car park "lying on a lower level overall".
+    A wall's edge now needs IPR to bear `WALL_SEEN` (0.5) of the step both across the edge (1 m in less 1 m out) and
+    from the road to 1 m in, the median within 1 m along the edge. The three walls above bear 0.58-0.90 at every
+    point, the verge under 0.5 at every point; DMR 5G (2009-2013) bears half of the step within 2 m at all the three
+    walls' points and at 3-8 % of the verge's. The walls' edges went from 832 / 958 / 539 / 280 / 372 m to 694 /
+    801 / 366 / 178 / 276 m (lines 9 / 17 / 22 / 23 / 37). By IPR's profile those cut are a walkway at the road's
+    level with a drop 1-3 m behind it (line 37 (9065, 1055); lines 22/23 (-885, 1105)), a slope rising from a plain
+    kerb (Bělohorská, line 22 (-4170, 145): IPR and DMR 5G +0.07 m at the kerb, the survey's edge +0.48 m), or a
+    road on a deck the raster does not see.
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
