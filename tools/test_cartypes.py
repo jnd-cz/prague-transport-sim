@@ -28,7 +28,11 @@ MATERIALS = {"paint", "glass", "trim", *LAMPS, "wheel_vertex"}
 WHEELS = ("FL", "FR", "RL", "RR")
 
 
-def car_types(path=os.path.join(ROOT, "src", "carTypes.js")):
+CAR_TYPES_JS = os.path.join(ROOT, "src", "carTypes.js")
+LICENCE = os.path.join(CARS, "LICENSE.txt")
+
+
+def car_types(path=CAR_TYPES_JS):
     """CAR_TYPES as written in src/carTypes.js: one { key: value, ... } line per type."""
     src = open(path, encoding="utf-8").read()
     body = re.search(r"export const CAR_TYPES = \[(.*?)\n\];", src, re.S).group(1)
@@ -41,7 +45,7 @@ def car_types(path=os.path.join(ROOT, "src", "carTypes.js")):
     return out
 
 
-def listed(path=os.path.join(CARS, "LICENSE.txt")):
+def listed(path=LICENCE):
     """file name -> (bytes, sha256) as the licence file lists them"""
     out = {}
     for name, size, sha in re.findall(r"^(\S+\.glb)\s+([\d,]+) B\s+sha256 ([0-9a-f]{64})", open(path, encoding="utf-8").read(), re.M):
