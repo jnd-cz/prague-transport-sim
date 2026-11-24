@@ -909,8 +909,18 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     to 2.5 m; 7-24 % of their area, triangulated on the outline, is steeper than 1:1 (1-2 % of the other paved
     areas'). They take a wall's heights (`ground_mesh.wall_like`): a terraced garden's edgings, line 23 (-1117, 806),
     stood as fins up to 2 m across its lawns. The wider ones (6-23 a line, 0.25-0.53 ha) keep their outline.
-  The survey also has 65 km of `Terénní_hrana` (the tops and feet of slopes) on line 17 and 8.4 km of
-  `Hranice_schodiště`; neither is read by the ground yet (#447 for the stairs).
+  - *Stairs' sides* (#447): the survey's stairs outline shares its points and heights with the areas beside it, so
+    where the ground beside stands lower or higher, the weld drew a slope through the stairs' edge: by the Belvedere
+    (line 22 (-1051, 823)) the flight's side was pulled up 2.6 m to the raster's smear of a 5 m wall. Read as wall
+    lines at the stairs' own heights (`ground_mesh.stairs_sides`), IPR's raster steps by 0.7 m or more beside
+    140-1,030 m of stairs side a line, three quarters of it with the stairs sunk under the ground beside (lawns on the
+    lidar, front gardens' cellar stairs). Two checks keep the raster honest: stairs 0.75 m or more over the raster
+    inside them are in the air, a structure (line 23 (-2255, 641): 3 m over it); and the raster 1 m out must already
+    hold half the step, else the step read 2.5-4 m out and carried back is a bank beginning a metre off (Dobeška,
+    line 17 (-1203, -4790): 1.1 m read, 0.05 m there).
+  The survey also has 65 km of `Terénní_hrana` (the tops and feet of slopes) on line 17, not read by the ground, and
+  8.4 km of `Hranice_schodiště`, which tells the stairs' own boundary from another feature's
+  (`ground_mesh.StairsHeights`, #447).
 
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 

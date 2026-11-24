@@ -3,13 +3,19 @@
 
     python -P -E tools/stairs_review.py [--lines 9,17,22,23,37]        # the table, and the review sets
     python -P -E tools/stairs_review.py --table [--lines ...]           # the table alone
+    python -P -E tools/stairs_review.py --table --odd [--lines ...]     # and the places still steeper than 1:1
     python -P -E tools/stairs_review.py --import [--reviews reports/reviews]
 
 - **The table** (per line): the level-0 stairs areas with a height at every outline point; those on the stairs' own
   heights (ground_mesh.StairsHeights); those that are one flight (ground_mesh.flight, #762, on those heights); the rest,
   drawn on their outline's triangles (ground_mesh.SurveySurface); the plan area
   of the rest steeper than 1:1 on a STEP grid (no stair is: 17 / 29 cm is 0.59); the areas with ODD m² or more of it.
-  It measures each area's own surface, before the ground fuses it with its neighbours.
+  It measures each area's own surface, before the ground fuses it with its neighbours. Then the stairs' sides that
+  stand as an upright face (ground_mesh.stairs_sides, wall_lines.stretches `stairs`): the metres where the stairs
+  stand over the ground beside them and where they lie under it (sunk), read on IPR's raster as the build reads it
+  but without its covers over passages (covers.Covers).
+- **--odd**: the places still steeper than 1:1 by ODD m² or more, the lines merged, the steepest first, with the
+  user's answer where the stairs review has one: the stairs no rule takes (#447).
 - **The cards** (reports/review/stairs-N.json): the WORST places with the most steep area, and the places the issue's
   thread asked about (ASKED). The lines are merged: an area on two lines' files (one city frame) is one card in both
   sets. Each asks what kind of stairs stand there; the kinds are what #447's rules are written for. Pins mark the
@@ -118,10 +124,45 @@ def measure(D, own=None):
 
 def table(counts):
     out = ["| line | stairs (level 0) | m² | on their own heights | one flight | the rest | their m² | steeper than 1:1, m² | "
-           f"areas with {ODD} m² or more of it | the rest rising over 10 m |", "|---|---|---|---|---|---|---|---|---|---|"]
+           f"areas with {ODD} m² or more of it | the rest rising over 10 m | sides standing as a face over / under the "
+           "ground beside, m |", "|---|---|---|---|---|---|---|---|---|---|---|"]
     for ln, n in counts.items():
         out.append(f"| {ln} | {n['stairs']:,} | {n['m2']:,.0f} | {n['own']:,} | {n['flight']:,} | {n['rest']:,} | {n['rest m2']:,.0f} | "
-                   f"{n['steep']:,.0f} | {n['odd']} | {n['tall']} |")
+                   f"{n['steep']:,.0f} | {n['odd']} | {n['tall']} | {n.get('face over', 0):,.0f} / {n.get('face under', 0):,.0f} |")
+    return "\n".join(out)
+
+
+def sides(ln, D, own, lidar):
+    """The stairs' sides of line ln that stand as an upright face: {"face over": m, "face under": m}, the stairs over
+    the ground beside them or under it (ground_mesh.stairs_sides, wall_lines.stretches)."""
+    import wall_lines
+    over = under = 0.0
+    for s in wall_lines.stretches(ln, lidar=lidar, stairs=gm.stairs_sides(ln, D, own)):
+        if not s.get("stairs"):
+            continue
+        p = s["p"]
+        L = np.hypot(np.diff(p[:, 0]), np.diff(p[:, 1]))
+        zin, zout = (s["zl"], s["zr"]) if s["stairs"] == "l" else (s["zr"], s["zl"])
+        h = (zin - zout)[:-1] + (zin - zout)[1:]
+        over += float(L[h > 0].sum())
+        under += float(L[h <= 0].sum())
+    return {"face over": over, "face under": under}
+
+
+def odd(rows, truth):
+    """The places still steeper than 1:1 by ODD m² or more (places()), the steepest first: a table."""
+    F = Frame()
+    got = [(shapely.Point(*(float(v) for v in F.xy(*a["place"]))), a["kind"]) for a in truth.get("stairsReview", {}).get("answers", [])]
+    P = sorted((p for p in places(rows) if p["steep"] >= ODD), key=lambda p: -p["steep"])
+    out = [f"{len(P)} places, {sum(p['steep'] for p in P):,.0f} m² steeper than 1:1 (area numbers index this build's files)", "",
+           "| # | line(s) | at (x, y) | lat, lon | m² | across, m | rise, m | steeper than 1:1, m² | line:area | the user's answer |",
+           "|---|---|---|---|---|---|---|---|---|---|"]
+    for k, p in enumerate(P, 1):
+        lat, lon = (float(v) for v in F.ll(p["x"], p["y"]))
+        kind = next((kd for q, kd in got if p["g"].covers(q)), "")
+        out.append(f"| {k} | {'/'.join(p['lines'])} | ({p['x']:.0f}, {p['y']:.0f}) | {lat:.5f}, {lon:.5f} | {p['m2']:.0f} | "
+                   f"{2 * p['g'].area / p['g'].length:.1f} | {p['top'][2] - p['foot'][2]:.2f} | {p['steep']:.1f} | "
+                   f"{p['line']}:{p['area']} | {kind} |")
     return "\n".join(out)
 
 
@@ -189,7 +230,9 @@ def load(lines):
     counts, rows = {}, {}
     for ln in lines:
         D = json.loads((ROOT / "data" / f"line{ln}.dtm.json").read_text(encoding="utf-8"))
-        counts[ln], rows[ln] = measure(D, gm.StairsHeights(D, gm.survey_edges(ln), lidar))
+        own = gm.StairsHeights(D, gm.survey_edges(ln), lidar)
+        counts[ln], rows[ln] = measure(D, own)
+        counts[ln].update(sides(ln, D, own, lidar))
     return counts, rows
 
 
@@ -271,6 +314,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--lines", default=LINES)
     ap.add_argument("--table", action="store_true", help="the table alone, no review sets written")
+    ap.add_argument("--odd", action="store_true", help="and the places still steeper than 1:1")
     ap.add_argument("--import", dest="imp", action="store_true", help="the user's answers into data/truth.json")
     ap.add_argument("--reviews", default="reports/reviews")
     a = ap.parse_args()
@@ -284,6 +328,9 @@ def main():
     counts, rows = load(lines)
     print(table(counts))
     print(f"({time.time() - t0:.0f} s)")
+    if a.odd:
+        print()
+        print(odd(rows, json.loads((ROOT / "data" / "truth.json").read_text(encoding="utf-8"))))
     if not a.table:
         write_sets(lines, counts, rows)
 

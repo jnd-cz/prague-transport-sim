@@ -63,6 +63,8 @@ TURN = 30.0  # degrees: a stretch is cut where its line turns by more
 PIECE = 1.0  # m: a piece between two turns shorter than this is no stretch
 GEO_NEAR = 2.0  # m: Geoportál's retaining wall this near a survey wall line or wall area's outline is that wall
 HOLD = 1.5  # m: the ground is held to a wall's levels this far from its line (ground_mesh.WALL_HOLD)
+STAIRS_NEAR = 1.0  # m: a stairs' side (of_lines `own`) steps where IPR this far out of the stairs ...
+STAIRS_SEEN = 0.5  # ... already has this share of the step (the raster smears a wall over 2 m: half of it 1 m out)
 
 
 def _median(v, n=SMOOTH):
@@ -274,7 +276,7 @@ def straight(S, d, a, b):
     return [(i, j, j != b) for i, j in zip(cuts, cuts[1:]) if d[j] - d[i] >= PIECE]
 
 
-def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
+def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None, own=None):
     """The stretches of polylines ([(n, 3) arrays]): [{"p": (m, 2), "zl", "gl", "zr", "gr": (m,)}]. others: more lines
     a side's readings stop at (the survey's wall areas' outlines). meeting: the lines (their indexes) whose two ends
     stand on other walls (an abutment's line between its wing walls' corners, ground_mesh.abutments): an end's
@@ -285,7 +287,12 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
     that side is: the strip to the next wall line there (levels()), its level STEP or more under the ground on both
     sides of the pair, the stretch's other side and IPR past the next line (a
     stairwell, an areaway; between a terrace's foot line and top line the strip is level with the lower ground). The
-    slot ends where the pair does, and its level holds nothing past the stretch's end (hold_at_walls)."""
+    slot ends where the pair does, and its level holds nothing past the stretch's end (hold_at_walls).
+    own: {a line's index: "l" or "r"}, for a stairs' side (ground_mesh.stairs_sides): that side's level is the line's
+    own height, level across (the stairs' own heights; IPR read inside a flight lies on the steps below or above), and
+    the stretch carries it as `stairs`. The other side steps from it only where IPR STAIRS_NEAR m out already has
+    STAIRS_SEEN of that step: read FIT m out and carried back by its slope, a bank rising a metre off the Dobeška
+    stairs' curb (line 17 (-1203, -4790)) stood 1.1 m over them at their side, the raster 0.05 m."""
     out = []
     walls = segments(list(lines) + list(others))
     for n_line, p in enumerate(lines):
@@ -298,6 +305,19 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
         else:
             zl, gl, zr, gr = retained(S, lidar, h, walls)
             sl = sr = (np.zeros(len(S), bool), np.full(len(S), np.nan))
+        stairs = (own or {}).get(n_line)
+        if stairs is not None:
+            none = (np.zeros(len(S), bool), np.full(len(S), np.nan))
+            o = -1.0 if stairs == "l" else 1.0  # (out of the stairs: the normal is to the left)
+            near = np.asarray(lidar(S[:, 0] + o * S[:, 3] * STAIRS_NEAR, S[:, 1] + o * S[:, 4] * STAIRS_NEAR), float)
+            zi, zo = S[:, 2].copy(), (zr if stairs == "l" else zl).copy()
+            with np.errstate(invalid="ignore"):
+                seen = (zi - near) * np.sign(zi - zo) >= STAIRS_SEEN * np.abs(zi - zo)
+            zo = np.where(seen, zo, zi)
+            if stairs == "l":
+                zl, gl, sl, zr = zi, np.zeros(len(S)), none, zo
+            else:
+                zr, gr, sr, zl = zi, np.zeros(len(S)), none, zo
         if n_line in meeting and len(S) > 3:
             for q in (zl, gl, zr, gr):
                 q[0], q[-1] = q[1], q[-2]
@@ -319,6 +339,8 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
                 out[-1]["across"] = True
             if n_line in (outside or {}):
                 out[-1]["out"] = outside[n_line]
+            if stairs is not None:
+                out[-1]["stairs"] = stairs
     return out
 
 
@@ -523,9 +545,11 @@ def ipr_lidar():
     return lambda x, y: np.asarray(ipr.sample(np.asarray(x) + F.E0, np.asarray(y) + F.N0), float)
 
 
-def stretches(ln, root=ROOT, box=None, lidar=None, extra=()):
+def stretches(ln, root=ROOT, box=None, lidar=None, extra=(), stairs=None):
     """The stepped stretches of line ln's wall lines (of_lines), those reaching a box where one is given (with SIDE's
-    margin: a stretch is found from its own line alone, so a box's build finds what the line's build does)."""
+    margin: a stretch is found from its own line alone, so a box's build finds what the line's build does). stairs: the
+    stairs' sides as wall lines and the side the stairs lie on (ground_mesh.stairs_sides, #447): their stretches come
+    after the walls', each carrying `stairs`; their readings stop at the walls, the walls' do not stop at them."""
     if box is not None:
         box = (box[0] - FIT[-1], box[1] - FIT[-1], box[2] + FIT[-1], box[3] + FIT[-1])
     # (extra: more lines taken as wall lines, ground_mesh.abutments, #763)
@@ -536,9 +560,12 @@ def stretches(ln, root=ROOT, box=None, lidar=None, extra=()):
     known = src + wall_outlines(ln, root, box, strips=True) + [p for p, g in zip(*strips(ln, root, box)) if g]
     geo, hs = geoportal_lines(ln, root, box, known)
     lines = src + walls + geo
-    return of_lines(lines + list(extra), lidar, areas, set(range(len(lines), len(lines) + len(extra))),
-                    {len(src) + len(walls) + k: h for k, h in enumerate(hs)},
-                    {len(src) + k: v for k, v in enumerate(sides) if v})
+    out = of_lines(lines + list(extra), lidar, areas, set(range(len(lines), len(lines) + len(extra))),
+                   {len(src) + len(walls) + k: h for k, h in enumerate(hs)},
+                   {len(src) + k: v for k, v in enumerate(sides) if v})
+    if stairs is not None and len(stairs[0]):
+        out += of_lines(stairs[0], lidar, lines + list(extra) + areas, own=dict(enumerate(stairs[1])))
+    return out
 
 
 def main(argv=None):

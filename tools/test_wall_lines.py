@@ -181,6 +181,30 @@ class Stretches(unittest.TestCase):
         self.assertEqual(sorted([low[0][0, 1], low[0][-1, 1]]), [0.0, 30.0])
         self.assertEqual(wl.low_edges(ring, lambda x, y: np.full(np.shape(x), 245.0)), [])  # (a kerb's strip: no low side)
 
+    # (#447: a stairs' side, the stairs to the line's left at their own height, the raster's ground to its right)
+    SIDE = np.array([[0.0, 0.0, 239.9], [0.0, 10.0, 239.9]])
+
+    def test_a_stairs_side_steps_from_the_stairs_own_height(self):
+        """The Belvedere's flight, line 22 (-1051, 823): the raster inside a flight is no level of its side."""
+        def wall(x, y):  # (a wall 5.5 m tall at the side, the raster's smear over it, and a flight falling into it)
+            x = np.asarray(x, float)
+            return np.where(x < 0, 241.0 - 0.6 * x, quay(-x, y, top=245.4, foot=240.0, smear=0.6))
+        st = wl.of_lines([self.SIDE], wall, own={0: "l"})
+        self.assertEqual(len(st), 1)
+        self.assertEqual(st[0]["stairs"], "l")
+        self.assertTrue(np.allclose(st[0]["zl"], 239.9) and np.allclose(st[0]["zr"], 245.4))
+        self.assertTrue(np.allclose(st[0]["gl"], 0.0))
+        # (read as any wall line, the flight's own raster 2.5-4 m inside stood for its side)
+        self.assertFalse(np.allclose(wl.of_lines([self.SIDE], wall)[0]["zl"], 239.9))
+
+    def test_a_stairs_side_steps_only_where_the_raster_beside_has_half_of_it(self):
+        """Dobeška, line 17 (-1203, -4790): a bank rising a metre off the stairs' kerb, read 2.5-4 m out and carried
+        back by its slope, stood 1.1 m over the stairs at their side; the raster there has the stairs' height."""
+        def bank(x, y):  # (level with the stairs to 1 m out, rising 1.1 m to a terrace 2 m out)
+            return 239.9 + 1.1 * np.clip(np.asarray(x, float) - 1.0, 0.0, 1.0)
+        self.assertEqual(wl.of_lines([self.SIDE], bank, own={0: "l"}), [])
+        self.assertEqual(len(wl.of_lines([self.SIDE], bank)), 1)  # (as a wall line it steps)
+
     def test_runs_close_small_gaps_and_drop_short_ones(self):
         d = np.arange(12.0)
         on = np.array([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0], bool)
