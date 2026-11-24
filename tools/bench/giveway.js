@@ -221,6 +221,7 @@ export function run(traffic = window.run.traffic, game = window.run.game) {
     }
 
     // where the loop has the car wait, against the passing body; and the body when it lets the car go
+    const spots = [];
     for (const x of xs) {
       let front = x.g.dC - YIELD_GAP, rule = inJunction ? 'inJunction' : 'band';
       // (the spot before the junction: since #602 the loop takes the nearer of the two, and that one only with the car's
@@ -230,6 +231,12 @@ export function run(traffic = window.run.traffic, game = window.run.game) {
         const toJ = J.off - 1, clear = xs.every((o) => o.g === x.g || o.dC >= x.g.dC || toJ - 2 * CAR_HALF >= o.dOut);
         if (!T._wayCrossings || (toJ < front && clear)) { front = toJ; rule = 'junction'; }
       }
+      spots.push({ x, front, rule, k });
+      // (a car already past the group's first band waits before a later place of it where that does not leave it in a
+      // place it crosses: standing on a lane along the rails, src/traffic.js _goesOn)
+      if (T._goesOn && x.g.dC < x.dC && !T._goesOn(x, xs)) spots.push({ x, front: x.dC - YIELD_GAP, rule: 'inGroup', k: x.k });
+    }
+    for (const { x, front, rule, k } of spots) {
       // (on the first lane, not wholly on it: a car there is on the way of the lane before)
       if (!inJunction && k === 0 && front - 2 * CAR_HALF < 0) continue;
       if (inJunction && front - CAR_HALF < 0) continue;

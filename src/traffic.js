@@ -591,8 +591,9 @@ export class Traffic {
           const gFront = x.g.dC - CAR_HALF, wait = gFront > 0 ? gFront : front;
           // (a car already across the group's first track goes on over the rest: waiting before the next one it stood on the
           // one behind it, and a tram there waited for it; line 37 s 4714, seed 5: our tram, a car on our track waiting for an
-          // oncoming tram, which waited for a car on its track, which waited for ours. It stops only for a tram's body there)
-          const across = gFront <= 0 && x.g.dC < x.dC;
+          // oncoming tram, which waited for a car on its track, which waited for ours. It stops only for a tram's body there.
+          // Not where it would wait on a lane along the rails before it, _goesOn)
+          const across = gFront <= 0 && x.g.dC < x.dC && this._goesOn(x, xs);
           // (braking up to 5 m/s2; a car standing or crawling stays where it is: one held by the queue
           // 0.9 m from the band, inside YIELD_GAP, counted as committed and pulled out in front of the
           // tram when the queue moved on, line 17 s 9903)
@@ -601,7 +602,9 @@ export class Traffic {
           // (the stretch of track the place takes up, lo to hi: the body on any of it holds the car, and the car is let go
           // once the tram's tail is past its far end; a car let go when the tail passed the point where its way came in
           // still had the body over its way further on, #602)
-          const { lo, hi } = x, zone = x.kind === 'cross' ? Math.max(TRACK_ZONE, x.dOut - x.dC) : TRACK_ZONE;
+          // (the time to clear it: across the band, or over the whole stretch where the car crosses along it, or goes along
+          // it towards the trams)
+          const { lo, hi } = x, zone = x.kind === 'cross' || x.against ? Math.max(TRACK_ZONE, x.dOut - x.dC) : TRACK_ZONE;
           for (const t of ours ? [tram, ...this.ahead] : this.oncoming) {
             if (!t || (t !== tram && (t.alpha ?? 0) < 0.3)) continue;
             const onBody = hi > t.s - t.length - 2 && lo < t.s + 2;
@@ -891,8 +894,9 @@ export class Traffic {
   // comes in on), or, never in it, where it comes within NEAR and leaves that. Its kind: 'rails' (on them RAILS_RUN m and
   // more: a lane along the rails), 'cross' (out on the other side, or over the centre line), 'reach' (beside the track,
   // within a passing body's reach); one clear of the body is no place. lo and hi: the stretch of track it takes up (where
-  // the car turns onto the rails, only that point). One place seen twice (a loop of the route) counts once; places with
-  // no room for a car between them are one group, crossed as one (g: its first band and its end). Those within `ahead` m.
+  // the car turns onto the rails with the trams, only that point); against: the car goes along it towards the trams there.
+  // One place seen twice (a loop of the route) counts once; places with no room for a car between them are one group,
+  // crossed as one (g: its first band and its end). Those within `ahead` m.
   _wayCrossings(seq, ahead = 45) {
     const xs = [];
     seq.forEach(([path, off], k) => {
@@ -925,10 +929,16 @@ export class Traffic {
       x.kind = !band ? (reach() ? 'reach' : null) : x.railsLen >= RAILS_RUN ? 'rails'
         : (!x.endsIn && x.sides[0] !== x.sides[1]) || x.flips > 0 || x.minD < CROSSES ? 'cross' : reach() ? 'reach' : null;
       if (!x.kind) continue;
-      // (a car turning onto the rails does not clear them in a few seconds: it goes only when the tram could stop behind
-      // it; s 9903: a bold driver turned in 36 m ahead of the tram at 45 km/h, crawled on along the track and was hit)
-      x.along = x.kind === 'rails';
-      x.lo = x.along ? x.sx : Math.min(x.sx, x.sxOut); x.hi = x.along ? x.sx : Math.max(x.sx, x.sxOut);
+      // (which way along the track: against its trams where the track's s falls over the stretch; a stretch over the
+      // route's seam, where its s jumps from the end back to the start, is taken at its entry)
+      const run = x.sx - x.sxOut, seam = Math.abs(run) > x.dOut - x.dC + 5;
+      x.against = !seam && run > 2;
+      // (a car turning onto the rails with the trams does not clear them in a few seconds: it goes only when the tram could
+      // stop behind it; s 9903: a bold driver turned in 36 m ahead of the tram at 45 km/h, crawled on along the track and
+      // was hit. One on them against the trams meets a tram anywhere on the stretch: the whole of it, as a crossing; line
+      // 17 s 2893 to 2932, a lane on our rails 40 m towards our tram, was taken at its entry, #602)
+      x.along = x.kind === 'rails' && !x.against;
+      x.lo = x.along || seam ? x.sx : Math.min(x.sx, x.sxOut); x.hi = x.along || seam ? x.sx : Math.max(x.sx, x.sxOut);
       out.push(x);
     }
     out.sort((a, b) => a.dC - b.dC);
@@ -940,6 +950,16 @@ export class Traffic {
       out[i].g = g;
     }
     return out;
+  }
+
+  // Whether a car past its group's first band goes on over a later place of it (x, of xs) instead of waiting before it:
+  // only where waiting there would leave it standing in a place it is crossing or within a passing body's reach. One on a
+  // lane along the rails with their trams waits there as cars queue on them anyway. (Line 17 s 2882, seed 4: a car on the
+  // opposite track's rails, its way then cutting across ours for 15 m towards our tram, went on as one already across
+  // the group with our tram 15 m off, and met it head on, #602)
+  _goesOn(x, xs) {
+    const tail = x.dC - YIELD_GAP - 2 * CAR_HALF, front = x.dC - YIELD_GAP;
+    return xs.some((o) => o !== x && o.g === x.g && !o.along && o.dC < front && o.dOut > tail);
   }
 
   // The paths a car drives next, each with the distance from the car to its start. Past a short next

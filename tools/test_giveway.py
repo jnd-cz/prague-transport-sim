@@ -39,6 +39,32 @@ SCENE = r"""async () => {
 }"""
 
 
+# the give-way loop's own places (src/traffic.js _wayCrossings, _goesOn) on made-up tracks: ours along x eastward, the
+# opposite one 3.5 m beside it westward; a car's way each, read for a car d m along it
+LOOP = r"""async () => {
+  const { Route } = await import('/src/route.js');
+  const { Traffic } = await import('/src/traffic.js');
+  const traffic = (route, back) => Object.assign(Object.create(Traffic.prototype), { route, back, ground: { profile: { overBridge: () => false } } });
+  const ours = new Route(Array.from({ length: 201 }, (_, i) => [i, 0]));
+  const back = new Route(Array.from({ length: 201 }, (_, i) => [200 - i, 3.5]));
+  const r = (v) => Math.round(v * 10) / 10;
+  const read = (T, pts, d = 0) => {
+    const xs = T._wayCrossings([[new Route(pts), -d, false]], Infinity);
+    return xs.map((x) => ({ rt: x.rt === ours ? 'ours' : 'back', kind: x.kind, along: x.along, against: x.against, lo: r(x.lo), hi: r(x.hi),
+      dC: r(x.dC), gdC: r(x.g.dC), group: xs.indexOf(xs.find((o) => o.g === x.g)), goesOn: T._goesOn(x, xs) }));
+  };
+  return {
+    // onto our rails with our trams, and against them
+    railsWith: read(traffic(ours, null), [[100, 8], [110, 0.3], [199, 0.3]]),
+    railsAgainst: read(traffic(ours, null), [[100, 8], [90, 0.3], [10, 0.3]]),
+    // on the opposite track's rails with its trams, then across ours at 25° (towards our trams): the car on those rails
+    groupRails: read(traffic(ours, back), [[150, 12], [140, 3.5], [115, 3.5], [95, -6], [80, -12]], Math.hypot(10, 8.5) + 15),
+    // straight across both: the car on the opposite track
+    groupCross: read(traffic(ours, back), [[60, 15], [60, -15]], 11.5),
+  };
+}"""
+
+
 class GiveWay(unittest.TestCase):
     def test_kinds_of_entries_and_the_body_reach(self):
         faulthandler.dump_traceback_later(300, exit=True)
@@ -73,6 +99,41 @@ class GiveWay(unittest.TestCase):
         # (the same 2.4 m outside a 20 m curve: the body's ends swing out about 0.9 m over it)
         self.assertEqual(kinds['curveOutside'], ['reach'])
         self.assertLess(r['curveOutside'][0]['least'], -0.4)
+
+    def test_the_loop_places_by_the_way_along(self):
+        faulthandler.dump_traceback_later(300, exit=True)
+        server, url = serve(0)
+        try:
+            with sync_playwright() as pw:
+                browser = gpu.launch(pw)[0]
+                page = browser.new_page()
+                page.route('**/giveway-test', lambda route: route.fulfill(body='<!doctype html><title>t</title>', content_type='text/html'))
+                page.goto(url + '/giveway-test')
+                r = page.evaluate(LOOP)
+                browser.close()
+        finally:
+            stop_server(server)
+            faulthandler.cancel_dump_traceback_later()
+        # (turned onto the rails with the trams: the tram can stop behind it, so only the point where it turns in counts)
+        [w] = r['railsWith']
+        self.assertEqual((w['kind'], w['along'], w['against']), ('rails', True, False))
+        self.assertEqual(w['lo'], w['hi'])
+        # (along the rails towards the trams: the whole stretch, about 80 m, as a crossing)
+        [a] = r['railsAgainst']
+        self.assertEqual((a['kind'], a['along'], a['against']), ('rails', False, True))
+        self.assertGreater(a['hi'] - a['lo'], 70)
+        # (on the opposite track's rails, past the group's first band: it waits there for our tram, not "already across";
+        # line 17 s 2882, seed 4)
+        b, o = sorted(r['groupRails'], key=lambda x: x['dC'])
+        self.assertEqual((b['rt'], b['kind'], b['along']), ('back', 'rails', True))
+        self.assertEqual((o['rt'], o['kind'], o['against']), ('ours', 'cross', True))
+        self.assertEqual(o['group'], 0)
+        self.assertLess(o['gdC'], 0)
+        self.assertFalse(o['goesOn'])
+        # (straight across both, on the opposite track: waiting before ours would stand it on that one, so it goes on)
+        b, o = sorted(r['groupCross'], key=lambda x: x['dC'])
+        self.assertEqual((b['kind'], o['kind'], o['group']), ('cross', 'cross', 0))
+        self.assertTrue(o['goesOn'])
 
     def test_measured_not_judged(self):
         ok, line = judge('giveway', {'checks': {'waits': 3, 'waitInBody': {'count': 2, 'at': [], 'byRule': {'band': 2}},
