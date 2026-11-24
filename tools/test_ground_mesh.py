@@ -295,6 +295,40 @@ class Stairs(unittest.TestCase):
         self.assertIn(0, s.flights)
         np.testing.assert_allclose(s.at(0, np.array([2.0, 2.0]), np.array([0.5, 9.5])), [100.25, 104.75], atol=1e-9)
 
+    # (#447, stairs_sides: a flight 2 m wide along y rising 0.5 m a metre, x 0-2, and a second flight beside it, x 2-4)
+    FLIGHT = {"c": "stairs", "l": 0, "r": [[0, 0, 100.0], [2, 0, 100.0], [2, 10, 105.0], [0, 10, 105.0]]}
+    NEXT = {"c": "stairs", "l": 0, "r": [[2, 0, 100.0], [4, 0, 100.0], [4, 10, 105.0], [2, 10, 105.0]]}
+
+    def sides(self, areas, lidar):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:  # (no survey lines, no walls: the stairs alone)
+            D = {"areas": areas}
+            return gm.stairs_sides("0", D, gm.StairsHeights(D, [], lidar), None, root)
+
+    def test_a_flights_outline_is_its_sides_at_its_own_heights_but_where_flights_meet(self):
+        lines, sides = self.sides([self.FLIGHT, self.NEXT], self.flight_lidar)
+        self.assertEqual(sides, ["l"] * len(lines))   # (anticlockwise outlines: the stairs to the left)
+        P = np.vstack(lines)
+        self.assertTrue(np.allclose(P[:, 2], 100.0 + 0.5 * P[:, 1]))   # (the flight's plane)
+        on_x = lambda x: np.isclose(P[:, 0], x) & (P[:, 1] > 0.5) & (P[:, 1] < 9.5)  # noqa: E731
+        self.assertTrue(on_x(0).any() and on_x(4).any())   # (each flight's outer side)
+        self.assertFalse(on_x(2).any())   # (where the two meet, the ground beside is the other flight)
+
+    def test_stairs_over_the_lidars_ground_have_no_sides(self):
+        # (stairs in the air, a structure: the survey's stairs 3 m over IPR inside them, line 23 (-2255, 641))
+        self.assertEqual(self.sides([self.FLIGHT], lambda x, y: 97.0 + 0.5 * np.asarray(y, float)), ([], []))
+        # (sunk under it, the raster not seeing into a narrow areaway: they have, line 22 (4557, -2643))
+        self.assertTrue(self.sides([self.FLIGHT], lambda x, y: 104.0 + 0.5 * np.asarray(y, float))[0])
+
+    def test_a_stairs_side_holds_no_street(self):
+        wall = [{"p": np.array([[0.0, 0.0], [0.0, 10.0]]), "zl": np.array([100.0, 100.0]), "zr": np.array([97.0, 97.0]),
+                 "stairs": "l"}]
+        cx, cy = np.array([0.5, 0.5]), np.array([5.0, 5.0])
+        got, held = gm.hold_at_walls(cx, cy, cx + 0.2, cy, np.array([99.0, 99.0]), np.ones(2, bool), wall,
+                                     street=np.array([True, False]))
+        self.assertEqual(held.tolist(), [False, True])
+        self.assertEqual(got.tolist(), [99.0, 97.0])
+
     def test_a_point_a_hair_off_a_long_edge_takes_the_edges_height_there(self):
         # (#548: a strip 44 m long and 2.7 m across that falls 2.2 m along; a lattice point on its long edge, 1 mm
         # outside it, lies in none of its triangles. It took the nearest vertex's height, 0.75 m off at 15 m along)

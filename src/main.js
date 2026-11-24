@@ -5,7 +5,7 @@ import { Terrain, Profile, makeGround, rockTunnels, bridgeModel, DtmSurface, cha
 import { buildWorld, WORLD_PARTS } from './world.js';
 import { widenTramStreets, buildStreetDetail } from './streets.js';
 import { groundStyles } from './groundDraw.js';
-import { fetchGround, GroundTiles, WINDOW_AHEAD, WINDOW_STEP } from './groundFile.js';
+import { fetchGround, GroundTiles, windowPoints } from './groundFile.js';
 import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
 import { fmtTime, fmtDev } from './game.js';
@@ -132,6 +132,9 @@ built[`line${lineId}.ground.json`] = groundFile.layout;
 checkBuild(lineId, lineBuild, built); // (a file of another build stops the load, naming the rebuild, #702)
 const groundTiles = new GroundTiles(groundFile, groundStyles(groundFile.layout), params.has('bot') || params.has('keepgeo'));
 window.groundTiles = groundTiles; // (what is held: tools/bench/tiles.js)
+let previewS = null; // (the route position the menu shows: the ground's window holds the route ahead of it, #711)
+// (the menu's window: its points, tools/test_loading.py)
+window.menuWindow = () => (previewS === null ? null : windowPoints(previewSpot(previewS), route, previewS));
 const groundLookups = groundTiles.loadLookups();
 await Promise.all(vehicles.filter((v) => v.preload).flatMap((v) => v.files.map((f) => load.get(fileUrl(v, f.path)))));
 await load.begin('terrain');
@@ -280,11 +283,10 @@ function useGroundLookup(ground, lk) {
 async function buildCity() {
   await load.parts(WORLD_PARTS);
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
-  // (the ground's window round the start before the first frame: the route ahead of the tram and the camera, #30)
-  const t0 = performance.now(), ahead = [];
-  for (let d = 0; d <= WINDOW_AHEAD; d += WINDOW_STEP) { const p = route.at(Math.min(route.length, d)); ahead.push([p.x, p.y]); }
-  await groundTiles.update([[camera.position.x, -camera.position.z], ...ahead], groundTiles.reach(scene.fog.far));
-  groundTiles.drain(); // (the start's tiles in the scene at once: the 'gpu' step uploads them with the world)
+  // (the ground's window before the first frame round the stop the menu shows first (fillTrips), where its preview's
+  // camera stands, and the route ahead of it, #30, #711; the 'gpu' step uploads its tiles with the world)
+  const t0 = performance.now(), s0 = data.stops[0].s + 6;
+  await groundTiles.settle(windowPoints(previewSpot(s0), route, s0), groundTiles.reach(scene.fog.far));
   window.groundTimes = { ...groundTiles.times, window: Math.round(performance.now() - t0) }; // (the workers' ms, summed; the window's wait)
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)
@@ -620,6 +622,7 @@ async function start(extra = {}, o = menuOpts()) {
   Object.assign(lamps, { indicate: null, high: false, held: false, turns: junctionTurns(route, data.switches), kerb: game.stops.filter((st) => st.vienna).map((st) => st.target) });
   game.lamps = lamps; // (the console and tests: the junction turns and kerb stops found, the lamps' state)
   pedalKey = null;
+  leverHeard = tram.eq.lever;
   window.game = game; // handy for debugging from the console
   window.run = run;
   window.hud = hud; // (its cost measured: tools/bench/hud.py)
@@ -636,6 +639,12 @@ async function start(extra = {}, o = menuOpts()) {
     return fc;
   };
   window.tramModel = tramModel;
+  // the ground's window round the tram and the route ahead in the scene before the shift shows (#711)
+  previewS = null;
+  const at = route.at(tram.s);
+  await groundTiles.settle(windowPoints([at.x, at.y], route, tram.s), groundTiles.reach(scene.fog.far),
+    (done, total) => load.wait(t('load.ground'), done / total));
+  load.wait(null);
   $('menu').classList.add('hidden');
   touch.sync();
   $('results').classList.add('hidden');
@@ -694,6 +703,7 @@ function showResults() {
 // browser) or not now. Nothing is sent without a click or that "always".
 const perfLog = new PerfLog();
 window.perfLog = perfLog;
+groundTiles.onFail = () => perfLog.tileFailed(); // (a ground tile that failed to decode, asked again later: #711)
 addFacts(() => ({ machine: machine(renderer), load: window.loadTimes || null, perf: perfLog.summary() }));
 const PERF_KEY = 'tram.perfSend';
 function offerPerf(el) {
@@ -879,7 +889,7 @@ window.addEventListener('keydown', (e) => {
   switch (k) {
     case 'w': case 'arrowup': control(+1, e.repeat); break;
     case 's': case 'arrowdown': control(-1, e.repeat); break;
-    case ' ': setStep(-6); break;
+    case ' ': if (arcade()) tram.eq.emergency(true); else setStep(-6); break;
     case 'n': setStep(0); break;
     case 'r': if (!arcade()) tram.eq.park(); break; // the brake pedal's ratchet (arcade parks by itself)
     case 'd': game.toggleDoors(); break;
@@ -903,9 +913,10 @@ window.addEventListener('keydown', (e) => {
     audio.emit('warning'); game.msg(t('msg.closeDoors'), 'warn');
   }
   if (command() !== prev) audio.emit(command() > prev ? 'notch.up' : 'notch.down');
+  leverHeard = tram.eq.lever;
 });
-// a held key whose keyup never comes (the window lost focus) lets the view go back
-window.addEventListener('blur', () => { zoomTarget = 1; });
+// a held key whose keyup never comes (the window lost focus) lets the view go back, and the lever
+window.addEventListener('blur', () => { zoomTarget = 1; if (game && tram.eq.held) tram.eq.press(0); });
 window.addEventListener('keyup', (e) => {
   if (e.key === 'Shift') shiftHeld = false;
   const ku = e.key.toLowerCase();
@@ -915,24 +926,32 @@ window.addEventListener('keyup', (e) => {
   if (['q', 'e', 'arrowleft', 'arrowright'].includes(ku)) lookTarget = 0;
   if (ku === 'g') zoomTarget = 1;
   if (ku === 'l') lamps.held = false;
-  if (e.key === ' ' && command() === -6) setStep(-5); // (the emergency stop let go: brake step 5)
-  if ((ku === 'w' || ku === 'arrowup' || ku === 's' || ku === 'arrowdown') && pedalKey) pedalKey = null;
+  // (the emergency stop let go: brake step 5; in Simple controls 0 as after N, or brake step 5 while S / ▼ is held)
+  if (e.key === ' ' && command() === -6) { if (arcade()) tram.eq.emergency(false); else setStep(-5); }
+  const dir = { w: 1, arrowup: 1, s: -1, arrowdown: -1 }[ku];
+  if (dir && game && arcade() && tram.eq.held === dir) tram.eq.press(0); // (let go: back to 0, #837)
+  if (dir && pedalKey) pedalKey = null;
 });
 
-// The controls (#221): 'arcade' moves a lever in steps and a helper works the pedals; 'advanced' moves the
-// pedals (a tap to the next step's angle, held on at 20°/s) and the ratchet (R) is the driver's
+// The controls (#221): 'arcade' moves a sprung lever (W / S held step it on, let go it is on 0 as after N, #837; the
+// number keys set a step) and a helper works the pedals; 'advanced' moves the pedals (a tap to the next step's angle, held on at
+// 20°/s) and the ratchet (R) is the driver's
 function controlMode() { return $('optControls').value === 'advanced' ? 'advanced' : 'arcade'; }
 function arcade() { return tram.eq.mode === 'arcade'; }
 // what the driver has set: the lever (arcade, the helper moves the pedals on the next step) or the pedals' step
 function command() { return arcade() ? tram.eq.lever : tram.notch; }
+// (taken over from the autopilot no hand is on the lever: it is on 0, as let go, unless the key that took over holds it)
 function takeOver() {
   tram.eq.mode = controlMode();
-  tram.eq.lever = Math.max(-5, Math.min(5, tram.notch));
+  tram.eq.setLever(Math.max(-5, Math.min(5, tram.notch)));
+  tram.eq.press(0);
+  leverHeard = tram.eq.lever;
 }
 let pedalKey = null; // advanced: a held W / S moves the pedal on after 0.35 s
+let leverHeard = 0; // arcade: the lever's step last clicked (the steps it takes held or let go click in the loop)
 function control(dir, repeat) {
   const eq = tram.eq;
-  if (arcade()) { if (eq.lever === -6) eq.lever = -5; else eq.lever = Math.max(-5, Math.min(5, eq.lever + dir)); return; }
+  if (arcade()) { if (!repeat) eq.press(dir); return; } // (the key's repeat is the lever's own, at its rate)
   if (dir > 0 && eq.parked && eq.pedal.brake === 0) parkedWarn();
   if (!repeat) { eq.tap(dir); pedalKey = { dir, t: 0 }; }
 }
@@ -945,7 +964,7 @@ function parkedWarn() {
   game.msg(text, 'warn', 4);
 }
 function setStep(n, now = false) {
-  if (arcade()) tram.eq.lever = n;
+  if (arcade()) tram.eq.setLever(n);
   else if (n > 0 && tram.eq.parked) parkedWarn();
   else if (now) tram.eq.pressTo(n);
   else tram.eq.setStep(n);
@@ -992,10 +1011,15 @@ const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 }, ORBIT_EL = 0.3;
   canvas.addEventListener('contextmenu', (e) => { if (on()) e.preventDefault(); });
 }
 
+// the menu's preview camera over the route (x, y): 40 m back of s and 6 m to the side
+function previewSpot(s) {
+  const p = route.at(s - 40), h = route.heading(s);
+  return [p.x - h.hy * 6, p.y + h.hx * 6];
+}
 function previewAt(s) {
-  const p = route.at(s - 40);
-  const h = route.heading(s);
-  camera.position.set(p.x - h.hy * 6, profile.height(s - 40) + 12, -(p.y + h.hx * 6));
+  const [x, y] = previewSpot(s);
+  camera.position.set(x, profile.height(s - 40) + 12, -y);
+  previewS = s;
   const q = route.at(s + 20);
   camera.lookAt(q.x, profile.height(s + 20), -q.y);
   placeTram(s);
@@ -1189,6 +1213,7 @@ function frame(now) {
         if (!inspect.active && drawn) recordStep(step.go);
       }
     });
+    if (arcade() && tram.eq.lever !== leverHeard) { audio.emit(tram.eq.lever > leverHeard ? 'notch.up' : 'notch.down'); leverHeard = tram.eq.lever; }
     game.updateVisuals();
     updateCamera(dt, now / 1000);
     if (inspect.active) inspect.update(dt);
@@ -1213,7 +1238,7 @@ function frame(now) {
     }
   }
   if (review) review.update(dt);
-  if (world) groundTiles.tick(now, camera, route, tram.s, scene.fog.far);
+  if (world) groundTiles.tick(now, camera, route, previewS ?? tram.s, scene.fog.far);
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   const lazy = idle();
