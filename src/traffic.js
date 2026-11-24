@@ -668,13 +668,15 @@ export class Traffic {
           }
           // crossing: on our track, or moving onto it (a car standing before it, held by a queue, is not:
           // the tram waited for two such cars for good, line 17 s 11629)
-          // (on a long crossing, a shallow one, where the car is on it now)
+          // (on a long crossing, a shallow one, where the car is on it now: on the whole stretch of the part of the route it
+          // is on. Line 9 s 22290, seed 3: a car on our rails with our trams, 66 m ahead at a red light, was put at the point
+          // where it turned in, the place's other part being against it, and our tram stood 6 m short of that for 104 s, #602)
           if (ours && ((front <= 0 && front > -zone - 2 * CAR_HALF) || (front > 0 && front < 8 && v > 1))) {
             let s = sx;
             if (front <= 0 && zone > TRACK_ZONE) {
               const p = c.path.at(c.s), n = this.route.nearest(p.x, p.y);
-              const sp = n && x.spans.find((o) => n.s >= o.lo - S_JUMP && n.s <= o.hi + S_JUMP);
-              if (n && n.d < BAND + CAR_HALF && sp) s = Math.max(sp.lo, Math.min(sp.hi, n.s));
+              const sp = n && x.spans.find((o) => n.s >= o.slo - S_JUMP && n.s <= o.shi + S_JUMP);
+              if (n && n.d < BAND + CAR_HALF && sp) s = Math.max(sp.slo, Math.min(sp.shi, n.s));
             }
             crossing.push({ s, onTrack: front <= 0, car: c });
           }
@@ -920,7 +922,7 @@ export class Traffic {
   // comes in on), or, never in it, where it comes within NEAR and leaves that. Its kind: 'rails' (on them RAILS_RUN m and
   // more: a lane along the rails), 'cross' (out on the other side, or over the centre line), 'reach' (beside the track,
   // within a passing body's reach); one clear of the body is no place. spans: the stretches of track it takes up, [{ lo, hi,
-  // along }], one per part of the route it comes near (where the car turns onto the rails with the trams, only that point; a way
+  // along, slo, shi }], one per part of the route it comes near (where the car turns onto the rails with the trams, only that point; a way
   // over a street the route takes out and back, one for each way: line 9 s 907 and 27560, seed 4, taken as one stretch,
   // the car watched only the second and was hit on the first, #602); against: the car goes along it towards the trams.
   // One place seen twice (a loop of the route) counts once; places with no room for a car between them are one group,
@@ -958,18 +960,20 @@ export class Traffic {
       x.kind = !band ? (reach() ? 'reach' : null) : x.railsLen >= RAILS_RUN ? 'rails'
         : (!x.endsIn && x.sides[0] !== x.sides[1]) || x.flips > 0 || x.minD < CROSSES ? 'cross' : reach() ? 'reach' : null;
       if (!x.kind) continue;
-      // (which way along the track: against its trams where the track's s falls over the stretch, on any part of the route)
       // (the parts of the route it comes into the band at, there; never in the band, those it comes near)
       const spans = band ? x.spans.filter((o) => o.band).map((o) => o.band) : x.spans;
+      // (which way along the track: against its trams where the track's s falls over the stretch, on any part of the route)
       x.against = spans.some((o) => o.a - o.b > 2);
       // (a car turning onto the rails with the trams does not clear them in a few seconds: it goes only when the tram could
       // stop behind it; s 9903: a bold driver turned in 36 m ahead of the tram at 45 km/h, crawled on along the track and
       // was hit. One on them against the trams meets a tram anywhere on the stretch: the whole of it, as a crossing; line
       // 17 s 2893 to 2932, a lane on our rails 40 m towards our tram, was taken at its entry, #602)
-      // (on the rails with the trams: the point where it turns in, on that part of the route; any other part, whole)
+      // (on the rails with the trams: the point where it turns in, on that part of the route, holds it; any other part,
+      // whole. slo and shi: the whole stretch on each part, where a car on it is)
       const first = spans.find((o) => x.sx >= o.lo && x.sx <= o.hi);
       x.along = x.kind === 'rails' && !!first && first.a - first.b <= 2;
-      x.spans = spans.map((o) => (o === first && x.along ? { lo: x.sx, hi: x.sx, along: true } : { lo: o.lo, hi: o.hi, along: false }));
+      x.spans = spans.map((o) => (o === first && x.along ? { lo: x.sx, hi: x.sx, along: true, slo: o.lo, shi: o.hi }
+        : { lo: o.lo, hi: o.hi, along: false, slo: o.lo, shi: o.hi }));
       out.push(x);
     }
     out.sort((a, b) => a.dC - b.dC);
