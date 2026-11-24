@@ -35,10 +35,6 @@ to its right at every point:
   read square to the line, so at a corner it is another ground, and smoothed round the corner it was carried there.
   At the Modřany abutment's corner (line 17 (-2392.7, -9250.8)) the wall's line jogs 0.5 m before it runs along the
   ramp; the ramp's top (204 m), carried round the jog, stood as shards on the sidewalk under the bridge (198.3 m).
-  The point at a turn is no piece's reading: the one beside it stands for it, at either end of a piece. Square to the
-  line after a stairwell's corner, its side was read along the wall before it, through the raster's smear: by
-  street-over-an-underpass (line 17 (-1446.6, -9111.2)) the stairwell's floor at the corner was 216.76 m for 210.50
-  beside it, and the ground's corners there stood 4.9 m over the floor (#812).
 """
 import json
 import math
@@ -265,16 +261,17 @@ def runs(on, d):
 
 
 def straight(S, d, a, b):
-    """The run a..b of sampled points S (distances d) cut at its turns over TURN: [(i, j, whether it starts at a turn
-    of the line, whether it ends at one)] (a run's own ends count too), the pieces under PIECE left out (the whole run
-    where it has no turn)."""
-    at = np.zeros(len(S), bool)
-    if len(S) > 2:
-        v = np.diff(S[:, :2], axis=0)
-        ang = np.arctan2(v[:, 1], v[:, 0])
-        at[1:-1] = np.abs((np.diff(ang) + np.pi) % (2 * np.pi) - np.pi) > math.radians(TURN)
-    cuts = [a] + [int(k) for k in np.flatnonzero(at[a + 1:b]) + a + 1] + [b]
-    return [(i, j, bool(at[i]), bool(at[j])) for i, j in zip(cuts, cuts[1:]) if len(cuts) == 2 or d[j] - d[i] >= PIECE]
+    """The run a..b of sampled points S (distances d) cut at its turns over TURN: [(i, j, whether it ends at a turn)],
+    the pieces under PIECE left out (the whole run where it has no turn)."""
+    if b - a < 2:
+        return [(a, b, False)]
+    v = np.diff(S[a:b + 1, :2], axis=0)
+    ang = np.arctan2(v[:, 1], v[:, 0])
+    turn = np.abs((np.diff(ang) + np.pi) % (2 * np.pi) - np.pi) > math.radians(TURN)
+    cuts = [a] + [a + 1 + int(k) for k in np.flatnonzero(turn)] + [b]
+    if len(cuts) == 2:
+        return [(a, b, False)]
+    return [(i, j, j != b) for i, j in zip(cuts, cuts[1:]) if d[j] - d[i] >= PIECE]
 
 
 def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
@@ -305,14 +302,10 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None):
             for q in (zl, gl, zr, gr):
                 q[0], q[-1] = q[1], q[-2]
         d = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(S[:, 0]), np.diff(S[:, 1])))])
-        for a, b, t0, t1 in (q for r in runs(np.abs(zl - zr) >= STEP, d) for q in straight(S, d, *r)):
+        for a, b, turns in (q for r in runs(np.abs(zl - zr) >= STEP, d) for q in straight(S, d, *r)):
             v = [np.array(q[a:b + 1], float) for q in (zl, gl, zr, gr)]
-            # (the point at a turn is read square to the line past it, and on one side along the line before it: for
-            # neither piece its side, the one beside it stands for it)
-            for q in v:
-                if t0:
-                    q[0] = q[1]
-                if t1:
+            if turns:  # (the point at the turn is read square to the line past it: the one before it stands for it)
+                for q in v:
                     q[-1] = q[-2]
             out.append({"p": S[a:b + 1, :2].copy(), "zl": _median(v[0]), "gl": _median(v[1]), "zr": _median(v[2]), "gr": _median(v[3])})
             for key, (strip, past), mine, other in (("sl", sl, "zl", "zr"), ("sr", sr, "zr", "zl")):

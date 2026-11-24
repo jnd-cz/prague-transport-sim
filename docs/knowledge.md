@@ -880,14 +880,20 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     0.343 m from two stretches laid over one wall in opposite directions 228.78 or 228.81 m. Ten picks settle a tie
     by place now (`tools/ties.py`), the wall rules first by meaning: of edges as near, the one whose line runs
     nearest the corner's triangle. Settled by place, two ties showed defects that main's tree order had happened to
-    step round, fixed in their rules:
+    step round, settled in their rules by meaning:
+    - At a turn `wall_lines` ends the piece before on the point beside the turn and starts the piece after on the
+      turn's own reading, taken along the wall before it: by street-over-an-underpass a stairwell's floor 216.76 m
+      for 210.50. A corner 0.77 m past both, as near each, took the piece after by its line, 216.20 m (main's tree
+      order: 211.56). Of stretches as near, `hold_at_walls` takes one starting there last now, with the distances to
+      1 µm (the float noise of a segment's end at t = 1 had chosen). Copying the point beside the turn onto the
+      piece after's start (tried) took the low side round turns into ground 3-5 m higher (line 37 (3940.7, 812.1))
+      and moved 1-6 m at seven places: the turn's readings want a rule of their own.
     - Past a wall's corner, `own_side` and `off_the_smear` read square to one of the two edges at the vertex. A
       sidewalk corner under Letná's wall read the sidewalk on the wall's top that way, 6.8 m up. They read from the
-      vertex towards the corner now (`out_of`); a corner on the outline still reads square to its edge (towards its
-      triangle, one along the wall read beside the outline: teeth of 7 cm at modranska-skola-ramp).
-    - `wall_lines` read the first point of a piece after a turn along the wall before it. By
-      street-over-an-underpass the stairwell's floor was 216.76 m there for 210.50, and a corner stood 4.9 m over
-      the floor.
+      vertex towards the corner now where the outline turns there (`out_of`, `turning`). Past a line's open end, at a
+      straight run's vertex and for a corner on the outline the read stays square: from such an end towards the
+      corner the point out ran along the line (notches of 1.8 m at yard-at-a-sidewalk, 0.7 m at belohorska-median),
+      and towards its triangle a corner on the outline read beside it (teeth of 7 cm at modranska-skola-ramp).
   - `meet_raised` weighed the edge per corner: its 8 nearest were copies of one point (12 corners, 1 mm apart),
     which by the KD tree's order. It weighs points now.
   Still box-wide: the covers over passages (`covers.Covers`: a passage merges with those the box holds, its cut

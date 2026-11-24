@@ -943,21 +943,27 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     t = np.clip(raw, 0, 1)
     d = np.hypot(*(P - A[si] - t[:, None] * v).T)
     past = ((raw < -1e-9) & END[si, 0]) | ((raw > 1 + 1e-9) & END[si, 1])
-    # (of segments as near, the one whose line runs nearest the corner's triangle (ties.across), then the first by where
-    # they lie and their levels: they went by the tree's order, which the box's extent moves, #812. Two stretches
-    # laid over one wall in opposite directions, 0.343 m from a corner by lattice-cell (line 23 (-742.1, 903.0)), took
-    # 228.78 or 228.81 m; at a stairwell's corner by street-over-an-underpass, line 17 (-1446.6, -9111.2), by place the
-    # corner took the other stretch's spike, 4.9 m over the floor its triangle lies on)
+    # (of segments as near (to 1 µm: a corner beyond the point where two meet is as far from both, and the float noise
+    # of reaching one's end at t = 1 chose), one whose stretch starts there last: at a turn wall_lines reads the first
+    # point of the piece after it along the wall before it, and lets the piece before end on the point beside it. Then
+    # the one whose line runs nearest the corner's triangle (ties.across), then the first by where they lie and their
+    # levels: they went by the tree's order, which the box's extent moves, #812. Two stretches laid over one wall in
+    # opposite directions, 0.343 m from a corner by lattice-cell (line 23 (-742.1, 903.0)), took 228.78 or 228.81 m.
+    # At a stairwell's turn by street-over-an-underpass, line 17 (-1446.58, -9111.23), the piece after starts at
+    # 216.76 m on the floor's side for 210.50 along it; a corner 0.77 m past both, (-1446.62, -9112.0), took that by
+    # its line, 216.20 m, the piece before's end 211.56 by the tree's order)
     rk = ties.segments(A, B, ZL[:, 0], ZL[:, 1], ZR[:, 0], ZR[:, 1], GL[:, 0], GR[:, 0], OUT)[si]
     along = ties.across(tx[idx[pi]], ty[idx[pi]], A[si], B[si])
+    dq = np.round(d, 6)
+    starts = (raw < 1e-9) & TIP[si, 0]
     # (whether a corner lies past a stretch's end is its nearest segment of that stretch's to say: 1 m beyond the end it
     # is still within WALL_HOLD of the stretch's second segment, which has no end to be past)
-    o = np.lexsort((rk, along, d, SID[si], pi))
+    o = np.lexsort((rk, along, dq, SID[si], pi))
     lead = np.concatenate([[True], (pi[o][1:] != pi[o][:-1]) | (SID[si[o]][1:] != SID[si[o]][:-1])])
     near = o[lead][np.cumsum(lead) - 1]
     gtip = np.empty(len(pi), bool)
     gtip[o] = ((raw[near] < -1e-9) & LAST[si[near], 0]) | ((raw[near] > 1 + 1e-9) & LAST[si[near], 1])
-    order = np.lexsort((rk, along, d, past, pi))  # (per corner the nearest segment it is not past first)
+    order = np.lexsort((rk, along, starts, dq, past, pi))  # (per corner the nearest segment it is not past first)
     first = np.concatenate([[True], pi[order][1:] != pi[order][:-1]])
     k = order[first]
     # (a corner at or beyond its segment's end, at a bend or where two stretches meet: its triangle lies on one of the
@@ -969,7 +975,8 @@ def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
     dc = np.hypot(*(C - A[si] - np.clip(rawc, 0, 1)[:, None] * v).T)
     dmin = np.full(len(idx), np.inf)
     np.minimum.at(dmin, pi, np.where(past, np.inf, d))
-    order2 = np.lexsort((rk, along, dc, (rawc < -1e-9) | (rawc > 1 + 1e-9), d > dmin[pi] + WALL_JOIN, past, pi))
+    order2 = np.lexsort((rk, along, (rawc < 1e-9) & TIP[si, 0], np.round(dc, 6), (rawc < -1e-9) | (rawc > 1 + 1e-9),
+                         d > dmin[pi] + WALL_JOIN, past, pi))
     k2 = order2[np.concatenate([[True], pi[order2][1:] != pi[order2][:-1]])]
     k = np.where(((raw[k] < 1e-9) | (raw[k] > 1 - 1e-9)) & ~past[k], k2, k)
     c, s, t, d, raw, gtip = idx[pi[k]], si[k], t[k], d[k], raw[k], gtip[k]
@@ -1123,17 +1130,49 @@ def outline_edges(D, ids):
 
 WALL_SIDE = 0.75  # m: a sidewalk's corner this near a wall's outline reads the street surface this far out from it on
 # its own side (the surface's cells are 0.5 m: a reading 0.75 m out lies between four cells of that side)
+WALL_TURN = 30.0  # degrees: an outline turns at a vertex where another edge goes on more than this another way (turning)
 
 
-def out_of(a, b, t, x, y, tx, ty):
+def turning(a, b):
+    """Per edge a -> b ((n, 2+)), whether the outline turns at its start and at its end: another edge meets it there
+    whose line goes on more than WALL_TURN another way. Not at a straight run's vertex, a line's open end, or where an
+    edge lies over it (the ends matched on the mm grid)."""
+    n = len(a)
+    if not n:
+        return np.zeros(0, bool), np.zeros(0, bool)
+    P = np.concatenate([a[:, :2], b[:, :2]])
+    U = np.concatenate([b[:, :2] - a[:, :2], a[:, :2] - b[:, :2]])  # (each end's edge, away from that end)
+    U = U / np.maximum(np.hypot(U[:, 0], U[:, 1]), 1e-12)[:, None]
+    g = np.unique(np.round(P * Q).astype(np.int64), axis=0, return_inverse=True)[1].ravel()
+    o = np.argsort(g, kind="stable")
+    start = np.r_[0, np.flatnonzero(g[o][1:] != g[o][:-1]) + 1]
+    size = np.diff(np.r_[start, len(o)])
+    s = np.repeat(size, size)  # (per end, in o's order, the ends at its point: every pair of them)
+    left = np.repeat(np.arange(len(o)), s)
+    right = np.repeat(np.repeat(start, size), s) + np.arange(len(left)) - np.repeat(np.cumsum(s) - s, s)
+    k = left != right
+    li, ri = o[left[k]], o[right[k]]
+    dot = (U[li] * U[ri]).sum(1)  # (-1: the line goes straight on; 1: the other edge lies over this one)
+    turn = np.zeros(2 * n, bool)
+    turn[li[(dot > -math.cos(math.radians(WALL_TURN))) & (dot < 0.999)]] = True
+    return turn[:n], turn[n:]
+
+
+def out_of(a, b, t, x, y, tx, ty, ta, tb):
     """Per corner (x, y) in a triangle with centre (tx, ty) and an outline edge a -> b ((n, 2+)) it is near, its nearest
     point on the edge at parameter t (clamped): (fx, fy, ux, uy), that point and the unit direction out from it to the
-    corner's side. Square to the edge, on its triangle's side; where the point is the edge's end (within WALL_ON) and
-    the corner is off the outline, from that end towards the corner: past a wall's corner the side is the wedge
-    between its two edges, and each edge's square read the other's face or what lies beyond it. Both edges then give
-    one point out, and the tie between them is gone. Under Letná's wall, line 17 (-176.28, 582.61), a sidewalk's
-    corner 0.72 m past the vertex two edges share read square to one of them the sidewalk on the wall's top, 193.13 m
-    for 186.30, and the other's square or the corner's own direction its own sidewalk (#812).
+    corner's side. Square to the edge, on its triangle's side; where the point is the edge's end (within WALL_ON), the
+    outline turns there (ta, tb: at a, at b; turning) and the corner is off the outline, from that end towards the
+    corner: past a wall's corner the side is the wedge between its two edges, and each edge's square read the other's
+    face or what lies beyond it. Both edges then give one point out, and the tie between them is gone. Under Letná's
+    wall, line 17 (-176.28, 582.61), a sidewalk's corner 0.72 m past the vertex two edges share read square to one of
+    them the sidewalk on the wall's top, 193.13 m for 186.30, and the other's square or the corner's own direction its
+    own sidewalk (#812).
+    Past a line's open end or a straight run's vertex there is no second face, and the point out from the end towards
+    a corner nearly in the line's way ran along the line: in a gap between two pieces of a thin wall at
+    yard-at-a-sidewalk (line 23 (-2382.0, 276.16)) into the next piece's smear, moved out of it to the low side, 285.5 m
+    for 288.0 on the corner's side; behind a corner on a line's end at belohorska-median (line 22 (-2804.67, 200.35))
+    through another wall, unseen, and the road's corner kept 293.74 m in ground at 296.6. There it is square.
     A corner on the outline reads square to its edge: towards its triangle's centre, a triangle along the wall, the
     point out lay beside the outline, among the cells of both sides. At modranska-skola-ramp (line 17 (-2482, -8420))
     the sidewalk at the wall's foot stood in teeth of 7 cm, 24 m more of wall over 0.3 m than the written file's 372."""
@@ -1144,9 +1183,10 @@ def out_of(a, b, t, x, y, tx, ty):
     side = np.where((tx - fx) * nx + (ty - fy) * ny >= 0, 1.0, -1.0)
     ux, uy = side * nx, side * ny
     first = t * L <= WALL_ON
-    vx, vy = np.where(first, a[:, 0], b[:, 0]), np.where(first, a[:, 1], b[:, 1])
+    at_a, at_b = first & ta, ~first & ((1 - t) * L <= WALL_ON) & tb
+    vx, vy = np.where(at_a, a[:, 0], b[:, 0]), np.where(at_a, a[:, 1], b[:, 1])
     r = np.hypot(x - vx, y - vy)
-    end = (first | ((1 - t) * L <= WALL_ON)) & (np.hypot(x - fx, y - fy) > WALL_ON) & (r > 1e-9)
+    end = (at_a | at_b) & (np.hypot(x - fx, y - fy) > WALL_ON) & (r > 1e-9)
     rr = np.maximum(r, 1e-12)
     return (np.where(end, vx, fx), np.where(end, vy, fy), np.where(end, (x - vx) / rr, ux), np.where(end, (y - vy) / rr, uy))
 
@@ -1176,7 +1216,8 @@ def own_side(walls, x, y, tx, ty, z, own):
     l2 = np.maximum((e ** 2).sum(1), 1e-12)
     t = np.clip(((x[s][pi] - a[si, 0]) * e[:, 0] + (y[s][pi] - a[si, 1]) * e[:, 1]) / l2, 0, 1)
     c = s[pi]
-    fx, fy, ux, uy = out_of(a[si], b[si], t, x[c], y[c], tx[c], ty[c])  # (the corner's side of the edge)
+    ta, tb = turning(a, b)
+    fx, fy, ux, uy = out_of(a[si], b[si], t, x[c], y[c], tx[c], ty[c], ta[si], tb[si])  # (the corner's side of the edge)
     d = np.hypot(x[c] - fx, y[c] - fy)
     qx, qy = fx + ux * WALL_SIDE, fy + uy * WALL_SIDE
     sees = np.ones(len(c), bool)
@@ -1424,7 +1465,8 @@ def off_the_smear(walls, x, y, tx, ty, z, own, lidar=None):
     l2 = np.maximum((e ** 2).sum(1), 1e-12)
     t = np.clip(((x[s][pi] - a[si, 0]) * e[:, 0] + (y[s][pi] - a[si, 1]) * e[:, 1]) / l2, 0, 1)
     c = s[pi]
-    fx, fy, ux, uy = out_of(a[si], b[si], t, x[c], y[c], tx[c], ty[c])  # (the corner's side of the edge)
+    ta, tb = turning(a, b)
+    fx, fy, ux, uy = out_of(a[si], b[si], t, x[c], y[c], tx[c], ty[c], ta[si], tb[si])  # (the corner's side of the edge)
     d = np.hypot(x[c] - fx, y[c] - fy)
     qx, qy = fx + ux * WALL_HOLD, fy + uy * WALL_HOLD
     moved = np.zeros(len(c), bool)

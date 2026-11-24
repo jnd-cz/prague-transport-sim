@@ -129,26 +129,6 @@ class Stretches(unittest.TestCase):
         for s in st:
             self.assertTrue(np.allclose(s["zl"], 203.0) and np.allclose(s["zr"], 200.0), (s["zl"], s["zr"]))
 
-    def test_the_piece_after_a_turn_does_not_read_along_the_wall_before_it(self):
-        """A stairwell's corner by street-over-an-underpass, line 17 (-1446.6, -9111.2), #812: the wall runs east, turns
-        right and runs south, the stairwell inside the turn (210.5 m), the street outside (215.3 m), the wall's top in
-        the raster (216.8 m). Square to the second piece at the corner, its right side is read along the first piece's
-        wall: its floor stood 216.76 m there, 210.50 m beside it."""
-        def stairwell(x, y):
-            x, y = np.asarray(x, float), np.asarray(y, float)
-            wall = ((np.abs(y) < 0.4) & (x < 0.4)) | ((np.abs(x) < 0.4) & (y < 0.4))
-            return np.where(wall, 216.8, np.where((x < 0) & (y < 0), 210.5, 215.3))
-        st = wl.of_lines([np.array([[-20.0, 0.0, np.nan], [0.0, 0.0, np.nan], [0.0, -20.0, np.nan]])], stairwell)
-        self.assertEqual(len(st), 2)
-        for s in st:
-            self.assertTrue(np.allclose(s["zl"], 215.3) and np.allclose(s["zr"], 210.5), (s["p"][0], s["zl"], s["zr"]))
-        # (a run that starts on a turn of its line: the same, though the run and not a cut put the end there)
-        S = wl.sample(np.array([[-20.0, 0.0, np.nan], [0.0, 0.0, np.nan], [0.0, -20.0, np.nan]]))
-        d = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(S[:, :2], axis=0).T))])
-        self.assertEqual(wl.straight(S, d, 20, 40), [(20, 40, True, False)])
-        self.assertEqual(wl.straight(S, d, 0, 40), [(0, 20, False, True), (20, 40, True, False)])
-        self.assertEqual(wl.straight(S, d, 0, 10), [(0, 10, False, False)])
-
     def test_a_line_meeting_walls_at_its_ends_reads_them_from_the_points_beside(self):
         # (an abutment's line between its wing walls, #763: at its ends the high side's readings run along a wing wall,
         # through the raster's smear of it)

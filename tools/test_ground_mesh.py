@@ -795,6 +795,26 @@ class BesideAStrip(unittest.TestCase):
         z, held = gm.own_side(walls, np.array([9.0]), np.array([-0.3]), np.array([9.0]), np.array([-0.3]), np.array([194.8]), read)
         self.assertEqual((z.tolist(), held.tolist()), ([197.4], [True]))
 
+    def test_past_a_lines_open_end_a_corner_reads_square_to_it(self):
+        # (#812, as in the gap between two pieces of a thin wall at yard-at-a-sidewalk, line 23 (-2382.0, 276.16): the
+        # wall's line from (0, 0) to (10, 0) in 1 m edges, the corner's side south at 197.4 m, the line's way on past its
+        # end the low side's 194.8 m. A corner 0.5 m past the end, nearly in the line's way, reads square from the end
+        # on its triangle's side, not along the line)
+        walls = np.array([[[k, 0.0], [k + 1.0, 0.0]] for k in range(10)])
+
+        def read(px, py):
+            return np.where(np.asarray(py, float) < -0.3, 197.4, 194.8)
+        z, held = gm.own_side(walls, np.array([10.5]), np.array([-0.05]), np.array([10.5]), np.array([-0.2]), np.array([194.8]), read)
+        self.assertEqual((z.tolist(), held.tolist()), ([197.4], [True]))
+
+    def test_an_outline_turns_where_another_edge_goes_another_way(self):
+        # (a ring's corners turn; a straight run's vertices, a line's open ends and an edge lying over another do not)
+        ring = gm.outline_edges(self.D, [0])
+        self.assertEqual([v.tolist() for v in gm.turning(ring[:, 0], ring[:, 1])], [[True] * 4, [True] * 4])
+        line = np.array([[[0.0, 0.0], [1.0, 0.0]], [[1.0, 0.0], [2.0, 0.01]], [[2.0, 0.01], [2.0, 1.0]], [[0.0, 0.0], [1.0, 0.0]]])
+        ta, tb = gm.turning(line[:, 0], line[:, 1])
+        self.assertEqual((ta.tolist(), tb.tolist()), ([False, False, True, False], [False, True, False, False]))
+
     def test_a_corner_on_the_outline_reads_square_to_it(self):
         # (#812, as at modranska-skola-ramp, line 17 (-2482, -8420): a corner on the vertex where the strip's south
         # edge bends by 0.6 degrees, its triangle along the wall. Towards the triangle's centre the point out lay 0.09 m
@@ -817,6 +837,25 @@ class BesideAStrip(unittest.TestCase):
         y = np.array([0.2, 0.0, 0.2])
         z = gm.snap_to_walls(self.D, x, y, np.array([197.35, 195.0, 197.15]), np.ones(3, bool))
         np.testing.assert_allclose(z, [197.4, 194.8, 197.15], atol=1e-9)
+
+
+class AtATurn(unittest.TestCase):
+    def test_a_corner_past_two_pieces_at_a_turn_takes_the_piece_before(self):
+        # (#812, the stairwell's turn by street-over-an-underpass, line 17 (-1446.58, -9111.23): a strip's outline runs
+        # west to the turn and north from it, the stairwell inside (its floor's side `out`). wall_lines ends the piece
+        # before on the point beside the turn (211.56 m) and starts the piece after on the turn's own reading, taken along
+        # the wall before it (216.76 m for the floor's 210.50). A corner 0.77 m past both, as near each, takes the
+        # piece before, whose line runs farther from its triangle)
+        n = 6
+        before = {"p": np.column_stack([np.arange(n - 1, -1, -1, dtype=float), np.zeros(n)]), "zl": np.full(n, 215.3),
+                  "zr": np.full(n, 211.56), "gl": np.zeros(n), "gr": np.zeros(n), "out": "r"}
+        after = {"p": np.column_stack([np.zeros(n), np.arange(n, dtype=float)]), "zl": np.full(n, 215.3),
+                 "zr": np.r_[216.76, np.full(n - 1, 210.5)], "gl": np.zeros(n), "gr": np.zeros(n), "out": "r"}
+        for walls in ([before, after], [after, before]):
+            z, held = gm.hold_at_walls(np.array([-0.31]), np.array([-0.70]), np.array([-0.42]), np.array([-0.82]),
+                                       np.array([215.3]), np.array([True]), walls)
+            self.assertEqual(held.tolist(), [True])
+            np.testing.assert_allclose(z, [211.56], atol=1e-9)
 
 
 class APairsEnd(unittest.TestCase):
