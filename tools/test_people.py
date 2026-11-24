@@ -38,9 +38,9 @@ SYNTHETIC = """async () => {
   const slots = [], m = new THREE.Matrix4(), red = new THREE.Color(0xc03020);
   const row = (x0, gap, dx = 0) => { for (let i = 0; i < N; i++) { m.makeTranslation(x0 + gap * i + dx, 0, 0); crowd.setMatrixAt(i, m); } };
   for (let i = 0; i < N; i++) { crowd.setColorAt(i, red); slots.push({ i }); }
-  const game = { clock: 0, crowd: null, runners: [], obstacles: [], action: null };
+  const game = { clock: 0, runners: [], obstacles: [], action: null }, gameView = { game, crowd: null, driver: null, meshOf: () => null };
   const cam = new THREE.PerspectiveCamera();
-  const look = (x, clock) => { cam.position.set(x, 1.6, 0); cam.updateMatrixWorld(); game.clock = clock; people.sync(cam, { crowd, traffic: { slots } }, game); };
+  const look = (x, clock) => { cam.position.set(x, 1.6, 0); cam.updateMatrixWorld(); game.clock = clock; people.sync(cam, { crowd, traffic: { slots } }, gameView); };
   const motions = () => { const k = {}; for (const f of people.near.values()) k[f.motion] = (k[f.motion] || 0) + 1; return k; };
   const out = { bones, tris, farTris, clips: assets.near.animations.map((c) => c.name).sort() };
   row(1, 2);                 // walkers at x = 1, 3, ..., 199 m
@@ -78,10 +78,11 @@ GAME = """async () => {
   const g = window.game, traffic = window.traffic, view = window.run.trafficView, ap = new Autopilot(), dt = 1 / 30;
   g.audio.setMuted?.(true);
   for (let t = 0; t < 90; t += dt) { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt); view.sync(window.camera); }
-  g.updateVisuals();
-  window.people.sync(window.camera, view, g);
+  const gv = window.run.gameView;
+  gv.sync(); gv.syncCrowd();
+  window.people.sync(window.camera, view, gv);
   const walkers = (traffic.slots || []).filter(Boolean).length;
-  return { ...window.people.stats, walkers, stopCrowd: g.crowd.count, hidden: [view.crowd.layers.mask, g.crowd.layers.mask] };
+  return { ...window.people.stats, walkers, stopCrowd: gv.crowd.count, hidden: [view.crowd.layers.mask, gv.crowd.layers.mask] };
 }"""
 
 

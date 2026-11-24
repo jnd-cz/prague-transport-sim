@@ -49,7 +49,7 @@ FIGURES = r"""async () => {
   const THREE = await import('three');
   const g = window.game, cam = window.camera;
   let board = null;
-  g.objects.traverse((o) => { if (o.userData?.sign?.kind === 'restriction' && Math.abs((o.userData.mountedS ?? -1e9) - g._zoomTestAt) < 1) board = o; });
+  window.run.gameView.objects.traverse((o) => { if (o.userData?.sign?.kind === 'restriction' && Math.abs((o.userData.mountedS ?? -1e9) - g._zoomTestAt) < 1) board = o; });
   if (!board) return null;
   const face = board.children[1], bb = (face.geometry.computeBoundingBox(), face.geometry.boundingBox);
   face.updateMatrixWorld(true);
@@ -74,7 +74,7 @@ def main():
             ctx, page, errors = shift(browser, port, args.line, (1920, 1080), False)
             r["start"] = page.evaluate(FOV)
             # 75 m before the first restriction board past 300 m, paused there
-            at = page.evaluate("(window.game.signBoards || []).filter((b) => b.kind === 'restriction' && b.at > 300).map((b) => b.at)[0] ?? null")
+            at = page.evaluate("(window.run.gameView.signBoards || []).filter((b) => b.kind === 'restriction' && b.at > 300).map((b) => b.at)[0] ?? null")
             r["board"] = at
             if at is not None:
                 page.evaluate(f"window.game._zoomTestAt = {at}; window.game.tram.s = {at - 75}; window.game.tram.v = 0; window.game.paused = true")

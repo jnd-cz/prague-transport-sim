@@ -54,7 +54,7 @@ export async function run() {
   const near = (x, y, l) => { let b = null; for (const p of by(l)) { const d = Math.hypot(p.x - x, p.y - y); if (d < 20 && (!b || d < b)) b = d; } return b; };
   const gCar = [], gTram = [];
   for (const h of traffic.heads || []) { const d = near(h.x, -h.z, 'car'); if (d !== null) gCar.push(d); }
-  for (const s of tramSigs) { const v = s.mesh.getWorldPosition(s.mesh.position.clone()), d = near(v.x, -v.z, 'tram'); if (d !== null) gTram.push(d); }
+  for (const s of tramSigs) { const m = window.run.gameView.meshOf(s), v = m.getWorldPosition(m.position.clone()), d = near(v.x, -v.z, 'tram'); if (d !== null) gTram.push(d); }
   const report = {
     heads: pts.length, poles: poles.length,
     labels: Object.fromEntries(['tram', 'car', 'ped', 'other'].map((l) => [l, by(l).length])),
