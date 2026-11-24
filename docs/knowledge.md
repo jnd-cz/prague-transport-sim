@@ -1003,14 +1003,15 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
     the verge's edge is surveyed at 211.38 m, 0.41 m off IPR 1.5 m in, and the test held it 0.66 m under the car
     park. IPR has the verge at the car park's level at the edge, falling 0.2 m a metre towards the road, and the user
     sees "grass and bushes on what would otherwise be sidewalk" and a car park "lying on a lower level overall".
-    A wall's edge now needs IPR to bear `WALL_SEEN` (0.5) of the step both across the edge (1 m in less 1 m out) and
-    from the road to 1 m in, the median within 1 m along the edge. The three walls above bear 0.58-0.90 at every
-    point, the verge under 0.5 at every point; DMR 5G (2009-2013) bears half of the step within 2 m at all the three
-    walls' points and at 3-8 % of the verge's. The walls' edges went from 832 / 958 / 539 / 280 / 372 m to 694 /
-    801 / 366 / 178 / 276 m (lines 9 / 17 / 22 / 23 / 37). By IPR's profile those cut are a walkway at the road's
-    level with a drop 1-3 m behind it (line 37 (9065, 1055); lines 22/23 (-885, 1105)), a slope rising from a plain
-    kerb (Bělohorská, line 22 (-4170, 145): IPR and DMR 5G +0.07 m at the kerb, the survey's edge +0.48 m), or a
-    road on a deck the raster does not see.
+    A wall's edge now needs IPR 1 m in to stand off the road's surface beyond by `WALL_SEEN` (0.5) of the step, the
+    median within 1 m along the edge. The three walls above bear 0.59-1.01 at every point, the verge 0.15-0.44; DMR
+    5G (2009-2013) bears half of the step within 2 m at all the three walls' points and at 3-8 % of the verge's. The
+    walls' edges of 3 m or more went from 832 / 958 / 539 / 280 / 372 m to 708 / 837 / 381 / 190 / 305 m (lines 9 /
+    17 / 22 / 23 / 37). By IPR's profile those cut are a walkway at the road's level with a drop 1-3 m behind it
+    (line 37 (9065, 1055); lines 22/23 (-885, 1105)), or a slope rising from a plain kerb (Bělohorská, line 22
+    (-4170, 145): IPR and DMR 5G +0.07 m at the kerb, the survey's edge +0.48 m). IPR 1 m out is no witness of the
+    road: under a deck it reads the ground. Read as one, it took the walls of short edges under Modřanská's deck,
+    line 17 (-2495, -8295), and their kerbs' planes lifted the walkway 3.5 m, 194.75 m to 198.23 m.
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.

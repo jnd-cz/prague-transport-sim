@@ -424,11 +424,12 @@ KERB_WALL = 0.7  # m: a sidewalk's kerb edge whose own height stands this far ov
 KERB_OWN = 0.5  # m: a kerb edge's own height this near IPR inside the sidewalk is the walkway's (wall_lines.OWN)
 KERB_NEAR = (0.5, 0.75, 1.0)  # m in from a kerb edge: IPR's readings of a walkway at the edge's own height, past the
 # smear of a wall at the edge itself (a 1 m raster) and before a drop behind a walkway that narrow
-WALL_SEEN = 0.5  # of a wall's step at a kerb edge (the walkway's level less the road beyond): what IPR must bear of it,
-# both across the edge (1 m in less 1 m out) and from the road to 1 m in. On the five lines (#800) the three walls at the
-# kerb the user confirmed bear 0.58-0.90 at every point, the verge by a car park with none (line 22 (3449, -2602))
-# under 0.5 at every point; 17-38 % of the walls' metres per line bear less, mostly a walkway at the road's level with
-# the step 1-3 m behind it, or none
+WALL_SEEN = 0.5  # of a wall's step at a kerb edge (the walkway's level less the road's surface beyond): what IPR 1 m in
+# must stand off that surface. On the five lines (#800) the three walls at the kerb the user confirmed bear 0.59-1.01 at
+# every point, the verge by a car park with none (line 22 (3449, -2602)) 0.15-0.44; 13-32 % of the walls' metres per
+# line bear less, mostly a walkway at the road's level with the step 1-3 m behind it, or none. (Not IPR 1 m out: under
+# a deck it reads the ground, not the road, and on Modřanská, line 17 (-2495, -8295), the walkway under the road's
+# deck rose 3.5 m to it)
 SEEN_ALONG = 1.0  # m either side along a kerb edge over which a wall's point takes the median of what IPR bears
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
 USUAL = 20  # samples (m) either side over which a street's usual width is its running median (a mouth is shorter)
@@ -1632,7 +1633,7 @@ def runs_in(walk, q, n, depth):
     return shapely.contains(walk, shapely.linestrings(np.stack([q + n * 0.05, q + n * depth[:, None]], 1)))
 
 
-def wall_tops(q, n, own, zr, ground=None, wide=None, near=None, beyond=None):
+def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
     """Which points of one kerb edge (q, normals n into the sidewalk, the sidewalk's own heights `own`, the road's
     surface zr beyond them) are a wall's edge and no kerb, and those as wall edges ((m, 2, 3) at the walkway's level,
     the sidewalk on their left, wall_edges()): where the walkway stands STEP_CUT or more over or under a kerb on that
@@ -1654,11 +1655,11 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None, beyond=None):
     surfaces check: 57 such kerb sites on the five lines, 18 at a wall's foot). Where IPR that near the edge comes
     within STEP_CUT of the edge's own height and that height is a plain kerb's on the road (within STEP_CUT of the
     road plus a kerb), a walkway lies at it: its own height. Without `ground`: the edge's own
-    height. beyond: IPR 1 m out from each point; with `near`, a wall's edge is one IPR bears WALL_SEEN of, across the
-    edge and from the road to 1 m in. By a car park on line 22 (3449, -2602) the verge's edge was surveyed at 211.38 m,
-    0.41 m off IPR 1.5 m in, and was held 0.66 m under the car park: IPR has the verge at the car park's level there
-    and falling 0.2 m a metre towards the road, and the user sees a slope with grass and bushes (2026-11-23, #834).
-    Without `beyond`: any step."""
+    height. With `near`, a wall's edge is one IPR bears WALL_SEEN of: IPR 1 m in stands off the road's surface by that
+    share of the step. By a car park on line 22 (3449, -2602) the verge's edge was surveyed at 211.38 m, 0.41 m off IPR
+    1.5 m in, and was held 0.66 m under the car park: IPR has the verge at the car park's level there and falling 0.2 m
+    a metre towards the road, and the user sees a slope with grass and bushes (2026-11-23, #834). Without `near`: any
+    step."""
     from kerbs import KERB
     level = np.asarray(own, float)
     with np.errstate(invalid="ignore"):
@@ -1672,14 +1673,13 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None, beyond=None):
                 ours |= (np.fmin.reduce(np.abs(level[:, None] - np.asarray(near, float).reshape(len(level), -1)), axis=1) <= STEP_CUT)                     & (np.abs(level - np.asarray(zr, float) - KERB) < STEP_CUT)
             level = np.where(ours, level, there)
         off = np.abs(level - np.asarray(zr, float) - KERB)
-        if near is not None and beyond is not None:
+        if near is not None:
             # (where IPR does not bear the step, the edge is no wall's: a kerb, the step further in or none)
-            # (each point's share, the least of the two, as the median of the wall's points within SEEN_ALONG along the
-            # edge: by a drop 1 m behind the kerb, line 17 (-360, 30), it reads 0.4-0.6 from point to point)
+            # (each point's share as the median of the wall's points within SEEN_ALONG along the edge: by a drop 1 m
+            # behind the kerb, line 17 (-360, 30), it reads 0.4-0.6 from point to point)
             claim = level - np.asarray(zr, float)
             z1 = np.asarray(near, float).reshape(len(level), -1)[:, KERB_NEAR.index(1.0)]
-            sg = np.sign(claim)
-            share = np.fmin((z1 - np.asarray(beyond, float)) * sg, (z1 - np.asarray(zr, float)) * sg) / np.maximum(np.abs(claim), 1e-6)
+            share = (z1 - np.asarray(zr, float)) * np.sign(claim) / np.maximum(np.abs(claim), 1e-6)
             share = np.where(off >= STEP_CUT, share, np.nan)
             ds = float(np.median(np.hypot(*np.diff(q, axis=0).T))) if len(q) > 1 else 1.0
             k = int(round(SEEN_ALONG / max(ds, 1e-3)))
@@ -1761,12 +1761,10 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
             ne = own[2][ok] if len(own) > 2 else n
             g = q + ne * SW_KERB_SMEAR
             g1 = [q + ne * v for v in KERB_NEAR]
-            b1 = q - ne
             ze = zr if ne is n else np.asarray(road_z(*(q - ne * 0.5).T), float)
             top, segs = wall_tops(q, ne, own[0][ok], ze, np.asarray(ipr.sample(g[:, 0] + F.E0, g[:, 1] + F.N0), float),
                                   runs_in(walk, q, ne, SW_KERB_SMEAR + 0.5),
-                                  np.column_stack([np.asarray(ipr.sample(v[:, 0] + F.E0, v[:, 1] + F.N0), float) for v in g1]),
-                                  np.asarray(ipr.sample(b1[:, 0] + F.E0, b1[:, 1] + F.N0), float))
+                                  np.column_stack([np.asarray(ipr.sample(v[:, 0] + F.E0, v[:, 1] + F.N0), float) for v in g1]))
             if top.any():
                 if wall_ok:
                     tops.append(segs)

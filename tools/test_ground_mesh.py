@@ -770,9 +770,13 @@ class BesideAThinWall(unittest.TestCase):
         # road 1.5 m over the walkway: a wall, by the lidar's level, #770)
         self.assertEqual(gm.kerb_walls(D, level(199.2), lidar(199.3, level(199.2))).shape, (0, 2, 2))
         self.assertEqual(gm.kerb_walls(D, level(200.8), lidar(199.3, level(200.8))).shape, (80, 2, 2))
-        # (#800: the same with the lidar level across the edge, the road's surface 1.5 m over it on both sides: no
-        # step there, no wall)
-        self.assertEqual(gm.kerb_walls(D, level(200.8), level(199.3)).shape, (0, 2, 2))
+        # (#800: the same with the lidar level across the edge, the road's surface 1.5 m over it on both sides, a
+        # deck's: the step from the road to the lidar 1 m in is the wall's)
+        self.assertEqual(gm.kerb_walls(D, level(200.8), level(199.3)).shape, (80, 2, 2))
+        # (the road 0.8 m over the outline and the lidar inside 0.45 m over it, 0.35 m under the road: a slope, not
+        # the wall the heights make; with the lidar at the outline's height, a wall)
+        self.assertEqual(gm.kerb_walls(D, level(201.2), lidar(200.85, level(201.2))).shape, (0, 2, 2))
+        self.assertEqual(gm.kerb_walls(D, level(201.2), lidar(200.4, level(201.2))).shape, (80, 2, 2))
 
     def test_in_a_corner_of_two_walls_the_surface_is_read_clear_of_both(self):
         # (walls along y = 0 and along x = 0, a pit at 258 m in their corner whose surface is smeared within 1.5 m of
