@@ -51,22 +51,23 @@ function network(roads, walks) {
   return N;
 }
 
-// A scene's traffic: { roads, walks, track (our tram's polyline), tram: { s, v }, seed }. Returns the Traffic; its game
-// stub is T.game (T.game.hits: the collisions the rules report).
-export function build({ roads = [], walks = [], track = null, tram = null, seed = 1 } = {}) {
+// A scene's traffic: { roads, walks, track (our tram's polyline), back (the opposite track's, its trams' way), tram: { s,
+// v }, seed }. Returns the Traffic; its game stub is T.game (T.game.hits: the collisions the rules report).
+export function build({ roads = [], walks = [], track = null, back = null, tram = null, seed = 1 } = {}) {
   const N = network(roads, walks);
   const route = new Route(dense(track || [[-500, 9000], [500, 9000]], 1));
   const hits = [];
   const game = {
     tram: { s: tram?.s ?? 0, v: tram?.v ?? 0, cars: 1, length: T3.length },
-    backRoute: null, platforms: [], stops: [], signals: [], segments: [], gauntlets: [], limits: [],
-    data: { line: 'scene', stops: [], switches: [] }, opts: {}, clock: 0, nextStop: 0, hits,
+    backRoute: back ? new Route(dense(back, 1)) : null, platforms: [], stops: [], signals: [], segments: [], gauntlets: [], limits: [],
+    data: { line: 'scene', stops: [], switches: [] }, opts: { speedFacts: { past: [] } }, clock: 0, nextStop: 0, hits,
     _collision(what) { hits.push({ clock: this.clock, what }); },
   };
   const ground = { surface: () => 0, way: () => () => 0, profile: { height: () => 0, overBridge: () => false } };
   const T = new Traffic({ line: 'scene', network: N, roads: N.roads, stops: [] }, route, ground, game, rng(seed));
   T.index = new Map(); // (no spawning: the scene's cars and walkers only)
   T.spawnTimer = Infinity;
+  T.backLimits = []; // (no tram comes on the opposite track: its speed limits, from the line's data, are not needed)
   T.slots = new Array(MAX_WALKERS).fill(null);
   return T;
 }
