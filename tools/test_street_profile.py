@@ -347,6 +347,21 @@ class Sidewalks(unittest.TestCase):
         smear = np.column_stack([np.full(len(u), 200.6), np.full(len(u), 200.1), np.full(len(u), 199.9)])
         top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 200.5), high, np.full(len(u), 199.9), np.ones(len(u), bool), smear)
         self.assertEqual((bool(top.all()), segs[0, :, 2].tolist()), (True, [199.9, 199.9]))
+        # (IPR 1 m out given: the foot's wall is IPR's too, 1.6 m from 1 m out to 1 m in)
+        top, segs = sp.wall_tops(edge[0], edge[1], np.full(len(u), 201.4), high, np.full(len(u), 199.9), np.ones(len(u), bool), foot, high)
+        self.assertEqual((bool(top.all()), segs[0, :, 2].tolist()), (True, [199.9, 199.9]))
+        # (#800: the verge by a car park on line 22 (3449, -2602). Its edge surveyed at 211.38 m, 0.41 m off IPR 1.5 m in,
+        # the car park's surface 212.04 m beyond: a wall 0.66 m down by the heights, but IPR falls 0.19 m from 1 m out to
+        # 1 m in, the verge's slope. No wall)
+        n = len(u)
+        verge = np.column_stack([np.full(n, 211.95), np.full(n, 211.90), np.full(n, 211.85)])
+        args = (edge[0], edge[1], np.full(n, 211.38), np.full(n, 212.04), np.full(n, 211.79), np.ones(n, bool), verge)
+        self.assertTrue(sp.wall_tops(*args)[0].all())
+        self.assertFalse(sp.wall_tops(*args, np.full(n, 212.04))[0].any())
+        # (the road's surface 1.6 m over IPR on both sides of the edge, a deck's: IPR bears nothing across the edge. No
+        # wall)
+        self.assertFalse(sp.wall_tops(edge[0], edge[1], np.full(n, 201.4), high, np.full(n, 199.9), np.ones(n, bool),
+                                      foot, np.full(n, 199.95))[0].any())
         ctx["kerb_edges"] = [edge]
         z0 = sp.bilinear(sp.sidewalks(ctx, ramp, [(0, 0), (20, 4)]), np.array([15.0]), np.array([0.25]))
         self.assertLess(z0[0], 199.5)

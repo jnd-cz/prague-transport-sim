@@ -1457,7 +1457,8 @@ def kerb_walls(D, road_at, lidar):
             continue
         top, e = street_profile.wall_tops(q, n, own, road_at(*(q - n * 0.5).T), lidar(*(q + n * street_profile.SW_KERB_SMEAR).T),
                                           street_profile.runs_in(walk, q, n, street_profile.SW_KERB_SMEAR + 0.5),
-                                          np.column_stack([lidar(*(q + n * v).T) for v in street_profile.KERB_NEAR]))
+                                          np.column_stack([lidar(*(q + n * v).T) for v in street_profile.KERB_NEAR]),
+                                          lidar(*(q - n).T))
         if top.any():
             segs.append(e[:, :, :2])
     return np.concatenate(segs) if segs else np.zeros((0, 2, 2))
