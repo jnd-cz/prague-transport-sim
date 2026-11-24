@@ -19,6 +19,8 @@ export const WINDOW_AHEAD = 1000; // m of route ahead of the tram held, as round
 export const WINDOW_STEP = 100; // m: the route ahead read this often
 export const WINDOW_KEEP = 250; // m past the window a tile is dropped (so a tile at its edge is not loaded and dropped in turn)
 export const WINDOW_EVERY = 250; // ms: the window looked at this often
+export const RETRY_FIRST = 1000; // ms: a tile that failed is asked for again after this, doubling up to RETRY_MAX (#711)
+export const RETRY_MAX = 60000;
 
 // The file: every line has it, the page builds no ground of its own (#510). Missing, the line does not load.
 export async function fetchGround(load, lineId) {
@@ -27,6 +29,13 @@ export async function fetchGround(load, lineId) {
   const layout = await jr.json();
   if (!layout.tiles) throw new Error(`line ${lineId}: the ground file has no tiles (built before #30): python -P -E tools/ground_mesh.py --line ${lineId}`);
   return { layout, buffer: await br.arrayBuffer() };
+}
+
+// the window's points: where the camera is (x, y), then the route ahead of s every WINDOW_STEP to WINDOW_AHEAD
+export function windowPoints(at, route, s) {
+  const pts = [at];
+  if (route) for (let d = 0; d <= WINDOW_AHEAD; d += WINDOW_STEP) { const p = route.at(Math.min(route.length, s + d)); pts.push([p.x, p.y]); }
+  return pts;
 }
 
 // A few workers, each job to the least busy (src/groundWorker.js)
@@ -77,6 +86,8 @@ export class GroundTiles {
     this.coarse = new Map(); // key -> the far ground's mesh (or, before the world is built, its arrays)
     this.ready = []; // [key, mesh arrays]: made one a frame
     this.busy = new Map(); // key -> the job's promise
+    this.failed = new Map(); // key -> { n, next, error }: a tile whose job failed, not asked for again before `next` (#711)
+    this.onFail = null; // (key, failed): told of each failure (src/main.js: the performance log)
     this.pool = new Pool(Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1)),
       { styles, names: drawNames(L), cell: LOOKUP_CELL, unit: L.unit, tile: L.tile });
     this.lookup = new TiledLookup(this);
@@ -136,14 +147,33 @@ export class GroundTiles {
   // one tile's meshes into the scene (each frame); drain(): all that are ready (the load, the benches)
   flush() { if (this.ready.length) this._make(...this.ready.shift()); }
   drain() { while (this.ready.length) this._make(...this.ready.shift()); }
+  // a tile's job; it resolves when the job fails too: the tile is noted in `failed`, its far ground stays drawn, and the
+  // window asks for it again only after a pause that doubles with each failure (it was asked for every 250 ms, #711)
   _want(key, meshes) {
     if (this.busy.has(key)) return this.busy.get(key);
-    const p = this._job(key, meshes).finally(() => this.busy.delete(key));
+    const p = this._job(key, meshes).then(() => { this.failed.delete(key); }, (e) => this._fail(key, e))
+      .finally(() => this.busy.delete(key));
     this.busy.set(key, p);
     return p;
   }
-  // every tile's lookup (the world is placed on it) and its far ground
-  loadLookups() { return Promise.all([...this.tiles.keys()].map((k) => this._want(k, false))); }
+  _fail(key, e) {
+    const f = this.failed.get(key) || { n: 0 };
+    f.n++;
+    f.next = performance.now() + Math.min(RETRY_MAX, RETRY_FIRST * 2 ** (f.n - 1));
+    f.error = String(e?.message || e);
+    this.failed.set(key, f);
+    console.warn(`ground tile ${key} failed (${f.n}×), asked again in ${Math.round(f.next - performance.now())} ms:`, f.error);
+    if (this.onFail) this.onFail(key, f);
+  }
+  // every tile's lookup (the world is placed on it) and its far ground; a tile that fails stops the load (the world
+  // would stand on the 10 m grid there)
+  async loadLookups() {
+    await Promise.all([...this.tiles.keys()].map((k) => this._want(k, false)));
+    if (this.failed.size) {
+      const [k, f] = this.failed.entries().next().value;
+      throw new Error(`ground tile ${k} (${this.failed.size} failed): ${f.error}`);
+    }
+  }
   // fn() now where (x, y)'s tile holds its lookup, else once it comes (the window reaches it); where the file has no tile
   // there, now (the 10 m grid answers). What Start places off the track settles on the drawn ground this way, without
   // reading a lookup past the window (#658)
@@ -172,9 +202,15 @@ export class GroundTiles {
   // The window: the tiles within `r` of the points held with their lookup and meshes; with `trim`, those past
   // r + WINDOW_KEEP dropped (their far ground shown again). Resolves when the window's tiles are ready (made by flush).
   // (#657 kept every lookup while Start read the survey along the whole line, 48-120 MB; it reads none since #658)
-  update(points, r) {
+  // each(): after each tile's job (settle's progress)
+  update(points, r, each = null) {
     const want = this.keep ? new Set(this.tiles.keys()) : this.near(points, r), jobs = [], queued = new Set(this.ready.map((e) => e[0]));
-    for (const k of want) if (!this.drawn.has(k) && !queued.has(k)) jobs.push(this._want(k, true));
+    const now = performance.now();
+    for (const k of want) {
+      if (this.drawn.has(k) || queued.has(k) || this.failed.get(k)?.next > now) continue;
+      const p = this._want(k, true);
+      jobs.push(each ? p.then(each) : p);
+    }
     if (this.trim && !this.keep) {
       const hold = this.near(points, r + WINDOW_KEEP);
       this.ready = this.ready.filter((e) => hold.has(e[0]));
@@ -195,9 +231,18 @@ export class GroundTiles {
     this.flush();
     if (now - this.last < WINDOW_EVERY) return;
     this.last = now;
-    const pts = [[camera.position.x, -camera.position.z]];
-    if (route) for (let d = 0; d <= WINDOW_AHEAD; d += WINDOW_STEP) { const p = route.at(Math.min(route.length, s + d)); pts.push([p.x, p.y]); }
-    this.update(pts, this.reach(fog)).catch((e) => console.error('ground tiles', e));
+    this.update(windowPoints([camera.position.x, -camera.position.z], route, s), this.reach(fog)).catch((e) => console.error('ground tiles', e));
+  }
+  // the window's tiles in the scene: their jobs waited for and all their meshes made at once (the load, Start, #711);
+  // progress(done, total) after each job. Returns the tiles asked for
+  async settle(points, r, progress = null) {
+    let done = 0, total = 0;
+    const p = this.update(points, r, () => { done++; if (progress) progress(done, total); });
+    total = this.busy.size;
+    if (progress && total) progress(0, total);
+    await p;
+    this.drain();
+    return total;
   }
   // what is held now (the window's measure, tools/bench/ground_tiles.py)
   held() {
