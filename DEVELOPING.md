@@ -140,7 +140,7 @@ Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait t
 | `cross_level` | `lineN.json` | the cross level of paved track where the road tilts across both tracks: one plane of IPR across them, the rails tilted with it (`crossLevel`, #538) |
 | `ground_mesh` (`--no-network`) | `lineN.ground.*` | after `street_profile`: the ground welded into one mesh (below, **Ground**); written only when the file decodes to the mesh built, its vertices and each class's triangles with their names, else the build fails (#702) |
 | `network` | `lineN.network.json` | on the ground file: the traffic's roads, lanes, walks, doors, the signals bound to the lanes (below, **The network**) |
-| `build_id` | the line's other files | the line's build ID, `data/lineN.json`'s CRC-32, into the provenance (`build`) of the files the page loads with it (`FILES`); the page computes the line file's and refuses a set of another build, or with a file that carries none, naming `rebuild.py N` (`src/buildId.js`, #702). A tool that writes one of those files stamps its provenance afresh, so a file built by hand after a rebuild carries none; a set where no file carries one was built before #702 and loads. `python -I tools/build_id.py --check N` lists them |
+| `build_id` | the line's other files | the line's build ID, `data/lineN.json`'s CRC-32, into the provenance (`build`) of the files the page loads with it (`FILES`); the page computes the line file's and refuses a set of another build, or with a file that carries none, naming `rebuild.py N` (`src/buildId.js`, #702). A tool that writes one of those files stamps its provenance afresh, so a file built by hand after a rebuild carries none; a set where no file carries one (built before #702) is refused too (#829). `python -I tools/build_id.py --check N` lists them |
 
 The page computes no profile of its own (#480): it reads the built top of rail, the lift and the structures. Where each source comes from, how it is refreshed (the GTFS service date, the survey's district
 packages, DI, the terrain) and its licence: [DATA.md](DATA.md) and [NOTICE.md](NOTICE.md).
@@ -314,7 +314,9 @@ python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3,redruns,traffic
   noise. Stuck, unfinished and penalty runs are listed per seed and need a reason, as does every mean outside the
   spread and every move of a seedless check (lint, surfaces).
 - **Which baseline each tier compares with** (#282):
-  - a checkpoint's run stores itself under its name (`--baseline --publish --checkpoint W1`: every check, seeds 1-5);
+  - a checkpoint's run stores itself under its name (`--baseline --publish --checkpoint W1`: every check, seeds 1-5),
+    and loads every line as a player does beside it (`--checks u3 --seeds 1 --player --gpu`, #710: the same counts,
+    or each move with its heights from the 10 m grid);
   - every check compares with main at the merge base: its baseline (the night's, or this machine's), else measured
     there once in a pinned worktree through the queue and kept on this machine by its key. A seeded check is
     measured with the seeds asked (#709), so the first compare on a base takes about twice as long;
@@ -497,6 +499,10 @@ disagreements (`track-z.json`, `tools/dtmp_tracks.py --findings`) went that way.
 `?line=17&review=reports/review/grass-track-17.json` lists where OSM maps grass over the track and nothing we know
 says so (#503, `python -P -E tools/grass_review.py`, which also prints how near the built grass's holes come to OSM's
 edges); `--import` takes the answers into `data/truth.json` `grassReview`, and grass answered lays grass track.
+`?line=9&review=reports/review/stairs-9.json` asks what kind of stairs stand where the ground draws a survey stairs area
+steeper than 1:1, and at the places #447's thread named (`python -P -E tools/stairs_review.py`, which prints the stairs
+per line, one flight or not and how steep; `--table` alone); `--import` takes the kinds into `data/truth.json`
+`stairsReview`, keyed by a point inside the area.
 `?line=17&review=reports/review/track-sources-17.json` lists where the track is not from DI and where DI and
 OSM disagree on a switch (#20, `tools/track_sources.py`); "matches reality" recorded in `data/truth.json`
 (`trackSources.reviewAnswers`) takes a finding off the list, anything else goes in a note.
@@ -577,14 +583,34 @@ the pinned #291 and only proposes.
   what it is told. It waits for the jobs alone and for the shared ones queued before it, then runs beside the
   shared ones running while its cores fit beside theirs and its memory fits in what is free, less what they
   declared and do not hold yet, less 8 GB kept (`city_terrain.py` stops itself under 6 GB free, `ground_mesh.py`
-  under 4). `headless.py` sizes its pages by what that leaves. A ticket from a checkout older than #728 is a job
-  alone, and such a checkout's jobs wait for every job as before. A tool becomes shared when its peak is measured
+  under 4). `headless.py` sizes its pages by what that leaves. A shared job goes before the alone jobs waiting ahead
+  of it, and the shared ones queued behind the first of them, when 1.5× its expected time ends before the jobs
+  running now are expected to end: those could not start sooner (`HeavyJob.BACKFILL`, #829; on 2026-11-23 three
+  shared jobs of 3-6 min waited an hour behind two test runs that waited for a shared one). With any of those times
+  not known it keeps its turn; one that runs over delays a job alone but never runs beside it. A ticket from a
+  checkout older than #728 is a job alone, and such a checkout's jobs wait for every job as before. A tool becomes shared when its peak is measured
   and written at its `HeavyJob(...)`.
 - A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that
   names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
   started with a clean environment: a job never waits for a process that started it (#585). A job that waits
   with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
+- A batch of heavy steps goes into the queue at its start. A loop that calls one heavy tool after another sends
+  each step to the back of the queue, behind every job queued while the last one ran (the user, 2026-11-23: "even
+  if it's bunch of 5 minute jobs"; #800's last of five 5-min street builds still waited at 14:17, nearly 4 h after
+  the first was done). The batch is split by kind, its shared steps apart from its alone ones (the user,
+  2026-11-24: "if it's a mix of jobs that can run shared, together with other tasks, then put them in the queue
+  separately from alone jobs to speed up the whole queue"). A shared step inside a job alone holds the whole
+  queue for its time: #800's chain of builds of 2026-11-23 (23:11-02:13) ran alone, and three shared jobs of
+  9-21 min waited 3 h behind it.
+  - Steps that need nothing of each other take a ticket each, all at the start. A tool that takes its own turn
+    takes it; any other count or build runs as `heavy.py --shared GB,CORES`, a timing as plain `heavy.py`.
+  - Steps that read another's output go into one chain, in one turn: `heavy.py --expect <their sum> "what" --
+    python -I chain.py`. When every step is a count or a build, add `--shared <the largest step's GB>,<its cores>`.
+  - A timing that reads shared steps' output is queued after them, on its own: a job alone waits for every job
+    queued before it.
+  - A shared step that reads a job alone's output stays in that job's chain. A shared job may start before a job
+    alone queued ahead of it (`HeavyJob.BACKFILL`), and would read the output before it is written.
 - Each job prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
   (`tools/sysinfo.py`). `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
 - A job in its own turn watches itself (#815; on 2026-11-22 a trace expected to take 5 min ran 100 min and held
@@ -603,7 +629,7 @@ the pinned #291 and only proposes.
   warnings and ends nothing. A job waiting behind one that watches itself gives it 20 min before calling it stuck.
   The board and the overview add each job's estimated start and finish (`baseline_store.schedule`, #826): the
   ticket's expected time, else its kind's median in the history (one full run is enough there), the jobs started in
-  queue order as their turns allow (alone after everything, shared while cores and GB fit).
+  queue order as their turns allow (alone after everything, shared while cores and GB fit, or before as above).
 - A stopped background task can leave its job running: when the command ended in a Git Bash program (`bash
   chain.sh`), bash handed its process over to it, and the stop kills a pid that is gone (measured 2026-11-22: the
   chain's shells and its python ran on, their parents unchanged; with the outer shell alive the stop ends the
@@ -673,7 +699,7 @@ replayed up to route s and handed over paused: a stuck scene as it was, #157).
 | one rebuild at a time | two branches publishing rebuilt data overwrite each other's lines (#280) |
 | findings off the path go on a lane's list | issues opened faster than closed: 410 against 251 in 26 days. The user, 2026-11-19: "yes" (#731) |
 | a finding's own issue only for the next step or a failing check, after a search; one issue for a place's or a batch's reports | 202 open on 2026-11-21, 120-129 opened a week against 41-87 closed; a session opened #797 and #800 in a day and reported a build race on #735 that #701 already held. The user, 2026-11-21, on "their number is still slowly but steadily climbing": "yes let's do this" |
-| merges in batches, the heaviest work at night | the user, 2026-11-21, having stopped the other lanes' sessions to save "resources, time as well as attention": "If we can merge in batches like today, keep the heavy work for nights, I'll be happy to resume the other lanes and sessions"; night from 22:00 to 07:00, plus any time the user says go: "yes" |
+| merges in batches, the heaviest work at night | the user, 2026-11-21, having stopped the other lanes' sessions to save "resources, time as well as attention": "If we can merge in batches like today, keep the heavy work for nights, I'll be happy to resume the other lanes and sessions"; night from 22:00 to 07:00, plus any time the user says go: "yes". From 23:00 (the user, 2026-11-23: "I want to adjust the night runs to start at 23:00 instead of 22") |
 | a ground rule's issue closes at the rule's merge | it stayed open as "Part of" until the batch's rebuild, 5-10 issues between batches, while #757 tracks the batch. The user, 2026-11-21: "ok, let's try this approach" |
 | a security hole is not written up in public | the repository is public and the alpha is live. The user, 2026-11-19: "fix and file privately" |
 

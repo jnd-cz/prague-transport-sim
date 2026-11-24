@@ -209,13 +209,15 @@ export class Cars {
     this.recs.push(r);
   }
 
-  // after the game's and the traffic's step, before drawing (as People.sync); trafficView: src/trafficView.js
-  sync(camera, trafficView, game) {
+  // after the game's and the traffic's step, before drawing (as People.sync); trafficView: src/trafficView.js, gameView:
+  // src/gameView.js (the parked cars and the signalled crossings' cars, by their box cars there)
+  sync(camera, trafficView, gameView) {
     this.recs.length = 0;
     if (trafficView) for (const [c, m] of trafficView.cars) this._box(m, c.id === undefined ? c : `t${c.id}`, c.id ?? 0);
+    const game = gameView?.game;
     if (game) {
-      game.obstacles.forEach((o, k) => { if (o.type === 'parked') this._box(o.mesh, o, 50000 + k, o.state === 'idle' || o.state === 'waiting'); });
-      game.signals.forEach((sig, i) => (sig.cars || []).forEach((c) => this._box(c.mesh, c, 60000 + i * 100 + (c.n ??= sig.seed))));
+      game.obstacles.forEach((o, k) => { if (o.type === 'parked') this._box(gameView.obstacles.get(o), o, 50000 + k, o.state === 'idle' || o.state === 'waiting'); });
+      game.signals.forEach((sig, i) => (sig.cars || []).forEach((c) => this._box(gameView.crossCars.get(c), c, 60000 + i * 100 + c.model)));
     }
     const t = game ? game.clock : 0, sweep = ++this.sweep;
     // what each did since the last drawn frame: its distance (the wheels' roll), speed (the brake lamps), the curve

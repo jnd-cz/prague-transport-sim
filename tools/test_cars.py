@@ -37,13 +37,14 @@ SYNTHETIC = """async () => {
   const scene = new THREE.Scene();
   const cars = new Cars(scene, await loadCars(await Promise.all(CAR_FILES.map((f) => fetch('/' + f)))));
   const view = { cars: new Map() }, game = { clock: 0, obstacles: [], signals: [] };
+  const gview = { game, obstacles: new Map(), crossCars: new Map() }; // (as src/gameView.js: the game's cars' box cars)
   const group = new THREE.Group(); scene.add(group);
   const made = [];
   const box = (i, type, x, z, yaw = 0) => { const m = makeCar(i); fitCar(m, type); m.rotation.order = 'YXZ'; m.position.set(x, 0, z); m.rotation.y = yaw; group.add(m); return m; };
   const add = (i, type, x, z, yaw) => { const m = box(i, type, x, z, yaw); view.cars.set({ id: i + 1 }, m); made.push(m); return m; };
   const cam = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 1000);
   const look = (x, z) => { cam.position.set(x, 1.6, z); cam.updateMatrixWorld(); };
-  const sync = (n = 1, fn) => { for (let i = 0; i < n; i++) { game.clock += 1 / 30; fn?.(i); cars.sync(cam, view, game); } };
+  const sync = (n = 1, fn) => { for (let i = 0; i < n; i++) { game.clock += 1 / 30; fn?.(i); cars.sync(cam, view, gview); } };
   const out = { nearMax: NEAR_MAX };
   // one of each type in a row 3.4 m apart at z = 0, facing +Z; 20 more from z = -100 on
   CAR_TYPES.forEach((t, i) => add(i, t, (i - 2) * 3.4, 0));
@@ -70,7 +71,8 @@ SYNTHETIC = """async () => {
   out.hysteresis = [a, b, c, d, e];
   // lamps: the hatchback indicating left; the sedan braking to a stop, then driving on at 5 m/s; a parked car
   const parked = box(40, CAR_TYPES[0], 8, 4);
-  game.obstacles.push({ type: 'parked', mesh: parked, state: 'idle' });
+  const ob = { type: 'parked', state: 'idle' };
+  game.obstacles.push(ob); gview.obstacles.set(ob, parked);
   look(0, 12);
   made[0].userData.blink('left', true);
   let v = 6;
@@ -81,7 +83,7 @@ SYNTHETIC = """async () => {
   sync(30, () => { made[1].position.z += 5 / 30; });
   out.lampsDriving = lampsOf(1);
   // steering: the hatchback (the nearest: wheels 0-3, FL FR RL RR) on a left arc, 0.012 rad a 0.2 m step, for 9 m
-  game.obstacles.length = 0; parked.visible = false;
+  game.obstacles.length = 0; gview.obstacles.clear(); parked.visible = false;
   const h = made[0];
   sync(45, () => { h.rotation.y += 0.012; h.position.x += Math.sin(h.rotation.y) * 0.2; h.position.z += Math.cos(h.rotation.y) * 0.2;
     cam.position.set(h.position.x + 3, 1.6, h.position.z + 3); cam.updateMatrixWorld(); });
@@ -114,7 +116,7 @@ SYNTHETIC = """async () => {
   let plates = 0;
   const draw = cars._plate.bind(cars);
   cars._plate = (c, t) => { plates++; draw(c, t); };
-  const turn = (y) => { cam.position.set(0, 1.6, 0); cam.rotation.set(0, y, 0); cam.updateMatrixWorld(); game.clock += 1 / 30; cars.sync(cam, view2, game); };
+  const turn = (y) => { cam.position.set(0, 1.6, 0); cam.rotation.set(0, y, 0); cam.updateMatrixWorld(); game.clock += 1 / 30; cars.sync(cam, view2, gview); };
   turn(0);
   out.queue = { ...cars.stats, cells: cars.cell.size, behindNear: ids(40, 46).filter((i) => cars.near.has(key(i))).length, plates };
   const cellsOf = () => ids(0, 40).map((i) => cars.cell.get(key(i)));
@@ -140,7 +142,7 @@ GAME = """async () => {
   const g = window.game, traffic = window.traffic, view = window.run.trafficView, ap = new Autopilot(), dt = 1 / 30;
   g.audio.setMuted?.(true);
   for (let t = 0; t < 90; t += dt) { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt); view.sync(window.camera); }
-  window.cars.sync(window.camera, view, g);
+  window.cars.sync(window.camera, view, window.run.gameView);
   const shown = [...view.cars].filter(([c, m]) => c.type && (m.userData.alpha ?? 1) > 0 && m.visible);
   const hidden = shown.filter(([, m]) => m.layers.mask === 2 && m.children.every((o) => o.layers.mask === 2)).length;
   const types = new Set(shown.map(([c]) => c.type.id)).size;

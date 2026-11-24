@@ -9,6 +9,8 @@
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks crossing           # pedestrian surfaces over rails
     python -P -E tools/headless.py --lines 17 --checks heights   # top of rail against the staged heights, junctions (#197)
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks limits   # the speed limits and what sets them (#211)
+    python -P -E tools/headless.py --lines 9,17,22,23,37 --checks giveway  # cars giving way against the trams' bodies (#602)
+    python -P -E tools/headless.py --lines 9,17,22,23,37 --checks u3 --seeds 1 --player --gpu   # as a player loads (#710)
 
 Each run gets a fresh page (`/?line=N&keepgeo`), waits for the loading screen to finish, imports the
 check and awaits it, exactly like tools/bench/batch.html. Results: one JSON per run in reports/headless/
@@ -47,6 +49,13 @@ compare with main (the note says so, #582). A checkpoint is stored by
 `--baseline --publish --checkpoint W1`; a name other than W<n> is a test's: stored under that name only, since a
 partial run under the key would stop the nightly measurement of main.
 
+As a player (#710): `--player` runs each job twice, in the checks' world (`?keepgeo`: every ground tile held, the
+geometry kept) and as a player's page loads it (the tiles held round the camera and the route ahead, drawn once a
+second), and tables the counts side by side (reports/headless/player.md). The page counts the height reads it answered
+from the 10 m grid where the file has a tile not held (src/groundFile.js TiledLookup.missed, `farGround` in each
+result): a move with such reads has its reason, one without fails the run. The stepping stays the benches' (1/30 s,
+not frame time). A change of the loaders runs it (tools/tiers.py), and so does a world checkpoint.
+
 The full run (all lines, all checks, seeds 1-5) takes ~27 min at 4 pages (2026-11-04, #205; ~2 h before).
 
 Seed spread (#156): a change to the tram's timing reshuffles traffic like a new seed (#151 moved walkerHit
@@ -74,6 +83,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P lea
 from sysinfo import workers  # noqa: E402
 import gpu  # noqa: E402
 import baseline_store  # noqa: E402
+import snapshot  # noqa: E402
 from baseline_store import MEASURED, HeavyJob  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -115,8 +125,11 @@ CALLS = {
                "const { run } = await import('/tools/bench/heights.js'); return run();",
     "limits": "document.getElementById('btnStart').click(); await new Promise((r) => setTimeout(r, 2000));"
               "const { run } = await import('/tools/bench/speedLimits.js'); return run();",
+    # (the cars' ways against the tracks and the trams' bodies, as the give-way places the cars: static, #602)
+    "giveway": "await window.startRun({ seed: 1, startStop: 0, autopilot: true });"
+               "const { run } = await import('/tools/bench/giveway.js'); return run();",
 }
-SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights", "limits"}
+SEEDLESS = {"lint", "surfaces", "canted", "crossing", "spacing", "heights", "limits", "giveway"}
 DRIVE = ("u3", "redruns", "stops", "traffic")  # the checks one drive serves: two or more of a line and seed run as one "drive"
 
 
@@ -225,6 +238,14 @@ def judge(check, r):
                 f"curves under 25 m {len(c.get('smallRadius') or [])}, limit lifts past a switch {c.get('liftPast')}, "
                 f"held there by {c.get('heldBy')}, km at the switch's speed {c.get('km15')}, past a curve's end {c.get('curveEnd')}, "
                 f"steep stretches {len(c.get('descents') or [])}")
+    elif check == "giveway":  # (measured, not judged yet: #602 sets its thresholds with the rule)
+        c = r.get("checks") or {}
+        more = (f"waits {c.get('waits')}: in a passing body {(c.get('waitInBody') or {}).get('count')} "
+                f"{(c.get('waitInBody') or {}).get('byRule')}, let go into it {(c.get('letGoInBody') or {}).get('count')} "
+                f"(further on {c.get('letGoLater')}); skipped entries crossing {(c.get('skippedCross') or {}).get('count')}, "
+                f"in the body's reach {(c.get('skippedReach') or {}).get('count')}, "
+                f"on the rails {(c.get('skippedRails') or {}).get('count')}; entries {c.get('entries')}, "
+                f"given way {c.get('covered')}; deepest {c.get('deepest')}")
     elif check == "traffic":
         st = r.get("stats") or {}
         if not st.get("finished"):
@@ -727,6 +748,8 @@ def run_one(page, errors, check, seed, timeout, load=0):
         # evaluate has no timeout: launch without returning the bench's promise, then wait outside it.
         page.evaluate(f"""() => {{
             window._job = {{ done: false }};
+            const lk = window.groundTiles?.lookup;
+            if (lk) lk.missed = {{ reads: 0, tiles: new Set(), at: [] }};  // (this run's, #710)
             (async () => {{ {js} }})().then(
                 result => {{ window._job.result = result; window._job.done = true; }},
                 error => {{ window._job.result = {{ error: String(error) }}; window._job.done = true; }});
@@ -736,6 +759,13 @@ def run_one(page, errors, check, seed, timeout, load=0):
         r = json.loads(json.dumps(r, default=str)) if r is not None else {}
         if isinstance(r, dict):
             r.pop("watch", None)
+            # (the reads a streamed page answered from the 10 m grid where the file has a tile: none with keepgeo, #710)
+            # (and what the page held at the end: a player's page streams, it holds fewer tiles than the file has)
+            far = page.evaluate("() => { const g = window.groundTiles, m = g?.lookup?.missed; "
+                                "return m ? { reads: m.reads, tiles: m.tiles.size, at: m.at, held: g.lookups.size, "
+                                "of: g.tiles.size, streamed: !!g.trim && !g.keep } : null; }")
+            if far is not None:
+                r["farGround"] = far
     except PlaywrightTimeoutError:
         r = {"error": "timeout"}
     except Exception as e:  # noqa: BLE001 (a failed run is a result)
@@ -743,6 +773,37 @@ def run_one(page, errors, check, seed, timeout, load=0):
     if errors:
         r["pageErrors"] = errors[:20]
     return r, round(time.monotonic() - t0) + load
+
+
+def player_rows(kept, streamed):
+    """The checks' world (?keepgeo) beside a player's (#710), run by run: the same counts, or the moves with the reads
+    the streamed page answered from the 10 m grid where the file has a tile; a move without such a read is unexplained.
+    Returns (the table's rows, the unexplained runs)."""
+    rows = ["| line | check | seed | keepgeo → player | tiles held at the end | heights from the 10 m grid | verdict |",
+            "|---|---|---|---|---|---|---|"]
+    bad = 0
+    for job in sorted(kept, key=lambda j: (int(j[0]) if j[0].isdigit() else j[0], j[1], j[2])):
+        r = streamed.get(job)
+        if r is None:
+            continue
+        line, check, seed = job
+        was, now = kept[job], counts(check, r)
+        moved = [f"{k} {was.get(k)} → {now.get(k)}" for k in sorted(set(was) | set(now)) if was.get(k) != now.get(k)]
+        far = r.get("farGround") or {}
+        reads = far.get("reads", 0)
+        grid = f"{reads} reads on {far.get('tiles', 0)} tiles" + (f", first at {far['at'][0]}" if far.get("at") else "") if reads else "none"
+        held = f"{far['held']} of {far['of']}" if "held" in far else "?"
+        if "streamed" in far and not far["streamed"]:
+            verdict, bad = "the page held every tile (not streamed): FAIL", bad + 1
+        elif not moved:
+            verdict = "same"
+        elif reads:
+            verdict = "moved: heights from the grid"
+        else:
+            verdict, bad = "moved without a grid read: FAIL", bad + 1
+        rows.append(f"| {line} | {check} | {'' if check in SEEDLESS else seed} | {'; '.join(moved) or 'same'} | {held} | {grid} | "
+                    f"{verdict} |")
+    return rows, bad
 
 
 def choose_baseline(base, stored_places, results, main_rev, want, measure=True, store=baseline_store):
@@ -834,6 +895,9 @@ def main():
     ap.add_argument("--publish", action="store_true", help="with --baseline: also publish it to the data store (the nightly run, #157)")
     ap.add_argument("--checkpoint", help="with --baseline --publish: also store it under this checkpoint's name (W1, #282)")
     ap.add_argument("--against", help="with --compare: compare with this checkpoint's run instead of main's")
+    ap.add_argument("--player", action="store_true",
+                    help="each run twice: in the checks' world (?keepgeo) and loaded as a player loads it (the ground's "
+                         "tiles streamed round the tram, drawn), the counts side by side (#710)")
     ap.add_argument("--no-measure-base", action="store_true",
                     help="with --compare: do not measure seedless runs at the merge base when it has no baseline")
     a = ap.parse_args()
@@ -850,6 +914,8 @@ def main():
         raise SystemExit(f"no checkpoint {a.against} in the store: python -I tools/baseline_store.py checkpoints")
     if a.timeout <= 0:
         ap.error("--timeout must be positive")
+    if a.player and (a.baseline or a.compare):
+        ap.error("--player compares the two worlds of one run, not with a baseline: no --baseline or --compare")
     try:
         vw, vh = (int(v) for v in a.viewport.lower().split("x"))
     except ValueError:
@@ -862,6 +928,7 @@ def main():
     jobs = [(line.strip(), c, s) for line in a.lines.split(",") for c in checks
             for s in ([0] if c in SEEDLESS else seeds_of(a.seeds))]
     lines = sorted({j[0] for j in jobs})
+    snapshot.require_current_data()  # (#835: a merge of main moves the manifest, not the files)
     if a.baseline:
         # (measured on what is committed and published, or the baseline would name the wrong trees)
         dirty = baseline_store.dirty()
@@ -870,39 +937,43 @@ def main():
                              f"{dirty or 'data differs: ' + ', '.join(bad)}")
     if a.compare and (bad := data_matches(lines)):
         print(f"note: data/ differs from data/MANIFEST.json ({', '.join(bad)}): comparing unpublished data")
-    results, found = {}, {}
+    results, found, streamed = {}, {}, {}
     server, url = (None, a.url) if a.url else serve(a.port)
     failed, t0 = 0, time.time()
 
     timed, loads = {}, {}
 
-    def report(i, job, r, secs, load=0):
+    def report(i, job, r, secs, load=0, tag=""):
         nonlocal failed
         line, check, seed = job
         ok, text = judge(check, r)
         failed += not ok
-        results[job] = counts(check, r)
-        found[job] = places(check, r)
-        name = f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}") + ".json"
+        if tag:
+            streamed[job] = r
+        else:
+            results[job] = counts(check, r)
+            found[job] = places(check, r)
+        name = f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}") + tag + ".json"
         with open(os.path.join(a.out, name), "w", encoding="utf-8") as f:
             json.dump({"line": line, "check": check, "seed": seed, "seconds": secs, "load": load, "ok": ok,
                        "time": time.strftime("%Y-%m-%dT%H:%M:%S"), "result": r}, f, ensure_ascii=False, indent=1)
-        print(f"[{i}/{len(jobs)}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}")
+        print(f"[{i}/{total}] line {line} {check}" + ("" if check in SEEDLESS else f" seed {seed}") + (" as a player" if tag else "")
               + f" … {'pass' if ok else 'FAIL'} ({secs} s) {text}", flush=True)
 
     asked = set(jobs)
+    total = len(jobs) * (2 if a.player else 1)
 
-    def split(res):
+    def split(res, note=True):
         """A drive's result as the results of the checks asked of it (an error goes to each); its time noted."""
         (line, check, seed), r, secs, *rest = res
         load = rest[0] if rest else 0
-        if not r.get("error") and secs - load > 0:  # (a timeout or a failed load says nothing of the run's length)
+        if note and not r.get("error") and secs - load > 0:  # (a timeout or a failed load says nothing of the run's length)
             timed[(line, check, seed)] = secs - load
             if load:
                 loads[line] = load
         if check != "drive":
             return [((line, check, seed), r, secs, load)]
-        extra = {"pageErrors": r["pageErrors"]} if r.get("pageErrors") else {}
+        extra = {k: r[k] for k in ("pageErrors", "farGround") if r.get(k)}
         return [((line, c, seed), {**r[c], **extra} if isinstance(r.get(c), dict) else dict(r), secs, load)
                 for c in DRIVE if (line, c, seed) in asked]
 
@@ -926,32 +997,45 @@ def main():
         pages = min(a.jobs, len(batches))  # (what the queue keeps for this run: the pages it opens, #728)
         heavy.claim(gb=PAGE_GB * pages, cores=PAGE_CORES * pages)
         dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
+        if a.player:  # (a player's page takes as long as the checks' one: 402 s against 406 s on the five lines, #710)
+            dur += dur
         heavy.expect(finish(dur, a.jobs))  # (its watch's time, #815)
         print(f"{len(runs)} runs in {len(batches)} batches on {min(a.jobs, len(batches))} pages, longest first; "
               f"expected {finish(dur, a.jobs):.0f} s from {len(t['runs'])} timed runs", flush=True)
         i = 0
-        if a.jobs > 1 and len(batches) > 1:
-            with ProcessPoolExecutor(min(a.jobs, len(batches))) as ex, multiprocessing.Manager() as mgr:
-                done = mgr.Queue()
-                futs = [ex.submit(worker, b, url, a.headed, a.timeout, done, page_opts) for b in batches]
-                while i < len(jobs):
-                    try:
-                        res = done.get(timeout=5)
-                    except queue.Empty:
-                        if all(fu.done() for fu in futs):
-                            for fu in futs:
-                                fu.result()  # (a worker that failed outside a run)
-                            break
-                        continue
-                    for part in split(res):
-                        i += 1
-                        report(i, *part)
-        else:
-            for b in batches:
-                for res in worker(b, url, a.headed, a.timeout, None, page_opts):
-                    for part in split(res):
-                        i += 1
-                        report(i, *part)
+
+        def go(opts, tag=""):
+            """Every batch in pages of these options; each result reported as it comes."""
+            nonlocal i
+            if a.jobs > 1 and len(batches) > 1:
+                with ProcessPoolExecutor(min(a.jobs, len(batches))) as ex, multiprocessing.Manager() as mgr:
+                    done = mgr.Queue()
+                    futs = [ex.submit(worker, b, url, a.headed, a.timeout, done, opts) for b in batches]
+                    end = i + len(jobs)
+                    while i < end:
+                        try:
+                            res = done.get(timeout=5)
+                        except queue.Empty:
+                            if all(fu.done() for fu in futs):
+                                for fu in futs:
+                                    fu.result()  # (a worker that failed outside a run)
+                                break
+                            continue
+                        for part in split(res, not tag):
+                            i += 1
+                            report(i, *part, tag=tag)
+            else:
+                for b in batches:
+                    for res in worker(b, url, a.headed, a.timeout, None, opts):
+                        for part in split(res, not tag):
+                            i += 1
+                            report(i, *part, tag=tag)
+
+        go(page_opts)
+        if a.player:
+            # (as a player's page: the tiles held round the camera and the route ahead only, the geometry dropped once on
+            # the GPU, drawn once a second, #710)
+            go({**page_opts, "keepgeo": False, "draw": True}, "-player")
     finally:
         heavy.__exit__()
         if server:
@@ -961,8 +1045,14 @@ def main():
                 save_timings(timed, loads)
             except OSError as e:
                 print(f"note: run times not kept ({e})")
-    print(f"{len(jobs) - failed}/{len(jobs)} passed in {time.time() - t0:.0f} s ({a.jobs} at once); "
+    print(f"{total - failed}/{total} passed in {time.time() - t0:.0f} s ({a.jobs} at once); "
           f"results in {os.path.relpath(a.out, ROOT)}")
+    if a.player:
+        rows, unexplained = player_rows(results, streamed)
+        failed += unexplained
+        print("\n" + "\n".join(rows))
+        with open(os.path.join(a.out, "player.md"), "w", encoding="utf-8") as f:
+            f.write("\n".join(rows) + "\n")
     base = json.load(open(BASELINE, encoding="utf-8")) if os.path.exists(BASELINE) else {}
     stored_places = load_places()
     if a.compare:

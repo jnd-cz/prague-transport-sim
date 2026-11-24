@@ -36,8 +36,16 @@ class Board(unittest.TestCase):
                 with open(os.path.join(d, n), "w", encoding="utf-8") as f:
                     f.write(s)
             got = board.build_tools(d)
-        self.assertEqual(got, {f"tools/{n}" for n in ("rebuild.py", "build_line.py", "geoportal.py", "sysinfo.py",
-                                                      "geo.py", "di_tracks.py", "track_curve.py")})
+        self.assertEqual(got, {f"tools/{n}" for n in ("rebuild.py", "build_line.py", "geoportal.py",
+                                                      "geo.py", "di_tracks.py", "track_curve.py")})  # (sysinfo: NOT_OUTPUT)
+
+    def test_the_queue_and_board_tools_are_no_rebuild(self):
+        """#727 changed heavy.py's docstring and the board called it a rebuild clashing with every data branch (#829)."""
+        tools = board.build_tools()
+        self.assertIn("tools/build_line.py", tools)
+        self.assertEqual(board.rebuilds(["tools/heavy.py", "tools/baseline_store.py", "tools/board.py",
+                                         "tools/stepcache.py", "tools/sysinfo.py"], tools), [])
+        self.assertNotIn("tools/snapshot.py", tools)  # (imported by baseline_store.py alone, for the store)
 
     def test_rebuilds_by_tool_manifest_or_snapshot_not_by_facts(self):
         tools = {"tools/build_line.py"}

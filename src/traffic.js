@@ -108,6 +108,56 @@ const TRACK_ZONE = 5.2, YIELD_GAP = 1.5;
 // a car on the track holds up the tram when its heading is within 72° of the track's (cos 0.3): one
 // still turning onto it counts (#100; at 60°, cos 0.5, it did not until it had straightened out)
 const CAR_ALIGN = 0.3;
+// #602: where a car's way meets a track. BAND each side of its centre the way is in the tram's way. A way that comes in
+// and leaves on the other side, or gets within CROSSES of the centre line, crosses it; one RAILS_RUN m or more within RAILS
+// of it runs on the rails (a car's middle there: its body over the tram's); the rest is judged by the body's reach: a car
+// on it against a T3's body (BODY_L x BODY_W half sizes, placed by its bogies, swung out in curves) passing there.
+// (Before, a way coming in at 45° or less was taken for driving along the track and given way at nowhere: one crossed at
+// 41° through the tram, and others waited with their noses in its body; the user's reports from Újezd and Malovanka,
+// 2026-11-22, tools/bench/giveway.js)
+const BAND = 2.6, CROSSES = 0.3, RAILS = 1.6, RAILS_RUN = 12;
+// a way's approach to a track: within NEAR of its centre. One that comes no nearer than BAND may still bring a car's
+// corner into the body (turned 26° to the track, its middle 2.57 m from the centre, 0.6 m into it; line 23 s 6532)
+const NEAR = 3.6;
+// a stretch's s on each part of the route it comes near: [{ lo, hi, a, b, band }] (the least and the most s within NEAR, the
+// first and the last; band: the same within BAND, or null). An s within S_JUMP of a part's is on it, else on another part
+// (a route that passes the street twice: line 9's out and back). Told apart by the s within NEAR, which runs on without
+// gaps along a stretch (a metre along a path moves the nearest point within 3.6 m of a curve's centre line at most about
+// 1.25 m); the s within BAND skips where the way leaves the band for a while.
+const S_JUMP = 4;
+function addSpan(list, s, inBand) {
+  addPart(list, { lo: s, hi: s, a: s, b: s, band: inBand ? { lo: s, hi: s, a: s, b: s } : null });
+}
+function addPart(list, p) {
+  const sp = list.find((o) => p.lo <= o.hi + S_JUMP && p.hi >= o.lo - S_JUMP);
+  if (!sp) { list.push({ ...p, band: p.band && { ...p.band } }); return; }
+  sp.lo = Math.min(sp.lo, p.lo); sp.hi = Math.max(sp.hi, p.hi); sp.b = p.b;
+  if (p.band && !sp.band) sp.band = { ...p.band };
+  else if (p.band) { sp.band.lo = Math.min(sp.band.lo, p.band.lo); sp.band.hi = Math.max(sp.band.hi, p.band.hi); sp.band.b = p.band.b; }
+}
+const BODY_L = 7.0, BODY_W = 1.25;
+// the car the give-way audit measures every way with (tools/bench/giveway.js: 4.4 x 1.8 m, as every car before #250);
+// a car in the traffic is its type's size (c.half, c.halfW)
+const REF_HALF = 2.2, REF_HALFW = 0.9;
+// a car whose box comes nearer a passing body than this holds the tram up (side by side they would touch)
+const SIDE_BY_SIDE = 0.1;
+
+// separation of two boxes {x, y, hx, hy, l, w} (half sizes; separating axes): > 0 apart by that, < 0 overlapping by that
+export function boxesApart(a, b) {
+  let best = -Infinity;
+  for (const [ax, ay] of [[a.hx, a.hy], [-a.hy, a.hx], [b.hx, b.hy], [-b.hy, b.hx]]) {
+    const r = (q) => q.l * Math.abs(q.hx * ax + q.hy * ay) + q.w * Math.abs(-q.hy * ax + q.hx * ay);
+    const d = Math.abs((b.x - a.x) * ax + (b.y - a.y) * ay) - r(a) - r(b);
+    if (d > best) best = d;
+  }
+  return best;
+}
+
+// a T3's body on route rt with its middle at route position s, as a box (placed by its running gear)
+function bodyAt(rt, s) {
+  const p = placeUnit(T3, s + T3.length / 2, (q) => { const a = rt.at(q); return [a.x, a.y, 0, 0]; }).sections[0];
+  return { x: p.p[0], y: p.p[1], hx: Math.sin(p.yaw), hy: -Math.cos(p.yaw), l: BODY_L, w: BODY_W };
+}
 
 // stand a car on the drawn street surface hf(x, y) (ground level, or the deck of the bridge its road
 // is on): pitch with the slope, roll with the camber
@@ -524,29 +574,11 @@ export class Traffic {
         // trams": both tracks, each with its trams, ours and the AI trams ahead of it on ours, the oncoming ones on the other;
         // and a car waits before the first track it reaches: tracks with no room for a car between them are crossed as one)
         let xGap = null, keepClear = false, yieldAi = null;
-        const xs = [];
-        seq.forEach(([path, off], k) => {
-          for (const x of this._trackCrossings(path)) {
-            const dC = off + x.sIn; // the car's middle to where the track's band begins
-            if (dC > -c.half - TRACK_ZONE - c.half && dC < 45) xs.push({ dC, dOut: off + x.sOut, sx: x.sx, rt: x.rt, sOurs: x.sOurs, k });
-          }
-        });
-        xs.sort((a, b) => a.dC - b.dC);
-        // (one crossing seen twice, the next path starting inside the track's band, counts once: a car
-        // turning into a lane along the track stood with its nose on it, giving way at the second copy
-        // past the first's edge, and the tram hit it; line 17 s 9903, seed 1)
-        for (let i = xs.length - 1; i > 0; i--) if (xs.slice(0, i).some((o) => o.rt === xs[i].rt && Math.abs(o.sx - xs[i].sx) < 4)) xs.splice(i, 1);
-        for (let i = 0; i < xs.length; i++) {
-          const g = i > 0 && xs[i].dC - xs[i - 1].g.dOut < 2 * c.half + 2 * YIELD_GAP ? xs[i - 1].g : { dC: xs[i].dC, dOut: xs[i].dOut, k: xs[i].k };
-          g.dOut = Math.max(g.dOut, xs[i].dOut);
-          xs[i].g = g;
-        }
-        // a car turning onto the track (its way still on it 12 m past the band's edge: a lane along
-        // the rails) does not clear it in a few seconds: it goes only when the tram could stop behind
-        // it (s 9903: a bold driver turned in 36 m ahead of the tram at 45 km/h, crawled on along the
-        // track and was hit)
-        const wayAt = (d) => { for (let i = seq.length - 1; i >= 0; i--) if (d >= seq[i][1]) return seq[i][0].at(d - seq[i][1]); return null; };
-        for (const x of xs) { const q = wayAt(x.dC + 12), n = q && x.rt.nearest(q.x, q.y); x.along = !!n && n.d < 2.6; }
+        // (dC: the car's middle to where the band begins; a band entered on the path before, the next one starting
+        // inside it, is one place with its entry there: a car turning into a lane along the track stood with its nose on
+        // it, giving way at the second copy past the first's edge, and the tram hit it, line 17 s 9903, seed 1; at Újezd
+        // a car waited "before" a connector already inside the band, its nose in the tram's body, #602)
+        const xs = this._wayCrossings(seq, 45, c);
         // the car ahead: on this path, else across the junction on the connector and the next lane
         let gap = null, vLead = 0, lead = null;
         for (const o of live) {
@@ -584,19 +616,33 @@ export class Traffic {
           const gFront = x.g.dC - c.half, wait = gFront > 0 ? gFront : front;
           // (a car already across the group's first track goes on over the rest: waiting before the next one it stood on the
           // one behind it, and a tram there waited for it; line 37 s 4714, seed 5: our tram, a car on our track waiting for an
-          // oncoming tram, which waited for a car on its track, which waited for ours. It stops only for a tram's body there)
-          const across = gFront <= 0 && x.g.dC < x.dC;
+          // oncoming tram, which waited for a car on its track, which waited for ours. It stops only for a tram's body there.
+          // Not where it would wait on a lane along the rails before it, _goesOn)
+          const across = gFront <= 0 && x.g.dC < x.dC && this._goesOn(x, xs, c.half);
           // (braking up to 5 m/s2; a car standing or crawling stays where it is: one held by the queue
           // 0.9 m from the band, inside YIELD_GAP, counted as committed and pulled out in front of the
           // tram when the queue moved on, line 17 s 9903)
           const canStop = v < 1 || wait - YIELD_GAP > (v * v) / 10 - 0.5;
           let holds = null;
+          // (the stretches of track the place takes up, lo to hi: the body on any of them holds the car, and the car is let
+          // go once the tram's tail is past their far ends; a car let go when the tail passed the point where its way came
+          // in still had the body over its way further on, #602)
+          // (the time to clear it, per stretch: across the band, or over the whole place where the car crosses along it, or
+          // goes along it towards the trams. Not a part along the rails with the trams because another part of the route is
+          // against them: line 9 s 27291, seed 4, a lane onto our rails whose way crosses the outbound track further on, #602.
+          // zone: the whole place's, where the car is on it, below)
+          const zone = x.kind === 'cross' || x.against ? Math.max(TRACK_ZONE, x.dOut - x.dC) : TRACK_ZONE;
+          const tCs = (Math.max(0, front) + TRACK_ZONE + 2 * c.half) / Math.max(v, 2.5);
+          const tCw = (Math.max(0, front) + Math.max(TRACK_ZONE, x.dOut - x.dC) + 2 * c.half) / Math.max(v, 2.5);
           for (const t of ours ? [tram, ...this.ahead] : this.oncoming) {
             if (!t || (t !== tram && (t.alpha ?? 0) < 0.3)) continue;
-            const onBody = sx > t.s - t.length - 2 && sx < t.s + 2;
-            const tA = (sx - t.s - 2) / Math.max(t.v, 0.1), tC = (Math.max(0, front) + TRACK_ZONE + 2 * c.half) / Math.max(v, 2.5);
-            const coming = t.v > 0.5 && sx >= t.s && (sx - t.s < 16 || tA < tC + (c.bold ? 0.5 : 2.5) || (x.along && sx - t.s < (t.v * t.v) / 2 + t.v * 2 + 20));
-            if (onBody || (coming && !across)) { holds = t; break; }
+            for (const { lo, hi, along, against } of x.spans) {
+              const onBody = hi > t.s - t.length - 2 && lo < t.s + 2;
+              const tA = (lo - t.s - 2) / Math.max(t.v, 0.1), tC = x.kind === 'cross' || against ? tCw : tCs;
+              const coming = t.v > 0.5 && lo >= t.s && (lo - t.s < 16 || tA < tC + (c.bold ? 0.5 : 2.5) || (along && lo - t.s < (t.v * t.v) / 2 + t.v * 2 + 20));
+              if (onBody || (coming && !across)) { holds = t; break; }
+            }
+            if (holds) break;
           }
           if (holds && canStop && front > 0) {
             xGap = wait - YIELD_GAP + 8; // (following() stops 8 m short)
@@ -604,10 +650,14 @@ export class Traffic {
             // wholly on the lane beyond. One waiting in the junction's mouth blocked a car leaving the
             // track the other way; the tram stopped for that one with its body on this car's crossing
             // (line 37 s 1475, seed 2). Where the tracks run through the junction, cars wait in it.
+            // (never past the spot before the band: where the junction's mouth is in it, that is the nearer one; and only
+            // with its tail clear of the places before it on its way: a short lane in the tracks, or one along the rails, before
+            // the junction is no place to wait in, #602, line 22 s 12622, line 9 s 515)
             const k = gFront > 0 ? x.g.k : x.k, J = seq[k - 1];
             if (J && J[2] && J[1] > 0 && wait + c.half - YIELD_GAP - 2 * c.half < seq[k][1]) {
               const toJ = J[1] - c.half - 1; // its front 1 m before the junction
-              if (v < 1 || toJ > (v * v) / 10 - 0.5) xGap = toJ + 8;
+              const clear = xs.every((o) => o.g === x.g || o.dC >= x.g.dC || toJ - c.half >= o.dOut);
+              if (clear && (v < 1 || toJ > (v * v) / 10 - 0.5)) xGap = Math.min(xGap, toJ + 8);
             }
             if (holds === tram) c.xing = x; else yieldAi = holds;
             break;
@@ -630,7 +680,18 @@ export class Traffic {
           }
           // crossing: on our track, or moving onto it (a car standing before it, held by a queue, is not:
           // the tram waited for two such cars for good, line 17 s 11629)
-          if (ours && ((front <= 0 && front > -TRACK_ZONE - 2 * c.half) || (front > 0 && front < 8 && v > 1))) crossing.push({ s: sx, onTrack: front <= 0, car: c });
+          // (on a long crossing, a shallow one, where the car is on it now: on the whole stretch of the part of the route it
+          // is on. Line 9 s 22290, seed 3: a car on our rails with our trams, 66 m ahead at a red light, was put at the point
+          // where it turned in, the place's other part being against it, and our tram stood 6 m short of that for 104 s, #602)
+          if (ours && ((front <= 0 && front > -zone - 2 * c.half) || (front > 0 && front < 8 && v > 1))) {
+            let s = sx;
+            if (front <= 0 && zone > TRACK_ZONE) {
+              const p = c.path.at(c.s), n = this.route.nearest(p.x, p.y);
+              const sp = n && x.spans.find((o) => n.s >= o.slo - S_JUMP && n.s <= o.shi + S_JUMP);
+              if (n && n.d < BAND + c.half && sp) s = Math.max(sp.slo, Math.min(sp.shi, n.s));
+            }
+            crossing.push({ s, onTrack: front <= 0, car: c });
+          }
         }
         c.yielding = xGap !== null && !keepClear && !yieldAi; // (to our tram: what u3 counts)
         c.yieldAi = yieldAi; // (to an AI tram)
@@ -736,11 +797,16 @@ export class Traffic {
     }
   }
 
-  // Cars on our track and on the opposite one (within 1.6 m of a track centre: the car body then
-  // overlaps a tram), as route positions: trams stop behind them (shared lanes, a car queuing on
-  // the tracks). this.game.carsOnTrack: [{s, v, car}] along our route, carsOnBack along the opposite one.
+  // Cars on our track and on the opposite one, as route positions: trams stop behind them (shared lanes, a car queuing on
+  // the tracks). On it: its middle within RAILS of a track centre, or its body within SIDE_BY_SIDE of a T3's body passing
+  // there (placed by its bogies, swung out in curves): where a lane runs beside the track too close for a car and a tram
+  // side by side, the tram waits for the car as the car waits for the tram (the user, 2026-11-23, #602: "both trams should
+  // wait for cars and vice versa in places where they can't fit side by side"; Karmelitská, lanes 1.63-1.74 m from the
+  // centre, a car in the tram's body in 4 of 5 runs). this.game.carsOnTrack: [{s, v, car}] along our route, carsOnBack
+  // along the opposite one.
   _carsOnTracks() {
     const ours = [], back = [];
+    const on = (rt, n, p, c) => n && (n.d < RAILS || (n.d < BODY_W + c.half + 1 && boxesApart({ x: p.x, y: p.y, hx: p.hx, hy: p.hy, l: c.half, w: c.halfW }, bodyAt(rt, n.s)) < SIDE_BY_SIDE));
     for (const c of this.cars) {
       if (!c.active || c.alpha < 0.5 || !c.path) continue;
       const p = c.path.at(c.s);
@@ -748,10 +814,10 @@ export class Traffic {
       const n = this.route.nearestOnHeading(p.x, p.y, p.hx, p.hy, CAR_ALIGN);
       // (a car on the road under our bridge, or on a bridge over the track, is not on it)
       if (n && c.z !== undefined && Math.abs(c.z - this.ground.profile.height(n.s)) > LEVEL_APART) continue;
-      if (n && n.d < 1.6) ours.push({ s: n.s, v: c.vNow ?? 0, car: c });
+      if (on(this.route, n, p, c)) ours.push({ s: n.s, v: c.vNow ?? 0, car: c });
       if (this.back) {
         const b = this.back.nearestOnHeading(p.x, p.y, p.hx, p.hy, CAR_ALIGN);
-        if (b && b.d < 1.6) back.push({ s: b.s, v: c.vNow ?? 0, car: c });
+        if (on(this.back, b, p, c)) back.push({ s: b.s, v: c.vNow ?? 0, car: c });
       }
     }
     this.game.carsOnTrack = ours;
@@ -802,31 +868,148 @@ export class Traffic {
     return false;
   }
 
-  // Where a car path crosses a track, ours or the opposite one (cached per path): [{ sIn, sOut, sx, rt, sOurs }], sIn along
-  // the path where it comes within 2.6 m of the track centre (the tram's swept edge and a margin), sOut where it leaves that
-  // band, sx the track's route position there, rt that route, sOurs our route's position (for the heights; null where the
-  // opposite track runs apart from ours). Only where the path crosses (|cos| < 0.7: not driving along the track, a car there
-  // follows the tram instead) and not where our track passes over it on a bridge.
+  // Where a car path comes near a track, ours or the opposite one (cached per path): a stretch per approach within NEAR of
+  // its centre, [{ sIn, sOut, sx, sxOut, bIn, bOut, bsx, bsxOut, railsLen, rt, sOurs, minD, sides, flips, startsIn, endsIn,
+  // path, spans }]. sIn and sOut along the path where it comes within NEAR and leaves it again (the path's end if it does
+  // not), sx and sxOut the track's route positions there; bIn and bOut where it comes within BAND of the centre (the tram's
+  // swept edge and a margin) and leaves it, the first and the last time (null: never), bsx and bsxOut there; spans the
+  // track's s on each part of the route it comes near (addSpan); railsLen the metres
+  // within RAILS of it; rt that route, sOurs our route's position at sIn (for the heights; null where the opposite track
+  // runs apart from ours); the least distance to the centre, the side of it the path is on first and last (+1 left, -1
+  // right) and how often it changed sides. Every approach at any angle: what it is, the way it is part of tells
+  // (_wayCrossings). Not where our track passes over the path on a bridge.
   _trackCrossings(path) {
     if (path._xings) return path._xings;
     const out = [];
     for (const rt of [this.route, this.back]) {
       if (!rt) continue;
-      let cur = null;
-      for (let s = 0; s <= path.length; s += 1) {
-        const p = path.at(s), n = rt.nearest(p.x, p.y), near = !!n && n.d < 2.6;
-        if (near && !cur) {
-          const h = rt.at(n.s), o = rt === this.route ? n : this.route.nearest(p.x, p.y), sOurs = o && o.d < 10 ? o.s : null;
-          const x = { sIn: s, sOut: path.length, sx: n.s, rt, sOurs };
-          cur = Math.abs(p.hx * h.hx + p.hy * h.hy) < 0.7 && !(sOurs !== null && this.ground.profile.overBridge(sOurs)) ? x : 'skip';
-          if (cur !== 'skip') out.push(cur);
-        } else if (!near && cur) {
-          if (cur !== 'skip') cur.sOut = s;
+      let cur = null, last = 0;
+      for (let s = 0; ; s = Math.min(path.length, s + 1)) {
+        const p = path.at(s), n = rt.nearest(p.x, p.y);
+        if (n && n.d < NEAR) {
+          const q = rt.at(n.s), side = Math.sign(q.hx * (p.y - q.y) - q.hy * (p.x - q.x)) || 1;
+          if (!cur) {
+            const o = rt === this.route ? n : this.route.nearest(p.x, p.y), sOurs = o && o.d < 10 ? o.s : null;
+            cur = { sIn: s, sOut: path.length, sx: n.s, sxOut: n.s, bIn: null, bOut: null, bsx: null, bsxOut: null, spans: [], railsLen: 0, rt, sOurs, minD: n.d,
+              sides: [side, side], flips: 0, startsIn: s === 0, endsIn: true, path, skip: sOurs !== null && this.ground.profile.overBridge(sOurs) };
+            out.push(cur);
+          }
+          if (n.d > 0.05) { if (side !== cur.sides[1]) cur.flips++; cur.sides[1] = side; }
+          cur.minD = Math.min(cur.minD, n.d);
+          cur.sxOut = n.s;
+          addSpan(cur.spans, n.s, n.d < BAND);
+          if (n.d < BAND) {
+            if (cur.bIn === null) { cur.bIn = s; cur.bsx = n.s; }
+            // (it leaves the band at the next metre, or runs on in it past the path's end)
+            cur.bOut = Math.min(path.length, s + 1); cur.bsxOut = n.s;
+          }
+          if (n.d < RAILS) cur.railsLen += s - last;
+        } else if (cur) {
+          cur.sOut = s; cur.endsIn = false;
           cur = null;
         }
+        last = s;
+        if (s >= path.length) break;
       }
     }
-    return (path._xings = out);
+    return (path._xings = out.filter((x) => !x.skip));
+  }
+
+  // How near a car on a stretch of a path gets to a T3's body passing there: the least separation of the car's box (every half
+  // metre of the stretch) and the body with its middle at the nearest route position and 3.5 and 7 m either side (< 0:
+  // they overlap; cached on the stretch per car size: a traffic car's type, the give-way audit's car by default)
+  _stretchReach(st, half = REF_HALF, halfW = REF_HALFW) {
+    const key = `${half}|${halfW}`;
+    if ((st.reach ??= {})[key] !== undefined) return st.reach[key];
+    let least = Infinity;
+    for (let s = st.sIn; s <= st.sOut + 1e-6; s += 0.5) {
+      const p = st.path.at(Math.min(s, st.path.length)), n = st.rt.nearest(p.x, p.y);
+      if (!n) continue;
+      const car = { x: p.x, y: p.y, hx: p.hx, hy: p.hy, l: half, w: halfW };
+      for (const dc of [-7, -3.5, 0, 3.5, 7]) least = Math.min(least, boxesApart(car, bodyAt(st.rt, n.s + dc)));
+    }
+    return (st.reach[key] = least);
+  }
+
+  // The places on a car's way (seq, as _seq gives it) where it meets the tracks, nearest first: [{ dC, dOut, sx, sxOut,
+  // spans, rt, sOurs, k, kind, along, against, g }]. A path's approach goes on into the next path's where the one ends near the track
+  // and the other starts there (one place). dC and dOut: where the way comes into the band and leaves it (k: the path it
+  // comes in on), or, never in it, where it comes within NEAR and leaves that. Its kind: 'rails' (on them RAILS_RUN m and
+  // more: a lane along the rails), 'cross' (out on the other side, or over the centre line), 'reach' (beside the track,
+  // within a passing body's reach); one clear of the body is no place. spans: the stretches of track it takes up, [{ lo, hi,
+  // along, against, slo, shi }], one per part of the route it comes near (where the car turns onto the rails with the trams, only that point; a way
+  // over a street the route takes out and back, one for each way: line 9 s 907 and 27560, seed 4, taken as one stretch,
+  // the car watched only the second and was hit on the first, #602); against: the car goes along it towards the trams.
+  // One place seen twice (a loop of the route) counts once; places with no room for a car between them are one group,
+  // crossed as one (g: its first band and its end). Those within `ahead` m.
+  _wayCrossings(seq, ahead = 45, car = { half: REF_HALF, halfW: REF_HALFW }) {
+    const xs = [];
+    seq.forEach(([path, off], k) => {
+      for (const st of this._trackCrossings(path)) {
+        const prev = xs.findLast((o) => o.rt === st.rt);
+        let x = prev && prev.endsIn && st.startsIn && Math.abs(prev.dNearOut - (off + st.sIn)) < 0.01 ? prev : null;
+        if (x) {
+          x.flips += st.flips + (x.sides[1] !== st.sides[0] ? 1 : 0);
+          x.sides = [x.sides[0], st.sides[1]]; x.minD = Math.min(x.minD, st.minD); x.parts.push(st);
+        } else {
+          x = { dNear: off + st.sIn, sxNear: st.sx, dBand: null, dBandOut: null, sxBand: null, sxBandOut: null, rt: st.rt, sOurs: st.sOurs, k, kBand: null,
+            sides: [...st.sides], flips: st.flips, minD: st.minD, railsLen: 0, parts: [st], spans: [] };
+          xs.push(x);
+        }
+        for (const o of st.spans) addPart(x.spans, o);
+        x.dNearOut = off + st.sOut; x.sxNearOut = st.sxOut; x.endsIn = st.endsIn; x.railsLen += st.railsLen;
+        if (st.bIn !== null) {
+          if (x.dBand === null) { x.dBand = off + st.bIn; x.sxBand = st.bsx; x.kBand = k; }
+          x.dBandOut = off + st.bOut; x.sxBandOut = st.bsxOut;
+        }
+      }
+    });
+    const out = [];
+    for (const x of xs) {
+      const band = x.dBand !== null;
+      x.dC = band ? x.dBand : x.dNear; x.dOut = band ? x.dBandOut : x.dNearOut;
+      x.sx = band ? x.sxBand : x.sxNear; x.sxOut = band ? x.sxBandOut : x.sxNearOut;
+      if (band) x.k = x.kBand;
+      if (x.dC >= ahead || x.dOut + car.half < 0) continue; // (beyond 45 m; or left behind)
+      const reach = () => x.parts.some((st) => this._stretchReach(st, car.half, car.halfW) < 0);
+      x.kind = !band ? (reach() ? 'reach' : null) : x.railsLen >= RAILS_RUN ? 'rails'
+        : (!x.endsIn && x.sides[0] !== x.sides[1]) || x.flips > 0 || x.minD < CROSSES ? 'cross' : reach() ? 'reach' : null;
+      if (!x.kind) continue;
+      // (the parts of the route it comes into the band at, there; never in the band, those it comes near)
+      const spans = band ? x.spans.filter((o) => o.band).map((o) => o.band) : x.spans;
+      // (which way along the track: against its trams where the track's s falls over the stretch, on any part of the route)
+      x.against = spans.some((o) => o.a - o.b > 2);
+      // (a car turning onto the rails with the trams does not clear them in a few seconds: it goes only when the tram could
+      // stop behind it; s 9903: a bold driver turned in 36 m ahead of the tram at 45 km/h, crawled on along the track and
+      // was hit. One on them against the trams meets a tram anywhere on the stretch: the whole of it, as a crossing; line
+      // 17 s 2893 to 2932, a lane on our rails 40 m towards our tram, was taken at its entry, #602)
+      // (on the rails with the trams: the point where it turns in, on that part of the route, holds it; any other part,
+      // whole. slo and shi: the whole stretch on each part, where a car on it is)
+      const first = spans.find((o) => x.sx >= o.lo && x.sx <= o.hi);
+      x.along = x.kind === 'rails' && !!first && first.a - first.b <= 2;
+      x.spans = spans.map((o) => (o === first && x.along ? { lo: x.sx, hi: x.sx, along: true, against: false, slo: o.lo, shi: o.hi }
+        : { lo: o.lo, hi: o.hi, along: false, against: o.a - o.b > 2, slo: o.lo, shi: o.hi }));
+      out.push(x);
+    }
+    out.sort((a, b) => a.dC - b.dC);
+    // (one place seen twice counts once: the route loops round past it)
+    for (let i = out.length - 1; i > 0; i--) if (out.slice(0, i).some((o) => o.rt === out[i].rt && Math.abs(o.sx - out[i].sx) < 4)) out.splice(i, 1);
+    for (let i = 0; i < out.length; i++) {
+      const g = i > 0 && out[i].dC - out[i - 1].g.dOut < 2 * car.half + 2 * YIELD_GAP ? out[i - 1].g : { dC: out[i].dC, dOut: out[i].dOut, k: out[i].k };
+      g.dOut = Math.max(g.dOut, out[i].dOut);
+      out[i].g = g;
+    }
+    return out;
+  }
+
+  // Whether a car past its group's first band goes on over a later place of it (x, of xs) instead of waiting before it:
+  // only where waiting there would leave it standing in a place it is crossing or within a passing body's reach. One on a
+  // lane along the rails with their trams waits there as cars queue on them anyway. (Line 17 s 2882, seed 4: a car on the
+  // opposite track's rails, its way then cutting across ours for 15 m towards our tram, went on as one already across
+  // the group with our tram 15 m off, and met it head on, #602)
+  _goesOn(x, xs, half = REF_HALF) {
+    const tail = x.dC - YIELD_GAP - 2 * half, front = x.dC - YIELD_GAP;
+    return xs.some((o) => o !== x && o.g === x.g && !o.along && o.dC < front && o.dOut > tail);
   }
 
   // The paths a car drives next, each with the distance from the car to its start. Past a short next
@@ -859,9 +1042,11 @@ export class Traffic {
   // AI trams, and the walkers.
   _pathObstacles() {
     const out = [], g = this.game, tram = g.tram;
-    for (let k = 0; k < (tram.cars || 1); k++) {
-      const s = tram.s - 0.6 - 7.6 - k * CAR_PITCH, p = this.route.at(s), h = this.route.heading(s, 3);
-      out.push({ x: p.x, y: p.y, z: this.ground.profile.height(s), hx: h.hx, hy: h.hy, l: 7.2, w: 1.3, vx: h.hx * tram.v, vy: h.hy * tram.v, what: 'our tram' });
+    // (our tram's cars placed by the running gear as the AI trams' are, #602: before, a box on the track's tangent at the
+    // car's middle less 0.6 m, which a car beside a tight curve's ends did not see)
+    const at = (q) => { const p = this.route.at(q); return [p.x, p.y, this.ground.profile.height(q), 0]; };
+    for (const b of tramBoxes(tram.s, tram.cars || 1, at)) {
+      out.push({ x: b.x, y: b.y, z: b.z, hx: b.hx, hy: b.hy, l: 7.2, w: 1.3, vx: b.hx * tram.v, vy: b.hy * tram.v, what: 'our tram' });
     }
     for (const t of [...this.ahead, ...this.oncoming]) {
       if ((t.alpha ?? 0) < 0.3 || !t.boxes) continue;

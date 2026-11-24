@@ -36,7 +36,7 @@ TASK = "tram-autodeploy"
 RETRY = 3600  # s after a failed deploy of the same commit
 NIGHT = range(1, 5)  # local hours in which the nightly baseline may start
 # (stops rides on the u3 drive at no extra run, #708: a tram or autopilot change compares it with main's)
-LINES, CHECKS = "9,17,22,23,37", "u3,redruns,stops,traffic,lint,surfaces,canted,crossing"
+LINES, CHECKS = "9,17,22,23,37", "u3,redruns,stops,traffic,lint,surfaces,canted,crossing,giveway"
 # (under pythonw a console child would open a window of its own on every run)
 QUIET = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
 

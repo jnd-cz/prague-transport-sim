@@ -168,6 +168,34 @@ RUN = """async () => {
     e.lever = -6; run(t, 0.1); seen.emergency = { notch: t.notch, track: e.brakeAngle };
     out.lever = seen;
   }
+  // the lever sprung (#837): held, a step at once and one each 0.5 s to step 5; let go, on 0 at once and the pedal off as
+  // fast as after N; a tap, step 1 while the finger is down; through 0 from the other side; a number key's step stays; doors
+  // open, no step into drive
+  {
+    const t = new Tram(1), e = t.eq, sp = {};
+    // (s from a change until the pedals are off, both pedals' step 0; until the drive pedal is up, at a stand, where the
+    // helper parks)
+    const off = (gone = (x) => x.notch === 0) => { let s = 0; run(t, 2, {}, (x) => { s += dt; return !gone(x); }); return +s.toFixed(2); };
+    run(t, 1);
+    e.press(1); run(t, 0.2); sp.tap = [e.lever, t.notch]; e.press(0); sp.tap.push(e.lever, off((x) => x.eq.pedal.drive === 0));
+    e.press(1); run(t, 1.9); sp.held = [e.lever]; run(t, 0.2); sp.held.push(e.lever); run(t, 2); sp.held.push(e.lever, t.notch);
+    e.press(0); sp.letGo = [e.lever, off()]; sp.kmh = +t.kmh.toFixed(1);
+    e.setLever(5); run(t, 1); sp.n = [t.notch]; e.setLever(0); sp.n.push(off());
+    e.press(-1); run(t, 2.1); sp.brake = [e.lever, t.notch]; e.press(0); sp.brake.push(e.lever, off());
+    e.setLever(-5); run(t, 1); e.setLever(0); sp.brakeN = off();
+    e.setLever(2); run(t, 3); sp.set = e.lever;
+    e.press(-1); sp.through = [e.lever]; run(t, 0.6); sp.through.push(e.lever); run(t, 0.5); sp.through.push(e.lever);
+    e.setLever(0); e.press(1); e.lever = 0; run(t, 1.5, { doorsOpen: true }); sp.doors = [e.lever]; run(t, 0.6); sp.doors.push(e.lever);
+    e.emergency(true); run(t, 1); sp.emergency = [e.lever]; e.emergency(false); sp.emergency.push(e.lever);
+    // (brake held before the emergency stop or pressed while it is held: it waits for the stop, and the stop let go is
+    // brake step 5 while brake is held; drive held, 0 and on from there)
+    e.press(-1); e.emergency(true); run(t, 0.6); sp.brakeBefore = [e.lever]; e.emergency(false); sp.brakeBefore.push(e.lever);
+    run(t, 1); sp.brakeBefore.push(e.lever); e.press(0); sp.brakeBefore.push(e.lever);
+    e.emergency(true); e.press(-1); run(t, 0.6); sp.brakeDuring = [e.lever]; e.emergency(false); sp.brakeDuring.push(e.lever); e.press(0);
+    e.emergency(true); e.press(1); run(t, 0.6); sp.driveDuring = [e.lever]; e.emergency(false); sp.driveDuring.push(e.lever);
+    run(t, 0.6); sp.driveDuring.push(e.lever); e.press(0);
+    out.sprung = sp;
+  }
   // the wire, on a made-up straight line: substations at km 1 and km 5
   {
     const route = { samples: Array.from({ length: 800 }, (_, i) => [i * 10, 0, i * 10, i]) };
@@ -242,6 +270,22 @@ def checks(o):
     want(v["stand"]["parked"] and v["drive"]["notch"] == 2 and v["drive"]["kmh"] > 5 and not v["drive"]["parked"], f"the lever, away: {v}")
     want(v["coast"]["notch"] == 0 and v["brake"]["notch"] == -3 and v["brake"]["decel"] > 0.4, f"the lever, coasting and braking: {v}")
     want(v["stopped"]["parked"] and v["doors"]["kmh"] == 0 and v["after"]["notch"] == 3 and v["after"]["kmh"] > 2 and v["emergency"]["notch"] == -6, f"the lever, parked, doors, on, emergency: {v}")
+    sp = o["sprung"]
+    want(sp["tap"][:3] == [1, 1, 0] and sp["tap"][3] <= 0.2, f"the sprung lever tapped 0.2 s: lever, step, let go, s to the pedal off {sp['tap']}")
+    want(sp["held"] == [4, 5, 5, 5] and sp["kmh"] > 3, f"the sprung lever held 1.9, 2.1, 4.1 s: {sp}")
+    # (let go as fast as N: the user, 2026-11-23, "the rate the current game simple controls goes when going from full power
+    # to neutral on neutral key press")
+    want(sp["letGo"][0] == 0 and sp["n"][0] == 5 and abs(sp["letGo"][1] - sp["n"][1]) <= 0.04 and sp["letGo"][1] <= 0.5,
+         f"drive step 5 let go: lever {sp['letGo'][0]}, the pedal off in {sp['letGo'][1]} s; after N {sp['n'][1]} s")
+    want(sp["brake"][:3] == [-5, -5, 0] and abs(sp["brake"][3] - sp["brakeN"]) <= 0.04,
+         f"brake held 2.1 s then let go: {sp['brake']}; after N from brake step 5 {sp['brakeN']} s")
+    want(sp["set"] == 2 and sp["through"] == [1, 0, -1], f"a number key's step stays, brake held steps through 0: {sp}")
+    want(sp["doors"] == [0, 1], f"drive held with the doors open stays at 0, then steps on: {sp['doors']}")
+    want(sp["emergency"] == [-6, 0], f"the emergency stop held, then let go: {sp['emergency']}")
+    # (the user, 2026-11-23: "If player wants to brake after emergency he will hold the brake button while letting go of
+    # emergency brake button")
+    want(sp["brakeBefore"] == [-6, -5, -5, 0] and sp["brakeDuring"] == [-6, -5] and sp["driveDuring"] == [-6, 0, 1],
+         f"the emergency stop with brake held before it, brake pressed during it, drive during it: {sp}")
     f = o["feed"]
     want(f["n"] == 2, f"the far substation should not feed this line: {f['n']} feeds")
     want(f["at1000"]["ref"] == "a" and f["at4800"]["ref"] == "b" and f["at1000"]["r"] < f["at1500"]["r"] < f["at2500"]["r"], f"the feeds and their resistance: {f}")
