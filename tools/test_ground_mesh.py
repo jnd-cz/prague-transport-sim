@@ -783,20 +783,32 @@ class BesideAStrip(unittest.TestCase):
     def test_past_a_walls_corner_a_corner_reads_out_towards_itself(self):
         # (#812, as under Letná's wall, line 17 (-176.28, 582.61): past the strip's corner (10, 0) the surface is the
         # ramp's, 194.8 m; square to the strip's south edge, beside the strip, the platform's 197.4 m. A corner 0.5 m
-        # past the vertex, nearly on the south edge's line, and one on the vertex, its triangle south-east of it: both
-        # edges at the vertex are as near, and the point out runs from the vertex towards the corner or its triangle)
+        # past the vertex, nearly on the south edge's line: both edges at the vertex are as near, and the point out runs
+        # from the vertex towards the corner)
         walls = gm.outline_edges(self.D, [0])
 
         def read(px, py):
             return np.where(np.asarray(px, float) < 10.2, 197.4, 194.8)
-        x, y = np.array([10.5, 10.0]), np.array([-0.05, 0.0])
-        tx, ty = np.array([10.5, 10.3]), np.array([-0.05, -0.3])
-        z, held = gm.own_side(walls, x, y, tx, ty, np.array([194.8, 196.0]), read)
-        np.testing.assert_allclose(z, [194.8, 194.8], atol=1e-9)
-        self.assertEqual(held.tolist(), [False, True])
+        z, held = gm.own_side(walls, np.array([10.5]), np.array([-0.05]), np.array([10.5]), np.array([-0.05]), np.array([194.8]), read)
+        self.assertEqual((z.tolist(), held.tolist()), ([194.8], [False]))
         # (one beside the south edge, not past its end, still reads square to it)
         z, held = gm.own_side(walls, np.array([9.0]), np.array([-0.3]), np.array([9.0]), np.array([-0.3]), np.array([194.8]), read)
         self.assertEqual((z.tolist(), held.tolist()), ([197.4], [True]))
+
+    def test_a_corner_on_the_outline_reads_square_to_it(self):
+        # (#812, as at modranska-skola-ramp, line 17 (-2482, -8420): a corner on the vertex where the strip's south
+        # edge bends by 0.6 degrees, its triangle along the wall. Towards the triangle's centre the point out lay 0.09 m
+        # off the outline, where the surface mixes the two sides' cells (195.6 m), and the sidewalk at the wall's foot
+        # stood in teeth; square to the edge it is the ramp's 194.8 m)
+        D = {"areas": [{"c": "paved", "l": 0, "r": [[0, 0, 194.8], [5, 0, 194.8], [10, 0.05, 194.8], [10, 0.25, 197.4],
+                                                    [0, 0.2, 197.4]]}]}
+
+        def read(px, py):
+            return 194.8 + 2.6 * np.clip((np.asarray(py, float) + 0.4) / 1.0, 0, 1)
+        z, held = gm.own_side(gm.outline_edges(D, [0]), np.array([5.0]), np.array([0.0]), np.array([5.4]), np.array([-0.05]),
+                              np.array([195.4]), read)
+        np.testing.assert_allclose(z, [194.8], atol=1e-9)
+        self.assertEqual(held.tolist(), [True])
 
     def test_a_street_corner_on_the_strips_line_takes_its_height(self):
         # (as on a wall area: on the top's line 0.05 m under it, and on the foot's line 0.2 m over it, the line's height;

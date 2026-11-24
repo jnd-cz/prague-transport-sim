@@ -883,7 +883,8 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     step round, fixed in their rules:
     - Past a wall's corner, `own_side` and `off_the_smear` read square to one of the two edges at the vertex. A
       sidewalk corner under Letná's wall read the sidewalk on the wall's top that way, 6.8 m up. They read from the
-      vertex towards the corner now (`out_of`).
+      vertex towards the corner now (`out_of`); a corner on the outline still reads square to its edge (towards its
+      triangle, one along the wall read beside the outline: teeth of 7 cm at modranska-skola-ramp).
     - `wall_lines` read the first point of a piece after a turn along the wall before it. By
       street-over-an-underpass the stairwell's floor was 216.76 m there for 210.50, and a corner stood 4.9 m over
       the floor.

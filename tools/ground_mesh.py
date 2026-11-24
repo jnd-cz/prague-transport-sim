@@ -1128,12 +1128,15 @@ WALL_SIDE = 0.75  # m: a sidewalk's corner this near a wall's outline reads the 
 def out_of(a, b, t, x, y, tx, ty):
     """Per corner (x, y) in a triangle with centre (tx, ty) and an outline edge a -> b ((n, 2+)) it is near, its nearest
     point on the edge at parameter t (clamped): (fx, fy, ux, uy), that point and the unit direction out from it to the
-    corner's side. Square to the edge, on its triangle's side; where the point is the edge's end (within WALL_ON), from
-    that end towards the corner (towards its triangle's centre for a corner on it): past a wall's corner the side is
-    the wedge between its two edges, and each edge's square read the other's face or what lies beyond it. Both edges
-    then give one point out, and the tie between them is gone. Under Letná's wall, line 17 (-176.28, 582.61), a
-    sidewalk's corner 0.72 m past the vertex two edges share read square to one of them the sidewalk on the wall's top,
-    193.13 m for 186.30, and the other's square or the corner's own direction its own sidewalk (#812)."""
+    corner's side. Square to the edge, on its triangle's side; where the point is the edge's end (within WALL_ON) and
+    the corner is off the outline, from that end towards the corner: past a wall's corner the side is the wedge
+    between its two edges, and each edge's square read the other's face or what lies beyond it. Both edges then give
+    one point out, and the tie between them is gone. Under Letná's wall, line 17 (-176.28, 582.61), a sidewalk's
+    corner 0.72 m past the vertex two edges share read square to one of them the sidewalk on the wall's top, 193.13 m
+    for 186.30, and the other's square or the corner's own direction its own sidewalk (#812).
+    A corner on the outline reads square to its edge: towards its triangle's centre, a triangle along the wall, the
+    point out lay beside the outline, among the cells of both sides. At modranska-skola-ramp (line 17 (-2482, -8420))
+    the sidewalk at the wall's foot stood in teeth of 7 cm, 24 m more of wall over 0.3 m than the written file's 372."""
     e = b[:, :2] - a[:, :2]
     L = np.maximum(np.hypot(e[:, 0], e[:, 1]), 1e-12)
     fx, fy = a[:, 0] + e[:, 0] * t, a[:, 1] + e[:, 1] * t
@@ -1142,12 +1145,10 @@ def out_of(a, b, t, x, y, tx, ty):
     ux, uy = side * nx, side * ny
     first = t * L <= WALL_ON
     vx, vy = np.where(first, a[:, 0], b[:, 0]), np.where(first, a[:, 1], b[:, 1])
-    on = np.hypot(x - vx, y - vy) <= WALL_ON
-    gx, gy = np.where(on, tx, x), np.where(on, ty, y)
-    r = np.hypot(gx - vx, gy - vy)
-    end = (first | ((1 - t) * L <= WALL_ON)) & (r > 1e-9)
+    r = np.hypot(x - vx, y - vy)
+    end = (first | ((1 - t) * L <= WALL_ON)) & (np.hypot(x - fx, y - fy) > WALL_ON) & (r > 1e-9)
     rr = np.maximum(r, 1e-12)
-    return (np.where(end, vx, fx), np.where(end, vy, fy), np.where(end, (gx - vx) / rr, ux), np.where(end, (gy - vy) / rr, uy))
+    return (np.where(end, vx, fx), np.where(end, vy, fy), np.where(end, (x - vx) / rr, ux), np.where(end, (y - vy) / rr, uy))
 
 
 def own_side(walls, x, y, tx, ty, z, own):
