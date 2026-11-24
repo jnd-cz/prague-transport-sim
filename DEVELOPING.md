@@ -595,11 +595,22 @@ the pinned #291 and only proposes.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
   started with a clean environment: a job never waits for a process that started it (#585). A job that waits
   with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
-- A chain of heavy steps (a build per line, then the places) goes into the queue as one job, its steps in its
-  turn: `heavy.py --expect <their sum> "what" -- python -I chain.py`; or each step is queued at the start. A loop
-  that calls one heavy tool after another sends each step to the back of the queue, behind every job queued
-  while the last one ran (the user, 2026-11-23: "even if it's bunch of 5 minute jobs"; #800's last of five
-  5-min street builds still waited at 14:17, nearly 4 h after the first was done).
+- A batch of heavy steps goes into the queue at its start. A loop that calls one heavy tool after another sends
+  each step to the back of the queue, behind every job queued while the last one ran (the user, 2026-11-23: "even
+  if it's bunch of 5 minute jobs"; #800's last of five 5-min street builds still waited at 14:17, nearly 4 h after
+  the first was done). The batch is split by kind, its shared steps apart from its alone ones (the user,
+  2026-11-24: "if it's a mix of jobs that can run shared, together with other tasks, then put them in the queue
+  separately from alone jobs to speed up the whole queue"). A shared step inside a job alone holds the whole
+  queue for its time: #800's chain of builds of 2026-11-23 (23:11-02:13) ran alone, and three shared jobs of
+  9-21 min waited 3 h behind it.
+  - Steps that need nothing of each other take a ticket each, all at the start. A tool that takes its own turn
+    takes it; any other count or build runs as `heavy.py --shared GB,CORES`, a timing as plain `heavy.py`.
+  - Steps that read another's output go into one chain, in one turn: `heavy.py --expect <their sum> "what" --
+    python -I chain.py`. When every step is a count or a build, add `--shared <the largest step's GB>,<its cores>`.
+  - A timing that reads shared steps' output is queued after them, on its own: a job alone waits for every job
+    queued before it.
+  - A shared step that reads a job alone's output stays in that job's chain. A shared job may start before a job
+    alone queued ahead of it (`HeavyJob.BACKFILL`), and would read the output before it is written.
 - Each job prints whom it waits for, and sizes its pages and builds by the memory free when its turn comes
   (`tools/sysinfo.py`). `TRAM_HEAVY_NOWAIT=1` runs one beside the others (it slows both).
 - A job in its own turn watches itself (#815; on 2026-11-22 a trace expected to take 5 min ran 100 min and held

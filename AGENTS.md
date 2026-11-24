@@ -101,7 +101,9 @@ things are done, and why a rule exists, is in the files it points to:
   change of two kinds runs both; `/regress` runs them. A world checkpoint (W1, W2 …) runs every check on every line.
 - **Heavy jobs take turns** (the user, 2026-11-12, #516; DEVELOPING.md, Heavy jobs, lists the tools that take
   theirs): anything else heavy runs through `python -I tools/heavy.py "what" -- CMD ...`. Start one in the
-  background and let it wait; never start a second beside it. **Never start a job detached** (`Start-Process`,
+  background and let it wait; never run one around the queue. **A batch is queued at its start, its shared steps
+  (counts, builds: `--shared GB,CORES`) apart from its alone ones (timings)**, so that they run beside other jobs
+  (the user, 2026-11-24; DEVELOPING.md, Heavy jobs). **Never start a job detached** (`Start-Process`,
   `start`, `nohup … &`): it ends as orphaned (the user, 2026-11-22, #815). End a background command with something
   after its last program (`; echo "exit $?"`), so that a stop reaches it.
 - **The heaviest work runs at night** (23:00 to 07:00) or on the user's word (the user, 2026-11-21; from 23:00 since 2026-11-23): a rebuild of
