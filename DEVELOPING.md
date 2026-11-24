@@ -370,6 +370,12 @@ the same counts every time (a second run in the same page differs slightly).
 Reports go to `reports/lineN.json` (not in git). Regression checks use `tools/headless.py --compare`
 (above), whose baseline follows main.
 
+**Traffic scenes** (`tools/bench/scenes.js`, `tools/test_traffic_scenes.py`, #566): a few roads, walks, cars and
+walkers built in code and driven on the real `Traffic` without the world (a flat ground, no stops, no spawning; our
+tram only where the scene has a track), at the game's step, in milliseconds each. A rule's case is shown on a scene
+first, then on the lines: `S.play('name', args)` in a page that imports the module gives what a scene reports;
+`SCENES` holds them (a jam's scene with its fix switched off shows the jam).
+
 Mirror rendering cost (#79): `python -P -E tools/mirror_bench.py --line 17 --s 5064 --headed`.
 Keep its game window in front until it closes: the report records the graphics backend, focus,
 frame times and mirror geometry/update counts, alternating mirror off/on. Unfocused frame rates are
