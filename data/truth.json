@@ -6208,6 +6208,109 @@
      "why": "the sidewalk's level, as the raster has it and the user sees it; the noses on the building's line are not the ground's (StairsHeights)"
     }
    ]
+  },
+  "stairs-belvedere-wall": {
+   "line": "22",
+   "at": [
+    -1051.0,
+    823.0
+   ],
+   "reach": 20,
+   "issue": 447,
+   "what": "the cobbled flight east of the Belvedere (survey area 439 of line 22 on main 49a4b5e, rising 239.6 -> 245.2 m westward over 25 m): along its north side IPR's raster rises from 240.5 m half a metre inside to 245.4 m 1.5 m out (x -1048.7 to -1054.2). Welded, the side was pulled up to the raster's smear, 242.6 m at x = -1051, and the ground beside ran on as one slope",
+   "said": "one flight, or flights in a straight line with landings",
+   "source": "the user's answer in the stairs review (data/truth.json stairsReview, 2026-11-22), #447",
+   "seen": {
+    "what": "A cobbled descent falls east from the Belvedere's terrace towards Mariánské hradby, a stone parapet on its south side over the slope and the city. On its north side a stone wall about 3 to 5 m tall stands up to the Belvedere's terrace and arcade, a strip of lawn at its foot.",
+    "from": [
+     {
+      "at": [
+       50.0933754,
+       14.4051624
+      ],
+      "headings": [
+       34,
+       104
+      ]
+     }
+    ],
+    "source": "Google Street View, seen 2026-11-24 (looked at, not copied)"
+   },
+   "sections": [
+    {
+     "name": "across the flight's north side at x = -1050.3",
+     "from": [
+      -1050.2,
+      820.7
+     ],
+     "to": [
+      -1050.4,
+      825.6
+     ],
+     "expect": {
+      "largest step m at least": 3.0
+     },
+     "why": "the stairs at their own 239.8 m, the ground beside at the raster's 245.4 m: an upright face between them (ground_mesh.stairs_sides), where the weld drew a slope through the side at 242.6 m"
+    }
+   ]
+  },
+  "stairs-dobeska": {
+   "line": "17",
+   "at": [
+    -1211.0,
+    -4793.0
+   ],
+   "reach": 25,
+   "issue": 447,
+   "what": "the stone stairs up to the Dobeška viewpoint (survey area 1962 of line 17 on main 49a4b5e, 226.6 -> 237 m): a cobbled path beside them below their lower part, a wooded bank rising beside their upper part",
+   "seen": {
+    "what": "A long flight of stone steps up through the wood, a stone kerb along each side and a steel railing on the left. Lower down a cobbled path runs beside the flight on its left, below it, the railing on the edge between them. On the right the wooded bank rises from the kerb, soil and leaves, no wall.",
+    "from": [
+     {
+      "at": [
+       50.0428708,
+       14.4136715
+      ],
+      "headings": [
+       257,
+       326
+      ]
+     }
+    ],
+    "source": "Google Street View, seen 2026-11-24 (looked at, not copied)"
+   },
+   "sections": [
+    {
+     "name": "across the lower flight's side over the path",
+     "from": [
+      -1229.4,
+      -4805.8
+     ],
+     "to": [
+      -1232.2,
+      -4801.7
+     ],
+     "expect": {
+      "largest step m at least": 0.8
+     },
+     "why": "the stairs at 226.6 m, the path 2 m out at 225.4 m on IPR's raster, 225.9 m 1 m out: the flight's edge stands over the path"
+    },
+    {
+     "name": "across the upper flight's side to the bank",
+     "from": [
+      -1202.5,
+      -4787.3
+     ],
+     "to": [
+      -1202.7,
+      -4792.2
+     ],
+     "expect": {
+      "largest step m": 0.3
+     },
+     "why": "the bank begins about a metre off the kerb: IPR's raster is 236.5-236.6 m from the side to 0.75 m out, the stairs' 236.5 m. Read 2.5-4 m out and carried back by its slope, as at a wall line, it stood 1.1 m over the stairs at their side, an upright face where none is (wall_lines.STAIRS_SEEN)"
+    }
+   ]
   }
  },
  "openTrackReview": {
