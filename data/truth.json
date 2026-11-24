@@ -6106,6 +6106,35 @@
     }
    ]
   },
+  "ballast-bed-off-the-route": {
+   "line": "37",
+   "at": [
+    9346.0,
+    939.0
+   ],
+   "reach": 20,
+   "issue": 548,
+   "what": "another line's track off our route (line 37, 50.10711, 14.54903; track 187 of line 37 on main cd91aaf), grass beside it: its rails stand 0.20-0.24 m over IPR's ground at the axis, open ballast by IPR. On ground batch D its bed lay at the rails' height (panels, the default off the route), 0.21 m over IPR, and the ground beside it 0.17-0.21 m under the bed's edge and the ground 4 m on",
+   "source": "measured 2026-11-24 on ground batch D (#548): buriedRails' sunken places at (9309-9346, 939-962), bed's edge and ground against IPR",
+   "sections": [
+    {
+     "name": "from the track's axis across its bed's edge 4 m into the grass, 7 m",
+     "from": [
+      9349.98,
+      937.3
+     ],
+     "to": [
+      9343.46,
+      939.85
+     ],
+     "expect": {
+      "largest step m": 0.12,
+      "off the chord m": 0.2
+     },
+     "why": "an open ballast bed lies its 0.17 m under the rails (railAboveDeck), on IPR's ground, and the grass beside it meets its edge: no trough. Batch D: a step of 0.23 m at the bed's edge, 0.24 m off the chord, the bed 0.25 m over IPR"
+    }
+   ]
+  },
   "stairs-reversed-ramp": {
    "line": "9",
    "at": [
