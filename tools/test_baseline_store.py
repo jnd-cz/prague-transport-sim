@@ -349,6 +349,37 @@ class Queue(unittest.TestCase):
         open(release_x, "w").close()
         self.assertEqual([k.wait(10) for k in (a, b, x)], [0, 0, 0])
 
+    def test_an_older_checkouts_step_is_found_in_the_process_table(self):
+        """A step whose ticket names no job (a checkout from before #844) is its chain's all the same: the chain's
+        process started it."""
+        old = ("_d = b.json.dump\n"  # (its tickets as an older checkout writes them: no "in")
+               "def _dump(o, f, *a, **k):\n"
+               "    return _d({x: y for x, y in o.items() if x != 'in'} if isinstance(o, dict) else o, f, *a, **k)\n"
+               "b.json.dump = _dump\n")
+        a, release_a, release_step = self.chain("chain", old)
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        jobs = baseline_store.queue()
+        step = next(j for j in jobs if j["what"] == "step")
+        self.assertNotIn("in", step)
+        self.assertEqual(baseline_store.ticket_parents(jobs), {step["pid"]: a.pid})
+        b, release_b = self.shared("b")
+        self.assertEqual(b.stdout.readline().strip(), "in")
+        for r in (release_step, release_a, release_b):
+            open(r, "w").close()
+        self.assertEqual([k.wait(10) for k in (a, b)], [0, 0])
+
+    def test_ticket_parents_take_an_ancestor_that_started_first(self):
+        t = time.time()
+        jobs = [{"pid": p, "state": s} for p, s in [(10, "running"), (13, "running"), (20, "running"), (30, "running"),
+                                                     (40, "waiting")]]  # (an older checkout's tickets: no "in")
+        jobs += [{"pid": 50, "state": "running", "in": None}, {"pid": 60, "state": "running", "in": 10}]
+        table = {13: 12, 12: 10, 10: 1, 20: 99, 99: 1, 30: 40, 40: 1, 50: 10, 60: 10}  # (13 under a shell under 10)
+        made = {10: t, 12: t + 1, 13: t + 2, 20: t, 30: t, 40: t + 5, 50: t + 1, 60: t + 1}.get
+        # (30's parent pid 40 holds a ticket but started after 30: a pid Windows reused, not 30's parent; 50 and 60 say
+        # themselves, 50 that it holds a turn of its own though 10 started it; 20's ancestors hold none)
+        self.assertEqual(baseline_store.ticket_parents(jobs, table, made), {13: 10})
+
     def test_turns_fold_a_jobs_steps_into_it(self):
         t = time.time()
 

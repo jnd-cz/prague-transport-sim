@@ -430,7 +430,8 @@ def show(rs, issues, jobs, now):
     head = git("log", "-1", "--format=%h %s", "origin/main") or "?"
     print(f"origin/main {head[:90]}")
     print("Heavy jobs: " + ("; ".join(baseline_store.describe(j, now) + eta(j, now)
-                                      for j in baseline_store.schedule(jobs, now, free=baseline_store._free_gb()))
+                                      for j in baseline_store.schedule(jobs, now, free=baseline_store._free_gb(),
+                                                                       parents=baseline_store.ticket_parents(jobs)))
                             if jobs else "none"))
     if ends := baseline_store.recent_ends(now):  # (#815: what a job's watch ended in the last hour, and why)
         print("Ended by their watch (1 h): " + "; ".join(

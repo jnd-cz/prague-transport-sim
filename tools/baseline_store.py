@@ -759,7 +759,7 @@ class HeavyJob:
     def room(self, jobs=None):
         """What a shared job may take beside the shared jobs running now: {"gb", "cores"}. The free memory less KEEP
         and less what each of them declared and does not hold yet; the machine's cores less theirs."""
-        jobs = turns(queue()) if jobs is None else jobs
+        jobs = queued_turns() if jobs is None else jobs
         free, table = self.FREE(), None
         gb, cores = (1e9 if free is None else free) - self.KEEP, self.CORES
         for j in jobs:
@@ -786,7 +786,7 @@ class HeavyJob:
         the shared ones queued behind the first of those;
         with none, the shared jobs running while its cores or its memory do not fit beside them (self.why says which)."""
         me = (self.t, os.getpid())
-        jobs = turns(queue())  # (a step in another job's turn is that job's, #844)
+        jobs = queued_turns()  # (a step in another job's turn is that job's, #844)
         others = [j for j in jobs if not own_turn(j)]
         self.why = ""
 
@@ -936,22 +936,26 @@ def queue():
     return sorted(out, key=lambda j: (j["t"] or 0, j["pid"]))
 
 
-def turns(jobs):
+def turns(jobs, parents=None):
     """queue()'s jobs as the turns they hold (#844): a step that runs in another job's turn (its ticket's "in", a tool
     that takes its own turn started by a chain) is that job's, not a job of its own. It is folded into the job at the
     top of its "in"s, listed in its "steps" ({pid, what}); a shared job's share becomes the larger of its own and its
     steps' (a step that declares none, a job alone run as a step, adds nothing: the chain's share stands for it). A
-    step whose parent's ticket is gone stands as a job of its own. The order is queue()'s.
+    step whose parent's ticket is gone stands as a job of its own. The order is queue()'s. parents: {pid: its
+    parent's pid} for tickets that name none, an older checkout's steps (ticket_parents()).
 
     (2026-11-24: #800's chain queued shared at 6 GB and 12 cores; each street_profile step inside it wrote a ticket
     without a share, a job alone running, and #843's three ground places, shared at 3.5 GB and a core, waited 22 min
     beside it with room free.)"""
     by = {j["pid"]: j for j in jobs}
 
+    def up(j):
+        return j.get("in") or (parents or {}).get(j["pid"])
+
     def top(j):
         seen = {j["pid"]}
-        while j.get("in") in by and j["in"] not in seen:
-            j = by[j["in"]]
+        while up(j) in by and up(j) not in seen:
+            j = by[up(j)]
             seen.add(j["pid"])
         return j
     out = {}
@@ -968,6 +972,38 @@ def turns(jobs):
         if s and p:
             o["share"] = {"gb": max(p["gb"], s["gb"]), "cores": max(p["cores"], s["cores"])}
     return [out[j["pid"]] for j in jobs if j["pid"] in out]
+
+
+def ticket_parents(jobs, table=None, made=None):
+    """{pid: the pid of the ticket's job it runs in} for the running tickets without an "in": a step from a checkout
+    older than #844, found in the process table as a descendant of another ticket's process. A newer ticket always
+    says ("in" None: a turn of its own, though a ticket's process may have started it before its own turn). The parent
+    counts only when it started before the step: Windows keeps a dead parent's pid, which a later process may take.
+    table: processes()'; made: pid -> when it started (_process's), for tests."""
+    held = {j["pid"] for j in jobs}
+    table = processes() if table is None else table
+    made = made or (lambda pid: (p := _process(pid)) and p[0])
+    out = {}
+    for j in jobs:
+        if "in" in j or j["state"] != "running":
+            continue
+        q, seen = table.get(j["pid"]), {j["pid"]}
+        while q and q not in seen and len(seen) < 64:
+            seen.add(q)
+            if q in held:
+                a, b = made(q), made(j["pid"])
+                if a and b and a <= b:
+                    out[j["pid"]] = q
+                break
+            q = table.get(q)
+    return out
+
+
+def queued_turns():
+    """The machine's heavy jobs now as the turns they hold: turns() of queue(), with older checkouts' steps found in
+    the process table (ticket_parents())."""
+    jobs = queue()
+    return turns(jobs, ticket_parents(jobs))
 
 
 def own_turn(j):
@@ -1007,7 +1043,7 @@ def backfills(mine, running, margin=HeavyJob.BACKFILL, now=None, records=None):
     return now + margin * mine <= max(ends)
 
 
-def schedule(jobs, now=None, records=None, free=None, cores=None, keep=None):
+def schedule(jobs, now=None, records=None, free=None, cores=None, keep=None, parents=None):
     """The queue's expected times and estimated starts and finishes (#826), as queue()'s dicts (in its order) with
     expect (s or None), expectFrom ("ticket", "history" or None), start and finish (epoch s; None: not known) and late
     (a running job past its expected time: its finish is taken as now).
@@ -1019,8 +1055,8 @@ def schedule(jobs, now=None, records=None, free=None, cores=None, keep=None):
     ahead of it when BACKFILL× its time ends before the jobs running now end (backfills()). The memory to share is the free
     memory now (`free` GB, None: unknown, no limit) plus what the running jobs hold now (their tickets' gb), less KEEP;
     a running shared job takes the larger of its share and its hold. A job after one with no known end has none.
-    Steps in another job's turn are that job's (turns()): they are left out of the list."""
-    jobs = turns(jobs)
+    Steps in another job's turn are that job's (turns(); parents: ticket_parents()'s): they are left out of the list."""
+    jobs = turns(jobs, parents)
     now = time.time() if now is None else now
     records = history() if records is None else records
     cores = HeavyJob.CORES if cores is None else cores
