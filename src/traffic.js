@@ -620,7 +620,9 @@ export class Traffic {
           // in still had the body over its way further on, #602)
           // (the time to clear it, per stretch: across the band, or over the whole place where the car crosses along it, or
           // goes along it towards the trams. Not a part along the rails with the trams because another part of the route is
-          // against them: line 9 s 27291, seed 4, a lane onto our rails whose way crosses the outbound track further on, #602)
+          // against them: line 9 s 27291, seed 4, a lane onto our rails whose way crosses the outbound track further on, #602.
+          // zone: the whole place's, where the car is on it, below)
+          const zone = x.kind === 'cross' || x.against ? Math.max(TRACK_ZONE, x.dOut - x.dC) : TRACK_ZONE;
           const tCs = (Math.max(0, front) + TRACK_ZONE + 2 * CAR_HALF) / Math.max(v, 2.5);
           const tCw = (Math.max(0, front) + Math.max(TRACK_ZONE, x.dOut - x.dC) + 2 * CAR_HALF) / Math.max(v, 2.5);
           for (const t of ours ? [tram, ...this.ahead] : this.oncoming) {
