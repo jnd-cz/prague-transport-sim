@@ -316,6 +316,64 @@ class Queue(unittest.TestCase):
         open(release_b, "w").close()
         self.assertEqual(b.wait(10), 0)
 
+    def chain(self, name, step_setup=""):
+        """A shared chain (4 GB, 2 cores) that starts a step once its turn comes: a job of its own tool, run in the
+        chain's turn (HELD), released by `<its release>-step`."""
+        setup = (MACHINE + "share = {'gb': 4, 'cores': 2}\nimport subprocess\nkid = []\n"
+                 "def spin():\n"
+                 f"    if not kid: kid.append(subprocess.Popen([sys.executable, '-I', '-c', {JOB!r}, sys.argv[1], "
+                 f"'step', sys.argv[3] + '-step', {MACHINE + step_setup!r}]))\n"
+                 "    time.sleep(0.05)\n")
+        p, release = self.job(name, setup)
+        self.addCleanup(lambda: open(release + "-step", "w").close())  # (the step is the chain's child, not the test's)
+        return p, release, release + "-step"
+
+    def test_a_shared_job_runs_beside_a_shared_chain_whose_step_declares_no_share(self):
+        """#844: the step's ticket names the chain ("in"), and the queue counts it as the chain's. Before, it was a job
+        alone running, and b waited for it (2026-11-24: 22 min beside #800's chain)."""
+        a, release_a, release_step = self.chain("chain")
+        self.assertEqual(a.stdout.readline().strip(), "in")
+        self.assertEqual(a.stdout.readline().strip(), "in")  # (the step, in the chain's turn: its output is the chain's)
+        step = next(j for j in baseline_store.queue() if j["what"] == "step")
+        self.assertEqual((step["in"], step["share"], step["state"]), (a.pid, None, "running"))
+        b, release_b = self.shared("b")
+        self.assertEqual(b.stdout.readline().strip(), "in")  # (beside the chain: 8 of 38 GB, 4 of 8 cores)
+        x, release_x = self.job("timing")
+        self.wait_for(lambda: ("timing", "waiting") in self.states())
+        open(release_step, "w").close()
+        time.sleep(0.5)
+        self.assertEqual(self.states()[-1], ("timing", "waiting"))  # (alone: it waits for the chain and b)
+        for r in (release_a, release_b):
+            open(r, "w").close()
+        self.assertEqual(x.stdout.readline().strip(), "in")
+        open(release_x, "w").close()
+        self.assertEqual([k.wait(10) for k in (a, b, x)], [0, 0, 0])
+
+    def test_turns_fold_a_jobs_steps_into_it(self):
+        t = time.time()
+
+        def tk(pid, what, share=None, inside=None, state="running"):
+            return {"what": what, "root": "C:/x/transport-game-800", "pid": pid, "t": t + pid / 1000, "state": state,
+                    "since": t, "share": share, "in": inside}
+        jobs = [tk(1, "chain", {"gb": 6.0, "cores": 12}), tk(2, "street_profile", None, 1),
+                tk(3, "ground_mesh", {"gb": 21.0, "cores": 8}, 2),  # (a step of a step: the chain's)
+                tk(4, "alone chain"), tk(5, "places", {"gb": 3.5, "cores": 1}, 4),
+                tk(6, "orphan step", None, 99),  # (its parent's ticket is gone: a job of its own)
+                tk(7, "b", {"gb": 3.5, "cores": 1}, state="waiting")]
+        got = baseline_store.turns(jobs)
+        self.assertEqual([j["what"] for j in got], ["chain", "alone chain", "orphan step", "b"])
+        self.assertEqual(got[0]["share"], {"gb": 21.0, "cores": 12})  # (the larger of its own and its steps')
+        self.assertEqual([s["what"] for s in got[0]["steps"]], ["street_profile", "ground_mesh"])
+        self.assertIsNone(got[1]["share"])  # (a shared step in a job alone: still alone)
+        self.assertEqual(got[2]["steps"], [])
+        self.assertEqual(jobs[0]["share"], {"gb": 6.0, "cores": 12})  # (the tickets themselves are kept)
+        self.assertIn(", its steps street_profile, ground_mesh running", baseline_store.describe(got[0], t))
+        self.assertEqual([j["what"] for j in baseline_store.schedule(jobs, t, records=[], free=40.0)],
+                         ["chain", "alone chain", "orphan step", "b"])
+        with mock.patch.object(baseline_store.os, "getpid", lambda: 3):  # (a step's own turn is its chain's)
+            self.assertTrue(baseline_store.own_turn(got[0]))
+            self.assertFalse(baseline_store.own_turn(got[1]))
+
     def test_room_is_what_the_running_shared_jobs_leave_and_a_claim_is_kept(self):
         a, release_a = self.shared("a", gb=30, cores=3)
         self.assertEqual(a.stdout.readline().strip(), "in")
