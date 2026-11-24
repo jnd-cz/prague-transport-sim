@@ -5,7 +5,7 @@ import { Terrain, Profile, makeGround, rockTunnels, bridgeModel, DtmSurface, cha
 import { buildWorld, WORLD_PARTS } from './world.js';
 import { widenTramStreets, buildStreetDetail } from './streets.js';
 import { groundStyles } from './groundDraw.js';
-import { fetchGround, GroundTiles, WINDOW_AHEAD, WINDOW_STEP } from './groundFile.js';
+import { fetchGround, GroundTiles, windowPoints } from './groundFile.js';
 import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
 import { Tram, T3, CAR_PITCH } from './tram.js';
 import { fmtTime, fmtDev } from './game.js';
@@ -132,6 +132,9 @@ built[`line${lineId}.ground.json`] = groundFile.layout;
 checkBuild(lineId, lineBuild, built); // (a file of another build stops the load, naming the rebuild, #702)
 const groundTiles = new GroundTiles(groundFile, groundStyles(groundFile.layout), params.has('bot') || params.has('keepgeo'));
 window.groundTiles = groundTiles; // (what is held: tools/bench/tiles.js)
+let previewS = null; // (the route position the menu shows: the ground's window holds the route ahead of it, #711)
+// (the menu's window: its points, tools/test_loading.py)
+window.menuWindow = () => (previewS === null ? null : windowPoints(previewSpot(previewS), route, previewS));
 const groundLookups = groundTiles.loadLookups();
 await Promise.all(vehicles.filter((v) => v.preload).flatMap((v) => v.files.map((f) => load.get(fileUrl(v, f.path)))));
 await load.begin('terrain');
@@ -280,11 +283,10 @@ function useGroundLookup(ground, lk) {
 async function buildCity() {
   await load.parts(WORLD_PARTS);
   world = await buildWorld(scene, data, route, ground, (part) => load.partDone(part));
-  // (the ground's window round the start before the first frame: the route ahead of the tram and the camera, #30)
-  const t0 = performance.now(), ahead = [];
-  for (let d = 0; d <= WINDOW_AHEAD; d += WINDOW_STEP) { const p = route.at(Math.min(route.length, d)); ahead.push([p.x, p.y]); }
-  await groundTiles.update([[camera.position.x, -camera.position.z], ...ahead], groundTiles.reach(scene.fog.far));
-  groundTiles.drain(); // (the start's tiles in the scene at once: the 'gpu' step uploads them with the world)
+  // (the ground's window before the first frame round the stop the menu shows first (fillTrips), where its preview's
+  // camera stands, and the route ahead of it, #30, #711; the 'gpu' step uploads its tiles with the world)
+  const t0 = performance.now(), s0 = data.stops[0].s + 6;
+  await groundTiles.settle(windowPoints(previewSpot(s0), route, s0), groundTiles.reach(scene.fog.far));
   window.groundTimes = { ...groundTiles.times, window: Math.round(performance.now() - t0) }; // (the workers' ms, summed; the window's wait)
   if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)
@@ -637,6 +639,12 @@ async function start(extra = {}, o = menuOpts()) {
     return fc;
   };
   window.tramModel = tramModel;
+  // the ground's window round the tram and the route ahead in the scene before the shift shows (#711)
+  previewS = null;
+  const at = route.at(tram.s);
+  await groundTiles.settle(windowPoints([at.x, at.y], route, tram.s), groundTiles.reach(scene.fog.far),
+    (done, total) => load.wait(t('load.ground'), done / total));
+  load.wait(null);
   $('menu').classList.add('hidden');
   touch.sync();
   $('results').classList.add('hidden');
@@ -695,6 +703,7 @@ function showResults() {
 // browser) or not now. Nothing is sent without a click or that "always".
 const perfLog = new PerfLog();
 window.perfLog = perfLog;
+groundTiles.onFail = () => perfLog.tileFailed(); // (a ground tile that failed to decode, asked again later: #711)
 addFacts(() => ({ machine: machine(renderer), load: window.loadTimes || null, perf: perfLog.summary() }));
 const PERF_KEY = 'tram.perfSend';
 function offerPerf(el) {
@@ -1002,10 +1011,15 @@ const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 }, ORBIT_EL = 0.3;
   canvas.addEventListener('contextmenu', (e) => { if (on()) e.preventDefault(); });
 }
 
+// the menu's preview camera over the route (x, y): 40 m back of s and 6 m to the side
+function previewSpot(s) {
+  const p = route.at(s - 40), h = route.heading(s);
+  return [p.x - h.hy * 6, p.y + h.hx * 6];
+}
 function previewAt(s) {
-  const p = route.at(s - 40);
-  const h = route.heading(s);
-  camera.position.set(p.x - h.hy * 6, profile.height(s - 40) + 12, -(p.y + h.hx * 6));
+  const [x, y] = previewSpot(s);
+  camera.position.set(x, profile.height(s - 40) + 12, -y);
+  previewS = s;
   const q = route.at(s + 20);
   camera.lookAt(q.x, profile.height(s + 20), -q.y);
   placeTram(s);
@@ -1224,7 +1238,7 @@ function frame(now) {
     }
   }
   if (review) review.update(dt);
-  if (world) groundTiles.tick(now, camera, route, tram.s, scene.fog.far);
+  if (world) groundTiles.tick(now, camera, route, previewS ?? tram.s, scene.fog.far);
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   const lazy = idle();
