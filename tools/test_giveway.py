@@ -47,10 +47,12 @@ LOOP = r"""async () => {
   const traffic = (route, back) => Object.assign(Object.create(Traffic.prototype), { route, back, ground: { profile: { overBridge: () => false } } });
   const ours = new Route(Array.from({ length: 201 }, (_, i) => [i, 0]));
   const back = new Route(Array.from({ length: 201 }, (_, i) => [200 - i, 3.5]));
+  const round = Array.from({ length: 9 }, (_, i) => [200 + 1.75 * Math.sin(Math.PI * (i + 1) / 10), 1.75 - 1.75 * Math.cos(Math.PI * (i + 1) / 10)]);
+  const twice = new Route([...Array.from({ length: 201 }, (_, i) => [i, 0]), ...round, ...Array.from({ length: 201 }, (_, i) => [200 - i, 3.5])]);
   const r = (v) => Math.round(v * 10) / 10;
   const read = (T, pts, d = 0) => {
     const xs = T._wayCrossings([[new Route(pts), -d, false]], Infinity);
-    return xs.map((x) => ({ rt: x.rt === ours ? 'ours' : 'back', kind: x.kind, along: x.along, against: x.against, lo: r(x.lo), hi: r(x.hi),
+    return xs.map((x) => ({ rt: x.rt === T.route ? 'ours' : 'back', kind: x.kind, along: x.along, against: x.against, lo: r(x.spans[0].lo), hi: r(x.spans[0].hi), spans: x.spans.map((o) => [r(o.lo), r(o.hi)]),
       dC: r(x.dC), gdC: r(x.g.dC), group: xs.indexOf(xs.find((o) => o.g === x.g)), goesOn: T._goesOn(x, xs) }));
   };
   return {
@@ -61,6 +63,8 @@ LOOP = r"""async () => {
     groupRails: read(traffic(ours, back), [[150, 12], [140, 3.5], [115, 3.5], [95, -6], [80, -12]], Math.hypot(10, 8.5) + 15),
     // straight across both: the car on the opposite track
     groupCross: read(traffic(ours, back), [[60, 15], [60, -15]], 11.5),
+    // across a street our route takes out and back (east at y 0, round, west at y 3.5): both tracks are ours, two places
+    twice: read(traffic(twice, null), [[60, 15], [60, -15]]),
   };
 }"""
 
@@ -134,6 +138,16 @@ class GiveWay(unittest.TestCase):
         b, o = sorted(r['groupCross'], key=lambda x: x['dC'])
         self.assertEqual((b['kind'], o['kind'], o['group']), ('cross', 'cross', 0))
         self.assertTrue(o['goesOn'])
+        # (across both tracks of a street our route takes out and back: one place watching both stretches of track, each
+        # near its own s; taken as one stretch, the car watched only the first and was hit on the second, line 9 s 907,
+        # seed 4)
+        [t] = r['twice']
+        self.assertEqual((t['rt'], t['kind']), ('ours', 'cross'))
+        back_, out_ = sorted(t['spans'], reverse=True)
+        self.assertGreater(back_[0], 300)
+        self.assertLess(back_[1] - back_[0], 6)
+        self.assertLess(abs(out_[0] - 60), 3)
+        self.assertLess(abs(out_[1] - 60), 3)
 
     def test_measured_not_judged(self):
         ok, line = judge('giveway', {'checks': {'waits': 3, 'waitInBody': {'count': 2, 'at': [], 'byRule': {'band': 2}},

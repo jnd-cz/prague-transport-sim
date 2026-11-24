@@ -6,8 +6,11 @@
 // Counts, each with its places [x, y, s on our route]:
 //   waitInBody    a spot where a car gives way (as src/traffic.js's give-way loop places it) that a passing body overlaps
 //   letGoInBody   the body still over the car's way within LET_GO m of that spot when the loop lets the car go
-//   skippedCross  a way that crosses a track where the loop gives way nowhere (before #602: one coming in at 45° or less)
+//   skippedCross  a way that crosses a track where the loop gives way nowhere (before #602: one coming in at 45° or less),
+//                 or where no place of it watches every part of the route the way comes into the band at
 //   skippedReach  a way within a passing body's reach, beside the track, where the loop gives way nowhere
+//   skippedRails  a way on the rails (a lane along them) where the loop gives way nowhere, or not at every part of the
+//                 route it comes into the band at
 // and as context: the waits, the band entries by kind and how many the give-way covers, and the let-gos further on.
 // The give-way spots and the let-go read the loop's rule (YIELD_GAP before the band, the group of tracks, the spot
 // before a junction): a change of that rule changes them here too. The entries' kinds are geometry only.
@@ -24,6 +27,17 @@ const RAILS_RUN = 12;    // m: a way on the rails this far is a lane along them 
 const CROSSES = 0.3;     // m: a way this near the centre line, or over to its other side, crosses the track
 const LET_GO = 2;        // m: a conflict this near the waiting spot when let go is the car's first metres
 const NEAR = 3.6;        // m: a way that stays out of the band but within this may bring a car's corner into the body
+const S_JUMP = 4;        // m: a track s this far from those seen on a stretch is another part of the route
+const HOLDS = 5;         // m: a place's stretch of track (lo to hi) this near the s where a way comes into the band watches it
+
+// the parts of the route a stretch comes near, each with the first s where it comes into the band there (null: never). A
+// part: its s within S_JUMP of the others seen on it, told by the s within NEAR, which runs on without gaps
+function addPart(parts, s, first = null, lo = s, hi = s) {
+  const p = parts.find((o) => lo <= o.hi + S_JUMP && hi >= o.lo - S_JUMP);
+  if (!p) { parts.push({ first, lo, hi }); return; }
+  p.lo = Math.min(p.lo, lo); p.hi = Math.max(p.hi, hi);
+  if (p.first === null) p.first = first;
+}
 
 const box = (x, y, hx, hy, l, w) => ({ x, y, hx, hy, l, w });
 
@@ -59,8 +73,8 @@ function side(rt, n, q) {
 }
 
 // where a path comes near a track, per track: one stretch per approach within NEAR of its centre, [{ rt, sIn, sOut, sxIn,
-// sxOut, bIn (where it first comes within the band, or null), railsLen (metres within RAILS), minD, sides: [first, last],
-// flips, startsIn, endsIn }] (cached on the path)
+// sxOut, bIn (where it first comes within the band, or null), bParts (addPart), railsLen (metres within RAILS), minD,
+// sides: [first, last], flips, startsIn, endsIn }] (cached on the path)
 export function stretches(path, tracks) {
   if (path._gwStretches) return path._gwStretches;
   const out = [];
@@ -71,7 +85,7 @@ export function stretches(path, tracks) {
       if (n && n.d < NEAR) {
         const sd = Math.sign(side(rt, n, q)) || 1;
         if (!cur) {
-          cur = { rt, sIn: s, sOut: path.length, sxIn: n.s, sxOut: n.s, bIn: null, railsLen: 0, minD: n.d, sides: [sd, sd], flips: 0, startsIn: s === 0, endsIn: true };
+          cur = { rt, sIn: s, sOut: path.length, sxIn: n.s, sxOut: n.s, bIn: null, bParts: [], railsLen: 0, minD: n.d, sides: [sd, sd], flips: 0, startsIn: s === 0, endsIn: true };
           out.push(cur);
         }
         if (sd !== cur.sides[1] && n.d > 0.05) cur.flips++;
@@ -79,6 +93,7 @@ export function stretches(path, tracks) {
         cur.minD = Math.min(cur.minD, n.d);
         cur.sxOut = n.s;
         if (n.d < BAND && cur.bIn === null) cur.bIn = s;
+        addPart(cur.bParts, n.s, n.d < BAND ? n.s : null);
         if (n.d < RAILS) cur.railsLen += s - last;
       } else if (cur) {
         cur.sOut = s; cur.endsIn = false; cur = null;
@@ -113,10 +128,11 @@ export function wayStretches(seq, tracks) {
         prev.flips += st.flips + (prev.sides[1] !== st.sides[0] ? 1 : 0);
         prev.sides[1] = st.sides[1]; prev.dOut = dOut; prev.endsIn = st.endsIn; prev.sxOut = st.sxOut;
         prev.minD = Math.min(prev.minD, st.minD); prev.railsLen += st.railsLen;
+        for (const p of st.bParts) addPart(prev.bParts, p.lo, p.first, p.lo, p.hi);
         if (prev.dBand === null && st.bIn !== null) prev.dBand = piece.off + st.bIn;
         continue;
       }
-      out.push({ ...st, sides: [...st.sides], dIn, dOut, dBand: st.bIn === null ? null : piece.off + st.bIn, k: seq.indexOf(piece) });
+      out.push({ ...st, sides: [...st.sides], bParts: st.bParts.map((p) => ({ ...p })), dIn, dOut, dBand: st.bIn === null ? null : piece.off + st.bIn, k: seq.indexOf(piece) });
     }
   }
   for (const w of out) {
@@ -180,7 +196,7 @@ export function run(traffic = window.run.traffic, game = window.run.game) {
   }
 
   const checks = { waitInBody: { count: 0, at: [], depth: [], byRule: {} }, letGoInBody: { count: 0, at: [] },
-    skippedCross: { count: 0, at: [] }, skippedReach: { count: 0, at: [], depth: [] } };
+    skippedCross: { count: 0, at: [] }, skippedReach: { count: 0, at: [], depth: [] }, skippedRails: { count: 0, at: [] } };
   const kinds = { cross: 0, rails: 0, reach: 0, clear: 0 }, covered = { cross: 0, rails: 0, reach: 0, clear: 0 };
   let waits = 0, letGoLater = 0;
   const seenEntry = new Set(), seenWait = new Set();
@@ -213,9 +229,14 @@ export function run(traffic = window.run.traffic, game = window.run.game) {
         let kind = w.kind, rr = null;
         if (!kind) { rr = reach(seq, w); kind = rr.least < 0 ? 'reach' : 'clear'; }
         kinds[kind]++;
-        const cov = xs.some((x) => x.rt === w.rt && x.dC >= w.dIn - 1 && x.dC <= w.dOut);
+        // (given way: places on this approach whose stretches of track hold the s of every part of the route it comes into
+        // the band at; the loop before #602 had one point per place)
+        const here = xs.filter((x) => x.rt === w.rt && x.dC >= w.dIn - 1 && x.dC <= w.dOut);
+        const spansOf = (x) => x.spans || [{ lo: x.sx, hi: x.sx }];
+        const cov = here.length > 0 && w.bParts.every((p) => p.first === null || here.some((x) => spansOf(x).some((o) => o.lo - HOLDS <= p.first && p.first <= o.hi + HOLDS)));
         if (cov) covered[kind]++;
         if (!cov && kind === 'cross') { checks.skippedCross.count++; checks.skippedCross.at.push(place(q0.x, q0.y)); }
+        if (!cov && kind === 'rails') { checks.skippedRails.count++; checks.skippedRails.at.push(place(q0.x, q0.y)); }
         if (!cov && kind === 'reach') { checks.skippedReach.count++; checks.skippedReach.at.push(place(rr.where.x, rr.where.y)); checks.skippedReach.depth.push(r2(-rr.least)); }
       }
     }
@@ -256,11 +277,14 @@ export function run(traffic = window.run.traffic, game = window.run.game) {
       }
       // (let go once the tram's front is its length and 2 m past the crossing, past the far end of the stretch of track
       // it takes up since #602: the loop's onBody)
-      const tb = bodies(x.rt, (x.hi ?? x.sx) + len + 2, cars);
+      // (on each stretch of track the place takes up: the tram passes one at a time)
       let rel = Infinity, relAt = null;
-      for (let d = front - CAR_HALF; d <= x.g.dOut + CAR_HALF + 0.5; d += 0.5) {
-        const cb = carBox(wayAt(seq, d));
-        for (const b of tb) { const v = sep(cb, b); if (v < rel) { rel = v; relAt = d - (front - CAR_HALF); } }
+      for (const o of x.spans || [{ hi: x.sx }]) {
+        const tb = bodies(x.rt, o.hi + len + 2, cars);
+        for (let d = front - CAR_HALF; d <= x.g.dOut + CAR_HALF + 0.5; d += 0.5) {
+          const cb = carBox(wayAt(seq, d));
+          for (const b of tb) { const v = sep(cb, b); if (v < rel) { rel = v; relAt = d - (front - CAR_HALF); } }
+        }
       }
       if (rel < 0 && relAt <= LET_GO) { checks.letGoInBody.count++; checks.letGoInBody.at.push(place(car.x, car.y)); }
       else if (rel < 0) letGoLater++;

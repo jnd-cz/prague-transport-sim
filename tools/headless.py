@@ -235,7 +235,8 @@ def judge(check, r):
         more = (f"waits {c.get('waits')}: in a passing body {(c.get('waitInBody') or {}).get('count')} "
                 f"{(c.get('waitInBody') or {}).get('byRule')}, let go into it {(c.get('letGoInBody') or {}).get('count')} "
                 f"(further on {c.get('letGoLater')}); skipped entries crossing {(c.get('skippedCross') or {}).get('count')}, "
-                f"in the body's reach {(c.get('skippedReach') or {}).get('count')}; entries {c.get('entries')}, "
+                f"in the body's reach {(c.get('skippedReach') or {}).get('count')}, "
+                f"on the rails {(c.get('skippedRails') or {}).get('count')}; entries {c.get('entries')}, "
                 f"given way {c.get('covered')}; deepest {c.get('deepest')}")
     elif check == "traffic":
         st = r.get("stats") or {}
