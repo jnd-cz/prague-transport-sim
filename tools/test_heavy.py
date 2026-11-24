@@ -145,6 +145,18 @@ class Queue(unittest.TestCase):
     def test_the_same_variable_as_the_queue(self):
         self.assertEqual(heavy.HELD, baseline_store.HELD)
 
+    def test_night_starts_early_and_ends(self):
+        """#851: heavy.py --night on the user's word, --night off."""
+        on = subprocess.run([sys.executable, "-I", str(TOOLS / "heavy.py"), "--night"], env=self.env, capture_output=True,
+                            text=True, timeout=60)
+        self.assertEqual(on.returncode, 0, on.stderr)
+        self.assertRegex(on.stderr, r"the night starts now, until 07:00 .*0 jobs held for it")
+        self.assertTrue(os.path.exists(os.path.join(self.locks, "night.json")))
+        off = subprocess.run([sys.executable, "-I", str(TOOLS / "heavy.py"), "--night", "off"], env=self.env,
+                             capture_output=True, text=True, timeout=60)
+        self.assertIn("the early night ended", off.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.locks, "night.json")))
+
     def test_options_before_the_name(self):
         """#815: --expect DURATION and --no-limit beside --shared, in any order."""
         self.assertEqual(heavy.options(["--expect", "20m", "--no-limit", "--shared", "4,2", "x", "--", "c"], baseline_store.seconds),

@@ -433,6 +433,9 @@ def show(rs, issues, jobs, now):
                                       for j in baseline_store.schedule(jobs, now, free=baseline_store._free_gb(),
                                                                        parents=baseline_store.ticket_parents(jobs)))
                             if jobs else "none"))
+    if early := baseline_store.early_night(now):  # (#851: the night started early on the user's word)
+        print(f"Night started early on the user's word at {time.strftime('%H:%M', time.localtime(early['from']))}, "
+              f"until {time.strftime('%H:%M', time.localtime(early['until']))} (heavy.py --night off ends it)")
     if ends := baseline_store.recent_ends(now):  # (#815: what a job's watch ended in the last hour, and why)
         print("Ended by their watch (1 h): " + "; ".join(
             f"{r['what']} in {os.path.basename(os.path.normpath(r['root']))}, {ago(r['t'] + r['wall'], now)} ago "

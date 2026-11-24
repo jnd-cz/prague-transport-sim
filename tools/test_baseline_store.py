@@ -160,6 +160,13 @@ MACHINE = "b.HeavyJob.FREE = staticmethod(lambda: 40.0); b.HeavyJob.CORES = 8; b
 class DayAndNight(unittest.TestCase):
     """#851: by day a long job, or one of unknown time, waits for the night and stands ahead of none meanwhile; a short
     one goes before longer ones queued earlier, but not before one that has waited PASS_MAX."""
+    def setUp(self):  # (a lock folder of the test's own: no early night of this machine's, heavy.py --night)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        locks = mock.patch.object(baseline_store, "LOCKS", self.tmp.name)
+        locks.start()
+        self.addCleanup(locks.stop)
+
     def at(self, h, m=0):
         lt = time.localtime()
         return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, h, m, 0, 0, 0, -1))
@@ -230,6 +237,22 @@ class DayAndNight(unittest.TestCase):
         self.assertTrue(got["held"])
         self.assertEqual(got["t"], baseline_store.night_starts())
         self.assertEqual((back["held"], back["t"]), (False, j.t))
+
+    def test_the_night_started_early_on_the_users_word(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            noon = self.at(12)
+            self.assertFalse(baseline_store.night(noon))
+            e = baseline_store.start_night(noon)
+            lt = time.localtime(noon + 86400)
+            self.assertEqual(e["until"], time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 7, 0, 0, 0, 0, -1)))
+            self.assertTrue(baseline_store.night(noon + 60))
+            self.assertEqual(baseline_store.night_starts(noon + 60), noon + 60)
+            self.assertEqual(self.job(expect=2400).night_hold(noon + 60, []), "")
+            self.assertFalse(baseline_store.night(noon - 60))  # (not before it was started)
+            self.assertTrue(baseline_store.end_night())
+            self.assertFalse(baseline_store.night(noon + 60))
+            self.assertFalse(baseline_store.end_night())
+        self.assertEqual(baseline_store.morning(self.at(3)), self.at(7))
 
     def test_a_held_job_starts_when_the_night_comes(self):
         out, nights = io.StringIO(), iter([False, False, True])

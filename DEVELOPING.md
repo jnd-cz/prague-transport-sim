@@ -601,7 +601,9 @@ the pinned #291 and only proposes.
   runs (`heavy.py --history`); a chain named for the first time has none, so state it. While it waits it stands
   ahead of no other job, and the board shows it "held for the night". On the user's word it runs by day:
   `heavy.py --day`, or `TRAM_HEAVY_DAY=1` for a tool that takes its own turn; say so in the PR. A job already
-  running at 07:00 runs on.
+  running at 07:00 runs on. With the machine left free by day the user may start the night early: `heavy.py --night`
+  (until 07:00; `--night off` ends it) lets the held jobs take their turns, after the jobs running now, and the board
+  says so.
 - A waiting job of 10 min or less goes before longer ones queued earlier (the suites, a one-line run), but not
   before one that has waited 2 h (`baseline_store.rank`, `SHORT`, `PASS_MAX`). It still waits for the jobs running.
 - A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that

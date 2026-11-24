@@ -376,9 +376,60 @@ SHORT, PASS_MAX = 600.0, 7200.0  # (s: a waiting job this short goes before long
 
 
 def night(t=None):
-    """Whether `t` (epoch s, now when None) falls in the night's hours (NIGHT)."""
-    h = time.localtime(time.time() if t is None else t).tm_hour
-    return h >= NIGHT[0] or h < NIGHT[1]
+    """Whether `t` (epoch s, now when None) falls in the night's hours (NIGHT), or in a night the user started early
+    (early_night())."""
+    t = time.time() if t is None else t
+    h = time.localtime(t).tm_hour
+    return h >= NIGHT[0] or h < NIGHT[1] or early_night(t) is not None
+
+
+def _early_path():
+    return os.path.join(LOCKS, "night.json")
+
+
+def morning(t=None):
+    """The next NIGHT[1] o'clock after `t` (epoch s)."""
+    t = time.time() if t is None else t
+    lt = time.localtime(t)
+    m = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, NIGHT[1], 0, 0, 0, 0, -1))
+    if m <= t:
+        lt = time.localtime(t + 86400)
+        m = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, NIGHT[1], 0, 0, 0, 0, -1))
+    return m
+
+
+def early_night(t=None):
+    """The night the user started early (heavy.py --night, #851) as {"from", "until"} (epoch s) while `t` is in it,
+    else None."""
+    t = time.time() if t is None else t
+    try:
+        with open(_early_path(), encoding="utf-8") as f:
+            e = json.load(f)
+        return e if e["from"] <= t < e["until"] else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def start_night(now=None):
+    """The night from now until the morning, on the user's word (heavy.py --night): the jobs held for it take their
+    turns, as at NIGHT[0] o'clock. Returns its {"from", "until"}."""
+    now = time.time() if now is None else now
+    e = {"from": now, "until": morning(now)}
+    os.makedirs(LOCKS, exist_ok=True)
+    tmp = _early_path() + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(e, f)
+    os.replace(tmp, _early_path())
+    return e
+
+
+def end_night():
+    """The early night ended (heavy.py --night off); whether there was one."""
+    try:
+        os.remove(_early_path())
+        return True
+    except OSError:
+        return False
 
 
 def night_starts(t=None):
