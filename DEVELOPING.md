@@ -594,7 +594,12 @@ the pinned #291 and only proposes.
   names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
   started with a clean environment: a job never waits for a process that started it (#585). A job that waits
-  with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue.
+  with nothing running ahead of it but its own wrapper is a bug in the queue: stop it and open an issue. Such a
+  step's ticket names the job it runs in, and the queue counts it as that job's (`baseline_store.turns`, #844): a
+  shared chain stays shared while a tool of its runs as a step, its share the larger of its own and its steps'.
+  The board shows the step on its chain's line. (Before, a step that declared no share was a job alone running:
+  on 2026-11-24 three shared ground places waited 22 min beside #800's shared chain, during its
+  `street_profile` steps.)
 - A batch of heavy steps goes into the queue at its start. A loop that calls one heavy tool after another sends
   each step to the back of the queue, behind every job queued while the last one ran (the user, 2026-11-23: "even
   if it's bunch of 5 minute jobs"; #800's last of five 5-min street builds still waited at 14:17, nearly 4 h after
