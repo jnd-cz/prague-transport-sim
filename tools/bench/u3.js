@@ -78,6 +78,9 @@ export async function run(seed = 1, opts = {}) {
         also.forEach((w, i) => w.after(alsoBefore[i]));
         for (const [c, b] of lit) {
           if (!c.conn && c.lane === b.lane && b.front > -0.5 && c.toEnd - b.lane.light.back - 3.2 <= -0.5) c._atLine = { lane: b.lane, a: traffic.lightAspect(b.lane.light), go: c.lightGo === b.lane };
+          // (a lane whose line is at its start: the car crossed it coming onto the lane, judged by the aspect then; one that
+          // stood on it, past its line, for the next lane's red was counted on its own red when it went on, #566)
+          else if (c._atLine?.lane !== b.lane && b.age === 0 && b.front <= -0.5) c._atLine = { lane: b.lane, a: b.a, go: b.go };
         }
         for (const [c, b0] of lit) {
           if (!c.conn || c.lane !== b0.lane) continue;
