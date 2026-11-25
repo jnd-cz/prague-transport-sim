@@ -606,6 +606,10 @@ the pinned #291 and only proposes.
   says so.
 - A waiting job of 10 min or less goes before longer ones queued earlier (the suites, a one-line run), but not
   before one that has waited 2 h (`baseline_store.rank`, `SHORT`, `PASS_MAX`). It still waits for the jobs running.
+- Checkouts of different queue versions may order the waiting jobs differently, and then wait for each other: on
+  2026-11-25 three jobs did so for hours with nothing running (#854). From #854 on, a job that waits while none runs
+  for 2 min (`HeavyJob.STALL`) waits only for the jobs queued before it by time, the order every version keeps, and
+  says so once.
 - A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that
   names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
