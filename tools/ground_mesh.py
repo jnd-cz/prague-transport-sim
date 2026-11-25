@@ -1913,8 +1913,7 @@ def bed_edges(beds, outline):
         near = tree.query(inside, predicate="dwithin", distance=EDGE_APART)
         near = near[ref_owner[near] < k]  # (the outline, and the edges of earlier tracks; a track's own other edge is apart)
         if len(near):
-            others = shapely.union_all(ref[near])
-            inside = inside.difference(others.buffer(EDGE_APART, quad_segs=2))
+            inside, others = cut_back(inside, ref[near])
         else:
             others = None
         for g in shapely.get_parts(inside):
@@ -1929,6 +1928,15 @@ def bed_edges(beds, outline):
                 c = np.vstack(([ends[0]] if ends[0] else []) + [c] + ([ends[1]] if ends[1] else [])) if any(ends) else c
             out.append(shapely.LineString(c))
     return out
+
+
+def cut_back(line, others):
+    """A line less what lies within EDGE_APART of other lines, and those lines as one geometry: (the rest, the others).
+    The others merged where only two meet: the union leaves a node where a ring starts, and the buffer's coarse caps
+    there cut differently from its join; rasinovo-quay's small outline ring started at a corner 5 cm off a bed's edge in
+    the larger box, and the edge's end moved 0.25 mm, #812."""
+    others = shapely.line_merge(shapely.union_all(others))
+    return line.difference(others.buffer(EDGE_APART, quad_segs=2)), others
 
 
 def chunks(lines, most=64):

@@ -911,7 +911,10 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     took the plot first: line 22's river edge crossed that edge at (-928.0614, 105.3350) or 0.38 mm east. On the grid
     a chunk of terrain also opened by where its rings start, which float noise 300 m off chose: a needle 6 m long and
     0.5 mm wide along a plot's edge at stairs-beside-a-building in one box. The strips are opened in a normal form
-    without the grid, and come out on it without one.
+    without the grid, and come out on it without one. Where a ring starts goes by the box too, and a union keeps
+    that start as a node: a bed's edge cut back from the beds' outline (`bed_edges`) by a buffer with coarse caps at
+    the node ended 0.25 mm apart at rasinovo-quay, where a small ring started at the corner 5 cm off the edge in the
+    larger box. The lines it is cut back from are merged where only two meet (`cut_back`).
   - A ray from a wall line to the next wall crossing two of its segments at one point took the first by the tree's
     order: under the Magistrála a wall's top and foot lines lie over each other, and the strip beside hlavni-nadrazi's
     wall read 198.57 m in one box and 198.02 m in another (`wall_lines._side`). Of the heights crossed as near, the

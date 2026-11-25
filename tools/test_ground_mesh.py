@@ -1316,6 +1316,17 @@ class Rails(unittest.TestCase):
         # (the outer edges lie on the outline: no line of their own)
         self.assertFalse([g for g in gm.bed_edges(beds, outline) if g.bounds[0] < -1.9 or g.bounds[2] > 5.9])
 
+    def test_a_bed_edge_is_cut_back_the_same_wherever_the_outline_is_split(self):
+        # (rasinovo-quay, line 17: a bed's edge 5 cm off a corner of the beds' outline, (-732.837, -1495.619); the outline
+        # there whole, or split at that corner where its ring started in the larger box: the edge ended at
+        # (-732.8658, -1495.6556) or 0.25 mm off it, #812)
+        edge = shapely.LineString([(-732.9916, -1496.2), (-732.9702, -1496.1075), (-732.7483, -1495.1466), (-732.6921, -1495.0)])
+        path = [(-732.6903, -1495.1269), (-732.753, -1495.277), (-732.837, -1495.619), (-732.712, -1495.563), (-731.272, -1494.477)]
+        whole = gm.cut_back(edge, [shapely.LineString(path)])[0]
+        split = gm.cut_back(edge, [shapely.LineString(path[:3]), shapely.LineString(path[2:])])[0]
+        self.assertTrue(shapely.normalize(whole).equals_exact(shapely.normalize(split), 0.0))
+        self.assertLess(whole.distance(shapely.Point(-732.837, -1495.619)), gm.EDGE_APART + 1e-9)
+
     def test_a_point_off_the_rail_is_judged_at_the_rail(self):
         # (the outline's edge on the right rail: a point 0.5 mm past it lies outside, its foot on the rail on the edge;
         # it counts, at the rail's height)
