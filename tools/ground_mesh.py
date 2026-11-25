@@ -1991,10 +1991,9 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
         border = shapely.LineString(np.vstack([pts[keep], pts[:1]]))
     # (noded on the mm grid, snap-rounded: every face's vertex on the grid the file keeps, so no two vertices a hair
     # apart make slivers that collapse to zero-area triangles when rounded, line 37 had three edges used four times)
-    # (through the µm, as the pieces are, ground_partition.on_grid: a vertex half a mm off the grid went either way by
-    # its float noise)
-    noded = (shapely.union_all(shapely.set_precision(np.asarray([border] + parts, dtype=object), 1e-6), grid_size=1 / Q) if parts
-             else shapely.set_precision(border, 1 / Q))
+    # (not through the µm as the pieces are, ground_partition.on_grid: a segment passing a hot pixel's edge within a µm
+    # snapped through it or not by that rounding, and 388 of a square's 14,355 faces came out another way, #812)
+    noded = shapely.union_all([border] + parts, grid_size=1 / Q) if parts else shapely.set_precision(border, 1 / Q)
     faces = np.asarray(shapely.get_parts(shapely.polygonize(shapely.get_parts(noded))))
     if not len(faces):
         return faces

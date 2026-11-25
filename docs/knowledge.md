@@ -918,7 +918,9 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     half a mm, as an intersection of the data's own mm can lie, went to the mm on either side by the sign of its
     float noise: hlavni-nadrazi's plot at x 1051.2025000000003 and stairs-not-there's at y 1242.4725000000017 held a
     vertex 1 mm off its neighbour in one box only. Everything goes on the grid through the µm now
-    (`ground_partition.on_grid`, and tile_faces' lines).
+    (`ground_partition.on_grid`). Not tile_faces' lines: there a segment passing a hot pixel's edge within a µm snapped
+    through it or not by that rounding, and ohrada-cutting-walls had 23,748 triangles cut another than the written
+    file's for 8,441.
   - A ray from a wall line to the next wall crossing two of its segments at one point took the first by the tree's
     order: under the Magistrála a wall's top and foot lines lie over each other, and the strip beside hlavni-nadrazi's
     wall read 198.57 m in one box and 198.02 m in another (`wall_lines._side`). Of the heights crossed as near, the
