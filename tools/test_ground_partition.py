@@ -248,6 +248,23 @@ class Terrain(unittest.TestCase):
             self.assertAlmostEqual(b["new_area"], a["new_area"], places=6)
             self.assertEqual([round(g.area, 9) for _, g in b["remains"]], [round(g.area, 9) for _, g in a["remains"]])
 
+    def test_a_piece_along_the_tiles_cut_unites(self):
+        # (vinohradska-raised-corridor, line 9: a plot reaching past the edge of the box its tile's cover is cut to
+        # (y = -1464) and back twice; clip_by_rect's ring of it crossed itself there and the union failed, #812)
+        ring = [(2612.12, -1463.38), (2611.781, -1463.331), (2611.78, -1463.331), (2611.49, -1463.29), (2610.7, -1464.38),
+                (2610.79, -1464.71), (2608.584, -1464.545), (2608.52, -1464.54), (2608.555, -1464.444), (2608.66, -1464.16),
+                (2608.22, -1463.419), (2608.219, -1463.417), (2608.03, -1463.1), (2607.04, -1463.09), (2606.95, -1465.57),
+                (2606.4, -1465.539), (2606.4, -1458), (2630.4, -1458), (2630.4, -1466.977), (2626.91, -1466.74),
+                (2626.95, -1464.24), (2626.17, -1464.21), (2626.162, -1464.22), (2625.4, -1465.25), (2625.42, -1465.51),
+                (2623.25, -1465.36), (2623.262, -1465.276), (2623.3, -1465.02), (2622.7, -1464), (2622.402, -1464.007),
+                (2621.79, -1464.02), (2621.68, -1466.49), (2621.4, -1466.475), (2612.4, -1465.995), (2612.31, -1465.99),
+                (2612.468, -1463.467), (2612.47, -1463.43)]
+        piece = shapely.Polygon(ring)
+        self.assertFalse(shapely.clip_by_rect(piece, 2295, -1982, 2814, -1464).is_valid)
+        x, y = np.array([2296.0, 2813.0, 2813.0, 2296.0]), np.array([-1981.0, -1981.0, -1465.0, -1465.0])
+        r = gp.cut_terrain(x, y, np.array([[0, 1, 2], [0, 2, 3]]), [piece], shapely.box(2290, -1990, 2820, -1460), threads=1)
+        self.assertAlmostEqual(r["kept_area"] + r["new_area"], 517 * 516 - piece.intersection(shapely.box(2296, -1981, 2813, -1465)).area, places=2)
+
 
 class Water(unittest.TestCase):
     """WaterLevels (#632): a point's level from the banks of its own water it sees over the water, past no cut."""

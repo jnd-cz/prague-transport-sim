@@ -688,7 +688,9 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
             if not len(k):
                 return Polygon()
             k = k[np.argsort(prank[k], kind="stable")]
-            return polygonal(shapely.union_all(shapely.clip_by_rect(pg[k], *bx), grid_size=GRID))
+            # (cut to the box on the grid, not clip_by_rect: its ring of a piece running along the box's edge from one
+            # touch to another crossed itself, and the union failed, vinohradska-raised-corridor (2612.4, -1464))
+            return polygonal(shapely.union_all(shapely.intersection(pg[k], shapely.box(*bx), grid_size=GRID), grid_size=GRID))
     else:
         def cover_of(bb):
             return shapely.clip_by_rect(cover, *bb)
