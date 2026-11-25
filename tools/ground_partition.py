@@ -341,9 +341,17 @@ def thin_parts(terrain, width=STRIP):
             chunk = polygonal(shapely.set_precision(terrain.intersection(sq.buffer(THIN_MARGIN * width, join_style="mitre")), GRID))
             if chunk.is_empty:
                 continue
+            # (in a normal form and opened without the grid: the same chunk with its rings started elsewhere, as float
+            # noise 300 m off made it, opened on the grid to a needle 6 m long and 0.5 mm wide along a plot's edge in
+            # one box and to none in the other, stairs-beside-a-building (-2726.4, -1336.0), #812)
+            chunk = shapely.normalize(shapely.set_precision(chunk, 0.0))
             thin = chunk.difference(chunk.buffer(-width / 2).buffer(width / 2, join_style="mitre"))
             out.append(polygonal(shapely.set_precision(thin.intersection(sq), GRID)))
-    return polygonal(shapely.union_all(out, grid_size=GRID)) if out else Polygon()
+    # (its vertices on the grid but no grid of its own: GEOS keeps a geometry's grid, and an overlay whose first input
+    # has one snap-rounds to it. The plots that took strips had it, and the union of the classes over the water bent
+    # a survey edge to a plot's vertex 0.4 mm off it in the box where the union paired them so: line 22's water piece
+    # at (-928.0614, 105.3350) or 0.38 mm east, and the faces' lines with it, #812)
+    return shapely.set_precision(polygonal(shapely.union_all(out, grid_size=GRID)), 0.0) if out else Polygon()
 
 
 def thin_strips(terrain, plots, width=STRIP):

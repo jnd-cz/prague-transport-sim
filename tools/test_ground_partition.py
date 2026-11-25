@@ -159,6 +159,31 @@ class Strips(unittest.TestCase):
         self.assertAlmostEqual(r["area"], 4.0, places=3)
         self.assertAlmostEqual(plots[0]["g"].area, 104.0, places=3)
 
+    def test_a_plot_that_took_a_strip_has_no_grid_of_its_own(self):
+        # (the strip is on the grid, but GEOS's grid stays with a geometry: a union over the plot snap-rounded every
+        # piece in it, a survey vertex 0.3 mm off the grid moved to it, #812)
+        plots = [{"building": 0, "z": 0, "g": shapely.box(10, 0, 20, 10)}]
+        gp.thin_strips(shapely.box(0, 0, 30, 10).difference(shapely.box(0, 0, 9.6, 10).union(plots[0]["g"])), plots)
+        self.assertEqual(float(shapely.get_precision(plots[0]["g"])), 0.0)
+        survey = shapely.Polygon([(20.0003, 5), (20.0003, 15), (25, 15), (25, 5)])
+        U = shapely.union_all([plots[0]["g"], survey])
+        self.assertIn(20.0003, shapely.get_coordinates(U)[:, 0].tolist())
+
+    def test_strips_do_not_go_by_where_the_terrains_rings_start(self):
+        # (stairs-beside-a-building's terrain by a plot, on the grid: opened with the grid, a needle 6 m long and 0.5 mm
+        # wide along the plot's edge (-2726.399, -1336.031) to (-2725.6, -1344.2) for three of its ring's starts and none
+        # for the fourth, and float noise 300 m off chose which, #812)
+        ring = [(-2725.024, -1351.031), (-2725.64, -1351.031), (-2725.0, -1350.9), (-2725.6, -1344.2), (-2726.399, -1336.031),
+                (-2720.85, -1334.77), (-2719.02, -1342.41), (-2718.42, -1342.33), (-2717.75, -1342.83), (-2716.48, -1348.89)]
+        edge = shapely.box(-2727.4, -1345.0, -2724.9, -1335.5)
+        got = []
+        for k in range(4):
+            r = ring[k:] + ring[:k]
+            th = gp.thin_parts(shapely.Polygon(r + r[:1]))
+            self.assertLess(th.intersection(edge).area, 1e-6)
+            got.append(shapely.normalize(th))
+        self.assertTrue(all(g.equals_exact(got[0], 0.0) for g in got))
+
     def test_strips_read_their_tile_and_its_margin_alone(self):
         # (a footprint and a survey area 0.4 m apart across a tile's edge: the strip between them as the opening of the
         # whole terrain gives it, one piece across the edge; and the same strip whatever terrain lies beyond the margin,

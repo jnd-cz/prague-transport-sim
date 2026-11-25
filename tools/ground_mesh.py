@@ -1954,6 +1954,11 @@ def tile_faces(rect, lines_tree, lines, kept_tree, kept_tris):
     idx = lines_tree.query(R, predicate="intersects")
     parts = [shapely.clip_by_rect(lines[i], *rect) for i in idx.tolist()]
     parts = [g for g in parts if not g.is_empty]
+    # (in an order by place, not the tree's: noded on the grid, the union's grouping goes by its inputs' order, and with
+    # the box's lines the tree hands them over in another. A crossing computed another way rounded to the next mm:
+    # street-over-an-underpass had a street's point 0.6 cm apart in the two boxes, line 9 (-1488, -1526) 4 triangles, #812)
+    if parts:
+        parts = [parts[i] for i in np.argsort(ties.by_place(parts), kind="stable")]
     # (the border with every point a line meets it at, and every vertex within BORDER_NEAR of it put onto it, from the
     # lines of both squares beside it: snap-rounding nodes a line ending a hair from the border onto it, in the square
     # it lies in only; both borders must hold the same points, or they differ: a T-junction)

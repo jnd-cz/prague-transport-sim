@@ -92,6 +92,22 @@ class Street(unittest.TestCase):
         self.assertEqual(len(C.places), 2)
         np.testing.assert_allclose(C.at(np.array([30.0, 50.0]), np.array([5.0, 5.0])), 200.0, atol=1e-9)
 
+    def test_the_cut_is_looked_for_on_one_lattice_whatever_joins_the_passage(self):
+        # (an OSM tunnel way joining the underpass from far west, as a larger box takes it in: the cut under the road
+        # is the same, the lattice on STEP's grid and not from the passages' bounds, #812; from the bounds the
+        # raster's slot 27.3 to 32.6 had 11 columns alone and 10 with the way)
+        lidar = slot(27.3, 32.6)
+        way = shapely.LineString([(30, 15), (-4.75, 15)])
+        alone = covers.Covers(self.D, lidar)
+        joined = covers.Covers(self.D, lidar, ways=[way])
+        self.assertEqual(len(alone.places), 1)
+        self.assertEqual(len(joined.places), 1)
+        self.assertEqual(alone.places[0]["cut m2"], joined.places[0]["cut m2"])
+        x, y = np.meshgrid(np.arange(20.0, 40.0, 0.1), np.arange(-5.0, 18.0, 0.1))
+        off = shapely.distance(shapely.points(x, y), way.buffer(covers.WAY, cap_style="flat")) > covers.REACH + covers.TOUCH + 0.1
+        self.assertGreater(off.sum(), 10000)  # (round the way the cover holds by it too, a passage)
+        np.testing.assert_array_equal(np.isnan(alone.at(x, y))[off], np.isnan(joined.at(x, y))[off])
+
     def test_iprs_reader_with_the_covers(self):
         from types import SimpleNamespace
         lidar = slot(27, 33)

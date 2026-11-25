@@ -905,9 +905,22 @@ Sections (`tools/test_readme.py` holds this list to the headings):
       and towards its triangle a corner on the outline read beside it (teeth of 7 cm at modranska-skola-ramp).
   - `meet_raised` weighed the edge per corner: its 8 nearest were copies of one point (12 corners, 1 mm apart),
     which by the KD tree's order. It weighs points now.
-  Still box-wide: the covers over passages (`covers.Covers`: a passage merges with those the box holds, its cut
-  lattice starts at its bounds; lattice-cell's one ring held one cover of 153 m², its two rings three of 273 m²,
-  none in the middle tile). street-over-an-underpass, the cover in its middle tile, is the same in both builds.
+  - GEOS keeps a geometry's grid (`set_precision`, `grid_size`), which its WKB does not carry, and an overlay with
+    such an input snap-rounds to it. The thin strips, on the 1 mm grid, gave it to the plots they joined, and the union
+    of the classes over the water bent a survey edge to a plot's vertex 0.4 mm off it in the box where its pairing
+    took the plot first: line 22's river edge crossed that edge at (-928.0614, 105.3350) or 0.38 mm east. On the grid
+    a chunk of terrain also opened by where its rings start, which float noise 300 m off chose: a needle 6 m long and
+    0.5 mm wide along a plot's edge at stairs-beside-a-building in one box. The strips are opened in a normal form
+    without the grid, and come out on it without one.
+  - A ray from a wall line to the next wall crossing two of its segments at one point took the first by the tree's
+    order: under the Magistrála a wall's top and foot lines lie over each other, and the strip beside hlavni-nadrazi's
+    wall read 198.57 m in one box and 198.02 m in another (`wall_lines._side`). Of the heights crossed as near, the
+    strip takes the one its middle's raster stands nearest, as it chooses between the line's own and the next's.
+  - The covers over passages (`covers.Covers`) looked for the raster's cut on a lattice from the passages' bounds, and
+    a passage merges with those the box holds (lattice-cell's one ring held one cover of 153 m², its two rings three of
+    273 m²): with a passage joining from a larger box the lattice moved, and the cut with it. The lattice is on STEP's
+    grid now. Still read past the ring: a cut connected along a passage is labelled whole, so a passage only a larger
+    box holds can join its cut and decide whether it is a slot (none measured).
 - **Where walls stand** (#697, measured 2026-11-19 on the five lines; the user: "can we use the open data sources to
   infer where walls should really stand as opposed to blending between the different height points?"). Four sources,
   best first:

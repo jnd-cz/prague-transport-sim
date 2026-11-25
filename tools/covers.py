@@ -153,8 +153,11 @@ class Covers:
             if not len(tris):
                 continue
             place = {"tris": tris, "tree": shapely.STRtree(shapely.polygons(tris[:, [0, 1, 2, 0], :2]))}
+            # (on STEP's grid, not from the passages' bounds: a larger box takes in a passage joining this one, and from
+            # its bounds the lattice moved and the cut with it, hlavni-nadrazi-under-the-magistrala's lidar 3.4 cm, #812)
             x0, y0, x1, y1 = near.bounds
-            X, Y = np.meshgrid(np.arange(x0, x1 + STEP, STEP), np.arange(y0, y1 + STEP, STEP))
+            X, Y = np.meshgrid(np.arange(np.floor(x0 / STEP), np.ceil(x1 / STEP) + 1) * STEP,
+                               np.arange(np.floor(y0 / STEP), np.ceil(y1 / STEP) + 1) * STEP)
             k = shapely.contains_xy(near, X.ravel(), Y.ravel())
             d = np.full(X.size, np.nan)
             with np.errstate(invalid="ignore"):
