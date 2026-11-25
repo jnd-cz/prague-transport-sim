@@ -333,7 +333,12 @@ UNDER_OFF = 0.20      # m: an older record this far under the lidar (archive_bef
                       # too, off structures, DI lies with the lidar at 694 of 725 such samples on paved track (within
                       # 0.1 m of it at 90 %, median -0.1 cm), even where the survey agrees with the archive (176 of 184),
                       # and at 868 of 871 where the construction is unknown
-BESIDE = 7.0          # m: a track this near a stretch the lidar took lies in the same street (NEIGHBOUR_GAP's far side)
+SURVEY_WITH = 0.05    # m: on paved track SOURCES_EDGE to UNDER_OFF under the lidar, a record whose bin's survey lies this
+                      # near it gives way too: there the survey is no second witness but the same street's old level, DI
+                      # lying with the lidar at 668 of 686 such samples (97.4 %; staged 2026-11-23, #539). Without the
+                      # survey alongside, DI sides with the lidar at 89 % of that band, whether the street beside the
+                      # track lies level with it (241 of 272) or falls away across it (1,743 of 1,927): no rule there
+BESIDE = 7.0         # m: a track this near a stretch the lidar took lies in the same street (NEIGHBOUR_GAP's far side)
 OVER_KINDS, UNDER_KINDS = {'paved'}, {'paved', 'unknown'}  # (the constructions each side holds on: over the lidar, DI
                       # sided with it at 23 of 52 samples of unknown construction, a ballast bed standing over the bare
                       # earth; open track has no DI heights to calibrate against)
@@ -445,7 +450,8 @@ def archive_before_lidar(chs):
       ballast bed on its own body, small bridges nothing marks).
     - Under: on paved track and track of unknown construction (UNDER_KINDS). Rails lie in the street's surface or over
       the bed, so they cannot lie a fifth of a metre under the lidar between them (the user, 2026-11-14, on Bělohorská:
-      the track "doesn't sit lower"). Calibrated as over: UNDER_OFF.
+      the track "doesn't sit lower"). Calibrated as over: UNDER_OFF. On paved track a stretch from SOURCES_EDGE under
+      it counts where the bin's survey keeps to the record (SURVEY_WITH): the two are the street's old level.
     A track within BESIDE m of a stretch taken lies in the same street: where its own archive lies more than SOURCES_EDGE
     off the lidar the same way, it goes with it (no rail stays under its neighbour's bed).
     Not a record of the lidar's year or later (a track rebuilt since the flight stands off it by right), nor one without
@@ -458,7 +464,11 @@ def archive_before_lidar(chs):
                 and not STRUCTURE_FLAGS & set(x.get('flags') or ()) and not (STEP_ANSWERS and step_answer_at(x['xy'])))
 
     def level(run):
-        return all(abs(q['terrain'] - p['terrain']) <= MAX_GRADE * (q['s'] - p['s']) for p, q in zip(run, run[1:]))
+        # (over the distance between the bins' samples, whose positions the lidar is read at, where it is longer than
+        # between the bins' middles: on Mariánské hradby, line 22, two samples 8 m apart rose 0.54 m, 6.8 %, and the
+        # 5 m between their bins made it a step of 11 %; the stretch, 0.20-0.36 m under the lidar, stayed)
+        return all(abs(q['terrain'] - p['terrain']) <= MAX_GRADE * max(q['s'] - p['s'], math.dist(p['xy'], q['xy']))
+                   for p, q in zip(run, run[1:]))
     taken = {}  # (chain, bin's index in its sorted bins): the bin
     for sign, least, kinds in ((1, SOURCES_OFF, OVER_KINDS), (-1, UNDER_OFF, UNDER_KINDS)):
         tracks = []  # per chain: its bins along it, and each one's archive off the lidar this way (False: not this rule's)
@@ -482,7 +492,14 @@ def archive_before_lidar(chs):
             return b, new
         fresh = []
         for ci, (bins, off) in enumerate(tracks):
-            core = lambda i: off[i] is not False and least < off[i] < SOURCES_CAP  # noqa: E731
+            def core(i, bins=bins, off=off):
+                if off[i] is False:
+                    return False
+                if least < off[i] < SOURCES_CAP:
+                    return True
+                x = bins[i]   # (under the lidar by less, on paved track: where the survey keeps to the record, SURVEY_WITH)
+                return (sign < 0 and SOURCES_EDGE < off[i] and x['kind'] == 'paved' and x.get('survey') is not None
+                        and abs(x['survey'] - x['archive']) <= SURVEY_WITH)
             k = 0
             while k < len(bins):
                 if not core(k):
