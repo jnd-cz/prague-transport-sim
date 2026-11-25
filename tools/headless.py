@@ -301,9 +301,13 @@ def counts(check, r):
         return {"error": 1}
     if check == "u3":
         j = r.get("carsIntoJunctions") or {}
+        w = r.get("waits") or {}  # (#560: chain heads by kind, circles let go by class, through a tram broken, given up)
         return {"stuck": None if r.get("stuck") is None else round(r["stuck"]), "hits": r.get("hits") or 0,
                 "red": j.get("red", 0), "signalPenalty": r.get("signalPenalty") or 0, "yielded": r.get("yielded"),
-                "closeCuts": r.get("closeCuts"), "green": j.get("green"), "amber": j.get("amber")}
+                "closeCuts": r.get("closeCuts"), "green": j.get("green"), "amber": j.get("amber"),
+                **{"heads " + k: (w.get("chainHeads") or {}).get(k, 0) for k in ("car", "light", "tram", "our tram", "walker")},
+                **{"let go " + k: (w.get("circlesLetGo") or {}).get(k, 0) for k in ("rules", "followers", "tangled")},
+                "cyclesBroken": w.get("cyclesBroken", 0), "givenUp": w.get("givenUp", 0)}
     if check == "redruns":
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     if check in STOPS_LIKE:
