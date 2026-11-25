@@ -73,6 +73,17 @@ class Causes(unittest.TestCase):
             self.assertEqual(r["cause"], "outline flat", classes)
             self.assertTrue(np.isnan(r["street"]))
 
+    def test_a_strip_at_a_walls_foot_reads_the_walls_kerb(self):
+        # an island 1.8 m wide at the foot of a 2 m wall: IPR past its reading on the island rises with the wall, and
+        # the kerb it reads is the wall's spread (line 17's islands at the retaining walls, #800); a kerb the ground
+        # has spread over the row is still a ramp
+        wall = lambda x, y: step(0.15)(x, y) + 2.0 * (np.asarray(y, float) > 1.8)  # noqa: E731
+        r = self.one(step(0.01), wall, classes=("road", "island"))
+        self.assertEqual(r["cause"], "beside a wall")
+        self.assertAlmostEqual(r["beyond"], 2.0)
+        self.assertEqual(self.one(step(0.12, at=-0.5, width=1.0), wall, classes=("road", "island"))["cause"], "ramp")
+        self.assertEqual(self.one(step(0.01), step(0.15), classes=("road", "island"))["cause"], "outline flat")
+
     def test_the_raised_side_is_found_whichever_way_the_row_runs(self):
         # the raised area on the route's right, the pair recorded raised first: the kerbs keep their sign
         ground, lidar = (lambda x, y: step(0.03)(x, -np.asarray(y))), (lambda x, y: step(0.15)(x, -np.asarray(y)))
@@ -91,8 +102,8 @@ class Causes(unittest.TestCase):
         rows = kc.sort_sites(sites, LINE, ground, lidar, street_of(ground), plat)
         self.assertEqual([r["platform"] for r in rows], [True, False])
         t = kc.table({"9": rows, "17": []})
-        self.assertEqual(t[2], "| 9 | 2 | 0 | 2 | 0 | 0 | 0 |")
-        self.assertEqual(t[-1], "| all | 2 | 0 | 2 | 0 | 0 | 0 |")
+        self.assertEqual(t[2], "| 9 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |")
+        self.assertEqual(t[-1], "| all | 2 | 0 | 0 | 2 | 0 | 0 | 0 |")
 
     def test_no_samples(self):
         self.assertEqual(kc.sort_sites([], LINE, step(0), step(0), street_of(step(0))), [])

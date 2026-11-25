@@ -19,6 +19,7 @@ const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
 const PHASE_HOLD = 10;        // s: the most a junction holds its phase for each tram committed to it (_runController)
 
 import { rng } from './random.js';
+import { carTypeOf } from './carTypes.js';
 import { Feeding } from './electric.js';
 import { platformsOf, stopOf } from './platformRules.js';
 
@@ -700,7 +701,10 @@ export class Game {
       if (this.switches.some((w) => Math.abs(w.s - s) < 30) || this.signals.some((g) => Math.abs(g.cross - s) < 40)) continue;
       const type = this.rand() < 0.5 ? 'parked' : 'pedestrian';
       // (its look, one of eight, drawn here as when its model was made here; turn: its heading against the track's)
-      this.obstacles.push({ type, model: Math.floor(this.rand() * 8), s, lat: type === 'parked' ? -1.5 : -6, turn: 0, state: 'idle', timer: 0, rung: false, speed: 1.3 });
+      const ob = { type, model: Math.floor(this.rand() * 8), s, lat: type === 'parked' ? -1.5 : -6, turn: 0, state: 'idle', timer: 0, rung: false, speed: 1.3 };
+      // a parked car's type (#250): its half length and width, numbered past the traffic's ids and the signal scenes'
+      if (type === 'parked') { ob.carType = carTypeOf(0x50000000 + i); ob.half = ob.carType.length / 2; ob.halfW = ob.carType.width / 2; }
+      this.obstacles.push(ob);
     }
     // jaywalkers at some unsignalised pedestrian crossings, none on the road under a bridge (the build's answer:
     // tools/network.py over_bridge. Asked here, the ground under the span was past the window at Start, #823)
@@ -1262,8 +1266,12 @@ export class Game {
         sig.spawn = 3 + this.rand() * 4;
         const dir = X.oneway || (this.rand() < 0.5 ? 1 : -1);
         const start = dir > 0 ? 0 : X.length;
-        // (its look from the signal's own counter, not the run's stream; drawn by src/gameView.js on the street's right side)
-        if (!sig.cars.some((c) => c.dir === dir && Math.abs(c.s - start) < 9)) sig.cars.push({ s: start, dir, model: sig.seed++, v: 0 });
+        // (its look and its type, #250, from the signal's own counter, not the run's stream, the type numbered past the
+        // traffic's ids; drawn by src/gameView.js on the street's right side)
+        if (!sig.cars.some((c) => c.dir === dir && Math.abs(c.s - start) < 9)) {
+          const type = carTypeOf(0x40000000 + sig.seed);
+          sig.cars.push({ s: start, dir, model: sig.seed++, v: 0, type, half: type.length / 2 });
+        }
       }
     }
     for (const car of sig.cars) {
@@ -1276,14 +1284,15 @@ export class Game {
       const waiting = toX > 3.5 && toX < 12 && (red || tramComing);
       // queue behind the car in front
       let gap = Infinity;
-      for (const o of sig.cars) if (o !== car && o.dir === car.dir && (o.s - car.s) * car.dir > 0) gap = Math.min(gap, (o.s - car.s) * car.dir - 4.4);
+      for (const o of sig.cars) if (o !== car && o.dir === car.dir && (o.s - car.s) * car.dir > 0) gap = Math.min(gap, (o.s - car.s) * car.dir - o.half - car.half);
       const vt = waiting ? 0 : Math.min(9, Math.max(0, (gap - 3) * 0.9));
       car.v = vt > car.v ? Math.min(vt, car.v + dt * 2.5) : Math.max(vt, car.v - dt * 6);
       car.s += car.dir * car.v * dt;
       // a hit: the car inside the tram's body on the crossing (its front plus the car's half width), not
-      // the 4 m ahead in which drivers see it coming (a car 4 m ahead counted, line 9 seed 7, #268)
+      // the 4 m ahead in which drivers see it coming (a car 4 m ahead counted, line 9 seed 7, #268); within its half
+      // length and 0.1 m of the crossing point (2.3 m for every car before #250)
       const inBody = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 1;
-      if (Math.abs(toX) < 2.3 && inBody && tram.v > 0.2 && !car.hit) {
+      if (Math.abs(toX) < car.half + 0.1 && inBody && tram.v > 0.2 && !car.hit) {
         car.hit = true;
         this._collision(t('obj.crossingCar'));
       }
@@ -1326,8 +1335,11 @@ export class Game {
           if (Math.abs(ob.lat) > 7) ob.state = 'gone';
         }
       }
-      // collision with tram body
-      if (ob.state !== 'gone' && Math.abs(ob.lat) < 1.55 && ob.s <= tram.s + 0.2 && ob.s >= tram.s - tram.length) {
+      // collision with tram body (a parked car: from its rear to its front, its middle within 0.65 m and its half width of
+      // the track centre, 1.55 m for the 1.8 m box car; a walker: where it is. Before #250 only a car's middle counted: the
+      // tram ran 2.2 m into it without a collision)
+      const hl = ob.half ?? 0, hw = ob.halfW !== undefined ? 0.65 + ob.halfW : 1.55;
+      if (ob.state !== 'gone' && Math.abs(ob.lat) < hw && ob.s - hl <= tram.s + 0.2 && ob.s + hl >= tram.s - tram.length) {
         if (tram.v > 0.15 || ob.type === 'pedestrian') {
           ob.state = 'gone';
           this._collision(t(ob.type === 'parked' ? 'obj.parkedCar' : 'obj.pedestrian'), ob.type === 'pedestrian' ? 500 : 300);
