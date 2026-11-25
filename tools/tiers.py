@@ -65,7 +65,7 @@ KINDS = [
                     "src/game.js", "src/people.js", "src/streetbot.js", "src/route.js", "src/speedRules.js",
                     "src/consist.js", "src/articulated.js", "src/random.js", "src/geo.js", "src/main.js", "src/run.js",
                     "tools/traffic_lint.js", "tools/autopilot.js", "tools/bench/*", "src/trafficView.js", "src/platformRules.js",
-                    "src/carTypes.js"),
+                    "src/carTypes.js", "src/passengers", "src/passengers/*"),
      f"--checks {SEEDED} on every line, seeds 1-5, --compare; the tram or the autopilot: also test_traction, "
      "test_electric, test_drives", "the geometry checks"),
     ("tool", ("tools/*",), "the changed tools' tests (tools/test_<tool>.py); the whole suite before the PR is ready", ""),
