@@ -44,6 +44,7 @@ načte ve hře, i se vzorkem přidaným jen jako složka.
 | `fleet` | evidenční čísla, pod kterými jeho soupravy jezdí (#527): `types`, pro každý typ (např. `T3SUCS`) jeho `ranges` `[první, poslední]` s `except` (díry), nebo `list`; `sets`, dvojice, které jezdí spolu a s žádným jiným vozem, ale každý z vozů může jezdit sám, kde linka jezdí sólo vozy, a jeho druhý vůz je pak volný pro jiný sólo vůz (souprava mimo seznam jsou dvě čísla jednoho typu); `liveries`, číslo → id nátěru (#529). Jízda je rozdává (`src/vehicles.js` `FleetDealer`): balíček všech čísel zamíchaný semínkem jízdy, takže každý typ přijde na řadu tak často, kolik má čísel, žádné dvakrát na ulici, a vrací se, když souprava odjede; naše tramvaj jezdí jako hráčova oblíbená souprava z menu, jinak jako T3SUCS rozdaná stejně, a žádná cizí tramvaj její čísla nedostane. Rozdávání kontroluje `tools/test_fleet.py` |
 | `slots` | sloty nátěru vozidla z glTF (#529): jméno slotu a materiály, které barví, např. hybridovy `body` (`Red_Hull`) a `band` (`Beige`, `Beige_wbackface`); načítač s rigem nechává jejich díly zvlášť (i s uv), aby jim nátěr mohl dát texturu nebo barvu |
 | `colours` | model barvený barvami: jména barev, které nátěr smí nahradit (vestavěného vozu `body`, `band`, `roof`) |
+| `passengers` | model ukazuje své cestující (*Cestující*, níže): `cabin`, id jeho kabiny `assets/passengers/<id>-cabin.json`, změřené z tohoto modelu; `accepted`, kdo ji přijal, kdy a kde |
 
 **glTF úrovně 1** nepotřebuje kód: nehybný model v metrech, počátek v rovině kolejnic uprostřed mezi čepy
 podvozků, +Y nahoru, čelem k `forward`; čepy má podle svého typu. Menu ho nabídne, při výběru se načte a
@@ -201,6 +202,35 @@ Co model umí nabídnout a co mu hra řídí. Model uvede svou úroveň; víc po
 
 Nezávisle na úrovních může model mít **úrovně podle vzdálenosti**: plnou u kamery a lehčí (sloučené díly, bez
 interiéru) pro vzdálené cizí tramvaje, jako podrobný model.
+
+## Cestující
+
+Cestující (#249) se simulují podle typu vozidla a kreslí podle modelu. **Simulace** běží s kabinou typu pro každou
+soupravu toho typu, ať je nakreslená jakýmkoli modelem, takže jízda se stejným semínkem napočítá totéž, ať si hráč
+vybere cokoli: kabina T3 je `assets/passengers/t3-cabin.json` (24 sedadel a 81 míst k stání, 105 vidět na vůz; nad ně
+se až do nejvyššího obsazení cestující jen počítají), fronty u jejích dveří určují čas v zastávce (`src/passengers/`,
+[knowledge.md](knowledge.md), *The passengers at a stop*). **Kreslí** se jen u modelu s funkčními dveřmi a interiérem
+(uživatel, 25. 11. 2026: „I would offer passenger simulation to vehicles which have functional door and interior"):
+jeho dveře se hýbou (`moves`), jeho rig jmenuje salon a jeho manifest v `passengers` jmenuje kabinu změřenou z právě
+tohoto modelu (`assetSha256` kabiny je soubor modelu), kterou uživatel přijal. Všechny čtyři věci kontroluje
+`tools/test_vehicles.py`. Dnes je ukazuje podrobný model; klasický a vestavěný ne.
+
+Jak model k cestujícím přijde:
+
+1. **Jeho kabina z jeho modelu:** `python -P -E tools/cabin.py --model assets/<id>/<model>.glb` na něm pustí přípravu
+   z dílny cestujících (sedadla z jejich dílů, dveře a jejich schody z podlahy, vyloučení kabiny řidiče, mřížka podlahy
+   po 2 cm, rozmístění stojících; jména dílů podle dílny, `tools/cabin/`, nebo příprava naučená jména modelu)
+   a `--packing` hledá hustší rozmístění (#249, krok 1).
+2. **U T3 proti plánu T3:** `assets/passengers/t3-cabin.json` je půdorys a rozmístění sedadel T3. Sedadla, dveře, schody
+   a výška podlahy nového modelu T3 vyjdou tam, kde jsou v plánu, nebo je rozdíl na modelu, aby ho vysvětlil či opravil.
+3. **Kontroly:** `tools/cabin.py --timing` a `--alight` (každé rozmístění naplněné a vyprázdněné, 10 ven / 10 dovnitř,
+   oba proudy všech dveří, žádné místo dvakrát, počty sedí; plný vůz se s tempem hry vyprázdní dřív, než se naplní),
+   `tools/test_passengers.py`.
+4. **Uživatel přijme** ukázaná místa (k sezení a k stání); `tools/cabin.py --game` zapíše kabinu a manifest ji jmenuje
+   v `passengers` s přijetím.
+
+**Jiný typ vozidla** začíná také krokem 1: znovu změřit a rozhodnout jeho místa k sezení a stání; pro simulaci
+přinese svou vlastní kabinu.
 
 ## Přidání vozidla
 

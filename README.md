@@ -46,6 +46,9 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
   je 24 sedadel a 81 míst k stání; kdo nastoupí nad těchto 105, toho vůz jen počítá (až do 160). Asi pětina
   nastupujících zůstane stát, i když je volno; uvolněná sedadla zaberou stojící, kteří chtějí sedět, i za jízdy. Kdo už je na schodech,
   když zavřete dveře, projde; ostatní zůstanou na zastávce, a kdo nestihl vystoupit, vystoupí na další.
+  S podrobným modelem tramvaje (výchozím) jsou cestující vidět: okny sedí a stojí ve voze, po schodech vystupují a
+  nastupují, čekající jdou z nástupiště ke dveřím a v pravém zrcátku uvidíte, kdo ještě nastupuje. Ty nad 105 vůz jen
+  počítá a vidět jsou jen na schodech a venku.
 - Změna linky: spoj může na trase linky a na konečné změnit číslo (linka 9 pokračuje na Nákladovém nádraží Žižkov jako 10):
   všichni vystoupí, přepnou se směrové tabule i údaje na obrazovce a tramvaj odjíždí jako 10.
 

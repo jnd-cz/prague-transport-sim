@@ -1335,6 +1335,16 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   The departures' mean delay (seeds 1–5, against main at 573d129): line 9 45 → 71 s, 17 117 → 186 s, 22 92 → 187 s (on time by
   D 1/2 0.91 → 0.50), 37 41 → 82 s; line 23 inside main's spread (its exchanges 16.5 s on average). The user, 2026-11-25: keep the
   queues' time; the drive between the stops is its own matter (most of the delay is there on arrival).
+- **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
+  is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
+  model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body
+  and are hidden with it in the cab view and drawn with it in the mirror; on the platform they are in the world on the car's frame
+  without its lean. The lab's clips at the core's phase (Sit, TramStepUp, TramStepDown, sitting down blended from Idle) and on the
+  steps its two-bone legs (thigh 0.43 m, shin 0.41 m). The distant ones on a car in its own batches, standing and seated
+  (`person-seated-far.glb`). A boarder walks to the queue at 1.3 m/s from the nearest place of the stop crowd, which then stays
+  empty (the core has them queued at once: drawn only); an alighter walks on 3 s after the core lets them go. The cabin's
+  platform is the game's, 0.18 m over the rail (`tools/cabin.py --game`). A run counts the same with and without the figures
+  (`tools/test_people.py`).
 - **Where the traction's energy goes** (#351, `--checks stops`: lineKWh, wasteKWh, brakeKWh; `tools/test_drives.py` in Wh): the
   starting resistors take 36 % of what the wire gives on a level test drive and 78 % holding 15 km/h in a slow street, almost all
   of it pulling away. Coasting 1 m/s under the limit before pressing again on step 3 (the drivers' "few presses, hard") cut the

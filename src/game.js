@@ -1035,6 +1035,7 @@ export class Game {
       const carry = this.pax.toAlight;
       st.alight = carry + this.pax.alight(Math.round((this.pax.aboard - carry) * st.alightFrac));
       this.pax.board(st.waiting, st.i);
+      st.boarders = st.waiting; // (how many waited when the tram came: the stop crowd's places, src/gameView.js)
     }
     // the exchange through the open doors is the passengers' own (src/passengers/consist.js); with the set full and everybody
     // off, those left wait for the next tram
