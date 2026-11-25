@@ -5,7 +5,9 @@ load with their skeleton and clips, and on a synthetic crowd of 100 walkers in a
 become animated figures (at most 64, in within 80 m, out beyond 88 m; the full figure within 40 m, the
 simplified one further out, which must be the far figure's body unbaked), walk or run by their speed and
 keep the crowd's shirt colours, with hair colours and styles of their own; the rest go to the far batch and
-the box crowd is hidden. Part 2, in the game (needs data/lineN.json; skipped without): after a short autopilot drive the
+the box crowd is hidden. Each animated figure is one draw call, and only people in view are animated: with
+the camera turned away from the row, none; with the right mirror's camera looking along it, those within 50 m of
+the mirror, as the simplified figure, one draw call each in its picture. Part 2, in the game (needs data/lineN.json; skipped without): after a short autopilot drive the
 walkers and the stop crowd are drawn by figures, the box meshes are on the hidden layer, and ?boxpeople
 leaves the box figures."""
 import argparse
@@ -33,13 +35,15 @@ SYNTHETIC = """async () => {
   let bones = 0, tris = 0, farTris = 0;
   assets.near.scene.traverse((o) => { if (o.isSkinnedMesh) bones = Math.max(bones, o.skeleton.bones.length); if (o.isMesh) tris += o.geometry.index.count / 3; });
   assets.far.scene.traverse((o) => { if (o.isMesh) farTris += o.geometry.index.count / 3; });
-  const people = new People(new THREE.Scene(), assets);
+  const scene = new THREE.Scene(), people = new People(scene, assets);
   const N = 100, crowd = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, 1.7, 0.3), new THREE.MeshBasicMaterial(), N);
   const slots = [], m = new THREE.Matrix4(), red = new THREE.Color(0xc03020);
   const row = (x0, gap, dx = 0) => { for (let i = 0; i < N; i++) { m.makeTranslation(x0 + gap * i + dx, 0, 0); crowd.setMatrixAt(i, m); } };
   for (let i = 0; i < N; i++) { crowd.setColorAt(i, red); slots.push({ i }); }
   const game = { clock: 0, runners: [], obstacles: [], action: null }, gameView = { game, crowd: null, driver: null, meshOf: () => null };
-  const cam = new THREE.PerspectiveCamera();
+  // (the game's field, looking along +X at the row: only people in view are animated)
+  const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.1, 2000);
+  cam.rotation.set(0, -Math.PI / 2, 0);
   const look = (x, clock) => { cam.position.set(x, 1.6, 0); cam.updateMatrixWorld(); game.clock = clock; people.sync(cam, { crowd, traffic: { slots } }, gameView); };
   const motions = () => { const k = {}; for (const f of people.near.values()) k[f.motion] = (k[f.motion] || 0) + 1; return k; };
   const out = { bones, tris, farTris, clips: assets.near.animations.map((c) => c.name).sort() };
@@ -51,9 +55,16 @@ SYNTHETIC = """async () => {
   row(1, 2, 0.6); look(0, 2.0); out.walk = motions(); // 0.6 m in 0.5 s: walking
   row(1, 2, 2.1); look(0, 2.5); out.run = motions();  // 1.5 m in 0.5 s: running
   const f = people.near.values().next().value;
-  out.shirt = f.mats.shirt.color.getHex() === red.getHex();
+  out.shirt = f.u.shirt.value.getHex() === red.getHex();
   row(1, 0.5); look(0, 3.0); out.cap = { ...people.stats }; // all 100 within 51 m: the cap
-  out.hairColours = new Set([...people.near.values()].map((f) => f.mats.hair.value.getHex())).size;
+  out.hairColours = new Set([...people.near.values()].map((f) => f.u.hair.value.getHex())).size;
+  // one draw call a figure, one for the far batch (three a figure before: the shirt, the trousers, the rest)
+  const ren = new THREE.WebGLRenderer(); ren.setSize(320, 180);
+  ren.info.reset(); ren.render(scene, cam); out.capCalls = ren.info.render.calls;
+  ren.dispose();
+  // turned away from the row: none animated but within the margin behind the camera; and back
+  cam.rotation.set(0, Math.PI / 2, 0); look(0, 3.5); out.away = { ...people.stats };
+  cam.rotation.set(0, -Math.PI / 2, 0); look(0, 4.0); out.back = { ...people.stats };
   const count = (a) => a.array.reduce((s, v) => s + v, 0);
   let nearHair = 0;
   assets.near.scene.traverse((o) => { if (o.isMesh && o.geometry.attributes.hairMask) nearHair = count(o.geometry.attributes.hairMask); });
@@ -69,6 +80,17 @@ SYNTHETIC = """async () => {
   for (const g of parts) { g.computeBoundingBox(); box.union(g.boundingBox); }
   people.far.geometry.computeBoundingBox();
   out.middleBoxGap = Math.max(box.min.distanceTo(people.far.geometry.boundingBox.min), box.max.distanceTo(people.far.geometry.boundingBox.max));
+  // the mirror (src/mirror.js's camera: 30 deg, 150:190) at the camera's place looking along the row, the camera turned
+  // away: the row every 2 m from x = 1; first without the mirror (only the camera's margin: x 1, 3, 5), then with it
+  const mirror = new THREE.PerspectiveCamera(30, 150 / 190, 0.3, 300);
+  mirror.position.set(0, 2.1, 0); mirror.rotation.set(0, -Math.PI / 2, 0);
+  row(1, 2); cam.rotation.set(0, Math.PI / 2, 0); cam.position.set(0, 1.6, 0); cam.updateMatrixWorld();
+  const sync = (m) => { game.clock += 0.5; people.sync(cam, { crowd, traffic: { slots } }, gameView, m); };
+  sync(null); sync(null); out.noMirror = { ...people.stats };
+  sync(mirror); sync(mirror); out.mirror = { ...people.stats };
+  const ren2 = new THREE.WebGLRenderer(); ren2.setSize(150, 190);
+  ren2.info.reset(); ren2.render(scene, mirror); out.mirrorCalls = ren2.info.render.calls;
+  ren2.dispose();
   return out;
 }"""
 
@@ -82,7 +104,9 @@ GAME = """async () => {
   gv.sync(); gv.syncCrowd();
   window.people.sync(window.camera, view, gv);
   const walkers = (traffic.slots || []).filter(Boolean).length;
-  return { ...window.people.stats, walkers, stopCrowd: gv.crowd.count, hidden: [view.crowd.layers.mask, gv.crowd.layers.mask] };
+  let skinned = 0;
+  window.people.group.traverse((o) => { if (o.isSkinnedMesh && o.parent?.visible !== false && o.parent?.parent?.visible !== false) skinned++; });
+  return { ...window.people.stats, walkers, skinned, stopCrowd: gv.crowd.count, hidden: [view.crowd.layers.mask, gv.crowd.layers.mask] };
 }"""
 
 
@@ -138,6 +162,14 @@ def main():
                 "at most 64 near": (s["cap"]["near"], s["cap"]["far"]) == (64, 36),
                 "the hair regions (86 near, 20 far vertices)": s["hairVertices"] == [86, 20],
                 "hair colours vary": s["hairColours"] >= 4,
+                "one draw call a figure (64 near + the far batch: 65)": s["capCalls"] == 65,
+                # (the figure's sphere, 1.45 m, and the 4 m kept: those within 5.45 m behind the camera stay, 9 of the row)
+                "none animated out of view (beyond the 5.45 m margin)": (s["away"]["near"], s["away"]["far"]) == (9, 91),
+                "animated again in view": s["back"]["near"] == 64,
+                "turned away, no mirror: the camera's margin only (3)": (s["noMirror"]["near"], s["noMirror"]["mirror"]) == (3, 0),
+                "the mirror: those within 50 m of it animated (3 + 22), the simplified figure":
+                    (s["mirror"]["near"], s["mirror"]["mirror"]) == (25, 22) and s["mirror"]["full"] <= 3,
+                "the mirror's picture: one draw call a figure (25 + the far batch)": s["mirrorCalls"] == 26,
             }
             fails += [f"synthetic: {k}" for k, ok in want.items() if not ok]
             if data and not args.synthetic:
@@ -157,6 +189,8 @@ def main():
                         fails.append(f"game: {gm['walkers']} walkers, {gm['people']} drawn as figures")
                     if gm["near"] == 0 or gm["near"] > 64:
                         fails.append(f"game: {gm['near']} near figures")
+                    if gm["skinned"] != gm["near"]:
+                        fails.append(f"game: {gm['skinned']} skinned meshes shown for {gm['near']} near figures (one each)")
                     if gm["hidden"] != [2, 2]:
                         fails.append(f"game: the box crowds' layers {gm['hidden']}, should be the hidden one (2)")
             elif not args.synthetic:
@@ -170,7 +204,8 @@ def main():
     print(json.dumps(r))
     if fails:
         sys.exit("; ".join(fails))
-    print("pedestrian figures: load, near/far by distance (64, 80 / 88 m), walk and run by speed, box figures hidden: pass")
+    print("pedestrian figures: load, near/far by distance (64, 80 / 88 m) and view, one draw call a figure, walk and run by "
+          "speed, box figures hidden: pass")
 
 
 if __name__ == "__main__":

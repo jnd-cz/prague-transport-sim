@@ -13,6 +13,9 @@ sample, SIDE m into the raised area against SIDE m out on the carriageway, acros
 The first cause that holds:
 - **raster flat:** IPR has under FLAT m: no kerb in the raster either (flush, lowered, or too fine for its 1 m cells);
 - **ramp:** the written ground has RAMP m or more: the kerb is there, spread over more than the check's 0.25 m;
+- **beside a wall:** IPR rises WALL m or more in the BEYOND m past its reading on the raised side: the raised area is
+  a strip at a wall's foot, and the raster's 1 m cells spread the wall over it, so the kerb it has is the wall's and
+  says nothing of a kerb the ground lacks (line 17's islands along the retaining walls at s 15500-15800, 2.7-3.6 m);
 - **street flat:** a sidewalk on the street surface, whose surface has under FLAT m where IPR has FLAT m or more;
 - **outline flat:** a raised area drawn from its own outline (a platform, an island, a median, a sidewalk beside
   parking): IPR has the kerb, the ground has not;
@@ -38,16 +41,21 @@ HALF = 0.125  # m: the check's own two samples, either side of the site (surface
 FLAT = 0.05   # m: under it a kerb is flat (surfaces.js)
 RAMP = 0.07   # m: the ground over 2 * SIDE: a kerb that is there
 PLATFORM = 8.0  # m: a sample this near a stop's platform stretch lies at a platform
+BEYOND = 1.5  # m: past the reading on the raised side, ...
+WALL = 0.3    # m: ... IPR rising this much has a wall within its cells' reach
 RAISED = {"sidewalk", "island", "median", "platform"}
-CAUSES = ("raster flat", "outline flat", "ramp", "street flat", "other")
+CAUSES = ("raster flat", "beside a wall", "outline flat", "ramp", "street flat", "other")  # (the table's columns)
 
 
-def cause(ipr, gnd, sur, on_street):
-    """A sample's cause from the kerb each source has (raised side minus carriageway, m; NaN: not read)."""
+def cause(ipr, gnd, sur, on_street, beyond=np.nan):
+    """A sample's cause from the kerb each source has (raised side minus carriageway, m; NaN: not read) and IPR's rise
+    past its reading on the raised side (beyond)."""
     if np.isfinite(ipr) and ipr < FLAT:
         return "raster flat"
     if np.isfinite(gnd) and gnd >= RAMP:
         return "ramp"
+    if np.isfinite(beyond) and beyond >= WALL:
+        return "beside a wall"
     if on_street and np.isfinite(sur) and sur < FLAT:
         return "street flat"
     return "other" if on_street else "outline flat"
@@ -84,14 +92,17 @@ def sort_sites(sites, line, ground, lidar, street, plat=None):
         sg = (1.0 if fwd <= back else -1.0) * (1.0 if raised == b else -1.0)  # (+u * sg points into the raised side)
         zin, zout = (Z[i, 3], Z[i, 0]) if sg > 0 else (Z[i, 0], Z[i, 3])
         pin, pout = xy[i] + u[i] * sg * SIDE, xy[i] - u[i] * sg * SIDE
-        ipr = float(lidar(pin[:1], pin[1:])[0] - lidar(pout[:1], pout[1:])[0])
+        pfar = pin + u[i] * sg * BEYOND
+        zin_ipr = float(lidar(pin[:1], pin[1:])[0])
+        ipr = zin_ipr - float(lidar(pout[:1], pout[1:])[0])
+        beyond = float(lidar(pfar[:1], pfar[1:])[0]) - zin_ipr
         on_street = raised == "sidewalk" and other in ("road", "tram")
         sur = float(street("sidewalk", pin[:1], pin[1:])[0] - street("road", pout[:1], pout[1:])[0]) if on_street else np.nan
         gnd = float(zin - zout)
-        rows.append({"cause": cause(ipr, gnd, sur, on_street), "pair": f"{raised}|{other}",
+        rows.append({"cause": cause(ipr, gnd, sur, on_street, beyond), "pair": f"{raised}|{other}",
                      "platform": bool(plat is not None and shapely.contains_xy(plat, xy[i, 0], xy[i, 1])),
                      "x": float(xy[i, 0]), "y": float(xy[i, 1]), "s": float(s[i]), "step": float(st["step"]),
-                     "ipr": ipr, "ground": gnd, "street": sur, "off": float(min(fwd, back))})
+                     "ipr": ipr, "ground": gnd, "street": sur, "beyond": beyond, "off": float(min(fwd, back))})
     return rows
 
 

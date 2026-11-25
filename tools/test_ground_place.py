@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 
 import numpy as np
@@ -149,6 +150,97 @@ class Places(unittest.TestCase):
                                      float(p.get("reach") or gpl.REACH), f"{name}: a section inside the place's reach")
             if p.get("seen"):
                 self.assertTrue(p["seen"].get("what") and p["seen"].get("from") and p["seen"].get("source"), name)
+
+
+def fake_place(job):
+    """A worker's place for Many: it sleeps its `sleep` s, then answers like ground_place.one."""
+    name, pl, kw = job
+    time.sleep(pl["sleep"])
+    return name, not pl.get("fail"), f"{name}: {'Traceback (a test)' if pl.get('fail') else 'holds'}\n"
+
+
+class Many(unittest.TestCase):
+    """Several places at once in worker processes, in one shared turn (#843)."""
+
+    def many(self, todo, jobs):
+        import argparse
+        import io
+        from unittest import mock
+        import baseline_store
+        a = argparse.Namespace(jobs=jobs, rings=False, ring=1, mesh=None, threads=1, overlay=False)
+        out = io.StringIO()
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d), \
+                mock.patch.object(baseline_store.HeavyJob, "WATCH", False), \
+                mock.patch.object(baseline_store.HeavyJob, "FREE", staticmethod(lambda: 64.0)), \
+                mock.patch.object(baseline_store.HeavyJob, "CORES", 24):
+            try:
+                gpl.many(todo, a, work=fake_place, out=out)
+                err = None
+            except SystemExit as e:
+                err = str(e)
+        return out.getvalue().splitlines(), err
+
+    def test_places_print_in_the_lists_order_whichever_ends_first(self):
+        todo = {"first": {"sleep": 1.5}, "second": {"sleep": 0.0}, "third": {"sleep": 0.5}}
+        lines, err = self.many(todo, 3)
+        self.assertIsNone(err)
+        self.assertEqual(lines, ["3 places, 3 at once, the longest first", "first: holds", "second: holds", "third: holds"])
+
+    def test_a_failed_place_stops_the_run_with_its_name_and_its_lines(self):
+        todo = {"done": {"sleep": 0.0}, "slow": {"sleep": 60.0}, "bad": {"sleep": 0.5, "fail": True}}
+        t0 = time.time()
+        lines, err = self.many(todo, 3)
+        self.assertLess(time.time() - t0, 30.0, "the slow place was stopped, not waited for")
+        self.assertIn("bad failed", err)
+        self.assertEqual(lines[1:], ["done: holds", "bad: Traceback (a test)"])
+
+    def test_a_worker_keeps_what_its_place_prints_though_a_tool_reconfigures_stdout(self):
+        from unittest import mock
+
+        def place(name, pl, **kw):  # (street_profile.py does this when the build first imports it)
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            print(f"{name}: Dobeška holds")
+        with mock.patch.object(gpl, "run", place):
+            self.assertEqual(gpl.one(("p", {}, {})), ("p", True, "p: Dobeška holds\n"))
+
+        def broken(name, pl, **kw):
+            print("built half")
+            raise SystemExit("no raw/")
+        with mock.patch.object(gpl, "run", broken):
+            name, ok, text = gpl.one(("q", {}, {}))
+        self.assertEqual((name, ok), ("q", False))
+        self.assertTrue(text.startswith("built half\nTraceback") and "no raw/" in text, text)
+
+    def test_the_turn_is_shared_and_takes_what_its_places_do(self):
+        import baseline_store
+        from unittest import mock
+        seen = {}
+        real = baseline_store.HeavyJob.claim
+
+        def claim(job, gb=None, cores=None):
+            seen.update(share=dict(job.share), gb=gb, cores=cores)
+            return real(job, gb, cores)
+        with mock.patch.object(baseline_store.HeavyJob, "claim", claim):
+            self.many({"a": {"sleep": 0.0}, "b": {"sleep": 0.0}}, 4)
+        # (queued for one place, so that it starts as soon as one fits; then it claims the two places it has, not the
+        # four asked for: one core and PLACE_GB each)
+        self.assertEqual(seen, {"share": {"gb": gpl.PLACE_GB[0], "cores": 1}, "gb": 2 * gpl.PLACE_GB[0], "cores": 2})
+
+    def test_beside_other_jobs_it_takes_only_the_places_that_fit(self):
+        import baseline_store
+        from unittest import mock
+        seen = {}
+        real = baseline_store.HeavyJob.claim
+
+        def claim(job, gb=None, cores=None):
+            seen.update(gb=gb, cores=cores)
+            return real(job, gb, cores)
+        # (the queue leaves 8 GB beside the jobs running: two places of 3.5 GB)
+        with mock.patch.object(baseline_store.HeavyJob, "claim", claim), \
+                mock.patch.object(baseline_store.HeavyJob, "room", lambda job, jobs=None: {"gb": 8.0, "cores": 20}):
+            lines, _ = self.many({k: {"sleep": 0.0} for k in "abcd"}, 4)
+        self.assertEqual(seen, {"gb": 2 * gpl.PLACE_GB[0], "cores": 2})
+        self.assertEqual(lines[0], "4 places, 2 at once, the longest first")
 
 
 class Sections(unittest.TestCase):

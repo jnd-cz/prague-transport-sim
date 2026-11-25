@@ -90,6 +90,13 @@ CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
 NEAR_ROUTE = 6         # m: a drawn track this near our route takes the route's style (src/world.js styleAt)
 BRANCH = 15            # m of a track along where another one leaves it, or it leaves another: the switch
 RAMP, LIFT_STEP = 15, 2  # m: a style's offset blends in over RAMP inside its section; `lift` every LIFT_STEP m
+# Another track's open ballast where IPR reads it (#548): the rails over IPR's ground at the axis, their running median
+# over BALLAST_WIN m, BALLAST_BAND for BALLAST_RUN m or more. On the five lines' route, whose styles are the user's
+# marks, the grassed-track list and the survey, that calls 92 % of the 33.7 km of ballast (its rails 0.16-0.21 m over
+# IPR, the middle half), 3 % of the 86 km of panels, 2 % of the 28 km of embedded track and none of the setts
+BALLAST_BAND = (0.12, 0.35)
+BALLAST_WIN = 20.0
+BALLAST_RUN = 40.0
 RANK = {"tram": 9, "road": 8, "island": 7, "median": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
         "stairs": 3, "green": 2, "water": 1}   # (src/terrain.js SURFACE_RANK)
 
@@ -394,6 +401,70 @@ def track_sections(data, survey):
         if own:
             out[i] = [[round(a, 1), round(b, 1), st] for a, b, st in own]
     return out
+
+
+def ballast_runs(data, terrain, step=2.0):
+    """Every other drawn track's open ballast where IPR reads it (#548), into its `styles` (after the heights: each
+    track's top of rail `zs`, every `step` m along its `p`). Where its rails stand BALLAST_BAND over IPR's ground at the
+    axis (`terrain(xs, ys)`), as the running median over BALLAST_WIN m, for BALLAST_RUN m or more, the track is ballast,
+    except where its own sections say otherwise (embedded at its crossings, switches and diamonds; grass on the survey's
+    green; track_sections). Elsewhere it stays panels, the default. Until #548 every other track was panels or grass,
+    its bed at the rails' height: another line's open ballast stood 0.17 m over the ballast IPR reads, and the ground
+    beside it lay in a trough (54 of batch D's 236 sunken places beside a bed). Returns the metres laid."""
+    near = LineString([q[:2] for q in data["path"]]).buffer(NEAR_ROUTE)
+    lo, hi = BALLAST_BAND
+    h = max(1, int(round(BALLAST_WIN / step / 2)))
+    laid = 0.0
+    for tr in data.get("tracks") or []:
+        own = [s for s in (tr.get("styles") or []) if s[2] != "ballast"]  # (a rerun lays it anew)
+        zs, pts = tr.get("zs"), [q[:2] for q in tr.get("p") or []]
+        if len(pts) < 2 or not zs or near.covers(LineString(pts)):
+            if own or tr.get("styles"):
+                tr["styles"] = own
+            continue
+        rt = Route(tr["p"])
+        L = rt.length
+        s = [min(k * step, L) for k in range(len(zs))]
+        xy = [rt.at(v)[:2] for v in s]
+        g = terrain([p[0] for p in xy], [p[1] for p in xy])
+        d = [z - q if z is not None and q is not None and q == q else None for z, q in zip(zs, g)]
+        med = []
+        for k in range(len(d)):
+            w = sorted(v for v in d[max(0, k - h):k + h + 1] if v is not None)
+            med.append(w[len(w) // 2] if w else None)
+        runs, k = [], 0
+        while k < len(med):
+            if med[k] is None or not lo <= med[k] <= hi:
+                k += 1
+                continue
+            j = k
+            while j + 1 < len(med) and med[j + 1] is not None and lo <= med[j + 1] <= hi:
+                j += 1
+            if s[j] - s[k] >= BALLAST_RUN:
+                runs.append((s[k], s[j]))
+            k = j + 1
+        bal = [[a, b, "ballast"] for r0, r1 in runs for a, b in minus(r0, r1, [{"s0": x[0], "s1": x[1]} for x in own])
+               if b - a >= MIN_PIECE]
+        laid += sum(b - a for a, b, _ in bal)
+        secs = sorted(own + [[round(a, 1), round(b, 1), st] for a, b, st in bal])
+        if secs:
+            tr["styles"] = secs
+        else:
+            tr.pop("styles", None)
+    return laid
+
+
+def own_lifts(data, off):
+    """Every drawn track's own rails' height over its bed (`lift`, {step, unit, v} every LIFT_STEP m along its `p`),
+    from its own sections' styles (`styles`) blended in as the route's (lift; #548): read where the track lies off our
+    route (src/world.js, tools/bed_surface.py). None where every section's style stands at its bed's height."""
+    for tr in data.get("tracks") or []:
+        secs = [{"s0": a, "s1": b, "style": st} for a, b, st in tr.get("styles") or []]
+        if len(tr.get("p") or []) < 2 or not any(off.get(x["style"], 0) for x in secs):
+            tr.pop("lift", None)
+            continue
+        n = int(Route(tr["p"]).length / LIFT_STEP) + 2
+        tr["lift"] = {"step": LIFT_STEP, "unit": 0.001, "v": [round(lift(secs, off, k * LIFT_STEP) * 1000) for k in range(n)]}
 
 
 def embed(secs, js):
@@ -738,6 +809,8 @@ def main():
         data["liftBack"] = lift_series(data, data["stylesBack"], offsets(truth))
     else:
         data.pop("liftBack", None)
+    # (the other tracks' own lift; their open ballast is laid after the heights, tools/line_heights.py, #548)
+    own_lifts(data, offsets(truth))
     with replacing(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
     print(f"line {line}: " + ", ".join(f"{x['style']} {x['s0']:.0f}-{x['s1']:.0f} ({x['source']})" for x in data["styles"]) or "none")

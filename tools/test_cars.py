@@ -4,7 +4,7 @@
 on synthetic box cars (src/models.js makeCar, sized by fitCar) every one in the camera's view within 65 m (out beyond
 73 m) is drawn as the near model, the nearest 64 at most, and the rest as the far one, in 21 draw calls however many; a
 queue of 40 ahead all near, 6 behind the camera far; turned around the other way, and back with the same plate cells,
-no plate drawn again; the box cars are on the hidden
+no plate drawn again; with the right mirror's camera looking back, the 6 behind near too; the box cars are on the hidden
 layer; each car's paint is its box car's colour, near and far; its lamps by its state (the indicator it shows, the brake
 lamps while it slows or stands, none on a parked car); its front wheels steered to the curve it drives (atan of the
 wheelbase by the curvature, to its left in a left turn), the rear ones not, the wheels on the ground and rolled by the
@@ -127,6 +127,12 @@ SYNTHETIC = """async () => {
   had = plates;
   turn(0);
   out.back = { ...cars.stats, plates: plates - had, sameCells: cellsOf().every((c, i) => c === kept[i]) };
+  // the right mirror (src/mirror.js's camera: 30 deg, 150:190) looking back from the camera's place: the 6 behind near
+  // too, with their cells (no plate drawn again), the queue ahead as before
+  const mirror = new THREE.PerspectiveCamera(30, 150 / 190, 0.3, 300);
+  mirror.position.set(0, 2.1, 0); mirror.rotation.set(0, Math.PI, 0);
+  had = plates; game.clock += 1 / 30; cars.sync(cam, view2, gview, mirror);
+  out.mirror = { ...cars.stats, behindNear: ids(40, 46).filter((i) => cars.near.has(key(i))).length, plates: plates - had };
   // the bound: 30 more in two outer lanes 14 to 62 m ahead, 70 in view: the nearest 64 near, a cell each (the cells of
   // the 6 behind taken back), still 21 draw calls
   for (let k = 0; k < 30; k++) put(46 + k, (k % 2 ? 1 : -1) * 8.75, -14 - 3.4 * Math.floor(k / 2));
@@ -196,6 +202,8 @@ def main():
                     s["turned"]["plates"]) == (6, 40, 6, 6),
                 "turned back: the queue near with its plates' cells, none drawn again": (s["back"]["near"], s["back"]["plates"],
                     s["back"]["sameCells"]) == (40, 0, True),
+                "the mirror looking back: the 6 behind near too, in their cells": (s["mirror"]["near"], s["mirror"]["mirror"],
+                    s["mirror"]["behindNear"], s["mirror"]["plates"]) == (46, 6, 6, 0),
                 f"70 in view: the nearest {s['nearMax']} near, a cell each, 21 draw calls": s["nearMax"] == 64
                 and (s["bound"]["near"], s["bound"]["far"], s["bound"]["cells"], s["bound"]["distinct"], s["bound"]["calls"])
                 == (64, 12, 64, 64, 21),
