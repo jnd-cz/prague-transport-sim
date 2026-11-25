@@ -903,6 +903,10 @@ Sections (`tools/test_readme.py` holds this list to the headings):
       straight run's vertex and for a corner on the outline the read stays square: from such an end towards the
       corner the point out ran along the line (notches of 1.8 m at yard-at-a-sidewalk, 0.7 m at belohorska-median),
       and towards its triangle a corner on the outline read beside it (teeth of 7 cm at modranska-skola-ramp).
+  - A lowered kerb's corner stood its stretch's height over the road corner at its point taken first by the
+    corners' order (`np.unique`'s first index), which the box sets: where two road areas meet at the point at another
+    height, 225.809 or 225.826 m at sidewalk-under-a-road-wall (1890.79, -2067.04), and the platform's plane fitted
+    over it moved the corners 1 mm on the grid. It takes the lowest road corner there (`lowest_at`).
   - `meet_raised` weighed the edge per corner: its 8 nearest were copies of one point (12 corners, 1 mm apart),
     which by the KD tree's order. It weighs points now.
   - GEOS keeps a geometry's grid (`set_precision`, `grid_size`), which its WKB does not carry, and an overlay with

@@ -1316,6 +1316,15 @@ class Rails(unittest.TestCase):
         # (the outer edges lie on the outline: no line of their own)
         self.assertFalse([g for g in gm.bed_edges(beds, outline) if g.bounds[0] < -1.9 or g.bounds[2] > 5.9])
 
+    def test_a_kerb_reads_the_lowest_road_at_its_point_in_any_order(self):
+        # (sidewalk-under-a-road-wall (1890.79, -2067.04): two road areas meeting at the kerb's point at another height;
+        # the first by the corners' order, which the box sets, was taken, #812)
+        keys, z = np.array([7, 3, 7, 5, 3]), np.array([225.874, 10.0, 225.782, 4.0, 9.0])
+        for o in ([0, 1, 2, 3, 4], [2, 4, 3, 0, 1]):
+            k, low = gm.lowest_at(keys[o], z[o])
+            self.assertEqual(k.tolist(), [3, 5, 7])
+            self.assertEqual(low.tolist(), [9.0, 4.0, 225.782])
+
     def test_a_bed_edge_is_cut_back_the_same_wherever_the_outline_is_split(self):
         # (rasinovo-quay, line 17: a bed's edge 5 cm off a corner of the beds' outline, (-732.837, -1495.619); the outline
         # there whole, or split at that corner where its ring started in the larger box: the edge ended at

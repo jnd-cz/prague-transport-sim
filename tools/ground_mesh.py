@@ -1930,6 +1930,14 @@ def bed_edges(beds, outline):
     return out
 
 
+def lowest_at(keys, z):
+    """Per distinct key (a point on the mm grid), the lowest of its heights: (the sorted keys, their heights), whatever
+    the order they come in."""
+    o = np.lexsort((z, keys))
+    k, first = np.unique(keys[o], return_index=True)
+    return k, z[o][first]
+
+
 def cut_back(line, others):
     """A line less what lies within EDGE_APART of other lines, and those lines as one geometry: (the rest, the others).
     The others merged where only two meet: the union leaves a node where a ring starts, and the buffer's coarse caps
@@ -2525,8 +2533,10 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     if len(low):
         road = np.isin(sc, list(CARRIAGEWAY)) & np.isfinite(zs)
         kr = np.round(cx[m][road] * Q).astype(np.int64) * 10_000_000_000 + np.round(cy[m][road] * Q).astype(np.int64)
-        ko, zo = np.unique(kr, return_index=True)
-        rz = zs[road][zo]
+        # (of the road's corners at a point, the lowest: two road areas meet there at another height, and the first by
+        # the corners' order, which the box sets, was 225.809 or 225.826 m at sidewalk-under-a-road-wall (1890.79,
+        # -2067.04), and the platform's plane over it moved, #812)
+        ko, rz = lowest_at(kr, zs[road])
         up = np.flatnonzero(np.isin(sc, list(LOWERED)) & np.isfinite(zs))
         ku = np.round(cx[m][up] * Q).astype(np.int64) * 10_000_000_000 + np.round(cy[m][up] * Q).astype(np.int64)
         j = np.clip(np.searchsorted(ko, ku), 0, max(len(ko) - 1, 0))
