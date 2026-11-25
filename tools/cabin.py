@@ -171,6 +171,9 @@ def timings(result):
 
 GAME = os.path.join(ROOT, "assets", "passengers", "t3-cabin.json")
 GAME_PACKING = "s16f"  # (the user, 2026-11-25, #249: "ok let's keep the 105 people per car": the search, 16 headings on 2 cm)
+# m over the top of rail: the game's platforms (src/platforms.js), for the lab's fixed 0.23 at the doors (the user's rules for
+# #249 step 2: "the lab's fixed 0.23 m platform becomes the surface at that door"); it places the people only, no time
+GAME_PLATFORM_Y = 0.18
 
 
 def rounded(v, places=4):
@@ -242,7 +245,7 @@ def game_cabin(layout, navigation, packing, source=None):
         "axes": layout["axes"], "units": layout["units"], "floorY": layout["floorY"],
         "seats": [{k: s[k] for k in ("id", "anchor", "heading", "forward", "width")} for s in layout["seats"]],
         "exclusions": [{k: e[k] for k in ("id", "polygon")} for e in layout["exclusions"]],
-        "doors": layout["doors"],
+        "doors": [{**d, "platformY": GAME_PLATFORM_Y} for d in layout["doors"]],
         "capacity": {"seats": len(layout["seats"]), "standing": len(places), "shown": len(layout["seats"]) + len(places)},
         "fitProfile": {k: layout["fitProfile"][k] for k in ("scale", "localSeatHeight", "backwardOffsetMetres")},
         "standing": {
