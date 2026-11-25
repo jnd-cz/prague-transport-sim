@@ -10,6 +10,8 @@ t3-floor-space.json, floor-space.svg, capacity-layout.svg, packing-<id>.svg, and
 --timing LAYOUT runs the lab's timing scenarios (tools/cabin/passenger-timing.js) on a layout instead: each packing
 filled and emptied, and 10 out / 10 in, both exit policies, with the lab's checks; writes DIR/passenger-timing.json.
 --expect FILE compares the timings with a recorded result (the lab's tests/passenger-timing.json).
+--alight LAYOUT fills every packing of a layout and empties it again with the game's alighting pace
+(src/passengers/exit-flow.js GAME_PACE; --pace JSON for another): the times in through the doors and out.
 --model defaults to the game's assets/t3h/tatra-t3-hybrid-nc.glb; the lab's own GLB reproduces its files. --packing adds
 an adaptive packing with those options (adaptivePacking's: id, padding, trials and the search's own, tools/cabin/).
 """
@@ -119,6 +121,43 @@ def timing(layout, v7):
         server.shutdown()
 
 
+ALIGHT = """async ([layout, pace]) => {
+  const flow = await import('/src/passengers/exit-flow.js');
+  const { createBoardingController } = await import('/src/passengers/boarding-state.js');
+  const { createPassengerTests } = await import('/tools/cabin/passenger-tests.js');
+  const { selectCabinPacking } = await import('/src/passengers/cabin-space.js');
+  const out = {};
+  for (const config of layout.standing.configurations) {
+    const c = createBoardingController(selectCabinPacking(layout, config.id), { exitPace: pace ?? flow.GAME_PACE }), t = createPassengerTests(c);
+    t.startFull();
+    let n = 0;
+    while (t.report().status === 'running' && n++ < 40000) { c.update(0.025); t.update(); }
+    out[config.id] = { people: 24 + config.places.length, status: t.report().status, ...t.report().timings };
+  }
+  return out;
+}"""
+
+
+def alight(layout, pace):
+    """Each packing filled and emptied with the game's alighting pace (or this one): {packing: timings}"""
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=ROOT))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with sync_playwright() as p:
+            browser = gpu.launch(p)[0]
+            page = browser.new_page()
+            page.route(base + "/__cabin.html", lambda r: r.fulfill(
+                content_type="text/html", body=f"<!doctype html><html><head>{importmap()}</head><body></body></html>"))
+            page.goto(base + "/__cabin.html")
+            page.set_default_timeout(3600000)
+            out = page.evaluate(ALIGHT, [layout, pace])
+            browser.close()
+            return out
+    finally:
+        server.shutdown()
+
+
 def timings(result):
     """{packing: {scenario: {timing: seconds}}} of a timing result"""
     return {k: {s: v[s]["timings"] for s in ("full", "mixed", "boardingDoorFull")} for k, v in result["configurations"].items()}
@@ -132,7 +171,15 @@ def main():
     ap.add_argument("--navigation-only", action="store_true")
     ap.add_argument("--timing", metavar="LAYOUT", help="run the timing scenarios on this layout instead")
     ap.add_argument("--expect", metavar="FILE", help="with --timing: a recorded result to compare with")
+    ap.add_argument("--alight", metavar="LAYOUT", help="fill and empty every packing with the game's alighting pace")
+    ap.add_argument("--pace", help="with --alight: another pace as JSON (src/passengers/exit-flow.js PACE's fields)")
     args = ap.parse_args()
+    if args.alight:
+        out = alight(json.load(open(args.alight, encoding="utf-8")), json.loads(args.pace) if args.pace else None)
+        for k, t in out.items():
+            print(f"{k:10} {t['people']:3} people: in through the doors {t['boardingDoorClear']:.1f} s, out {t.get('alightingDoorClear', float('nan')):.1f} s"
+                  f" ({t['status']})")
+        return
     if args.timing:
         layout = json.load(open(args.timing, encoding="utf-8"))
         out = timing(layout, None)

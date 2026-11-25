@@ -8,7 +8,10 @@ scenarios (tools/cabin/passenger-timing.js: every packing filled and emptied, 10
 checks: no place taken twice, counts conserved, both streams of every door used together, doorway places last in and
 first out) pass and give the lab's recorded times (tests/passenger-timing.json of street-life-boarding v14, revision 10),
 so the modules brought into src/passengers/ work as they did there. A short search (tools/cabin/packing-search.js) gives
-a packing with no overlaps and at least the lab's adaptive count, the same twice for one seed.
+a packing with no overlapping outlines and at least the lab's adaptive count, the same twice for one seed. With the
+game's alighting pace (src/passengers/exit-flow.js GAME_PACE) a full car empties before it fills, on the lab's packing
+and on the search's, everyone out and the places free, approaching alighters of a door 0.50 m apart and more and one
+stream's on the steps 0.60 m (the pace's 0.52 and 0.64 between the planner's 50 ms samples).
 """
 import faulthandler
 import functools
@@ -55,6 +58,31 @@ PAGE = """async () => {
   }));
   // (the lab's scenarios on its own five packings: the two searches are left out, the lab recorded none for them)
   const lab = { ...L, standing: { ...L.standing, configurations: L.standing.configurations.filter((c) => !['search', 'again'].includes(c.id)) } };
+  // the game's alighting pace: a full car filled, then emptied (the lab's full scenario), the closest two approaching
+  // alighters of a door and two on one stream's steps
+  const { GAME_PACE } = await import('/src/passengers/exit-flow.js');
+  const { createBoardingController } = await import('/src/passengers/boarding-state.js');
+  const { createPassengerTests } = await import('/tools/cabin/passenger-tests.js');
+  const { selectCabinPacking } = await import('/src/passengers/cabin-space.js');
+  out.game = {};
+  for (const id of ['adaptive', 'search']) {
+    const c = createBoardingController(selectCabinPacking(L, id), { exitPace: GAME_PACE }), t = createPassengerTests(c);
+    t.startFull();
+    let n = 0, approach = Infinity, stairs = Infinity;
+    while (t.report().status === 'running' && n++ < 40000) {
+      c.update(0.025); t.update();
+      const out = [...c.actors.values()].filter((a) => a.exiting && a.outsideAt == null);
+      for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
+        const a = out[i], b = out[j];
+        if (a.doorId !== b.doorId) continue;
+        const d = Math.hypot(a.x - b.x, a.z - b.z);
+        if (!a.legPose && !b.legPose) approach = Math.min(approach, d);
+        else if (a.legPose && b.legPose && a.channel === b.channel) stairs = Math.min(stairs, Math.abs(a.z - b.z));
+      }
+    }
+    const r = t.report(), s = c.snapshot();
+    out.game[id] = { status: r.status, target: 24 + c.standingLedger.seats.length, exited: s.exited, free: s.free, timings: r.timings, approach, stairs };
+  }
   try {
     const { result } = passengerTiming(lab, null);
     out.timings = Object.fromEntries(Object.entries(result.configurations).map(([k, v]) => [k, { full: v.full.timings, mixed: v.mixed.timings }]));
@@ -109,6 +137,11 @@ def main():
         "the search: one seed, one packing": r["packings"]["search"]["cells"] == r["packings"]["again"]["cells"],
         "the lab's scenarios pass (its checks)": "failed" not in r,
     }
+    for k, g in r["game"].items():
+        t = g["timings"]
+        want[f"the game's pace, {k}: all {g['target']} out, the seats free"] = g["status"] == "complete" and g["exited"] == g["target"] and g["free"] == 24
+        want[f"the game's pace, {k}: emptied ({t.get('alightingDoorClear', 0):.1f} s) before filled ({t.get('boardingDoorClear', 0):.1f} s)"] =             t.get("alightingDoorClear", 1e9) < t.get("boardingDoorClear", 0)
+        want[f"the game's pace, {k}: approaching alighters 0.50 m apart ({g['approach']:.3f}), on the steps 0.60 m ({g['stairs']:.3f})"] =             g["approach"] >= 0.50 and g["stairs"] >= 0.60
     fails += [k for k, ok in want.items() if not ok]
     if "failed" in r:
         fails.append(r["failed"][:300])
@@ -118,9 +151,12 @@ def main():
         if moved:
             fails.append(f"times differ from the lab's: {moved[:4]}")
     print({k: v["count"] for k, v in r["packings"].items()})
+    print({k: {"boarded": round(g["timings"]["boardingDoorClear"], 2), "emptied": round(g["timings"].get("alightingDoorClear", -1), 2),
+               "approach": round(g["approach"], 3), "stairs": round(g["stairs"], 3)} for k, g in r["game"].items()})
     if fails:
         sys.exit("; ".join(fails))
-    print("passenger cabin: the game's T3 gives the lab's layout, packings and times; the search packs at least as many: pass")
+    print("passenger cabin: the game's T3 gives the lab's layout, packings and times; the search packs at least as many; with the "
+          "game's pace a full car empties before it fills: pass")
 
 
 if __name__ == "__main__":

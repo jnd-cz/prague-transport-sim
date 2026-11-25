@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), dist/traffic/boarding-state.js, as it was (sha256 9f980a96b335581d);
 // accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
+// #249: changed: exitPace passed to the exit flow (its PACE by default).
 import {createPassengerCore,doorIsOpen} from './passenger-core.js';
 import {createExitFlow} from './exit-flow.js';
 import {planExitDoors} from './exit-routing.js';
@@ -9,7 +10,7 @@ import {excludedFromPassengers} from './cabin-space.js';
 const lerp=(a,b,t)=>a+(b-a)*t,smooth=t=>t*t*(3-2*t),tau=Math.PI*2;
 const angle=(a,b,t)=>a+(((b-a+Math.PI)%tau+tau)%tau-Math.PI)*t;
 // Authored door channels and routes. This is deliberately not a crowd/navmesh solver.
-export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPolicy='balanced',avoidWaiting=false}={}){
+export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPolicy='balanced',avoidWaiting=false,exitPace=undefined}={}){
  const core=createPassengerCore({vehicleId,seats:layout.seats,doors:layout.doors??[layout.door],standing:layout.standing.places??[],capacity:layout.capacity}),{ledger,standingLedger,actors}=core,events=[];const record=(type,a)=>events.push({type,time,passengerId:a.id,doorId:a.doorId,channel:a.channel});
  for(const p of layout.standing.places??[]){const e=p.footprintHalfExtents??{x:.32,z:.22},points=p.footprintPolygon?transformFootprint(p.footprintPolygon,p.x,p.z,p.heading):[[-e.x,-e.z],[e.x,-e.z],[e.x,e.z],[-e.x,e.z]].map(([x,z])=>[p.x+x,p.z+z]);for(const [x,z]of points)if(excludedFromPassengers(layout,x,z))throw new Error(`Standing place in excluded cab: ${p.id}`);}
  const doors=layout.doors??[layout.door],channels=doors.flatMap(door=>[-.34,.34].map((offset,lane)=>({id:`${door.id}:${lane}`,door,lane,x:door.x+offset,queue:[],entry:null,next:0,alighted:0})));
@@ -23,7 +24,7 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
  const place=a=>a.seatId?bySeat.get(a.seatId):byStand.get(a.standingId);
  const seatRoot=s=>({x:s.anchor.x-s.forward.x*layout.fitProfile.backwardOffsetMetres,y:s.anchor.y-layout.fitProfile.localSeatHeight,z:s.anchor.z-s.forward.z*layout.fitProfile.backwardOffsetMetres});
  function settle(a){const p=place(a);Object.assign(a,a.seatId?seatRoot(p):{x:p.x,y:p.y,z:p.z},{heading:p.heading,motion:a.seatId?'Sit':'Idle',speedMps:0,legPose:null,poseBlend:null,stage:a.seatId?'seated':'standing',actions:null});}
- const exitFlow=createExitFlow(layout,channels,{avoidWaiting,allActors:()=>[...actors.values()],
+ const exitFlow=createExitFlow(layout,channels,{pace:exitPace,avoidWaiting,allActors:()=>[...actors.values()],
   onRelease:a=>core.releasePlace(a),
   onNeedYield:(ids,requester,nav)=>{
    const blockers=ids.map(id=>actors.get(id)).filter(b=>b?.stage==='standing'&&b.standingId&&!b.yielding);
@@ -66,7 +67,7 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
  }
  function alight(count=1,{balanced=false}={}){let selected=[...actors.values()].filter(occupied).sort((a,b)=>Number(!a.doorBufferId)-Number(!b.doorBufferId)||Number(!!a.seatId)-Number(!!b.seatId)||a.index-b.index);
   if(balanced){const groups=doors.map(d=>selected.filter(a=>a.doorId===d.id).sort((a,b)=>Number(!a.doorBufferId)-Number(!b.doorBufferId)||Number(!!a.seatId)-Number(!!b.seatId)||a.index-b.index));selected=[];while(groups.some(g=>g.length))for(const g of groups)if(g.length)selected.push(g.shift());}
-  selected=selected.slice(0,count);if(!selected.length)return 0;const plan=planExitDoors(selected,doors,{policy:exitPolicy,active:[...actors.values()].filter(a=>a.exiting)});exitPlan=plan.summary;let n=0;for(const a of selected){
+  selected=selected.slice(0,count);if(!selected.length)return 0;const plan=planExitDoors(selected,doors,{policy:exitPolicy,active:[...actors.values()].filter(a=>a.exiting),service:exitPace?.service??{},walk:exitPace?.walk??.95});exitPlan=plan.summary;let n=0;for(const a of selected){
    const d=doors.find(d=>d.id===plan.assignment.get(a.id));a.doorId=d.id;core.requestAlighting(a,'exit queue');a.motion=a.seatId?'Sit':'Idle';n++;
   }if(exitFlow.pending.length===0)waitForEntries=[...actors.values()].some(a=>a.actions&&!a.exiting);exitFlow.schedule(selected);message=`${n} passengers requested to alight; two-stream route reservations, door clearance places first.`;return n;}
  const walk=(x,y,z)=>({type:'walk',x,y,z});
