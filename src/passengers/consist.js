@@ -60,7 +60,7 @@ export function createConsist(layout, { cars, crush, rand }) {
       const car = b.car != null ? (room(set[b.car]) > 0 ? set[b.car] : null)
         : set.filter((c) => room(c) > 0).sort((x, y) => room(y) - room(x) || incoming(x) - incoming(y) || x.k - y.k)[0];
       if (!car) { i++; continue; }
-      car.c.enqueue(1, null, b.door, { waitForPlace: true, extra: { tag: b.tag, stands: b.stands } });
+      car.c.enqueue(1, null, b.door, { waitForPlace: true, extra: { tag: b.tag, stands: b.stands, runner: b.car != null } });
       platform.splice(i, 1);
     }
   }

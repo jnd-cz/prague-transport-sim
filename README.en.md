@@ -49,6 +49,9 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   tram drives.
   Whoever is on the steps when you close the doors gets through; the others stay at the stop, and anyone who could
   not get off gets off at the next one.
+  With the detailed tram model (the default) you see them: sitting and standing through the windows, getting off and
+  on by the steps, those waiting walking from the platform to the doors, and in the right mirror who is still
+  boarding. Those above the 105 a car only counts are seen on the steps and outside only.
 - Line changes: a trip can change its number along the line's route and at a terminus (line 9 continues as 10 at Nákladové
   nádraží Žižkov): everybody gets out, the route boxes and the HUD switch, the tram departs as 10.
 
