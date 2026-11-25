@@ -914,7 +914,11 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     without the grid, and come out on it without one. Where a ring starts goes by the box too, and a union keeps
     that start as a node: a bed's edge cut back from the beds' outline (`bed_edges`) by a buffer with coarse caps at
     the node ended 0.25 mm apart at rasinovo-quay, where a small ring started at the corner 5 cm off the edge in the
-    larger box. The lines it is cut back from are merged where only two meet (`cut_back`).
+    larger box. The lines it is cut back from are merged where only two meet (`cut_back`). And a vertex at exactly
+    half a mm, as an intersection of the data's own mm can lie, went to the mm on either side by the sign of its
+    float noise: hlavni-nadrazi's plot at x 1051.2025000000003 and stairs-not-there's at y 1242.4725000000017 held a
+    vertex 1 mm off its neighbour in one box only. Everything goes on the grid through the µm now
+    (`ground_partition.on_grid`, and tile_faces' lines).
   - A ray from a wall line to the next wall crossing two of its segments at one point took the first by the tree's
     order: under the Magistrála a wall's top and foot lines lie over each other, and the strip beside hlavni-nadrazi's
     wall read 198.57 m in one box and 198.02 m in another (`wall_lines._side`). Of the heights crossed as near, the
