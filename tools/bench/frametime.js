@@ -8,7 +8,9 @@
 // game runs (a paused one draws 4 frames a second, #149) with the run's seeded traffic.
 // Returns the frame interval (median, p95; vsync off in the runner), the CPU time of renderer.render,
 // the draw calls and triangles of a frame, and each set's level. `fov`: the camera's vertical field in degrees
-// (the cab's 62 unless given; the zoom key's 22.75, #382).
+// (the cab's 62 unless given; the zoom key's 22.75, #382). `traffic`: seconds the traffic steps before the measurement,
+// our tram standing, so that its cars fill the streets (#250: the street vehicles drawn; the page's ?boxcars draws the
+// box cars instead); `stop`: the stop of the trip (its index in the menu).
 import { startShift } from './shift.js';
 
 const AI = [45, 110, 180];
@@ -25,10 +27,10 @@ const count = (o) => { let n = 0; o.traverse(() => n++); return n; };
 const frame = () => new Promise((r) => requestAnimationFrame(r));
 
 // livery: a livery id (#529) our set and the sets ahead wear; none, the vehicle's own
-export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fov = null, livery = null } = {}) {
+export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fov = null, livery = null, traffic = 0, stop = 0 } = {}) {
   const $ = (id) => document.getElementById(id);
   window.runSeed = 1; // (the run's seeded stream: the same traffic for every model)
-  $('selStop').value = '0'; $('selStop').dispatchEvent(new Event('change'));
+  $('selStop').value = String(stop); $('selStop').dispatchEvent(new Event('change'));
   $('selTrip').value = '0'; $('optWeather').value = 'dry'; $('optTemp').value = 'autumn'; $('optObst').value = 'off';
   $('optAuto').checked = false;
   const sel = $('optModel');
@@ -55,6 +57,8 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
     setRiggedLevel(m, far < FULL_OUT ? 'full' : 'light');
     return { m, far: Math.round(far) };
   });
+  for (let t = 0; t < traffic; t += 1 / 30) window.traffic.update(1 / 30);
+  if (traffic) window.run.trafficView.sync(window.camera);
   // the CPU time of each render (the GPU's work shows in the frame interval)
   const r = window.renderer, orig = r.render;
   // (split: the scene's matrix update, which render does first, and the rest of render)
@@ -93,5 +97,9 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
     nodes, tramNodes: count(window.tramModel), setNodes,
     sets: sets.map(({ m, far }) => ({ far, level: m.userData.level ?? m.userData.kind })),
     viewport: [innerWidth, innerHeight, devicePixelRatio],
+    // the traffic's cars in the streets, and as drawn (src/cars.js: near and far models; none with ?boxcars)
+    trafficCars: window.traffic.cars.filter((c) => c.active).length, cars: window.cars ? { ...window.cars.stats } : null,
+    // the people as drawn (src/people.js: animated figures, full and middle, each its own skinned copy; the far batch)
+    people: window.people ? { ...window.people.stats } : null,
   };
 }

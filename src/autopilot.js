@@ -206,7 +206,8 @@ export class Autopilot {
     let hazard = false;
     for (const ob of g.obstacles) {
       if (ob.state !== 'gone' && Math.abs(ob.lat) < 2.5 && ob.s > tr.s) {
-        consider(ob.s - 8, false, ob.type === 'pedestrian' ? 'walker' : 'obstacle');
+        // (8 m short of a walker; 5.8 m behind a parked car's rear: 8 m from its middle when every car was 4.4 m long)
+        consider(ob.s - (ob.half !== undefined ? ob.half + 5.8 : 8), false, ob.type === 'pedestrian' ? 'walker' : 'obstacle');
         if (ob.s - tr.s < 80) hazard = true;
       }
     }
@@ -219,7 +220,7 @@ export class Autopilot {
       if (clear !== null) consider(clear, false, 'junction');
     }
     // a car on our track ahead (shared lane, queuing on the tracks): stop behind it
-    for (const c of g.carsOnTrack || []) if (c.s > tr.s && c.s - tr.s < 120) consider(c.s - 2.5 - 5, false, 'car');
+    for (const c of g.carsOnTrack || []) if (c.s > tr.s && c.s - tr.s < 120) consider(c.s - c.car.half - 0.3 - 5, false, 'car');
     // a car crossing our track ahead (turning across, U3), or committed to it (too close to stop): stop
     // short of it until it is across, and ring the bell within 60 m (a car that went while we stood at a
     // stop before the junction was hit as we pulled away, line 17 s 16851)

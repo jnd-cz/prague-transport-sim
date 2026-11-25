@@ -42,6 +42,7 @@ import { loadInstalled } from './packages.js';
 import { Mirror } from './mirror.js';
 import { CabFrame, EYE, lookLimits, leanFor } from './cabframe.js';
 import { People, PEOPLE_FILES, loadPeople } from './people.js';
+import { Cars, CAR_FILES, loadCars } from './cars.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -64,6 +65,9 @@ for (const v of vehicles) if (v.preload) for (const f of v.files) load.prefetch(
 // the pedestrians' figures (#251); ?boxpeople keeps the box figures
 const figures = !params.has('boxpeople');
 if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
+// the street vehicles' models (#250); ?boxcars keeps the box cars
+const carModels = !params.has('boxcars');
+if (carModels) for (const f of CAR_FILES) load.prefetch(f);
 // (weights: the steps' usual milliseconds on line 17; the bar shares them with the downloads by time)
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
 const lineFile = await load.get(`data/line${lineId}.json`);
@@ -387,6 +391,12 @@ if (figures) {
   catch (e) { console.warn('pedestrian figures not loaded: the box figures stay', e); }
 }
 window.people = people;
+let cars = null;
+if (carModels) {
+  try { cars = new Cars(scene, await loadCars(await Promise.all(CAR_FILES.map((f) => load.get(f))))); }
+  catch (e) { console.warn('car models not loaded: the box cars stay', e); }
+}
+window.cars = cars;
 // the menu's tram models, in the index's order with their names in the menu's language; the first is the default.
 // One not loaded at start downloads when the player picks it (the user, 2026-11-04, of the classic model: "make it
 // available for user's choice to load").
@@ -1246,6 +1256,10 @@ function frame(now) {
     // (the movers between the last two steps, as our tram; back where the steps left them after the draw, below)
     if (game && !inspect.active && !window.headless) between.show(Math.min(1, carry / STEP));
     if (people && game) people.sync(camera, run.trafficView, run.gameView);
+    // (the right mirror's camera, posed for this frame while the mirror is shown: the cars it shows near the tram are the
+    // near model too, with their indicators and brake lamps, src/cars.js)
+    const mirrorCam = game && mirrorShown() ? (poseMirror(mirror.camera), mirror.camera) : null;
+    if (cars && game) cars.sync(camera, run.trafficView, run.gameView, mirrorCam);
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }
