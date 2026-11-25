@@ -31,7 +31,9 @@ line's build, of that box only. Then, per place, into reports/places/NAME/:
   reports/places/NAME/overlay/data/, for tools/shot.py --overlay: the game drawn with the place's ground, nothing
   published. (The network file is the written one; a tile's border may crack where the rule moved it.)
 
-Several places take a shared heavy-job turn (3 GB, the threads); one runs as it is.
+Several places take one shared heavy-job turn and build --jobs of them at once, each in its own process (#843): a
+place's build runs on one core, so 36 places one after another took an hour of the machine's 24 cores. Each place's
+lines print whole, in the list's order. One place runs as it is.
 """
 import argparse
 import json
@@ -54,6 +56,11 @@ SECTION_STEP = 0.25  # m: a section's samples
 SLOPING = (0.2, 3.0)  # rise over run: between these the ground slopes; under, it is level; over, it is a wall
 OFF_LIDAR = 0.5  # m: the ground this far from IPR's raster is off it (the raster spreads a wall over 1-2 m)
 Q = 1000
+JOBS = 4  # places built at once (#843)
+# (what one place's build takes, as the heavy-job queue counts it: GB alone and with --rings, heavy.py --history of
+# 2026-11-24 (the most of --all 3.5 GB, of --rings 5.0); one core, its CPU time 99 s in 94 s of wall)
+PLACE_GB = (3.5, 5.0)
+PLACE_S = (110.0, 220.0)  # s: a place's expected time where it has no report yet (the median of --all, #843)
 
 
 def places(root=ROOT):
@@ -400,6 +407,80 @@ def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False
     return rep
 
 
+def estimate(name, rings=False):
+    """A place's expected seconds: its last report's build time and a little for the measures, else PLACE_S."""
+    try:
+        with open(os.path.join(ROOT, "reports", "places", name, "place.json"), encoding="utf-8") as f:
+            r = json.load(f)
+        s = r.get("seconds with the wider ring" if rings else "seconds")
+        if s:
+            return float(s) + 10.0
+    except (OSError, ValueError):
+        pass
+    return PLACE_S[1 if rings else 0]
+
+
+def one(job):
+    """A place in a worker process (many()): (its name, whether it ran, all it printed, a failure's traceback too)."""
+    import contextlib
+    import io
+    import traceback
+    name, pl, kw = job
+    # (a text stream over bytes, not a StringIO: tools imported during the build reconfigure sys.stdout, #843)
+    buf, ok = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", errors="replace", newline="\n"), True
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+        try:
+            run(name, pl, **kw)
+        except (Exception, SystemExit):  # (a SystemExit would end the worker and leave its place unanswered)
+            traceback.print_exc()
+            ok = False
+    buf.flush()
+    return name, ok, buf.buffer.getvalue().decode("utf-8", "replace")
+
+
+def many(todo, a, work=one, out=None):
+    """Several places in one shared turn of the heavy jobs (#843), a.jobs at once in worker processes, the longest
+    first. The turn queues for one place, then sizes the workers to what the queue leaves free once it comes
+    (HeavyJob.room) and claims what they take together. Each place's lines print whole, in the list's order; a failure prints its place's
+    and stops the rest. a.jobs 1: one after another in this process."""
+    import multiprocessing
+    from baseline_store import HeavyJob
+    out = out or sys.stdout
+    gb = PLACE_GB[1 if a.rings else 0]
+    kw = dict(ring=a.ring, mesh=a.mesh, threads=a.threads, rings=a.rings, over=a.overlay)
+    n = max(1, min(a.jobs, len(todo)))
+    est = {k: estimate(k, a.rings) for k in todo}
+
+    def expect(n):  # (n at once, the longest first: the board's and the watch's time, and the backfill's)
+        return sum(est.values()) / n + max(est.values())
+    # (it queues for one place, so that it starts as soon as one fits beside the other shared jobs, and takes up to n
+    # of what they leave once its turn comes, as headless.py sizes its pages)
+    heavy = HeavyJob("ground places", share={"gb": gb, "cores": 1}, expect=expect(n))
+    with heavy:
+        room = heavy.room()
+        n = max(1, min(n, int(room["gb"] // gb), int(room["cores"])))
+        heavy.claim(gb=gb * n, cores=n)
+        heavy.expect(expect(n))
+        if n == 1:
+            for k, v in todo.items():
+                run(k, v, log=lambda s: print(s, file=out, flush=True), **kw)
+            return 0
+        print(f"{len(todo)} places, {n} at once, the longest first", file=out, flush=True)
+        names, done, shown = list(todo), {}, 0
+        jobs = [(k, todo[k], kw) for k in sorted(todo, key=lambda k: -est[k])]
+        with multiprocessing.get_context("spawn").Pool(n) as pool:  # (its end terminates the workers still building)
+            for name, ok, text in pool.imap_unordered(work, jobs):
+                done[name] = text
+                while shown < len(names) and (names[shown] in done or not ok):
+                    if names[shown] in done:
+                        out.write(done[names[shown]])
+                    shown += 1
+                out.flush()
+                if not ok:
+                    raise SystemExit(f"ground_place: {name} failed (its lines above); the places still building were stopped")
+    return 0
+
+
 def line_of(rep):
     w, loc = rep.get("written"), rep.get("locality")
     b = rep.get("built") or w
@@ -439,6 +520,8 @@ def main(argv=None):
     ap.add_argument("--overlay", action="store_true", help="also write the line's ground file with the place's tiles replaced")
     ap.add_argument("--mesh")
     ap.add_argument("--threads", type=int, default=4)
+    ap.add_argument("--jobs", type=int, default=JOBS, help="several places: how many build at once, each in its own "
+                    "process (#843); 1: one after another in this one")
     a = ap.parse_args(argv)
     known = places()
     if a.list:
@@ -461,11 +544,7 @@ def main(argv=None):
         for k, v in todo.items():
             run(k, v, a.ring, a.mesh, a.threads, build=not a.written, over=a.overlay)
         return 0
-    from baseline_store import HeavyJob
-    with HeavyJob("ground places", share={"gb": 5 if a.rings else 3, "cores": a.threads}):
-        for k, v in todo.items():
-            run(k, v, a.ring, a.mesh, a.threads, rings=a.rings, over=a.overlay)
-    return 0
+    return many(todo, a)
 
 
 if __name__ == "__main__":

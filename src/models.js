@@ -644,8 +644,16 @@ export function makeCar(seed = 0) {
   }
   g.userData.blink = (side, on) => {
     for (const s of ['left', 'right']) for (const l of lamps[s]) l.visible = s === side && on;
+    g.userData.signal = on ? side ?? null : null; // (the lit side: src/cars.js draws it)
   };
   return g; // facing +Z
+}
+// the box car stretched to a car type's size (src/carTypes.js: its length, width over the tyres, height), the size the
+// traffic rules give it (#250; the box car is 4.3 × 1.8 × 1.58 m)
+export function fitCar(car, type) {
+  if (!type) return;
+  car.scale.set(type.width / 1.8, type.height / 1.58, type.length / 4.3);
+  car.userData.type = type; // (src/cars.js draws the type's model where it stands)
 }
 
 const SHIRTS = [0x8b2f2f, 0x2f4f8b, 0x3c6b3c, 0x666666, 0xc29a3a, 0x222222, 0x8a5a9a, 0xd0d0d0, 0x2a5c63, 0xa8523a];

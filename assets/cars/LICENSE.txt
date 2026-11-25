@@ -1,0 +1,31 @@
+Street vehicles: five car, van and truck types, near and far (assets/cars/<type>-near.glb, <type>-far.glb)
+
+Source: the project's own asset lab "street-life-boarding" v14 (2026-10-27), catalog revision 20261027-v9 (schema
+        0.2.0), made for this project by a ChatGPT agent working for the project owner; original parametric models
+        prepared offline by the lab's recipe (tools/prepare-traffic-assets.mjs, Node with three.js r160; not in this
+        repository). Inventory and provenance: docs/assets-inventory.md (#247). Not based on a third-party model.
+        Appearance accepted by the project owner on 2026-10-26.
+Licence: GNU AGPL v3 or later, like the code (the project owner, 2026-11-23, #250: "we should standardize these
+         assets to the repo's AGPL"; docs/decisions/2026-10-29-tests-and-licences.md, #518).
+Changes: none; renamed from the lab's file names (in brackets) to the type's id.
+
+compact-near.glb  144,064 B  sha256 1e55553aea11a9ebb24627afce3d049213d48ce350bac9b0d9472cdb8465565e  (car-near.glb)
+compact-far.glb    32,704 B  sha256 73052489c6f71ee496b3c10baa7e38c572b0d4a80c6312ecfb64dbc37b29b9f9  (car-far.glb)
+sedan-near.glb    143,444 B  sha256 a54e583414094906cbd60e31626e00a744aed3cdb7d3f26ba8a25f4cac897702  (car-sedan-near.glb)
+sedan-far.glb      32,704 B  sha256 bb7a3180dd15f3ac4bf2915b634b2177824b507ab317be9a49082d97c2c1ed64  (car-sedan-far.glb)
+estate-near.glb   143,436 B  sha256 f2ca26d59e98ba1f044819c9c568d98550ea4e6f3762ff0a8ef73db0c87a3753  (car-estate-near.glb)
+estate-far.glb     32,688 B  sha256 2fc7da3f6c1ce1e2ab27bdabf7985dd5353ca36ceea9e9bfe33c46da80cdfa59  (car-estate-far.glb)
+van-near.glb      139,668 B  sha256 85d6c9b2f3d0703263c5dccdf15b1a123e0198d162e50b8b59833eec63bd9e7c  (car-van-near.glb)
+van-far.glb        33,360 B  sha256 851ab054ba569db7543e39e6e5c2fcdd6a396fd1a8606d5036950bc319943cd1  (car-van-far.glb)
+box-near.glb      143,860 B  sha256 cbcbe590315768dbdc34141f6515799740466e69141d46ae888fdcf3c34f176b  (car-box-near.glb)
+box-far.glb        35,304 B  sha256 df6ce17be7b80a30fa5e67ea0edeae57a212674b7150fcb1b51eefdc92add4bc  (car-box-far.glb)
+
+Near: 13 primitives (the box truck 14: its cargo door), 2,466-2,602 triangles; nodes steer_FL/FR at the front wheel
+      centres with wheel_FL/FR under them, wheel_RL/RR under steer_RL/RR (not steered); materials paint, glass, trim,
+      alloy, headlamp, brake (also the tail lamps), indicator_left, indicator_right (front, wing repeater, rear),
+      plate_text (front and rear plates), wheel_vertex. No clips: the game turns the nodes.
+Far:  one primitive, 582-622 triangles, colours baked into the vertices, no lamps.
+Sizes per type: src/carTypes.js, checked against the files by tools/test_cartypes.py.
+
+Axes: metres, +X forward, +Y up, +Z right (indicator_left on -Z), origin on the ground midway between the axles.
+Unchanged from the lab (the game turns them to its +Z forward).
