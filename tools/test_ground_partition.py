@@ -204,6 +204,25 @@ class Terrain(unittest.TestCase):
         self.assertEqual(r["cut"], 2)
         self.assertAlmostEqual(r["kept_area"] + r["new_area"], 50, places=6)
 
+    def test_a_needle_thinner_than_the_grid_is_no_remain(self):
+        # (#812, modranska-skola-ramp: needles 0.2-0.3 mm wide along a building's edge, kept in one box and not in
+        # another. A cover leaving a strip 0.3 mm wide and 10 m long (3e-3 m2, over SLIVER) leaves no remain; 2 mm wide
+        # it does)
+        for w, n in ((0.0003, 0), (0.002, 1)):
+            r = gp.cut_terrain(self.x, self.y, self.T, shapely.box(-1, -1, 10 - w, 11), self.box, threads=1, geometry=True)
+            self.assertEqual(len(r["remains"]), n, w)
+
+    def test_the_cover_from_its_pieces_per_tile(self):
+        # (#812, yard-at-a-sidewalk: the cover united for the whole box kept a crossing's node as a vertex by what else
+        # the box held; from the pieces each tile unites its own, in an order by place, and cuts as the united cover)
+        pieces = [shapely.box(6, 1, 8, 3), shapely.box(7, 2, 9, 4), shapely.box(-50, -50, -40, -40)]
+        a = gp.cut_terrain(self.x, self.y, self.T, shapely.union_all(pieces), self.box, threads=1, geometry=True)
+        for order in (pieces, pieces[::-1]):
+            b = gp.cut_terrain(self.x, self.y, self.T, order, self.box, threads=1, geometry=True)
+            self.assertEqual((b["cut"], b["kept"], b["dropped"]), (a["cut"], a["kept"], a["dropped"]))
+            self.assertAlmostEqual(b["new_area"], a["new_area"], places=6)
+            self.assertEqual([round(g.area, 9) for _, g in b["remains"]], [round(g.area, 9) for _, g in a["remains"]])
+
 
 class Water(unittest.TestCase):
     """WaterLevels (#632): a point's level from the banks of its own water it sees over the water, past no cut."""
@@ -284,6 +303,23 @@ class WaterLocality(unittest.TestCase):
             out.append(lv.at(px, py))
         self.assertTrue(np.isfinite(out[0]).all())
         self.assertEqual(out[0].tolist(), out[1].tolist())
+
+    def test_a_sight_line_along_a_cells_edge_reads_one_cell_in_any_box(self):
+        # (#812, rasinovo-quay: a line of sight along x = -744, its sample's x -744 within 1e-13 m, read the wet cell
+        # west of the edge with one ring of tiles and the dry one east of it with two. Here the line runs along the
+        # lake's east edge in the raster, and a pond far west moves the raster's origin from -50 to -2000)
+        lake, pond = shapely.box(-50, -50, 0, 50), shapely.box(-2000, -1000, -1990, -990)
+        W = shapely.union_all([lake, pond])
+        ipr = Ipr(lambda x, y: np.full(np.shape(x), 10.0))
+        lvs = [gp.WaterLevels(W, [], ipr, Frame(), extent=e) for e in (shapely.box(-100, -100, 100, 100), shapely.box(-2100, -1100, 100, 100))]
+        # (the first dry cell's west edge on the row of y = 0; past the raster's end a cell is dry)
+        edges = [lv.x0 + np.flatnonzero(lv.grid[int(lv.y1), :])[-1] + 1 for lv in lvs]
+        self.assertEqual(edges[0], edges[1])
+        seen = []
+        for lv in lvs:
+            lv.P = np.array([[edges[0] - 1e-13, 20.0]])
+            seen.append(lv._seen(np.array([edges[0] - 1e-13, -20.0]), np.array([0])).tolist())
+        self.assertEqual(seen[0], seen[1])
 
     def test_no_bank_farther_than_water_far(self):
         # (a lake's middle, 600 m from every bank: no level, where the old fallback read banks at any distance; the

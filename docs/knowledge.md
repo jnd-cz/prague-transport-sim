@@ -871,9 +871,18 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   - The water levels (`ground_partition.WaterLevels`): the sight raster started at the box's corner, the banks were
     sampled evenly from wherever each ring starts, and banks up to 1,000 m off were read. Now the raster is on the
     S-JTSK grid, the banks are sampled where they cross a 10 m grid, and no bank is read farther than a tile's side.
+    A sight line's cells are counted from the point's S-JTSK coordinates: from the local point less the raster's
+    origin, the float noise of a line along a cell's edge went by the box (rasinovo-quay's pool: 10 banks seen or 9,
+    186.28 or 186.00 m).
   - Float noise of the box-wide overlays: the cover's union left needles 9 m long and 1e-13 m wide, and GEOS's buffer
     of the whole box's terrain (the thin strips by a plot) put a vertex 0.2 mm apart, 1 mm on the ground file's grid.
-    The pieces go on the 1 mm grid before they are united; the strips are opened per tile with a 4 m margin.
+    The pieces go on the 1 mm grid before they are united; the strips are opened per tile with a 4 m margin. United on
+    the grid, the cover is no more local: which pieces are united first goes by everything in the box, and with it
+    whether a wedge a fraction of a mm wide between two pieces stays open, and whether a crossing's node stays as a
+    vertex on an edge (modranska-skola-ramp: needles 1.9-7.8 m long and 0.2-0.3 mm wide cut from the terrain's
+    triangles along a building in one box only; yard-at-a-sidewalk: a vertex on a building's edge). The terrain's cut
+    unites its cover per world tile from the pieces near it, in an order by place, and a remain thinner than the grid
+    is none.
   - Ties broken by an STRtree's order: its hits come in the order of its traversal, which every geometry in the
     tree moves, and `query_nearest(all_matches=False)` takes the first of the equally near. A sidewalk corner on
     the vertex two wall edges share read the surface on one side or the other, 230.21 or 230.37 m; a lidar corner

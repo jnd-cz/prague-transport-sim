@@ -541,15 +541,22 @@ class WaterLevels:
         ex = W if extent is None else W.intersection(extent)
         r = WATER_RES
         bx0, y0, x1, by1 = ex.bounds if not ex.is_empty else (0, 0, 1, 1)
-        self.x0 = math.floor((bx0 + ORIGIN[0]) / r) * r - ORIGIN[0]
-        self.y1 = math.ceil((by1 + ORIGIN[1]) / r) * r - ORIGIN[1]
+        # (a cell's column and row from the point's S-JTSK coordinates and the raster's first cell there, both whole
+        # cells: from the local point less the raster's origin, the float noise of the sum went by the box. A line of
+        # sight along x = -744 at rasinovo-quay (line 17), its sample's x -744 within 1e-13 m, read the wet column with
+        # one ring of tiles and the dry one with two, saw 10 banks or 9, and the level took the fallback, 186.28 or
+        # 186.00 m, #812)
+        self.kx0 = math.floor((bx0 + ORIGIN[0]) / r)
+        self.ky1 = math.ceil((by1 + ORIGIN[1]) / r)
+        self.x0 = self.kx0 * r - ORIGIN[0]
+        self.y1 = self.ky1 * r - ORIGIN[1]
         nx, ny = int((x1 - self.x0) / r) + 2, int((self.y1 - y0) / r) + 2
         im = Image.new("1", (nx, ny), 0)
         d = ImageDraw.Draw(im)
 
         def px(c):
             c = np.asarray(c)
-            return list(zip(((c[:, 0] - self.x0) / r).tolist(), ((self.y1 - c[:, 1]) / r).tolist()))
+            return list(zip(((c[:, 0] + ORIGIN[0]) / r - self.kx0).tolist(), (self.ky1 - (c[:, 1] + ORIGIN[1]) / r).tolist()))
         for g in shapely.get_parts(polygonal(ex)):
             if g.geom_type != "Polygon":
                 continue
@@ -574,8 +581,9 @@ class WaterLevels:
         h = WATER_RES
         t = np.arange(WATER_SEE, max(float(n.max()) - WATER_SEE, WATER_SEE) + h, h)
         q = v[None, None, :] + d[:, None, :] * (t[None, :, None] / np.maximum(n, 1e-9)[:, None, None])
-        c = ((q[..., 0] - self.x0) / WATER_RES).astype(int)
-        rr = ((self.y1 - q[..., 1]) / WATER_RES).astype(int)
+        from geo import ORIGIN
+        c = np.floor((q[..., 0] + ORIGIN[0]) / WATER_RES).astype(np.int64) - self.kx0
+        rr = self.ky1 - np.ceil((q[..., 1] + ORIGIN[1]) / WATER_RES).astype(np.int64)
         ny, nx = self.grid.shape
         inside = (c >= 0) & (c < nx) & (rr >= 0) & (rr < ny)
         wet = np.zeros(c.shape, bool)
@@ -646,14 +654,36 @@ def mesh_in_box(mesh_dir, box):
 
 
 def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
-    """The terrain triangles against the cover (the classes above) and the box, tile by tile side by side (shapely's
-    vectorised calls release the GIL): counts and areas, and the triangles inside `window` (a box) for the pictures.
-    geometry: also "kept" (the indexes of the triangles kept whole), "remains" ([(the cut triangle's index, a polygon of
-    what is left of it)]) and "under" (the indexes of those the cover reaches: dropped or cut), for the mesh
-    (tools/ground_mesh.py)."""
+    """The terrain triangles against the cover (the classes above: a geometry, or the pieces on the GRID it unites) and
+    the box, tile by tile side by side (shapely's vectorised calls release the GIL): counts and areas, and the
+    triangles inside `window` (a box) for the pictures. geometry: also "kept" (the indexes of the triangles kept
+    whole), "remains" ([(the cut triangle's index, a polygon of what is left of it)]) and "under" (the indexes of those
+    the cover reaches: dropped or cut), for the mesh (tools/ground_mesh.py).
+    Given the pieces, each of the world's tiles unites its own cover from those near it, in an order by place: united
+    on the grid for the whole box, the cover kept a crossing's node as a vertex on an edge or not, by which pieces were
+    united first, and that by what else the box held. At yard-at-a-sidewalk, line 23 (-2352.019, 24.302), a
+    building's edge had a vertex there with two rings of tiles and not with one (#812)."""
+    from geo import tile_index
     tris = shapely.polygons(np.stack([np.column_stack([x[T[:, k]], y[T[:, k]]]) for k in (0, 1, 2, 0)], 1))
     cx, cy = x[T].mean(1), y[T].mean(1)
-    tile = np.floor(cx / TILE).astype(np.int64) * 1000003 + np.floor(cy / TILE).astype(np.int64)
+    te, tn = tile_index(cx, cy)
+    tile = te * 1000003 + tn
+    if isinstance(cover, (list, tuple)):
+        pg = np.asarray([g for g in cover if not g.is_empty], dtype=object)
+        ptree = shapely.STRtree(pg)
+        prank = ties.by_place(pg)
+
+        def cover_of(bb):
+            # (a metre past the triangles' bounds, on whole metres: the clip's edges lie off every triangle)
+            bx = (math.floor(bb[0]) - 1, math.floor(bb[1]) - 1, math.ceil(bb[2]) + 1, math.ceil(bb[3]) + 1)
+            k = ptree.query(shapely.box(*bx))
+            if not len(k):
+                return Polygon()
+            k = k[np.argsort(prank[k], kind="stable")]
+            return polygonal(shapely.union_all(shapely.clip_by_rect(pg[k], *bx), grid_size=GRID))
+    else:
+        def cover_of(bb):
+            return shapely.clip_by_rect(cover, *bb)
     order = np.argsort(tile, kind="stable")
     bounds = np.flatnonzero(np.diff(tile[order])) + 1
     groups = np.split(order, bounds)
@@ -662,7 +692,7 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
         P = tris[ids]
         b = shapely.bounds(P)
         bb = (b[:, 0].min(), b[:, 1].min(), b[:, 2].max(), b[:, 3].max())
-        C = shapely.clip_by_rect(cover, *bb)
+        C = cover_of(bb)
         # (each tile its own piece of the box: a prepared geometry builds its index at its first use, and the corridor's
         # polygon shared by the threads crashed GEOS with an access violation)
         Bx = shapely.clip_by_rect(box, *bb)
@@ -686,8 +716,13 @@ def cut_terrain(x, y, T, cover, box, threads=8, window=None, geometry=False):
             poly = np.isin(shapely.get_type_id(parts), (3,))
             parts, pi = parts[poly], pi[poly]
             a = shapely.area(parts)
-            r["lost_area"] = float(a[a <= SLIVER].sum())
-            parts, pi = parts[a > SLIVER], pi[a > SLIVER]
+            # (and those thinner than the GRID: the cover united on the grid leaves a wedge a fraction of a mm wide
+            # between two pieces or closes it, by what else the box holds, and the needles cut from the triangles there
+            # came out in one box and not in another: 1.9-7.8 m long and 0.2-0.3 mm wide along a building's edge at
+            # modranska-skola-ramp, line 17 (-2361.7, -8046.5), with two rings of tiles and not with one, #812)
+            keep = (a > SLIVER) & (2 * a / np.maximum(shapely.length(parts), 1e-12) >= GRID)
+            r["lost_area"] = float(a[~keep].sum())
+            parts, pi = parts[keep], pi[keep]
             if geometry:
                 r["remains"] = list(zip(ids[cut][pi].tolist(), parts))
             new = shapely.get_parts(shapely.constrained_delaunay_triangles(parts)) if len(parts) else []
@@ -780,7 +815,7 @@ def partition(ln, mesh=None, threads=8, windows=(), geometry=False, within=None)
         windows.append(rep["bed window"])
     win = shapely.union_all([shapely.box(*w) for w in windows]) if windows else None
     t1 = time.time()
-    cut = cut_terrain(x, y, T, cover, box, threads, win, geometry)
+    cut = cut_terrain(x, y, T, [q["g"] for qs in (survey, beds, plots, water) for q in qs], box, threads, win, geometry)
     mesh_area = cut["kept_area"] + cut["new_area"]
     A = box.area
     areas = {"survey": S.area, "street": 0.0, "bed": B.area, "plot": P.area, "water": Wp.area, "terrain": terrain.area}
