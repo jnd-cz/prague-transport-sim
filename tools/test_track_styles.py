@@ -124,20 +124,16 @@ class OtherTracks(unittest.TestCase):
         self.assertEqual([(a, b, st) for a, b, st in own[0]], [(20.0, 100.0, "grass")])
 
     def test_a_side_tracks_rails_over_ipr_by_the_ballast_band_for_40_m_are_open_ballast(self):
-        # (#548: a side track 200 m long, its rails 0.18 m over IPR from 30 to 140 m along it, at IPR elsewhere; its own
-        # embedded crossing at 80-90 m, paved at the rails' height, stays; its switch at 120-130 m, the rails in the band,
-        # is ballast (the user's open ballast keeps its switches, #503); a stretch over IPR 30 m long, 160-190 m, inside a
-        # longer stretch of its own, is no ballast)
+        # (#548: a side track 200 m long, its rails 0.18 m over IPR from 40 to 140 m along it, at IPR elsewhere; its own
+        # embedded crossing at 80-90 m stays; a second stretch over IPR only 30 m long, 160-190 m, is no ballast)
         def ipr(xs, ys):
-            return [100.0 - (0.18 if (30 <= y - 20 <= 140 and not 80 <= y - 20 <= 90) or 160 <= y - 20 <= 190 else 0.0)
-                    for y in ys]
-        tr = {"p": [[300.0, 20.0], [300.0, 220.0]], "zs": [100.0] * 101,
-              "styles": [[80.0, 90.0, "embedded"], [120.0, 130.0, "embedded"]]}
+            return [100.0 - (0.18 if 40 <= y - 20 <= 140 or 160 <= y - 20 <= 190 else 0.0) for y in ys]
+        tr = {"p": [[300.0, 20.0], [300.0, 220.0]], "zs": [100.0] * 101, "styles": [[80.0, 90.0, "embedded"]]}
         data = {"path": [[0.0, 0.0], [600.0, 0.0]], "tracks": [tr]}
         laid = T.ballast_runs(data, ipr)
         got = [(round(a), round(b), st) for a, b, st in tr["styles"]]
         self.assertEqual([g[2] for g in got], ["ballast", "embedded", "ballast"])
-        self.assertTrue(all(abs(g[0] - w[0]) <= 12 and abs(g[1] - w[1]) <= 12 for g, w in zip(got, [(30, 80), (80, 90), (90, 140)])), got)
+        self.assertTrue(all(abs(g[0] - w[0]) <= 12 and abs(g[1] - w[1]) <= 12 for g, w in zip(got, [(40, 80), (80, 90), (90, 140)])), got)
         self.assertAlmostEqual(laid, sum(b - a for a, b, st in tr["styles"] if st == "ballast"), places=0)
         self.assertEqual(got[1], (80, 90, "embedded"))
         # (laid anew on a rerun, and its bed's lift is the ballast's 0.17 m inside the run, 0 at the crossing)
@@ -152,15 +148,6 @@ class OtherTracks(unittest.TestCase):
         flat = {"p": [[300.0, 20.0], [300.0, 220.0]], "zs": [100.0] * 101}
         T.ballast_runs({"path": data["path"], "tracks": [flat]}, lambda xs, ys: [100.0] * len(xs))
         self.assertNotIn("styles", flat)
-        # (a stretch of 30 m between two grass sections of its own, its rails in the band: a short open ballast before
-        # the grass; a yard's piece of 22 m in the band all along: ballast; one of 12 m: too short to tell)
-        gr = {"p": [[300.0, 20.0], [300.0, 120.0]], "zs": [100.0] * 51, "styles": [[0.0, 40.0, "grass"], [70.0, 100.0, "grass"]]}
-        T.ballast_runs({"path": data["path"], "tracks": [gr]}, lambda xs, ys: [100.0 - (0.18 if 40 <= y - 20 <= 70 else 0.0) for y in ys])
-        self.assertEqual([(round(a), round(b), st) for a, b, st in gr["styles"]], [(0, 40, "grass"), (40, 70, "ballast"), (70, 100, "grass")])
-        for n, want in ((12, [(0, 22, "ballast")]), (7, None)):
-            piece = {"p": [[300.0, 20.0], [300.0, 20.0 + (n - 1) * 2.0]], "zs": [100.0] * n}
-            T.ballast_runs({"path": data["path"], "tracks": [piece]}, lambda xs, ys: [99.82] * len(xs))
-            self.assertEqual([(round(a), round(b), st) for a, b, st in piece["styles"]] if "styles" in piece else None, want)
 
 
 def styled(style, **extra):

@@ -97,12 +97,6 @@ RAMP, LIFT_STEP = 15, 2  # m: a style's offset blends in over RAMP inside its se
 BALLAST_BAND = (0.12, 0.35)
 BALLAST_WIN = 20.0
 BALLAST_RUN = 40.0
-# and a whole stretch between a track's own sections or its ends, BALLAST_GAP long, by the median over it: on the
-# route's stretches of one style that calls 83 % of the ballast of 20-40 m (96 % of 40 m and more), 3 % of the embedded
-# and 7 % of the panels of 20-40 m, none of the setts or grass; of 10-20 m only 57 % of the ballast against more metres
-# of paved track, so a shorter one is left as it is. Pieces under BALLAST_SHORT are none
-BALLAST_GAP = (20.0, 60.0)   # m: a longer stretch is read by its runs (BALLAST_RUN), not as a whole
-BALLAST_SHORT = 10.0
 RANK = {"tram": 9, "road": 8, "island": 7, "median": 7, "platform": 7, "sidewalk": 6, "parking": 5, "cycle": 5, "paved": 4,
         "stairs": 3, "green": 2, "water": 1}   # (src/terrain.js SURFACE_RANK)
 
@@ -409,17 +403,6 @@ def track_sections(data, survey):
     return out
 
 
-def union(pieces):
-    """The pieces [(a, b)] merged where they overlap or touch, in order."""
-    out = []
-    for a, b in sorted(pieces):
-        if out and a <= out[-1][1]:
-            out[-1] = (out[-1][0], max(out[-1][1], b))
-        else:
-            out.append((a, b))
-    return out
-
-
 def ballast_runs(data, terrain, step=2.0):
     """Every other drawn track's open ballast where IPR reads it (#548), into its `styles` (after the heights: each
     track's top of rail `zs`, every `step` m along its `p`). Where its rails stand BALLAST_BAND over IPR's ground at the
@@ -445,15 +428,6 @@ def ballast_runs(data, terrain, step=2.0):
         xy = [rt.at(v)[:2] for v in s]
         g = terrain([p[0] for p in xy], [p[1] for p in xy])
         d = [z - q if z is not None and q is not None and q == q else None for z, q in zip(zs, g)]
-
-        def median(a, b, d=d, s=s):
-            v = sorted(x for x, q in zip(d, s) if x is not None and a <= q <= b)
-            return v[len(v) // 2] if len(v) >= 3 else None
-        # (an embedded section of its own whose rails stand in the band is a switch in open ballast, not paved: the
-        # user's open ballast keeps its switches, #503. A paved one has its rails at IPR's height: 1-3 % of the route's
-        # embedded stretches read in the band)
-        turned = [x for x in own if x[2] == "embedded" and (m := median(x[0], x[1])) is not None and lo <= m <= hi]
-        own = [x for x in own if x not in turned]
         med = []
         for k in range(len(d)):
             w = sorted(v for v in d[max(0, k - h):k + h + 1] if v is not None)
@@ -469,16 +443,8 @@ def ballast_runs(data, terrain, step=2.0):
             if s[j] - s[k] >= BALLAST_RUN:
                 runs.append((s[k], s[j]))
             k = j + 1
-        # (and a whole stretch between its own sections or its ends, BALLAST_GAP long, whose rails stand in the
-        # band by their median: a short open ballast before grass or a crossing, or a yard's piece between switches)
-        cover = [{"s0": x[0], "s1": x[1]} for x in own]
-        runs += [(a, b) for a, b in minus(0.0, L, cover) if BALLAST_GAP[0] <= b - a < BALLAST_GAP[1] and (m := median(a, b)) is not None
-                 and lo <= m <= hi]
-        bal = [[a, b, "ballast"] for r0, r1 in runs for a, b in minus(r0, r1, cover) if b - a >= BALLAST_SHORT]
-        bal = [[a, b, "ballast"] for a, b in union([(x[0], x[1]) for x in bal])]
-        # (a turned switch's section stays embedded where no ballast takes it)
-        own += [[round(a, 1), round(b, 1), "embedded"] for x in turned
-                for a, b in minus(x[0], x[1], [{"s0": q[0], "s1": q[1]} for q in bal]) if b - a >= 1]
+        bal = [[a, b, "ballast"] for r0, r1 in runs for a, b in minus(r0, r1, [{"s0": x[0], "s1": x[1]} for x in own])
+               if b - a >= MIN_PIECE]
         laid += sum(b - a for a, b, _ in bal)
         secs = sorted(own + [[round(a, 1), round(b, 1), st] for a, b, st in bal])
         if secs:
