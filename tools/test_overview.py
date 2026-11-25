@@ -26,7 +26,7 @@ MARKER = "SECRET-PROMPT-TEXT-8c1f"
 def job(pid, state, since=None, share=None, expect=None, kind="x.py", gb=None, t=None):
     return {"what": f"job{pid}", "root": f"/w/transport-game-{pid}", "pid": pid, "t": NOW - 1000 + pid if t is None else t,
             "state": state, "since": since if since is not None else NOW - 1000 + pid, "share": share, "kind": kind,
-            "expect": expect, "gb": gb}
+            "expect": expect, "gb": gb, "queue": baseline_store.QUEUE}
 
 
 def times(jobs, **kw):

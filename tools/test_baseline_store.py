@@ -178,7 +178,7 @@ class DayAndNight(unittest.TestCase):
 
     def ticket(self, what, pid, t, **kw):
         return {"what": what, "root": "C:/x/transport-game-1", "pid": pid, "t": t, "state": "waiting", "since": t,
-                "share": None, **kw}
+                "share": None, "queue": baseline_store.QUEUE, **kw}
 
     def test_the_night_hours(self):
         self.assertEqual([baseline_store.night(self.at(h)) for h in (6, 7, 12, 22, 23, 2)],
@@ -260,7 +260,7 @@ class DayAndNight(unittest.TestCase):
         STALL s the short one takes its turn by queue time."""
         now = time.time()
         old = {"what": "#548", "root": "C:/x/transport-game-548", "pid": 2, "t": now - 4 * 3600, "state": "waiting",
-               "since": now - 4 * 3600, "share": {"gb": 22.0, "cores": 12}, "expect": 7200}
+               "since": now - 4 * 3600, "share": {"gb": 22.0, "cores": 12}, "expect": 7200, "held": False}
         me, out = self.job(expect=360), io.StringIO()
         me.t, me.out = now - 6 * 3600, out
         old["t"] = now - 3 * 3600  # (queued after me, waited past PASS_MAX: before me by rank)
@@ -273,6 +273,44 @@ class DayAndNight(unittest.TestCase):
         with mock.patch.object(baseline_store, "queued_turns", lambda: [running, old]),                 mock.patch.object(baseline_store, "history", lambda: []):
             self.assertEqual([j["what"] for j in me.ahead()], ["#548", "#548"])  # (something runs: the rule as before)
             self.assertIsNone(me.still)
+
+    def test_the_queue_version_of_a_ticket(self):
+        v = baseline_store.queue_version
+        self.assertEqual([v({}), v({"held": False}), v({"held": False, "queue": 2}), v({"queue": 7})], [0, 1, 2, 7])
+        self.assertEqual(self.ticket("x", 1, 0)["queue"], baseline_store.QUEUE)
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            j = self.job(expect=60)
+            j.t = time.time()
+            j._write("waiting")
+            got, = baseline_store.queue()
+            os.remove(j.path)
+        self.assertEqual(got["queue"], baseline_store.QUEUE)
+        self.assertNotIn("merge main", baseline_store.describe(got))
+        self.assertTrue(baseline_store.describe({**got, "queue": 1}).endswith(", its queue code is older (merge main)"))
+
+    def test_with_a_first_come_ticket_waiting_first_come_first_served_at_once(self):
+        """#856, as on 2026-11-25 06:24: #812's jobs (#851's code) put #250's short job first; #250's checkout (first come
+        first served, no "queue" nor "held" on its ticket) waits for #812's, queued before it. Now #812's take their
+        turn by queue time too, at once."""
+        now = time.time()
+        old = {"what": "#250 perf M", "root": "C:/x/transport-game-250-main", "pid": 2, "t": now - 1300,
+               "state": "waiting", "since": now - 1300, "share": None, "expect": 360}
+        me = self.job(expect=1500, share={"gb": 5, "cores": 4})
+        me.t = now - 2600
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [old]), \
+                mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual(me.ahead(), [])
+            later = self.job(expect=60)
+            later.t = now
+            self.assertEqual([j["what"] for j in later.ahead()], ["#250 perf M"])  # (short, but queued after it)
+        new = dict(old, queue=baseline_store.QUEUE)  # (the same ticket of this version: short ones first)
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [new]), \
+                mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual([j["what"] for j in me.ahead()], ["#250 perf M"])
+        got = baseline_store.schedule([dict(old, pid=2), {**old, "what": "#812", "pid": 3, "t": now - 2600,
+                                                          "since": now - 2600, "expect": 1500, "queue": 2}], now, records=[])
+        self.assertLess(next(j["start"] for j in got if j["what"] == "#812"),
+                        next(j["start"] for j in got if j["what"] == "#250 perf M"))
 
     def test_a_held_job_starts_when_the_night_comes(self):
         out, nights = io.StringIO(), iter([False, False, True])
@@ -657,9 +695,10 @@ class Queue(unittest.TestCase):
             f.write("headless C:/x/transport-game-268\n")
         j, = baseline_store.queue()
         self.assertEqual((j["what"], j["state"], j["root"]), ("headless", "running", "C:/x/transport-game-268"))
-        self.assertEqual(baseline_store.describe(j, j["since"] + 600), "headless in transport-game-268, running 10 min")
+        old = ", its queue code is older (merge main)"  # (#856)
+        self.assertEqual(baseline_store.describe(j, j["since"] + 600), "headless in transport-game-268, running 10 min" + old)
         # (a ticket written just after the board read the clock)
-        self.assertEqual(baseline_store.describe(j, j["since"] - 1), "headless in transport-game-268, running 0 min")
+        self.assertEqual(baseline_store.describe(j, j["since"] - 1), "headless in transport-game-268, running 0 min" + old)
 
     def test_a_job_that_watches_itself_is_given_twice_the_idle_time(self):
         other = subprocess.Popen([sys.executable, "-I", "-c", "import time; time.sleep(60)"])
@@ -747,7 +786,7 @@ class Rules(unittest.TestCase):
 
     def test_the_board_sees_the_expected_time_the_warning_and_the_ends(self):
         j = {"what": "trace heights", "root": "C:/x/transport-game-812", "state": "running", "since": 0, "expect": 300,
-             "share": {"gb": 6, "cores": 4}, "warn": "LATE ×20; 17 of 6 GB"}
+             "share": {"gb": 6, "cores": 4}, "warn": "LATE ×20; 17 of 6 GB", "queue": baseline_store.QUEUE}
         self.assertEqual(baseline_store.describe(j, 6000), "trace heights in transport-game-812, running 100 min, "
                                                           "expected 5 (shared: 6 GB, 4 cores): LATE ×20; 17 of 6 GB")
         rs = [{"t": 0, "wall": 100, "ended": "idle: …"}, {"t": 0, "wall": 5000, "ended": None},
