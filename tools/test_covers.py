@@ -108,6 +108,27 @@ class Street(unittest.TestCase):
         self.assertGreater(off.sum(), 10000)  # (round the way the cover holds by it too, a passage)
         np.testing.assert_array_equal(np.isnan(alone.at(x, y))[off], np.isnan(joined.at(x, y))[off])
 
+    def test_a_tiles_cover_reads_the_cut_within_its_window_alone(self):
+        # (a passage 700 m long under a road, the raster's slot along all of it; past the next tile the cut widens into
+        # a structure left out whole, 40 m across: judged as one part the whole slot ran on and no cover held, #812)
+        from geo import tile_box, tile_index
+        (e, _), (n, _) = tile_index([0.0, 0.0], [0.0, 0.0])
+        x0, y0 = tile_box(int(e), int(n))[:2]
+        x0, y = x0 + 10.0, y0 + 250.0
+        D = {"areas": [rect("road", x0, y - 25, x0 + 700, y + 25, 200.0), rect("underpass", x0, y - 2, x0 + 700, y + 2, 196.0, level=-1)]}
+
+        def lidar(wide):
+            def z(px, py):
+                px, py = np.asarray(px, float), np.asarray(py, float)
+                cut = (np.abs(py - y) < 3) | (wide & (px > x0 + 650) & (np.abs(py - y) < 20))
+                return np.where(cut, 196.0, 200.0)
+            return z
+        narrow, widened = covers.Covers(D, lidar(False)), covers.Covers(D, lidar(True))
+        px, py = np.array([x0 + 100.0, x0 + 300.0]), np.array([y, y + 1.0])
+        np.testing.assert_allclose(narrow.at(px, py), 200.0, atol=1e-9)
+        np.testing.assert_allclose(widened.at(px, py), narrow.at(px, py), atol=1e-9)
+        self.assertTrue(np.isnan(widened.at(np.array([x0 + 680.0]), np.array([y]))).all())  # (where it runs on: none)
+
     def test_iprs_reader_with_the_covers(self):
         from types import SimpleNamespace
         lidar = slot(27, 33)

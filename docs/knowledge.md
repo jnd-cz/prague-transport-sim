@@ -932,8 +932,15 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   - The covers over passages (`covers.Covers`) looked for the raster's cut on a lattice from the passages' bounds, and
     a passage merges with those the box holds (lattice-cell's one ring held one cover of 153 m², its two rings three of
     273 m²): with a passage joining from a larger box the lattice moved, and the cut with it. The lattice is on STEP's
-    grid now. Still read past the ring: a cut connected along a passage is labelled whole, so a passage only a larger
-    box holds can join its cut and decide whether it is a slot (none measured).
+    grid now. A cut connected along a passage was labelled whole, so a passage only a larger box holds could join it
+    and decide whether it is a slot. Each world tile's points are judged by the cut's parts within 30 m of the tile now
+    (`covers.WINDOW`, twice LIMIT); the five lines' covers are the same as before (5, 11, 5, 2 and 4, 115-1028 m²).
+  - What a tile may read, then: the tile and its ring of tiles (the build's box, which `ground_place.py --rings` widens
+    by a ring) and inputs computed once for the whole line or city (the city terrain mesh, the street surface
+    `lineN.streets.*`, the survey, OSM, IPR's raster). Rules reach into the ring by at most: a tile's side for the water
+    levels' banks, 30 m for the covers' cut, 4 m for the thin strips, 18 m (LIMIT + NEAR) for the passages a cover
+    looks at, a platform's length for its plane. Ties are settled by place or by meaning, never by an order the box
+    sets, and every snap to the grid goes through the µm.
 - **Where walls stand** (#697, measured 2026-11-19 on the five lines; the user: "can we use the open data sources to
   infer where walls should really stand as opposed to blending between the different height points?"). Four sources,
   best first:
