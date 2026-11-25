@@ -148,6 +148,16 @@ class Plots(unittest.TestCase):
         self.assertEqual([q["z"] for q in p], [200.0, 200.0])
 
 
+class Grid(unittest.TestCase):
+    def test_a_vertex_half_a_mm_off_the_grid_goes_one_way_whatever_its_float_noise(self):
+        # (hlavni-nadrazi-under-the-magistrala's plot: x 1051.2025 plus or minus the overlays' noise went to 1051.203 in
+        # one box and to 1051.202 in the other, #812)
+        got = [shapely.get_coordinates(gp.on_grid(shapely.Polygon([(1040.0, -410.0), (x, -400.79), (1040.0, -390.0)])))
+               for x in (1051.2025000000003, 1051.2024999999998)]
+        np.testing.assert_array_equal(got[0], got[1])
+        self.assertIn(1051.203, got[0][:, 0].tolist())
+
+
 class Strips(unittest.TestCase):
     def test_a_thin_strip_by_a_plot_joins_it_a_wide_one_stays(self):
         box = shapely.box(0, 0, 30, 10)

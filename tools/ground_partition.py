@@ -308,13 +308,21 @@ def plot_pieces(L, box, above, ipr, F):
     return res
 
 
+def on_grid(g):
+    """g with its vertices on GRID, through the µm: a vertex half a mm off the grid, as an intersection of the data's
+    own mm can lie, went to the mm on either side by the float noise of the overlays it came from, and that by the box:
+    hlavni-nadrazi-under-the-magistrala's plot at x 1051.2025000000003 and stairs-not-there's at y 1242.4725000000017
+    each held a vertex 1 mm off its neighbour in one box only (#812). Rounded to the µm first, the noise is gone."""
+    return shapely.set_precision(shapely.set_precision(g, 1e-6), GRID)
+
+
 def on_the_grid(qs):
     """Pieces ([{g, ...}], in place) with their vertices on the mm grid the ground file keeps (GRID), those left under
     SLIVER dropped. The cuts run over the whole box, and where pieces meet they leave needles and slivers of float
     noise that differ with the box: lattice-cell's tile held a plot with a needle 9 m long and 1e-13 m wide in one box
     and not in the other, and its edges were among the faces' lines (#812). On the grid they are gone."""
     for q in qs:
-        q["g"] = polygonal(shapely.set_precision(q["g"], GRID))
+        q["g"] = polygonal(on_grid(q["g"]))
     qs[:] = [q for q in qs if q["g"].area > SLIVER]
     return qs
 
@@ -338,7 +346,7 @@ def thin_parts(terrain, width=STRIP):
     for e in range(int(e0), int(e1) + 1):
         for n in range(int(n0), int(n1) + 1):
             sq = shapely.box(*tile_box(e, n))
-            chunk = polygonal(shapely.set_precision(terrain.intersection(sq.buffer(THIN_MARGIN * width, join_style="mitre")), GRID))
+            chunk = polygonal(on_grid(terrain.intersection(sq.buffer(THIN_MARGIN * width, join_style="mitre"))))
             if chunk.is_empty:
                 continue
             # (in a normal form and opened without the grid: the same chunk with its rings started elsewhere, as float
@@ -346,7 +354,7 @@ def thin_parts(terrain, width=STRIP):
             # one box and to none in the other, stairs-beside-a-building (-2726.4, -1336.0), #812)
             chunk = shapely.normalize(shapely.set_precision(chunk, 0.0))
             thin = chunk.difference(chunk.buffer(-width / 2).buffer(width / 2, join_style="mitre"))
-            out.append(polygonal(shapely.set_precision(thin.intersection(sq), GRID)))
+            out.append(polygonal(on_grid(thin.intersection(sq))))
     # (its vertices on the grid but no grid of its own: GEOS keeps a geometry's grid, and an overlay whose first input
     # has one snap-rounds to it. The plots that took strips had it, and the union of the classes over the water bent
     # a survey edge to a plot's vertex 0.4 mm off it in the box where the union paired them so: line 22's water piece
@@ -803,7 +811,7 @@ def partition(ln, mesh=None, threads=8, windows=(), geometry=False, within=None)
     for qs in (survey, beds, plots, water):
         on_the_grid(qs)
     S, B, P, Wp = (shapely.union_all([q["g"] for q in qs], grid_size=GRID) if qs else Polygon() for qs in (survey, beds, plots, water))
-    B0 = polygonal(shapely.set_precision(B0, GRID))
+    B0 = polygonal(on_grid(B0))
     lap("on the grid")
     cover = shapely.union_all([S, B, P, Wp], grid_size=GRID)
     terrain = polygonal(box.difference(cover, grid_size=GRID))
