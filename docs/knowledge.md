@@ -1308,12 +1308,33 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   takes them only for a walker, a car or an obstacle in the way, or where the grip is under 0.25 or the wheels slide. A stop, a
   signal, a junction or a tram ahead on dry rail gets step 5 at most.
 - **The load** (#351, `tools/headless.py --checks load10,load90`: the stops run with the passengers held at 10 % and 90 % of the
-  capacity): a full car's plan brakes gentler and longer, as step 5 gives less over the mass, and boarding slows over 75 %. A full car
+  capacity): a full car's plan brakes gentler and longer, as step 5 gives less over the mass (since #249 the hold moves the mass only:
+  the exchanges at the stops are the passengers' own, with their own count; before it boarding slowed over 75 %). A full car
   pulls away on step 4 where step 3 cannot make 1.0 m/s² (on step 3 it made 0.8). At 90 % against 10 %, lines 9, 17, 22, 23 and 37
   (seed 1, line 23 seed 2): +79, +320, +302, +206 and +142 s to the terminus (main +4, +263, +240, +46, +50 s); the departures' mean
   delay 99, 308, 251, 214 and 91 s at 90 %. The full car ends within 30 s of main's on four lines, the empty one 3–63 s ahead of
   main's. Line 23's full car came down Chotkova 16 s behind main's and waited a whole cycle (108 s) at the signal main's passed. A
   run's length also moves 35–223 s from seed to seed, as the traffic reshuffles.
+- **The passengers at a stop** (#249 step 2, `src/passengers/consist.js`): each car runs the passenger lab's boarding controller
+  (`src/passengers/boarding-state.js`) on the T3's cabin (`assets/passengers/t3-cabin.json` from `tools/cabin.py --game`: 24 seats
+  and 81 standing places, 105 shown a car, the user's choice of 2026-11-25; the floor behind the cab's partition by the front door
+  is open floor, the user the same day: the lab took the cab's control panel by its box for a fixture there, and the front door
+  keeps both its streams both ways), and the game's counts are theirs. A passenger is
+  aboard from the head of the entry steps in to their foot out; the counts, the score and `st.waiting` / `st.alight` change
+  there, and the autopilot closes the doors once the last one is across. How many alight is drawn as before (`alightFrac`);
+  who alights is the nearest to a door by walking (the user's rule), the counted ones (above the 105, up to the crush load of
+  160) first, from the doorways. The waiting queue at the doors of the car with the most room, two streams a door, those
+  alighting first at each door. About one boarder in five wishes to stand though seats are free (`STAND_SHARE`, from the
+  passengers' own seeded stream: the rules' and the traffic's draws are as they were); a seat freed by a door whose exchange is
+  over goes to the nearest standing passenger who wants to sit, at 0.8 m/s round the others, also while driving. Doors closed
+  during the exchange: who is on the steps finishes the way, the rest of the queue stays (`leftBehind`, as before), those not
+  yet on the steps out get off at the next stop (`cantAlight`, as before). The exchange took 3.3 people a second a car before
+  (a 15 out / 20 in two-car exchange in about 5 s); now its time is the queues': on line 22 (seed 1, 38 stops) 2.6–15.8 s, mean
+  10.3 s (line 17: 10.0 s, at most 14.9 s), with the doors' 2 s to open and 3 s to close about 15 s a stop. Their cost on line
+  17's drive (seed 1, 102 748 steps): 1.1 s in all, 0.011 ms a step, 0.1 ms at the 99th percentile, 5.3 ms at most (one step).
+  The departures' mean delay (seeds 1–5, against main at 573d129): line 9 45 → 71 s, 17 117 → 186 s, 22 92 → 187 s (on time by
+  D 1/2 0.91 → 0.50), 37 41 → 82 s; line 23 inside main's spread (its exchanges 16.5 s on average). The user, 2026-11-25: keep the
+  queues' time; the drive between the stops is its own matter (most of the delay is there on arrival).
 - **Where the traction's energy goes** (#351, `--checks stops`: lineKWh, wasteKWh, brakeKWh; `tools/test_drives.py` in Wh): the
   starting resistors take 36 % of what the wire gives on a level test drive and 78 % holding 15 km/h in a slow street, almost all
   of it pulling away. Coasting 1 m/s under the limit before pressing again on step 3 (the drivers' "few presses, hard") cut the

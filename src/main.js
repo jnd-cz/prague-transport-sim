@@ -68,6 +68,9 @@ if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
 // the street vehicles' models (#250); ?boxcars keeps the box cars
 const carModels = !params.has('boxcars');
 if (carModels) for (const f of CAR_FILES) load.prefetch(f);
+// the T3's cabin the passengers use, whichever model is drawn (#249: tools/cabin.py --game; src/passengers/consist.js)
+const CABIN = 'assets/passengers/t3-cabin.json';
+load.prefetch(CABIN);
 // (weights: the steps' usual milliseconds on line 17; the bar shares them with the downloads by time)
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
 const lineFile = await load.get(`data/line${lineId}.json`);
@@ -76,6 +79,7 @@ const lineBuild = crc32(lineFile.bytes); // (the line's build ID: every file of 
 data.line = String(data.line);
 checkBuiltRoute(data); // (the track as the build draws it: its curves, the run past the termini, radius and cant: #477, #478)
 const built = { [`line${lineId}.json`]: data }; // every built file, for the credits and the provenance log
+const cabin = await (await load.get(CABIN)).json();
 // ?profile=<name>: a trial height profile over the line's own, to drive and compare (reports/review/profiles/, #358)
 if (params.has('profile')) {
   const name = params.get('profile'), res = await fetch(`reports/review/profiles/line${lineId}-${encodeURIComponent(name)}.json`);
@@ -616,7 +620,7 @@ async function start(extra = {}, o = menuOpts()) {
   if (run) { run.gameView.dispose(); run.trafficView.dispose(); }
   applyWeather(o.weather);
   sWas = null; carry = 0; between.clear(); // (the steps start afresh with the shift: fixedSteps, drawnS, src/between.js)
-  run = createRun({ scene, data, route, ground, audio }, {
+  run = createRun({ scene, data, route, ground, audio, cabin }, {
     ...o, seed, dealer, toutAt: outdoorTemperature(o.temp), extra,
     facts: { substations: truth.substations?.list, speedFacts: speedFacts(truth), signFacts: signFacts(truth) },
   });

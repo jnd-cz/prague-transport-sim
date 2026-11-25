@@ -39,8 +39,13 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
   i ve skutečnosti a cestující přesto nastoupí a vystoupí, proto do 4 m za označníkem hra nic nestrhne; přejetí
   o více než 4 m stojí 20 bodů, i když zastávku obsloužíte. Zastavení dál vzadu v povoleném místě se netrestá.
 - Cestující: počítadlo ve voze (běžná obsaditelnost 110, nejvýše 160 na vůz). Poptávka se řídí denní dobou:
-  ranní (7–9:30) a odpolední (15:30–17:30) špička přivádí davy, v noci je klid; v přeplněném voze trvá nástup
-  déle a při plném vozu zůstanou cestující čekat na další spoj.
+  ranní (7–9:30) a odpolední (15:30–17:30) špička přivádí davy, v noci je klid; při plném vozu zůstanou cestující
+  čekat na další spoj.
+- Nástup a výstup trvají tak dlouho, jak cestujícím trvá projít dveřmi: každé dveře mají dva proudy, nejdřív
+  vystoupí ti, kdo stojí nebo sedí nejblíž dveřím, pak nastoupí čekající a jdou si sednout nebo stoupnout. Ve voze
+  je 24 sedadel a 81 míst k stání; kdo nastoupí nad těchto 105, toho vůz jen počítá (až do 160). Asi pětina
+  nastupujících zůstane stát, i když je volno; uvolněná sedadla zaberou stojící, kteří chtějí sedět, i za jízdy. Kdo už je na schodech,
+  když zavřete dveře, projde; ostatní zůstanou na zastávce, a kdo nestihl vystoupit, vystoupí na další.
 - Změna linky: spoj může na trase linky a na konečné změnit číslo (linka 9 pokračuje na Nákladovém nádraží Žižkov jako 10):
   všichni vystoupí, přepnou se směrové tabule i údaje na obrazovce a tramvaj odjíždí jako 10.
 
