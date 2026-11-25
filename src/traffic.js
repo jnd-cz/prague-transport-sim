@@ -105,6 +105,13 @@ function limitSpeed(lim, s, len) {
 
 const key = (p) => `${Math.round(p[0])},${Math.round(p[1])}`;
 
+// does following next() from `start` (up to 12 links) come back to c? Of a circle (Traffic._letGo), the one that goes passes
+// a hold only where its own kind of wait closes the circle (#560)
+function closes(c, start, next) {
+  for (let o = start, n = 0; o && n < 12; o = next(o), n++) if (o === c) return true;
+  return false;
+}
+
 // speed a car may drive at behind a leader `gap` m ahead (bumper to bumper) going `vLead`
 function following(gap, vLead) {
   if (gap === null) return Infinity;
@@ -721,7 +728,10 @@ export class Traffic {
     // (below), nor is held at a junction by one (_junctionHeld)
     for (const c of live) c.seen = this._obstacleAhead(c, this._seq(c), obstacles);
     const goes = (this._goes = this._letGo(live));
-    for (const [c, ring] of goes) if (ring.has(c.seen?.car) && !this._seq(c).some(([path]) => path === c.seen.car.path)) c.seen = null;
+    // (each hold it passes only where that kind of wait closes the circle back to it, as the walk it replaced: what the
+    // cars see, here; the cars followed, below; the waits at a junction, _junctionHeld. One of a circle closed by other
+    // waits passing all of them drove into a car: 13 of the 14 overlaps over 0.5 m on line 37 seed 1, up to 2.5 m deep)
+    for (const [c, ring] of goes) if (ring.has(c.seen?.car) && !this._seq(c).some(([path]) => path === c.seen.car.path) && closes(c, c.seen.car, (o) => o.seen?.car)) c.seen = null;
     const crossing = []; // cars on, or committed to, a crossing of our track (game.carsCrossing)
     // Each car plans from the state at the step's start: where the others stand and how fast they go, whom they followed
     // and what held them in the last step. None moves before all have planned, so which car the loop takes first decides
@@ -763,7 +773,7 @@ export class Traffic {
         // the one of a circle that goes does not follow a car of it (three cars at a junction: one on the connector
         // ahead of the next, who waited for the third, who overlapped the first; line 17 s 21178, the tram stuck
         // behind); what it sees still stops it
-        if (lead && goes.get(c)?.has(lead)) { gap = null; lead = null; }
+        if (lead && goes.get(c)?.has(lead) && closes(c, lead, (o) => o.seen?.car || o.lead)) { gap = null; lead = null; }
         // trams and walkers on the path ahead (shared lanes on the tracks, a tram stopped at a
         // stop, someone crossing): stop or follow behind
         const ob = c.seen;
@@ -996,7 +1006,7 @@ export class Traffic {
     const J = plan.at;
     // (the exit's room: the car on it leaves less than c's length and 0.4 m behind its rear; with their own lengths, #250:
     // its middle under 7 m in when every car was 4.4 m long. In a lane's mouth: its end within 2.8 m, its middle 5 m)
-    const exitFull = live.find((o) => o !== c && o.path === plan.to.path && o.s - o.half < 2 * c.half + 0.4 && o.seen?.car !== c && o.lead !== c && !this._goes?.get(c)?.has(o));
+    const exitFull = live.find((o) => o !== c && o.path === plan.to.path && o.s - o.half < 2 * c.half + 0.4 && o.seen?.car !== c && o.lead !== c && !this._passes(c, o));
     const blocker = live.find((o) => o !== c && (
       (o.conn && o.conn.at === J && this._conflict(o.conn, plan) && o.seen?.car !== c)
       || (!o.conn && o.plan && o.plan.at === J && o.toEnd < look && this._conflict(o.plan, plan)
@@ -1005,8 +1015,13 @@ export class Traffic {
         && !(o.seen && (o.seen.gap < 4 || ((o.vNow ?? 0) < 0.3 && o.seen.v < 0.3)))
         && (o.toEnd < dist - 0.05 || (Math.abs(o.toEnd - dist) <= 0.05 && o.id < c.id)))
       || (!o.conn && o.lane !== plan.from && o.lane.to === J && o.toEnd - o.half < 2.8 && !(o.plan && o.plan.at === J) && this._nearLaneEnd(plan, o.lane, true))
-      || (!o.conn && o.lane !== plan.to && o.lane.from === J && o.s - o.half < 2.8 && o.seen?.car !== c && this._nearLaneEnd(plan, o.lane, false))) && !this._goes?.get(c)?.has(o));
+      || (!o.conn && o.lane !== plan.to && o.lane.from === J && o.s - o.half < 2.8 && o.seen?.car !== c && this._nearLaneEnd(plan, o.lane, false))) && !this._passes(c, o));
     return { exitFull, blocker };
+  }
+
+  // does c, the one of its circle to go, pass o's hold at a junction: o's waits come back to c (#607, #560)
+  _passes(c, o) {
+    return !!this._goes?.get(c)?.has(o) && closes(c, o.waitFor, (x) => x.waitFor);
   }
 
   // Where a car path comes near a track, ours or the opposite one (cached per path): a stretch per approach within NEAR of
