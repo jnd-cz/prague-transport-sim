@@ -6106,6 +6106,319 @@
     }
    ]
   },
+  "narodni-mikulandska-corner": {
+   "line": "9",
+   "at": [
+    -346.1,
+    -568.8
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "the sidewalk's kerb round the corner of Národní and Mikulandská (line 9 s 9796, 10 m off the route): the survey draws it in edges of 0.8-1.3 m turning 30 degrees",
+   "source": "measured 2026-11-23 on ground batch D (#800): IPR's raster rises 0.09 m from the road 1.3 m out to the sidewalk 1.3 m in; the generated street surface had the sidewalk 1 cm under the road, the sidewalk's walkway without a kerb's plane on edges under 3 m (street_profile.kerb_edges)",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk, 4 m",
+     "from": [
+      -345.26,
+      -567.0
+     ],
+     "to": [
+      -347.0,
+      -570.6
+     ],
+     "expect": {
+      "largest step m at least": 0.05,
+      "largest step m": 0.25,
+      "rise m at least": 0.05
+     },
+     "why": "a kerb stands round the corner as along the street (IPR 0.09 m over 2.6 m; the surfaces check's flat kerb is under 5 cm in 0.25 m)"
+    }
+   ]
+  },
+  "plzenska-bend-kerb": {
+   "line": "9",
+   "at": [
+    -4266.5,
+    -1387.1
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "the sidewalk's kerb along Plzeňská's south side where it bends (line 9 s 23476): the survey draws it in edges of 0.6-2.1 m turning 45 degrees",
+   "source": "measured 2026-11-23 on ground batch D (#800): IPR's raster rises 0.15 m from the road 2 m out to the sidewalk 2 m in; the generated street surface had the sidewalk level with the road at the kerb, its walkway without a kerb's plane on edges under 3 m (street_profile.kerb_edges)",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk, 4 m",
+     "from": [
+      -4266.99,
+      -1389.05
+     ],
+     "to": [
+      -4266.08,
+      -1385.15
+     ],
+     "expect": {
+      "largest step m at least": 0.05,
+      "largest step m": 0.25,
+      "rise m at least": 0.08
+     },
+     "why": "a kerb stands along the bend as along the street (IPR 0.15 m over 4 m)"
+    }
+   ]
+  },
+  "zizkov-wall-at-the-kerb": {
+   "line": "9",
+   "at": [
+    2217.7,
+    -671.0
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a sidewalk 1.5 m over the road beside it (line 9, 50.0841, 14.4534): the survey's kerb edge at the road's level (238.73 m by the road at 238.57 m), IPR rising to 240.1 m 1.25 m in and level beyond, the sidewalk's far side at 240.07 m",
+   "said": "50.0841, 14.4534 has a wall next to sidewalk.",
+   "source": "the user, answering PR #834's question 1 (a sidewalk at road level under a rise, or a raised one with a wall at its kerb?), 2026-11-23, #800",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk, 3 m",
+     "from": [
+      2218.02,
+      -670.02
+     ],
+     "to": [
+      2217.02,
+      -672.85
+     ],
+     "expect": {
+      "rise m at least": 1.0,
+      "largest step m at least": 1.0
+     },
+     "why": "a wall between the road and the raised sidewalk (IPR 238.54 m 1 m out, 240.08 m 2 m in): the walkway is not at the road's level at the kerb (ground batch D: a step of 1.55 m)"
+    }
+   ]
+  },
+  "vysehrad-wall-over-the-ramp": {
+   "line": "17",
+   "at": [
+    -764.1,
+    -2356.4
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "the sidewalk at the street's level over the ramp down to the river under Vyšehrad (line 17, 50.0654, 14.4152): the survey's kerb edge at the ramp's level (190.34 m by the ramp at 189.96 m), IPR rising to 192.58 m 2 m in, a green in the sidewalk at 192.57 m",
+   "said": "50.0654, 14.4152 has not vertical but still steep wall down from street level to the ramp going down to the river.",
+   "source": "the user, answering PR #834's question 1 (a sidewalk at road level under a rise, or a raised one with a wall at its kerb?), 2026-11-23, #800",
+   "sections": [
+    {
+     "name": "from the ramp across its edge onto the sidewalk, 3 m",
+     "from": [
+      -765.1,
+      -2356.45
+     ],
+     "to": [
+      -762.1,
+      -2356.38
+     ],
+     "expect": {
+      "rise m at least": 1.5,
+      "largest step m at least": 1.5
+     },
+     "why": "a steep wall from the street's level down to the ramp (IPR 189.97 m 1 m out, 192.58 m 2 m in): the walkway is not at the ramp's level at its edge (ground batch D: a step of 2.25 m)"
+    }
+   ]
+  },
+  "motol-wall-at-the-kerb": {
+   "line": "9",
+   "at": [
+    -6418.8,
+    -1518.4
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a sidewalk 3 m over the road beside it in Motol (line 9, 50.0660, 14.3354): the survey's kerb edge at the road's level (290.38 m by the road at 290.30 m), IPR rising to 293.7 m 2 m in",
+   "said": "50.0660, 14.3354 again there is a straight up wall between road and sidewalk",
+   "source": "the user, answering PR #834's question 1 (a sidewalk at road level under a rise, or a raised one with a wall at its kerb?), 2026-11-23, #800",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk, 3 m",
+     "from": [
+      -6419.74,
+      -1518.2
+     ],
+     "to": [
+      -6416.81,
+      -1518.86
+     ],
+     "expect": {
+      "rise m at least": 2.0,
+      "largest step m at least": 2.0
+     },
+     "why": "a straight up wall between the road and the sidewalk (IPR 290.27 m 1 m out, 293.74 m 2 m in): the walkway is not at the road's level at the kerb (ground batch D: a step of 3.24 m)"
+    }
+   ]
+  },
+  "repy-parking-kerb": {
+   "line": "9",
+   "at": [
+    -8655.0,
+    -1214.3
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a parking area beside a sidewalk in Řepy (line 9, 50.0659, 14.3039): the survey's parking area 8704 on its outline, the sidewalk 8627 behind it",
+   "source": "measured 2026-11-23 on ground batch D (#800): IPR rises 0.13 m from the bay 1.5 m off the kerb (357.87 m) to the sidewalk 1.5 m on it (358.00 m); the ground had the bay on its outline 6-8 cm over IPR and the sidewalk on the fill to IPR, level at the kerb (357.97 m either side)",
+   "sections": [
+    {
+     "name": "from the bay across the kerb onto the sidewalk, 4 m",
+     "from": [
+      -8655.31,
+      -1216.25
+     ],
+     "to": [
+      -8654.65,
+      -1212.31
+     ],
+     "expect": {
+      "rise m at least": 0.08,
+      "largest step m at least": 0.07
+     },
+     "why": "IPR rises 0.13 m across the kerb: the sidewalk stands a kerb over the bay, as over a road"
+    }
+   ]
+  },
+  "vystaviste-flush-parking": {
+   "line": "17",
+   "at": [
+    1175.5,
+    1908.8
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a parking area level with the sidewalk beside it by Výstaviště (line 17, 50.1058, 14.4340): the survey's parking area 3557 and sidewalk 3507, their shared edge flagged a kerb",
+   "source": "measured 2026-11-23 on ground batch D (#800): IPR falls 3 cm a metre from the bay (192.85 m 2 m off the edge) across the edge (192.80 m) onto the sidewalk (192.75 m 3 m on), with no step: -0.04 m from 1 m out to 1 m in",
+   "sections": [
+    {
+     "name": "from the bay across its edge onto the sidewalk, 5 m",
+     "from": [
+      1176.73,
+      1907.24
+     ],
+     "to": [
+      1173.7,
+      1911.22
+     ],
+     "expect": {
+      "largest step m": 0.04
+     },
+     "why": "IPR reads no kerb here: a bay level with the sidewalk keeps none (street_profile.flush_parking)"
+    }
+   ]
+  },
+  "verge-by-a-car-park-no-wall": {
+   "line": "22",
+   "at": [
+    3449.4,
+    -2602.0
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "a survey sidewalk between a side road and a parking area (line 22, 50.0684, 14.4740; sidewalk area 6119 and parking area 6549 of line 22 on main 6415834): the survey has the sidewalk's edge at the parking area at 211.38 m, level with the road's kerb (road 211.23 m); IPR rises 0.7 m across the sidewalk to 212.06 m at that edge and falls on into the parking area (212.05 m 0.5 m out, 2.3 m lower 6 m out)",
+   "said": "the road from main street through ypur gps point is sloping down gently, there's some grass and bushes on what would otherwise be sidewalk. There's further wild greenery between that and the car park which seems to be lying on a lower level overall",
+   "source": "the user's answer to PR #834's question 1, 2026-11-23: no wall between the sidewalk and the car park. Built with #800's parking rule (c7a9551) the walkway lay level at the survey's 211.4 m with a 0.65 m wall's hold up to the parking area; batch D had the parking area on its outline 0.4 m under IPR",
+   "sections": [
+    {
+     "name": "from the verge 2.5 m in across its edge 2 m into the parking area, 4.5 m",
+     "from": [
+      3451.82,
+      -2601.53
+     ],
+     "to": [
+      3447.37,
+      -2602.25
+     ],
+     "expect": {
+      "largest step m": 0.2,
+      "off the lidar m": 0.2
+     },
+     "why": "grass and bushes rising from the road to wild greenery that falls to the car park: no wall at the edge, the ground on IPR"
+    }
+   ]
+  },
+  "wall-above-a-lower-walkway": {
+   "line": "17",
+   "at": [
+    -363.0,
+    29.4
+   ],
+   "reach": 25,
+   "issue": 800,
+   "what": "a survey sidewalk 3.8 m wide between the street and a building (line 17, 50.0872, 14.4163): its kerb edge surveyed 0.3-0.46 m under the road; IPR at the road's level 0.5 m in, 1.8-1.9 m under it from 1.5 m in to the building. IPR 1 m in bears 0.28-0.82 of that step along its 82 m",
+   "said": "D street has a wall and lower sidewalk next to the building.",
+   "source": "the user's answer to PR #834's question 1 (A-D: a wall at the kerb, or a plain kerb with the ground falling behind?), 2026-11-24, #800. The wall rule of d5e1402 (IPR 1 m in bearing half of the step) took 11 of its 24 m for a kerb",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the walkway, 4 m, east",
+     "from": [
+      -342.9,
+      28.4
+     ],
+     "to": [
+      -343.3,
+      24.4
+     ],
+     "expect": {
+      "largest step m at least": 1.2,
+      "rise m": -1.2
+     },
+     "why": "a wall between the street and the walkway beside the building, 1.8 m lower (the road 190.50 m 0.5 m out, IPR 188.62 m 2 m in): held at two-thirds of IPR's drop"
+    },
+    {
+     "name": "from the road across the kerb onto the walkway, 4 m, west",
+     "from": [
+      -383.8,
+      32.3
+     ],
+     "to": [
+      -384.2,
+      28.3
+     ],
+     "expect": {
+      "largest step m at least": 1.2,
+      "rise m": -1.2
+     },
+     "why": "the same wall 41 m on (the road 190.74 m 0.5 m out, IPR 188.99 m 2 m in)"
+    }
+   ]
+  },
+  "belohorska-plain-kerb": {
+   "line": "22",
+   "at": [
+    -4169.5,
+    149.2
+   ],
+   "reach": 20,
+   "issue": 800,
+   "what": "Bělohorská's sidewalk (line 22, 50.0836, 14.3634): its kerb edge surveyed 0.47 m over the road (320.87 m by 320.40 m); IPR 0.08 m over the road at the edge, rising 0.05-0.1 m a metre across the walkway (DMR 5G the same). Built with #800's parking rule (4d94176) the walkway stood at the survey's height, a 0.48 m wall over the road",
+   "said": "C is plain street with sidewalk kerb.",
+   "source": "the user's answer to PR #834's question 1 (A-D), 2026-11-24, #800",
+   "sections": [
+    {
+     "name": "from the road across the kerb onto the sidewalk, 4 m",
+     "from": [
+      -4169.52,
+      150.2
+     ],
+     "to": [
+      -4169.44,
+      146.2
+     ],
+     "expect": {
+      "largest step m at least": 0.05,
+      "largest step m": 0.25
+     },
+     "why": "a plain kerb, the walkway rising from it with IPR: no wall at the edge"
+    }
+   ]
+  },
   "marianske-hradby-upper-track": {
    "line": "22",
    "at": [
