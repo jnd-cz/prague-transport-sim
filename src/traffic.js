@@ -894,14 +894,18 @@ export class Traffic {
         // at its start, back = its length)
         // (also past its own lane's line, not held by it: lane 2979, 6.7 m, its line at its start, green, hid the red of the
         // next one, 2763, 2.9 m; a car came off it at 5 m/s onto the junction on red, line 9 s 11935, seed 3, #566)
-        const pastOwn = L && toLine - c.half - 1 <= -0.5 && c.lightHold !== c.lane;
+        // (not one going through its own amber: it keeps to that until it is off the lane)
+        const pastOwn = L && toLine - c.half - 1 <= -0.5 && c.lightHold !== c.lane && c.lightGo !== c.lane;
         if ((!L || pastOwn) && !c.conn && c.next?.light) { const d = c.toEnd + (c.plan ? c.plan.path.length : 0) + c.next.path.length - c.next.light.back; if (d < 60) { L = c.next.light; lane = c.next; toLine = d; } }
         // (and from a junction connector onto such a lane)
         if (!L && c.conn && c.conn.to.light) { const d = c.conn.path.length - c.s + c.conn.to.path.length - c.conn.to.light.back; if (d < 60) { L = c.conn.to.light; lane = c.conn.to; toLine = d; } }
         if (L) {
           const a = this.lightAspect(L), v = c.vNow ?? 0, front = toLine - c.half - 1;
           if (a === 'green') { c.lightGo = null; c.lightHold = null; }
-          else if (a === 'amber' && c.lightGo !== lane && c.lightHold !== lane && front < (v * v) / 6 + v) c.lightGo = lane;
+          // (one that went on amber but came to a stand before the line, behind a car held at the junction, waits there: it
+          // kept going on amber and went on red 1.4 s after it stood 5 m short, line 9 s 25601, seed 5, #560's compare)
+          else if (c.lightGo === lane && v < 0.3 && front > 0.5) c.lightGo = null;
+          if (a === 'amber' && c.lightGo !== lane && c.lightHold !== lane && front < (v * v) / 6 + v) c.lightGo = lane;
           if (a !== 'green' && c.lightGo !== lane && (front > -0.5 || c.lightHold === lane)) { lGap = Math.max(0, front) + 8; c.lightHold = lane; } // (following() halts 8 m short)
         }
         const terms = { lead: following(gap, vLead), junction: jStop === null ? Infinity : following(jStop, 0), tram: following(xGap, 0), light: following(lGap, 0), curve: vCurve };
