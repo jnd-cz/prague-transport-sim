@@ -47,6 +47,9 @@ export function stopsWatch(game) {
     after: () => {
       const tr = game.tram, n = tr.notch, st = game.stops[game.nextStop];
       R.steps++;
+      // (the passengers' exchange, #249: from the doors open at the stop to the last one across them)
+      if (st && st.served && st._ex0 == null) st._ex0 = game.clock;
+      if (st && st._ex0 != null && st._ex == null && st.waiting === 0 && st.alight === 0) { st._ex = game.clock - st._ex0; R.exchanges = [...(R.exchanges || []), st._ex]; }
       // (the pedal's use over the whole run, read before lastStep moves on)
       if (n > 0 && lastStep <= 0) { R.presses++; if (tr.v > 1) R.pressesRolling++; }
       if (n < 0 && lastStep >= 0 && tr.v > 0.3) R.brakeApplies++;
@@ -155,6 +158,10 @@ export function stopsWatch(game) {
         lineKWh: +(R.lineJ / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3), wasteKWh: +((R.lineJ - R.mechJ) / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3), brakeKWh: +(R.brakeJ / 3.6e6 / Math.max(0.1, game.tram.s / 1000)).toFixed(3),
         slipSecs: +R.slip.toFixed(1), slideSecs: +R.slide.toFixed(1), slips: R.slips, slides: R.slides, slidesAtStops: R.slidesAtStops, sandSecs: +R.sand.toFixed(1), sandLeft: +(game.tram.sand ?? 0).toFixed(2), emergencies: R.emergencies, emergencyAt: R.emergencyAt,
         comfort: Math.round(game.penalties.comfort || 0), overspeed: Math.round(game.penalties.speed || 0), late: Math.round(game.penalties.late || 0),
+        // (the passengers, #249: the stops where their counts or places went wrong, game.paxProblems; the exchanges' seconds from the
+        // doors open to the last one across, mean and longest)
+        paxProblems: (game.paxProblems || []).length, paxProblem: (game.paxProblems || [])[0] ?? null,
+        exchangeMean: R.exchanges?.length ? +(R.exchanges.reduce((t, x) => t + x, 0) / R.exchanges.length).toFixed(1) : null, exchangeMax: R.exchanges?.length ? +Math.max(...R.exchanges).toFixed(1) : null,
         devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5),
         // (arrival against the timetable's time, which is the departure: arrOnTime the share within ±30 s of it, arrEarly the stops
         // reached more than 30 s before it, where the tram then stands, arrMean in s; #242. The terminus is left out)
@@ -171,7 +178,7 @@ export function stopsWatch(game) {
 }
 
 // (opts.load: the passengers held at this share of the capacity all the way, before and after each step: how the timetable and the
-// driving follow the load; boarding still slows in a full car, src/game.js)
+// driving follow the load. The tram's mass only: the exchanges at the stops are the passengers' own, with their own count, #249)
 const loadWatch = (share) => (game) => {
   const hold = () => { game.tram.passengers = Math.round(share * game.tram.capacity); };
   return { before: hold, after: hold, result: () => null };
