@@ -677,6 +677,7 @@ class HeavyJob:
     # waited an hour behind two test_all runs that themselves waited for a shared ground_place run, #829)
     BACKFILL = 1.5
     DAY_MAX = DAY_MAX  # (a test's own)
+    STALL = 120.0  # (s with jobs waiting and none running before the waiting ones take first come first served, #854)
 
     def __init__(self, what, wait=None, out=None, share=None, expect=None, kind=None, limits=None, day=None):
         self.path = os.path.join(LOCKS, f"{os.getpid()}.lock")
@@ -696,6 +697,7 @@ class HeavyJob:
         self.limits = os.environ.get(NOLIMIT) != "1" if limits is None else limits
         self.day = os.environ.get(DAY) == "1" if day is None else day  # (may run long by day: the user's word, #851)
         self.parked = ""  # (why it waits for the night, "" when it does not)
+        self.still, self.told_still = None, False  # (since when nothing ran while it waited; said once, #854)
         self.own = False  # (holds a turn of its own: watched, recorded)
         self.warn, self.gb, self.peak, self.cpu = "", None, 0.0, 0.0
         self.mark, self.over = None, 0  # (idle: (when, CPU) when the CPU last moved; memory: looks in a row over)
@@ -897,6 +899,19 @@ class HeavyJob:
         jobs = queued_turns()  # (a step in another job's turn is that job's, #844)
         others = [j for j in jobs if not own_turn(j) and not j.get("held")]  # (held for the night: ahead of none, #851)
         self.why = ""
+        # (nothing runs and this job still waits: from STALL s on it waits only for the jobs queued before it by their
+        # time, the order every version of the queue keeps. A checkout's queue of another version orders otherwise, and
+        # the two would wait for each other for good: on 2026-11-25 three jobs did so for hours, #854)
+        if any(j["state"] == "running" for j in others):
+            self.still = None
+        else:
+            self.still = self.still or now
+            if now - self.still >= self.STALL:
+                if not self.told_still:
+                    self.told_still = True
+                    print(f"heavy jobs: {self.what}: nothing has run for {self.STALL / 60:.0f} min with jobs waiting; first "
+                          f"come first served until one runs (#854)", file=self.out, flush=True)
+                return [j for j in others if (j["t"], j["pid"]) < (self.t, os.getpid())]
 
         def first(j):  # (a running job counts below; the waiting ones by rank(): the short ones first, #851)
             return j["state"] == "waiting" and rank(j, now, records) < me

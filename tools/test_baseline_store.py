@@ -235,7 +235,7 @@ class DayAndNight(unittest.TestCase):
             back, = baseline_store.queue()
             os.remove(j.path)
         self.assertTrue(got["held"])
-        self.assertEqual(got["t"], baseline_store.night_starts())
+        self.assertAlmostEqual(got["t"], baseline_store.night_starts(), delta=5)  # (at night "now": read twice, #854)
         self.assertEqual((back["held"], back["t"]), (False, j.t))
 
     def test_the_night_started_early_on_the_users_word(self):
@@ -253,6 +253,26 @@ class DayAndNight(unittest.TestCase):
             self.assertFalse(baseline_store.night(noon + 60))
             self.assertFalse(baseline_store.end_night())
         self.assertEqual(baseline_store.morning(self.at(3)), self.at(7))
+
+    def test_versions_that_order_otherwise_wait_for_each_other_only_until_the_queue_stands_still(self):
+        """#854, as on 2026-11-25: this version puts a long job that has waited 2 h before a short one; a checkout of an
+        older version (a ticket without "held") waits for the short one, queued first. With nothing running, after
+        STALL s the short one takes its turn by queue time."""
+        now = time.time()
+        old = {"what": "#548", "root": "C:/x/transport-game-548", "pid": 2, "t": now - 4 * 3600, "state": "waiting",
+               "since": now - 4 * 3600, "share": {"gb": 22.0, "cores": 12}, "expect": 7200}
+        me, out = self.job(expect=360), io.StringIO()
+        me.t, me.out = now - 6 * 3600, out
+        old["t"] = now - 3 * 3600  # (queued after me, waited past PASS_MAX: before me by rank)
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [old]),                 mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual([j["what"] for j in me.ahead()], ["#548"])  # (the stall starts)
+            with mock.patch.object(baseline_store.HeavyJob, "STALL", 0.0):
+                self.assertEqual(me.ahead(), [])  # (first come first served: mine is the older ticket)
+        self.assertIn("first come first served until one runs (#854)", out.getvalue())
+        running = dict(old, state="running", pid=3, t=now - 60)
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [running, old]),                 mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual([j["what"] for j in me.ahead()], ["#548", "#548"])  # (something runs: the rule as before)
+            self.assertIsNone(me.still)
 
     def test_a_held_job_starts_when_the_night_comes(self):
         out, nights = io.StringIO(), iter([False, False, True])
