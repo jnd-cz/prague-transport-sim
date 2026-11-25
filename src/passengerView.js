@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Our set's passengers drawn (#249 step 3): the people of the passenger core (src/passengers/consist.js) as records for
 // the figures (src/people.js), drawing only: it reads the core and writes nothing back, so a seeded run counts the same
-// with or without it. The detailed model only (the rigged hybrid T3, whose cabin the core's is: assets/passengers/).
+// with or without it. Only a model whose manifest names its cabin (`passengers`; today the hybrid T3's, assets/passengers/).
 //
 // The frames (the user's rules for #249, 2026-11-25): a passenger on the car (its floor or its entry steps) is drawn in the
 // car's own frame, a child of its model's node, so they sway, pitch and lean with the body and are hidden with it (the cab
@@ -33,12 +33,13 @@ export class PassengerView {
   usedAt(stop) { return this.used.get(stop) || null; }
 
   // the records of our set's passengers for this frame (src/people.js sync's): { recs, cars: the car nodes }; model: our
-  // set's model, posed for this frame; gameView: its crowd's places
-  sync(game, model, gameView) {
+  // set's model, posed for this frame; gameView: its crowd's places; shows: the model shows passengers (its manifest's
+  // `passengers`: working doors, a saloon and a cabin measured from it, accepted by the user; docs/vehicles.md)
+  sync(game, model, gameView, shows = true) {
     const recs = this.recs;
     recs.length = 0;
     if (game !== this.game) { this.game = game; this.seen.clear(); this.ghosts.clear(); this.used.clear(); }
-    const cars = model?.userData?.rigged ? model.userData.cars.map((c) => c.userData.rig.full) : [];
+    const cars = shows && model?.userData?.rigged ? model.userData.cars.map((c) => c.userData.rig.full) : [];
     if (!game?.pax || !cars.length || cars.length !== game.pax.cars.length) return { recs, cars: [] };
     model.updateMatrixWorld(true);
     const t = game.clock, shown = model.visible, st = game.stops[game.nextStop];

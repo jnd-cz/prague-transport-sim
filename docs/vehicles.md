@@ -44,6 +44,7 @@ credits from the manifests (`src/vehicles.js`, `src/main.js`); `tools/test_vehic
 | `fleet` | the numbers its sets run as (#527): `types`, per type (e.g. `T3SUCS`) its `ranges` `[first, last]` with `except` (holes), or a `list`; `sets`, the pairs that run together and with no other car, though either car may run alone where a line runs single cars, its partner then free for another single car (a set not listed is two numbers of one type); `liveries`, number → livery id (#529). The run deals them (`src/vehicles.js` `FleetDealer`): a deck of every number shuffled by the run's seed, so each type comes up as often as it has numbers, none twice on the street, given back when a set leaves; our tram runs as the player's preferred set from the menu, else as a T3SUCS dealt the same way, and no AI tram is dealt its numbers. `tools/test_fleet.py` checks the dealing |
 | `slots` | a glTF vehicle's livery slots (#529): a slot's name and the materials it paints, e.g. the hybrid's `body` (`Red_Hull`) and `band` (`Beige`, `Beige_wbackface`); the rigged loader keeps their parts apart (with their uv) so a livery can give them a texture or a colour |
 | `colours` | a model painted by colour: the names of the colours a livery may replace (the built-in car's `body`, `band`, `roof`) |
+| `passengers` | the model shows its passengers (*Passengers*, below): `cabin`, the id of its cabin `assets/passengers/<id>-cabin.json`, measured from this model; `accepted`, who accepted it, when and where |
 
 A **tier-1 glTF** needs no code: a still model in metres, its origin on the rail plane midway between the bogie
 pivots, +Y up, facing `forward`; its pivots are its type's. The menu offers it, it loads when picked and the
@@ -391,6 +392,36 @@ What a model can offer and the game drives. A model states its tier; the game as
 
 Apart from the tiers, a model can have **distance levels**: the full one near the camera and a lighter one
 (merged meshes, no saloon) for AI trams farther away, as the hybrid has.
+
+## Passengers
+
+The passengers (#249) are simulated by vehicle type and drawn by model. **The simulation** runs the type's cabin for
+every set of that type, whichever model is drawn, so a seeded run counts the same whatever the player picks: the T3's
+is `assets/passengers/t3-cabin.json` (24 seats and 81 standing places, 105 shown a car; above them, up to the crush
+load, passengers are counted only), the queues at its doors set the time at a stop (`src/passengers/`,
+[knowledge.md](knowledge.md), *The passengers at a stop*). **The drawing** shows them only on a model with working doors
+and an interior (the user, 2026-11-25: "I would offer passenger simulation to vehicles which have functional door and
+interior"): its doors move (`moves`), its rig names its saloon, and its manifest's `passengers` names a cabin measured
+from this very model (the cabin's `assetSha256` is the model file's), which the user has accepted. `tools/test_vehicles.py`
+checks all four. Today the hybrid shows them; the classic model and the built-in one do not.
+
+How a model comes to show them:
+
+1. **Its cabin, from its model:** `python -P -E tools/cabin.py --model assets/<id>/<model>.glb` runs the passenger lab's
+   preparation on it (the seats from their meshes, the doors and their entry steps from the floor, the cab's
+   exclusion, the floor's 2 cm grid, the standing packings; the lab's mesh names, `tools/cabin/`, or the preparation
+   taught the model's), and `--packing` searches denser packings (#249 step 1).
+2. **For a T3, against the T3's plan:** `assets/passengers/t3-cabin.json` is the T3's floor and seating plan. A new T3
+   model's seats, doors, steps and floor height come out where the plan's are, or the difference is the model's to
+   explain or fix.
+3. **The checks:** `tools/cabin.py --timing` and `--alight` (every packing filled and emptied, 10 out / 10 in, both
+   streams of every door used, no place taken twice, the counts conserved; a full car empties before it fills with
+   the game's pace), `tools/test_passengers.py`.
+4. **The user accepts** the places shown (seated and standing); `tools/cabin.py --game` writes the cabin, the
+   manifest names it in `passengers` with the acceptance.
+
+**Another vehicle type** starts from step 1 too, its seat and standing capacity measured and decided anew, and brings
+its own cabin for the simulation.
 
 ## Adding a vehicle
 

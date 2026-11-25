@@ -1269,7 +1269,9 @@ function frame(now) {
     // (the right mirror's camera, posed for this frame while the mirror is shown: the people it shows near the tram are
     // animated too, and its cars are the near model, with their indicators and brake lamps: src/people.js, src/cars.js)
     const mirrorCam = game && mirrorShown() ? (poseMirror(mirror.camera), mirror.camera) : null;
-    if (people && game) people.sync(camera, run.trafficView, run.gameView, mirrorCam, paxView.sync(game, tramModel, run.gameView));
+    // (our set's passengers where its model shows them: its manifest's `passengers`, docs/vehicles.md)
+    if (people && game) people.sync(camera, run.trafficView, run.gameView, mirrorCam,
+      paxView.sync(game, tramModel, run.gameView, !!pickVehicle(tramModel.userData.vehicle)?.passengers));
     if (cars && game) cars.sync(camera, run.trafficView, run.gameView, mirrorCam);
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
