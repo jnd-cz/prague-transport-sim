@@ -1317,7 +1317,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   run's length also moves 35–223 s from seed to seed, as the traffic reshuffles.
 - **The passengers at a stop** (#249 step 2, `src/passengers/consist.js`): each car runs the passenger lab's boarding controller
   (`src/passengers/boarding-state.js`) on the T3's cabin (`assets/passengers/t3-cabin.json` from `tools/cabin.py --game`: 24 seats
-  and 81 standing places, 105 shown a car, the user's choice of 2026-11-25), and the game's counts are theirs. A passenger is
+  and 81 standing places, 105 shown a car, the user's choice of 2026-11-25; the floor behind the cab's partition by the front door
+  is open floor, the user the same day: the lab took the cab's control panel by its box for a fixture there, and the front door
+  keeps both its streams both ways), and the game's counts are theirs. A passenger is
   aboard from the head of the entry steps in to their foot out; the counts, the score and `st.waiting` / `st.alight` change
   there, and the autopilot closes the doors once the last one is across. How many alight is drawn as before (`alightFrac`);
   who alights is the nearest to a door by walking (the user's rule), the counted ones (above the 105, up to the crush load of

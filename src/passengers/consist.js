@@ -43,8 +43,8 @@ export function createConsist(layout, { cars, crush, rand }) {
       // (a boarder with no place left: counted, if nobody is still to leave the car and its count has room)
       overflow: () => { if (outgoing(car) > 0 || car.counted + car.flight >= extra) return false; car.flight++; return true; },
       onEvent: (type, a) => {
-        if (type === 'board-door-clear') { tally.in++; crossings.push({ dir: 'in', tag: a.tag, car: k }); }
-        else if (type === 'exit-door-clear') { tally.out++; crossings.push({ dir: 'out', car: k }); }
+        if (type === 'board-door-clear') { tally.in++; crossings.push({ dir: 'in', tag: a.tag, car: k, lane: a.channel }); }
+        else if (type === 'exit-door-clear') { tally.out++; crossings.push({ dir: 'out', car: k, lane: a.channel }); }
         else if (type === 'counted') { car.flight--; car.counted++; }
       },
     });
@@ -119,7 +119,7 @@ export function createConsist(layout, { cars, crush, rand }) {
       return n;
     },
     // a step of dt s; open: the doors are open with the tram standing at the stop (new crossings only then). The crossings in it:
-    // [{ dir: 'in' | 'out', tag, car }]
+    // [{ dir: 'in' | 'out', tag, car, lane (the door's stream, as 'Front:1') }]
     update(dt, open) {
       crossings.length = 0;
       assign();

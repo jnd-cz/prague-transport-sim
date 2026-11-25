@@ -9,7 +9,10 @@ project's own asset lab "street-life-boarding" v14, 2026-10-27; AGPL v3 like the
 - the pedestrian figure's body outline, assets/people/person-near.glb (the project's own, AGPL v3);
 
 with the standing places of a packing search (tools/cabin/packing-search.js; its options are in the file: 16 headings on a
-2 cm grid, 3000 moves, seed 1): 24 seats and 81 standing places, 105 people shown a car (the user, 2026-11-25, #249).
+2 cm grid, 3000 moves, seed 1): 24 seats and 81 standing places, 105 people shown a car (the user, 2026-11-25, #249). The
+floor behind the cab's partition by the front door is open floor (the user, the same day); the search ran on the floor
+before that fix (the same search on the corrected floor packs 80), each of its places checked on the corrected floor
+(tools/cabin.py --packing-from).
 
 Licence: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/), as the model it is measured from.
 Non-commercial: a commercial release measures the cabin again from the built-in model (src/t3simple.js).

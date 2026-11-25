@@ -12,10 +12,14 @@ filled and emptied, and 10 out / 10 in, both exit policies, with the lab's check
 --expect FILE compares the timings with a recorded result (the lab's tests/passenger-timing.json).
 --alight LAYOUT fills every packing of a layout and empties it again with the game's alighting pace
 (src/passengers/exit-flow.js GAME_PACE; --pace JSON for another): the times in through the doors and out.
---model defaults to the game's assets/t3h/tatra-t3-hybrid-nc.glb; the lab's own GLB reproduces its files. --packing adds
-an adaptive packing with those options (adaptivePacking's: id, padding, trials and the search's own, tools/cabin/).
+--model defaults to the game's assets/t3h/tatra-t3-hybrid-nc.glb; the lab's own GLB with --lab-floor reproduces its files
+(without it the floor behind the cab's partition by the front door is open floor: the cab's control panel no longer marks
+it as a fixture by its box; the user, 2026-11-25). --packing adds an adaptive packing with those options
+(adaptivePacking's: id, padding, trials; {"search": {...}} the search's own, tools/cabin/packing-search.js).
 --game LAYOUT writes the game's cabin, assets/passengers/t3-cabin.json: one packing (--packing-id, the user's s16f by default: the
-search with 16 headings on 2 cm, 3000 moves, seed 1, 105 people a car) and the navigation grid beside the layout.
+search with 16 headings on 2 cm, 3000 moves, seed 1, 105 people a car) and the navigation grid beside the layout;
+--packing-from LAYOUT2 takes the packing from another layout of the model, each place checked to stand on LAYOUT's open floor
+(the game's: the 81 places searched on the lab's floor, on the corrected one, where the same search packs 80).
 """
 import argparse
 import functools
@@ -180,14 +184,54 @@ def rounded(v, places=4):
     return v
 
 
-def game_cabin(layout, navigation, packing):
+def off_floor(navigation, places, step=0.01):
+    """The places whose body outline (footprintWorld) covers a cell of the navigation grid that is not open floor
+    (circulation or a standing pocket), sampled every step m inside it: [(place id, the categories found)]"""
+    cat, nx, nz, cell = [], navigation["nx"], navigation["nz"], navigation["cell"]
+    runs = navigation["runs"]
+    for i in range(0, len(runs), 2):
+        cat += [runs[i]] * runs[i + 1]
+    names, free = navigation["categories"], {navigation["categories"].index(k) for k in ("circulation", "standing pockets")}
+    bad = []
+    for p in places:
+        poly = p["footprintWorld"]
+        xs, zs = [q[0] for q in poly], [q[1] for q in poly]
+        found = set()
+        x = min(xs)
+        while x <= max(xs):
+            z = min(zs)
+            while z <= max(zs):
+                inside = False
+                for i in range(len(poly)):  # (even-odd rule, as src/passengers/cabin-space.js pointInPolygon)
+                    (xi, zi), (xj, zj) = poly[i], poly[i - 1]
+                    if (zi > z) != (zj > z) and x < (xj - xi) * (z - zi) / (zj - zi) + xi:
+                        inside = not inside
+                ix, iz = int((x - navigation["xMin"]) // cell), int((z - navigation["zMin"]) // cell)
+                if inside and (not (0 <= ix < nx and 0 <= iz < nz) or cat[iz * nx + ix] not in free):
+                    found.add(names[cat[iz * nx + ix]] if 0 <= ix < nx and 0 <= iz < nz else "outside")
+                z += step
+            x += step
+        if found:
+            bad.append((p["id"], sorted(found)))
+    return bad
+
+
+def game_cabin(layout, navigation, packing, source=None):
     """The game's cabin (src/passengers/consist.js): one packing of a prepared layout and its navigation grid, what the
-    passenger modules read of them and nothing else (the other packings, the studies, the world outlines left out)"""
-    config = next((c for c in layout["standing"]["configurations"] if c["id"] == packing), None)
+    passenger modules read of them and nothing else (the other packings, the studies, the world outlines left out).
+    source: another layout of the same model to take the packing from (one searched on an earlier floor), every place of it
+    checked to stand on this layout's open floor"""
+    if source is not None and source["assetSha256"] != layout["assetSha256"]:
+        sys.exit("the packing's layout is not of the same model")
+    config = next((c for c in (source or layout)["standing"]["configurations"] if c["id"] == packing), None)
     if config is None:
-        sys.exit(f"no packing {packing} in the layout (it has {[c['id'] for c in layout['standing']['configurations']]})")
+        sys.exit(f"no packing {packing} in the layout (it has {[c['id'] for c in (source or layout)['standing']['configurations']]})")
     if navigation.get("assetSha256") != layout["assetSha256"]:
         sys.exit("the navigation grid is not the layout's model's")
+    if source is not None:
+        bad = off_floor(navigation, config["places"])
+        if bad:
+            sys.exit(f"{len(bad)} places of {packing} are not on this floor's open floor: {bad[:5]}")
     keep = ("id", "x", "y", "z", "heading", "footprintPolygon", "footprintHalfExtents", "doorId", "doorBufferId", "phase", "priority")
     places = [{k: p[k] for k in keep if k in p} for p in config["places"]]
     pl = config.get("placement", {})
@@ -207,6 +251,8 @@ def game_cabin(layout, navigation, packing):
             "placement": {k: pl[k] for k in ("count", "totalWithSeats", "overlappingBoundingEnvelopePairs", "windowPlaces",
                                              "circulationPlaces", "doorwayPlaces", "sectorCounts") if k in pl},
             "search": config.get("search"), "paddingMetres": config.get("paddingMetres"),
+            **({"searchedOn": "an earlier floor of the same model (the cab's fixtures marking the floor by their boxes); every "
+                              "place checked on this floor's open floor"} if source is not None else {}),
         },
         "navigation": {k: navigation[k] for k in ("schemaVersion", "assetSha256", "cell", "nx", "nz", "xMin", "zMin", "categories",
                                                   "runs", "seatedFootprint")},
@@ -219,6 +265,7 @@ def main():
     ap.add_argument("--out", default=os.path.join(ROOT, "reports", "249", "cabin"))
     ap.add_argument("--packing", action="append", default=[], help="an adaptive packing's options as JSON")
     ap.add_argument("--navigation-only", action="store_true")
+    ap.add_argument("--lab-floor", action="store_true", help="the lab's floor: the cab's fixtures mark the floor by their boxes")
     ap.add_argument("--timing", metavar="LAYOUT", help="run the timing scenarios on this layout instead")
     ap.add_argument("--expect", metavar="FILE", help="with --timing: a recorded result to compare with")
     ap.add_argument("--alight", metavar="LAYOUT", help="fill and empty every packing with the game's alighting pace")
@@ -226,11 +273,14 @@ def main():
     ap.add_argument("--game", metavar="LAYOUT", help="write the game's cabin (assets/passengers/t3-cabin.json) from this layout and the "
                     "t3-cabin-navigation.json beside it")
     ap.add_argument("--packing-id", default=GAME_PACKING, help=f"with --game: the packing (default {GAME_PACKING})")
+    ap.add_argument("--packing-from", metavar="LAYOUT", help="with --game: take the packing from this layout of the same model, "
+                    "each place checked on the --game layout's open floor")
     args = ap.parse_args()
     if args.game:
         layout = json.load(open(args.game, encoding="utf-8"))
         nav = json.load(open(os.path.join(os.path.dirname(os.path.abspath(args.game)), "t3-cabin-navigation.json"), encoding="utf-8"))
-        cabin = game_cabin(layout, nav, args.packing_id)
+        source = json.load(open(args.packing_from, encoding="utf-8")) if args.packing_from else None
+        cabin = game_cabin(layout, nav, args.packing_id, source)
         write(GAME, json.dumps(cabin, separators=(",", ":"), ensure_ascii=False) + "\n")
         c = cabin["capacity"]
         print(f"{os.path.relpath(GAME, ROOT)}: {c['seats']} seats + {c['standing']} standing ({args.packing_id}) = {c['shown']}, "
@@ -263,7 +313,7 @@ def main():
                 sys.exit(f"{len(moved)} timings differ from {args.expect}")
             print(f"every timing as in {args.expect}")
         return
-    opts = {"packings": [json.loads(o) for o in args.packing], "navigationOnly": args.navigation_only}
+    opts = {"packings": [json.loads(o) for o in args.packing], "navigationOnly": args.navigation_only, "cabFixtures": args.lab_floor}
     out = prepare(args.model, opts)
     os.makedirs(args.out, exist_ok=True)
     for name, v in out["files"].items():
