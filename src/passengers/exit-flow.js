@@ -2,6 +2,7 @@
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), dist/traffic/exit-flow.js, as it was (sha256 776c708cc81c7d75);
 // accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
 // #249: changed: the alighting pace an option (PACE, the lab's values by default: the lab's times hold).
+// #249 step 2: changed: an alighter already on the steps when the door closes finishes the way out (the lab froze them there).
 import {createCabinNavigator,pointPolygonDistance} from './cabin-navigation.js';
 // Cooperative time/space reservations for the stationary cabin's authored exit routes.
 // No scene objects. Optional root-core/waiting-outline guard is a bounded experiment.
@@ -79,9 +80,11 @@ export function createExitFlow(layout,channels,{pace=PACE,onRelease,onOutside,on
   group.plans.set(a.id,plan);group.assigned[plan.c.lane]++;group.nextEntry[plan.c.lane]=plan.start+plan.trace.entryIndex+pace.laneSteps;a.channel=plan.c.id;a.exitScheduledAt=plan.start*STEP-group.time;reserve(group,plan.trace,plan.start);if(a.doorBufferId)group.bufferRelease=Math.max(group.bufferRelease,plan.start+plan.trace.released+1);
  }}
  function update(dt,doorsOpen){for(const [id,group]of groups){const open=typeof doorsOpen==='boolean'?doorsOpen:doorsOpen[id];if(open)group.time+=dt;
-   for(const [id,plan]of group.plans){const {a,trace,c}=plan,t=group.time/STEP-plan.start;if(t<0)continue;if(plan.baseDistance==null){if(plan.kind==='yield'){a.yielding=true;a.yieldAdmittedAt=group.time;onYieldAdmission?.(a,plan.target);}else{a.exiting=true;a.exitAdmittedAt=group.time;}if(avoidWaiting)wake=true;plan.baseDistance=a.distanceMetres;if(plan.kind!=='yield')onAdmission?.(a);}
+   for(const [id,plan]of group.plans){const {a,trace,c}=plan;let t=group.time/STEP-plan.start;
+    // (#249: one already on the steps when the door closes goes on down and away: their plan moves on alone)
+    if(!open&&t>=trace.entryIndex&&t<trace.frames.length-1){plan.start-=dt/STEP;t+=dt/STEP;}const going=open||t>=trace.entryIndex;if(t<0)continue;if(plan.baseDistance==null){if(plan.kind==='yield'){a.yielding=true;a.yieldAdmittedAt=group.time;onYieldAdmission?.(a,plan.target);}else{a.exiting=true;a.exitAdmittedAt=group.time;}if(avoidWaiting)wake=true;plan.baseDistance=a.distanceMetres;if(plan.kind!=='yield')onAdmission?.(a);}
     const i=Math.min(trace.frames.length-1,Math.floor(t+1e-8)),v=Math.min(1,Math.max(0,t-i)),p=trace.frames[i],q=trace.frames[Math.min(i+1,trace.frames.length-1)];
-    Object.assign(a,{x:lerp(p.x,q.x,v),y:lerp(p.y,q.y,v),z:lerp(p.z,q.z,v),heading:turn(p.heading,q.heading,v),distanceMetres:plan.baseDistance+lerp(p.distance,q.distance,v),speedMps:open?lerp(p.speed,q.speed,v):0,motion:open?p.motion:p.phase==='rise'?'Sit':'Idle',legPose:p.legPose&&q.legPose?{hipsHeight:lerp(p.legPose.hipsHeight,q.legPose.hipsHeight,v),feet:p.legPose.feet.map((f,j)=>({x:lerp(f.x,q.legPose.feet[j].x,v),y:lerp(f.y,q.legPose.feet[j].y,v)}))}:p.legPose,poseBlend:p.poseBlend,animationPhase:lerp(p.animationPhase??0,q.animationPhase??0,v),stage:plan.kind==='yield'?'yielding':p.phase==='stairs'?'descending measured entry steps':p.phase==='rise'?'standing up':'alighting'});
+    Object.assign(a,{x:lerp(p.x,q.x,v),y:lerp(p.y,q.y,v),z:lerp(p.z,q.z,v),heading:turn(p.heading,q.heading,v),distanceMetres:plan.baseDistance+lerp(p.distance,q.distance,v),speedMps:going?lerp(p.speed,q.speed,v):0,motion:going?p.motion:p.phase==='rise'?'Sit':'Idle',legPose:p.legPose&&q.legPose?{hipsHeight:lerp(p.legPose.hipsHeight,q.legPose.hipsHeight,v),feet:p.legPose.feet.map((f,j)=>({x:lerp(f.x,q.legPose.feet[j].x,v),y:lerp(f.y,q.legPose.feet[j].y,v)}))}:p.legPose,poseBlend:p.poseBlend,animationPhase:lerp(p.animationPhase??0,q.animationPhase??0,v),stage:plan.kind==='yield'?'yielding':p.phase==='stairs'?'descending measured entry steps':p.phase==='rise'?'standing up':'alighting'});
     if(p.phase==='stairs'&&a.descentStartedAt==null)a.descentStartedAt=group.time;
     if(p.released&&!a.placeReleased){a.placeReleased=true;onRelease?.(a);}
     if(p.outside&&a.outsideAt==null){a.outsideAt=group.time;onOutside?.(a);}
