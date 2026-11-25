@@ -1332,6 +1332,9 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   (a 15 out / 20 in two-car exchange in about 5 s); now its time is the queues': on line 22 (seed 1, 38 stops) 2.6–15.8 s, mean
   10.3 s (line 17: 10.0 s, at most 14.9 s), with the doors' 2 s to open and 3 s to close about 15 s a stop. Their cost on line
   17's drive (seed 1, 102 748 steps): 1.1 s in all, 0.011 ms a step, 0.1 ms at the 99th percentile, 5.3 ms at most (one step).
+  The departures' mean delay (seeds 1–5, against main at 573d129): line 9 45 → 71 s, 17 117 → 186 s, 22 92 → 187 s (on time by
+  D 1/2 0.91 → 0.50), 37 41 → 82 s; line 23 inside main's spread (its exchanges 16.5 s on average). The user, 2026-11-25: keep the
+  queues' time; the drive between the stops is its own matter (most of the delay is there on arrival).
 - **Where the traction's energy goes** (#351, `--checks stops`: lineKWh, wasteKWh, brakeKWh; `tools/test_drives.py` in Wh): the
   starting resistors take 36 % of what the wire gives on a level test drive and 78 % holding 15 km/h in a slow street, almost all
   of it pulling away. Coasting 1 m/s under the limit before pressing again on step 3 (the drivers' "few presses, hard") cut the
