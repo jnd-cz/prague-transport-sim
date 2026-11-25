@@ -749,7 +749,10 @@ export class Traffic {
         // 2-6 m into short lanes; looking only at lanes under 12 m, cars came onto such a lane at the line
         // at 4-11 m/s and crossed it on red, line 17 s 11785, 14839, 16161, 17244; a short lane's line is
         // at its start, back = its length)
-        if (!L && !c.conn && c.next?.light) { const d = c.toEnd + (c.plan ? c.plan.path.length : 0) + c.next.path.length - c.next.light.back; if (d < 60) { L = c.next.light; lane = c.next; toLine = d; } }
+        // (also past its own lane's line, not held by it: lane 2979, 6.7 m, its line at its start, green, hid the red of the
+        // next one, 2763, 2.9 m; a car came off it at 5 m/s onto the junction on red, line 9 s 11935, seed 3, #566)
+        const pastOwn = L && toLine - c.half - 1 <= -0.5 && c.lightHold !== c.lane;
+        if ((!L || pastOwn) && !c.conn && c.next?.light) { const d = c.toEnd + (c.plan ? c.plan.path.length : 0) + c.next.path.length - c.next.light.back; if (d < 60) { L = c.next.light; lane = c.next; toLine = d; } }
         // (and from a junction connector onto such a lane)
         if (!L && c.conn && c.conn.to.light) { const d = c.conn.path.length - c.s + c.conn.to.path.length - c.conn.to.light.back; if (d < 60) { L = c.conn.to.light; lane = c.conn.to; toLine = d; } }
         if (L) {
