@@ -31,7 +31,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 
 # what is drawn: the diagnostic group's state and its boards, the real boards' visibility, and diagnostics beside real signs
 STATE = r"""() => {
-  const g = window.game, shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+  const g = window.run.gameView, shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
   const diag = g.diagBoards, boards = [], real = [];
   g.objects.traverse((o) => { if (o.userData.diagnostic) boards.push(o); else if (o.userData.sign) real.push(o); });
   const realAt = g.signBoards.filter((b) => b.kind !== 'diagnostic').map((b) => b.at ?? b.s);

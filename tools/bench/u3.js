@@ -33,8 +33,9 @@ export async function run(seed = 1, opts = {}) {
   const { game, traffic, pilot } = run, camera = window.camera;
   game.pilot = pilot; // (for the watchers: what it stops for, tools/bench/stops.js)
   const stuck = stuckWatch(game);
-  // (other checks' watchers along on the same drive, opts.also: [(game, traffic) => watcher], #205)
-  const also = (opts.also || []).map((make) => make(game, traffic));
+  // (other checks' watchers along on the same drive, opts.also: [(game, traffic, { view }) => watcher], #205; view: the
+  // traffic as drawn, src/trafficView.js)
+  const also = (opts.also || []).map((make) => make(game, traffic, { view: run.trafficView }));
   game.paused = false;
   const R = window._u3 = { seed, steps: 0, done: false, bells: 0, hits: [], cuts: [] };
   const yielded = new Set(), crossed = new Set(), cut = new Set();

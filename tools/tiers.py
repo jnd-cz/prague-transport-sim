@@ -22,7 +22,7 @@ TOOLS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(TOOLS)
 sys.path.insert(0, TOOLS)
 
-SEEDED = "u3,redruns,stops,traffic,lint"  # (stops rides on the u3 drive, #708)
+SEEDED = "u3,redruns,stops,traffic,lint,giveway"  # (stops rides on the u3 drive, #708; giveway is static, #602)
 STATIC = "lint,surfaces,canted,crossing,spacing,heights"
 DRAWN = "lint,surfaces,crossing,canted"
 
@@ -45,7 +45,7 @@ KINDS = [
      "also heights", ""),
     ("drawn geometry", ("src/terrain.js", "src/world.js", "src/worldMesh.js", "src/groundDraw.js", "src/streets.js",
                         "src/heights.js", "src/platforms.js", "src/pedestrianCrossings.js", "src/structures.js",
-                        "tools/lint.js"),
+                        "src/gameView.js", "src/platformRules.js", "tools/lint.js"),
      f"--checks {DRAWN} on every line; every seedless move needs a reason", "seeded checks"),
     ("drawing", ("src/models.js", "src/buildings.js", "src/trees.js", "src/lamps.js", "src/figures.js", "src/rigged.js",
                  "src/vehicles.js", "src/t3simple.js", "src/t3photo.js", "src/cabframe.js", "src/mirror.js", "src/weather.js",
@@ -55,13 +55,16 @@ KINDS = [
                  "src/panel.js", "src/panel.css", "src/help.js", "src/i18n.js", "src/touch.js", "src/gamepad.js",
                  "src/localFiles.js", "src/packagesMenu.js", "src/report.js", "src/debugOverlay.js", "src/inspect.js",
                  "src/provenance.js", "src/buildId.js", "src/main.js", "index.html", "app.webmanifest", "assets/*",
-                 "tools/frametime.py", "tools/shot.py"),
+                 "src/trafficView.js", "tools/frametime.py", "tools/shot.py"),
      "screenshots main vs branch (tools/shot.py), tools/frametime.py; for a load cut, the world after load compared "
      "with main's", "seeded checks"),
+    ("loading", ("src/groundFile.js", "src/groundWorker.js", "src/world.js", "src/loading.js", "src/localFiles.js"),
+     "a smoke drive per line as a player loads it beside the checks' world (--checks u3 --seeds 1 --player): the same "
+     "counts, or each move with its heights from the 10 m grid (#710)", ""),
     ("simulation", ("src/traffic.js", "src/autopilot.js", "src/tram.js", "src/tr37.js", "src/electric.js",
                     "src/game.js", "src/people.js", "src/streetbot.js", "src/route.js", "src/speedRules.js",
                     "src/consist.js", "src/articulated.js", "src/random.js", "src/geo.js", "src/main.js", "src/run.js",
-                    "tools/traffic_lint.js", "tools/autopilot.js", "tools/bench/*"),
+                    "tools/traffic_lint.js", "tools/autopilot.js", "tools/bench/*", "src/trafficView.js", "src/platformRules.js"),
      f"--checks {SEEDED} on every line, seeds 1-5, --compare; the tram or the autopilot: also test_traction, "
      "test_electric, test_drives", "the geometry checks"),
     ("tool", ("tools/*",), "the changed tools' tests (tools/test_<tool>.py); the whole suite before the PR is ready", ""),
@@ -150,6 +153,8 @@ def commands(found, base="origin/main", root=ROOT):
         out.append(f"python -P -E tools/headless.py --lines {every} --checks heights --compare")
     if "drawn geometry" in found:
         out.append(f"python -P -E tools/headless.py --lines {every} --checks {DRAWN} --compare")
+    if "loading" in found:
+        out.append(f"python -P -E tools/headless.py --lines {every} --checks u3 --seeds 1 --player --gpu")
     if "simulation" in found:
         out.append(f"python -P -E tools/headless.py --lines {every} --checks {SEEDED} --seeds 1-5 --compare")
         if any(p in TRAM for p in found["simulation"]):

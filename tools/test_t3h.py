@@ -132,7 +132,7 @@ SYNTHETIC = r"""async () => {
   for (let y = 0; y < fim.height; y++) for (let x = 0; x < fim.width; x++) if (fd[4 * (y * fim.width + x) + 3] > 127) { fr0 = Math.min(fr0, y); fr1 = Math.max(fr1, y); }
   out.fleetDigits = fh.map((h) => h * (fr1 - fr0 + 1) / fim.height);
   // faded in as an AI tram: the fleet numbers' clear canvas stays clear, the body opaque
-  const { setOpacity } = await import('/src/traffic.js');
+  const { setOpacity } = await import('/src/models.js');
   setOpacity(m, 0); setOpacity(m, 0.5); setOpacity(m, 1);
   const fleetMat = a.userData.rig.full.getObjectByName(proto.rig.numberPlates[0]).material;
   out.fadedFleet = { transparent: fleetMat.transparent, depthWrite: fleetMat.depthWrite, opacity: fleetMat.opacity };

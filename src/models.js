@@ -37,6 +37,24 @@ export function disposeModel(root) {
   });
 }
 
+// Fade a model in/out by its materials' opacity (each model owns its materials).
+export function setOpacity(obj, a) {
+  obj.visible = a > 0.01;
+  obj.traverse((o) => {
+    const m = o.material;
+    if (!m) return;
+    // (glass keeps its own opacity: userData.opacity, src/rigged.js. A material blended from the start
+    // stays blended: the hybrid's fleet numbers are a decal on a clear canvas, whose clear pixels drew
+    // black once the faded-in tram went opaque)
+    const base = m.userData.opacity ?? 1;
+    m.userData.blend ??= m.transparent;
+    m.userData.fade = a;
+    m.transparent = a < 0.999 || base < 1 || m.userData.blend;
+    m.opacity = a * base;
+    m.depthWrite = a > 0.5 && base === 1 && !m.userData.blend;
+  });
+}
+
 function canvasTexture(w, h, draw) {
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
@@ -188,7 +206,7 @@ export function makeT3({ line = '22', cars = 1, vehicle = null, dest = null, run
   const look = lookOf(v, dealt ? dealt.livery : livery);
   root.userData.line = line;
   root.userData.vehicle = v?.id ?? null;
-  root.userData.fleet = fleet;   // (given back to the dealer when an AI tram leaves)
+  root.userData.fleet = fleet;   // (the cars' fleet numbers: the dealt ones, else from the run number)
   root.userData.livery = look?.id ?? null;
   if (loader === 'gltf-classic') { makeDetailedSet(root, detailedProto, line, cars, dest, run); root.userData.kind = 'classic'; return root; }
   if (loader === 'gltf') { makeDetailedSet(root, gltfProtos.get(v.id), line, cars, dest, run); root.userData.kind = 'gltf'; return root; }

@@ -3,7 +3,7 @@
 (its own server on a free port). A standard-layout pad, played by a page script in place of navigator.getGamepads():
 it is announced when it connects. A closes the doors. The right trigger half pressed sets drive step 3 and the tram
 moves. Held just over a step's edge and eased back a little, the trigger keeps its step. The left trigger over it
-brakes at step 5, and both released free the pedals. LB held is the emergency brake, and let go it is brake step 5. A
+brakes at step 5, and both released free the pedals. LB held is the emergency brake, and let go the lever is on 0 (#837). A
 held D-pad ↑ repeats. A key pressed beside a pad at rest stays. Start pauses and resumes, and Y and
 the D-pad's sides send their keys. The right stick turns the head in proportion, nothing in its dead zone. In advanced controls a trigger puts the pedal straight on its step's angle,
 for drive once Y has released the parking brake (before it, a warning says so); the dead-man pedal counts as held while the pad is connected."""
@@ -190,8 +190,8 @@ def main():
         fails.append(f"a trigger eased back at a step's edge flickers: {r['edge']} (want [2, 2])")
     if r["brake"] != -5 or r["free"] != 0:
         fails.append(f"left trigger over the right: {r['brake']} (want -5); both released: {r['free']} (want 0)")
-    if r["emergency"] != [-6, -5]:
-        fails.append(f"emergency brake held, let go: {r['emergency']} (want [-6, -5])")
+    if r["emergency"] != [-6, 0]:
+        fails.append(f"emergency brake held, let go: {r['emergency']} (want [-6, 0], the sprung lever, #837)")
     if r["keyBeside"] != 2:
         fails.append(f"a key pressed beside the pad at rest gave {r['keyBeside']} (want 2)")
     if r["repeats"] < 2:

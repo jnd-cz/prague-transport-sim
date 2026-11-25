@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Gameplay: timetable, stops & passengers, doors, signals, switches, obstacles, scoring.
-import * as THREE from 'three';
-import { ADHESION, PANTO_FROM_FRONT, T3, tramClearance } from './tram.js';
+// Only the rules and their state live here (#228): plain objects, no meshes. src/gameView.js draws them: the platforms
+// and stops (src/platformRules.js), each signal's aspect (sig.show, a gauntlet's G.their), each switch indicator's
+// (sw.shown), the signs where the rules want them (signPlan, diagSigns), the obstacles, the late passengers, the cross
+// streets' cars, the driver with the switch iron and the leaf mash (leafSmears). Every rand() draw stays here.
+import { ADHESION, PANTO_FROM_FRONT, T3 } from './tram.js';
 import { Route } from './route.js';
 import { DERAIL, FROG, derailRisk, placeStretches, stopPassPoints, trackworkStretches, withoutOwnPieces } from './speedRules.js';
 import { locateGradients, planSigns, smallRadiusCurves, withArrows } from './speedSigns.js';
 import { toLatLon } from './geo.js';
 import { t } from './i18n.js';
-import { leafTexture } from './weather.js';
-import {
-  makeCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
-  makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeSpeedBoard, disposeModel,
-  makeSpeedSwitchSignal, makeSwitchNumberPlate, makeCallSignal, makeEntrySignal,
-} from './models.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
 const STOP_AHEAD = 6;          // without a stop sign in the data: the front stops this far past the GTFS point
@@ -23,7 +20,7 @@ const PHASE_HOLD = 10;        // s: the most a junction holds its phase for each
 
 import { rng } from './random.js';
 import { Feeding } from './electric.js';
-import { buildPlatforms, buildStop, place } from './platforms.js';
+import { platformsOf, stopOf } from './platformRules.js';
 
 // Passenger demand by time of day (weekday): morning and afternoon peaks, quiet nights.
 const DEMAND = [[0, 0.3], [5, 0.35], [6, 1.0], [7, 2.2], [8.5, 2.3], [9.5, 1.3], [11, 1.0], [14, 1.3],
@@ -49,8 +46,7 @@ export const fmtDev = (d) => {
 };
 
 export class Game {
-  constructor(scene, data, route, tram, audio, opts) {
-    this.scene = scene;
+  constructor(data, route, tram, audio, opts) {
     this.data = data;
     this.route = route;
     this.tram = tram;
@@ -85,8 +81,6 @@ export class Game {
     this.action = null; // { label, t, done }
     this.runners = []; // late passengers running for the tram (C14)
     this.holdTimer = 0;
-    this.objects = new THREE.Group();
-    scene.add(this.objects);
 
     this.profile = route.ground.profile;
     this.weather = opts.weather || 'dry';
@@ -169,19 +163,17 @@ export class Game {
       this._buildStop(stop);
       return stop;
     });
-    this.crowd = makeCrowd(120);
-    this.objects.add(this.crowd);
   }
 
-  // the platforms of both directions and the opposite stops' furniture (src/platforms.js)
+  // the platforms of both directions (src/platformRules.js; drawn with the opposite stops' furniture by src/gameView.js)
   _buildPlatforms() {
     this.stopTypeDiffs = [];
-    this.platformGaps = [];
-    this.platforms = buildPlatforms({ data: this.data, route: this.route, backRoute: this.backRoute, group: this.objects, log: this });
+    this.platforms = platformsOf({ data: this.data, route: this.route, backRoute: this.backRoute });
   }
 
+  // one of our stops' kind: vienna, standIn, shelterOuter (src/platformRules.js)
   _buildStop(stop) {
-    buildStop({ stop, data: this.data, route: this.route, platforms: this.platforms, group: this.objects, log: this });
+    stopOf({ stop, data: this.data, platforms: this.platforms });
   }
 
   _initSignals() {
@@ -207,23 +199,13 @@ export class Game {
       placed = live(own).map((d) => this._platformRule(d));
     }
     if (this.signalsBeforeSign.length) console.log(`signals hung before their stop's sign (not used to move it, #694): ${this.signalsBeforeSign.map((b) => b.info).join('; ')}`);
+    // (each signal's head drawn where src/gameView.js mounts it; sig.show: what it shows)
     this.signals = placed.map((d, i) => {
-      const mesh = makeTramSignal();
-      // (at a platform end: on its own pole at the island's tip, a few metres past the post and further from
-      // the track, so the post does not hide it from the driver; the same pole carries the crossing's
-      // pedestrian heads; user's street view, Palackého náměstí. Hung from a span it hung 20 m back)
-      if (d.head && !d.head.vienna) {
-        const s = Math.min(d.s, (d.head.p1 ?? d.s) - 0.5);
-        place(mesh, this.route, s, -3.5, 0.18, true);
-        mesh.userData.tip = s === d.head.p1 - 0.5;
-      }
-      else this._mount(mesh, d.s, { hang: d.hang });
-      this.objects.add(mesh);
       // the GO aspect shows the direction the route takes through the junction
       const h0 = this.route.heading(d.cross - 5, 5), h1 = this.route.heading(d.cross + 30, 8);
       const turn = Math.atan2(h0.hx * h1.hy - h0.hy * h1.hx, h0.hx * h1.hx + h0.hy * h1.hy);
       const goDir = turn > 0.45 ? 'left' : turn < -0.45 ? 'right' : 'straight';
-      const sig = { ...d, goDir, state: 'stop', timer: 0, preferred: false, mesh, cars: [], spawn: 0, seed: i * 31 };
+      const sig = { ...d, goDir, state: 'stop', timer: 0, preferred: false, show: { aspect: 'stop', goDir }, cars: [], spawn: 0, seed: i * 31 };
       // the junction's controller: one fixed cycle (60-90 s): trams going straight in both
       // directions together, then a short turning phase if our route turns here, then the cross
       // street; our GO is the straight phase or the turning phase
@@ -236,7 +218,6 @@ export class Game {
         const x = this.route.at(d.cross), n = this.backRoute.nearestOnHeading(x.x, x.y, -x.hx, -x.hy);
         if (n && n.d < 15) sig.backCross = n.s;
       }
-      mesh.userData.set(sig.state, { goDir });
       return sig;
     }).sort((a, b) => a.s - b.s);
     this._initGauntlets();
@@ -324,22 +305,11 @@ export class Game {
         theirs: { requested: false, occupied: false },
       };
       // drop ordinary traffic-light signals that fall inside or just before the block
-      this.signals = this.signals.filter((x) => {
-        const drop = x.s > s0 - 30 && x.s < s1;
-        if (drop) this.objects.remove(x.mesh);
-        return !drop;
-      });
-      const mesh = makeTramSignal();
-      place(mesh, this.route, s0 - 4, -2.4, 0, true);
-      this.objects.add(mesh);
-      G.sig = { s: s0 - 4, cross: s0, goDir: 'straight', gauntlet: G, state: 'stop', timer: Infinity, preferred: false, mesh, cars: [], spawn: 0 };
+      this.signals = this.signals.filter((x) => !(x.s > s0 - 30 && x.s < s1));
+      G.sig = { s: s0 - 4, cross: s0, goDir: 'straight', gauntlet: G, state: 'stop', timer: Infinity, preferred: false, show: { aspect: 'stop', goDir: 'straight' }, cars: [], spawn: 0 };
       this.signals.push(G.sig);
-      // the opposite direction's signal, facing oncoming trams
-      G.theirMesh = makeTramSignal();
-      const o = back.offset(G.b0 - 4, -2.4);
-      G.theirMesh.position.set(o.x, this.route.ground.trackAt(o.x, o.y), -o.y);
-      G.theirMesh.rotation.y = Math.atan2(-o.hx, o.hy);
-      this.objects.add(G.theirMesh);
+      // the opposite direction's signal, facing oncoming trams 4 m before they enter (G.their: what it shows)
+      G.their = { aspect: 'stop', goDir: 'straight', call: 'off' };
       this.gauntlets.push(G);
     }
     this.signals.sort((a, b) => a.s - b.s);
@@ -567,7 +537,7 @@ export class Game {
       if (G.sig.state === 'stop' && G.sig.lastState !== 'stop') G.sig.stopSince = this.clock;
       G.sig.lastState = G.sig.state;
       const theirGo = G.state === 'theirs' && !G.entered;
-      G.theirMesh.userData.set(theirGo ? 'go' : 'stop', { goDir: 'straight', call: G.theirs.requested && !theirGo ? 'on' : 'off' });
+      G.their = { aspect: theirGo ? 'go' : 'stop', goDir: 'straight', call: G.theirs.requested && !theirGo ? 'on' : 'off' };
       // head-on: we are inside while an oncoming tram is too
       if (overlaps(tram.s) && occTheirs && !G.crashed) {
         G.crashed = true;
@@ -587,10 +557,7 @@ export class Game {
       const ds = sig.s - 120;
       if (minR > 110 || ds < 30 || ds - lastS < 60) continue;
       if (this.signals.some((o) => o !== sig && o.s > ds - 20 && o.s < sig.s)) continue;
-      const mesh = makeTramSignal({ distant: true });
-      this._mount(mesh, ds);
-      this.objects.add(mesh);
-      this.distants.push({ s: ds, main: sig, mesh });
+      this.distants.push({ s: ds, main: sig }); // (it shows its main signal's GO or STOP)
       lastS = sig.s;
     }
   }
@@ -605,21 +572,10 @@ export class Game {
     return list.find((e) => m(e) < 15) || null;
   }
 
-  // A speed switch's elements at R01's distances (D 1/2 § 46; docs/decisions/2026-11-07-speed-switch-signals.md): the
-  // number plate 190 m before it, the call signal 160 m (dark: no registration yet), the entry sleeper signal 27 m (may
-  // enter), and the switch signal at the frog, in place of the red indicator. They and their limit stay as for any
-  // facing switch until registration is built (the later issue).
-  _initSpeedSwitch(sw) {
-    const frog = sw.frog ?? FROG, add = (obj, s, how) => { if (s < 5) return; how(obj, s); this.objects.add(obj); };
-    add(makeSwitchNumberPlate(sw.speedSwitch.number), sw.s - 190, (o, s) => this._mount(o, s, { movable: true }));
-    add(makeCallSignal(), sw.s - 160, (o, s) => this._mount(o, s, { movable: true }));
-    add(makeEntrySignal('go'), sw.s - 27, (o, s) => place(o, this.route, s, -1.1, 0, true));
-    this._mount(sw.indicator, sw.s + frog);
-    this.signBoards.push({ kind: 'speedSwitch', number: sw.speedSwitch.number, s: Math.round(sw.s) });
-  }
-
+  // the facing switches: where each one's overhead contact is, its position (sw.pos; sw.shown, what its indicator
+  // shows) and whether it is worked by radio. A speed switch's (truth.json `speed-switches`) elements are drawn by
+  // src/gameView.js at R01's distances.
   _initSwitches() {
-    this.signBoards ||= [];
     // contacts of closely following switches keep their order and at least 4 m between them
     const contacts = [];
     this.data.switches.forEach((d, k) => {
@@ -636,25 +592,13 @@ export class Game {
         ...d, required, divSide, speedSwitch,
         pos: this.rand() < 0.5 ? 'straight' : 'diverging',
         contact: contacts[k], passedContact: false, passed: false,
-        indicator: speedSwitch ? makeSpeedSwitchSignal() : makeSwitchIndicator(), marker: makeContactMarker(),
       };
       // Every facing switch is worked by an overhead contact: the driver passes under it with
       // current (turn) or coasting (straight), also right after a stop, at a signal or on a
       // gradient. Radio (IRC) control is only used where the data marks a switch as such.
       // Trailing switches are not in the data at all: the tram simply trails through them.
       sw.auto = !!d.irc || !!this.opts.autoSwitch;
-      sw.marker.visible = !sw.auto;
       if (sw.auto && this.opts.autoIrc) sw.pos = required;
-      const sign = sw.auto ? makeRadioSwitchSign() : makeContactSign();
-      this._mount(sign, sw.auto ? d.s - 40 : sw.contact);
-      this.objects.add(sign);
-      if (speedSwitch) this._initSpeedSwitch(sw);
-      else place(sw.indicator, this.route, d.s - 8, -0.4, -0.26, true); // hangs from the span wire over the track
-      const c = this.route.at(sw.contact);
-      sw.marker.position.x = c.x;
-      sw.marker.position.y += this.profile.height(sw.contact);
-      sw.marker.position.z = -c.y;
-      this.objects.add(sw.indicator, sw.marker);
       this._showSwitch(sw);
       return sw;
     });
@@ -702,9 +646,9 @@ export class Game {
 
   // Track signs (#364): D 1/2's speed and gradient signs where src/speedSigns.js's `planSigns` puts them, from the posted
   // speeds, the trackwork, the curves under 25 m and the listed dangerous gradients; and a diagnostic board where a limit
-  // comes from a curve alone. Each is in `signBoards` for the debug overlay and the checks.
+  // comes from a curve alone. signPlan: where the rule wants each sign; diagSigns: the diagnostic boards' { s, v, movable }.
+  // src/gameView.js mounts them (moved off a platform, or to a span) and lists each with where it stands (signBoards).
   _initSigns() {
-    this.signBoards ||= [];
     const route = this.route, sp = route.speedInfo, top = Math.round(T3.vMax * 3.6);
     const posted = sp?.osm || [], pstep = sp?.step ?? 5;
     const tw = this.data.trackwork || {};
@@ -713,23 +657,14 @@ export class Game {
     const smallRadius = smallRadiusCurves(route.length, (s) => route._radius(s), turnAt);
     const gradients = locateGradients(this.opts.signFacts?.gradients || [], this.data.stops, (s) => this.profile.height(s));
     const plan = withArrows(planSigns({ posted, step: pstep, top, trackwork, smallRadius, gradients }), this.switches);
-    const RELEASE = new Set(['end', 'higher', 'climbEnd', 'descentEnd', 'zoneEnd']);
-    for (const sign of plan) {
-      const board = makeSpeedBoard(sign);
-      this._mount(board, sign.s, { movable: RELEASE.has(sign.kind) ? 'after' : true });
-      this.objects.add(board);
-      // where the rule wants it, and where it stands (moved off a platform, or to its span)
-      this.signBoards.push({ ...sign, s: Math.round(sign.s), at: Math.round(board.userData.mountedS ?? sign.s) });
-    }
+    this.signPlan = plan;
     // Diagnostic boards: a curve's limit with no real sign (R 25 m and more; the user, 2026-11-08: "keep them for now for
     // diagnostic purposes, we can drop them later with more stable release"). Where the limit lies under both the posted
     // speed and the restrictions for 25 m or more: the lowest at the start, 12 m before it, and the speed after it.
     // They show only with the debug overlay (F8, src/debugOverlay.js; the user, 2026-11-08, #389: "Only with F8"): in the
-    // old design they read as real signs, three to one against those. None within 20 m of a real sign, which stands there.
-    const diag = (this.diagBoards = new THREE.Group());
-    diag.visible = false;
-    this.objects.add(diag);
-    const real = this.signBoards.map((b) => b.at ?? b.s);
+    // old design they read as real signs, three to one against those. None within 20 m of a real sign, which stands there
+    // (src/gameView.js, where they are mounted).
+    this.diagSigns = [];
     const lim = this.limits, step = lim.step, vals = lim.values;
     const postedAt = (s) => Math.min(posted[Math.floor(s / pstep)] || 50, top);
     const curveBin = (i) => vals[i] < Math.min(postedAt(i * step), lim.restriction(i * step + step / 2));
@@ -743,65 +678,15 @@ export class Game {
       for (const [s, v] of [[i * step - 12, low], [k * step, vals[Math.min(k, vals.length - 1)]]]) {
         if (s - last < 35 || s < 20) continue;
         last = s;
-        const board = makeSpeedSign(v);
-        board.userData.diagnostic = true;
-        this._mount(board, s, { movable: v > low ? 'after' : true });
-        const at = board.userData.mountedS ?? s;
-        if (real.some((r) => Math.abs(r - at) < 20)) continue;
-        diag.add(board);
-        this.signBoards.push({ kind: 'diagnostic', v, s: Math.round(s), at: Math.round(at) });
+        this.diagSigns.push({ s, v, movable: v > low ? 'after' : true });
       }
       i = k;
     }
   }
 
-  // Put a signal or sign beside the track at route position s: at the kerb on the right when it
-  // is close to the track (within 6.5 m), otherwise hung from the nearest span wire over the
-  // track, where the driver sees it best. Never on a platform or against a facade; speed and
-  // gradient signs that would stand on a platform move to just before it.
-  _mount(obj, s, { movable = false, hang = false } = {}) {
-    const route = this.route, C = route.catenary || [], ud = obj.userData;
-    const platformAt = (x) => this.stops.find((st) => x > (st.p0 ?? st.target - 30) - 4 && x < (st.p1 ?? st.target + 2) + 2);
-    // movable: true moves a sign on a platform to just before it; 'after', for a sign that releases a limit (an end, a
-    // Rychlostník), to just past it, so that no sign tells the driver to speed up before the limit lifts
-    const after = movable === 'after';
-    let onPlatform = platformAt(s);
-    if (onPlatform && movable) { s = after ? (onPlatform.p1 ?? onPlatform.target + 2) + 6 : (onPlatform.p0 ?? onPlatform.target - 30) - 6; onPlatform = platformAt(s); }
-    ud.mountedS = s;
-    const hidePole = () => { if (ud.pole) ud.pole.visible = false; };
-    const kerb = route.kerbAt ? route.kerbAt(s, -1) : null;
-    if (kerb && !kerb.wall && kerb.lat <= 6.5 && !onPlatform && !hang) {
-      place(obj, route, s, -kerb.lat, 0, true);
-      return;
-    }
-    // a signal that must hang (its place is on a platform) takes a span up to 30 m away
-    const reach = hang ? 30 : 16;
-    // (a cross-span; one that must hang may also use a pole's bracket arm over the track. Not one
-    // after s: the nearest span was often over the junction, the signal hung in its middle (user,
-    // 2026-10-24); one that must hang takes such a span only when there is none before s)
-    const spans = C.filter((c) => (hang ? c.L || c.R : c.L && c.R) && Math.abs(c.s - s) <= reach).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s));
-    const span = spans.find((c) => (after ? c.s >= s - 2 : c.s <= s + 2)) || (hang ? spans[0] : null);
-    if (span && ud.boardTop !== undefined) {
-      ud.mountedS = span.s;
-      // right of the tram: its half width, the overhang of the car ends in a curve, a margin and
-      // the board's own half width (it used to hang 1.15 m out, over the tram's roof edge)
-      hidePole();
-      const box = new THREE.Box3().setFromObject(obj);
-      const half = Math.max(0.2, (box.max.x - box.min.x) / 2);
-      place(obj, route, span.s, -(tramClearance(route, span.s) + half), 0, true);
-      ud.hung = true;
-      obj.position.y = this.profile.height(span.s) + 5.04 - ud.boardTop;
-      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.25, 4), new THREE.MeshLambertMaterial({ color: 0x333333 }));
-      rod.position.y = ud.boardTop + 0.62;
-      obj.add(rod);
-      return;
-    }
-    if (kerb && !kerb.wall && kerb.lat <= 12) { place(obj, route, s, -kerb.lat, 0, true); return; }
-    place(obj, route, s, -2.6, 0, true);
-  }
-
+  // what the switch's indicator shows: the way it is set (dir), steady (off: the blink's dark half while it is locked)
   _showSwitch(sw) {
-    sw.indicator.userData.set(sw.pos === 'straight' ? 'straight' : sw.divSide);
+    sw.shown = { dir: sw.pos === 'straight' ? 'straight' : sw.divSide, off: false };
   }
 
   _initObstacles() {
@@ -814,12 +699,8 @@ export class Game {
       const s = a + this.rand() * (b - a);
       if (this.switches.some((w) => Math.abs(w.s - s) < 30) || this.signals.some((g) => Math.abs(g.cross - s) < 40)) continue;
       const type = this.rand() < 0.5 ? 'parked' : 'pedestrian';
-      const mesh = type === 'parked' ? makeCar(Math.floor(this.rand() * 8)) : makePerson(Math.floor(this.rand() * 8));
-      const ob = { type, s, lat: type === 'parked' ? -1.5 : -6, mesh, state: 'idle', timer: 0, rung: false, speed: 1.3 };
-      place(mesh, this.route, s, ob.lat, 0, false);
-      if (type === 'pedestrian') mesh.visible = false;
-      this.objects.add(mesh);
-      this.obstacles.push(ob);
+      // (its look, one of eight, drawn here as when its model was made here; turn: its heading against the track's)
+      this.obstacles.push({ type, model: Math.floor(this.rand() * 8), s, lat: type === 'parked' ? -1.5 : -6, turn: 0, state: 'idle', timer: 0, rung: false, speed: 1.3 });
     }
     // jaywalkers at some unsignalised pedestrian crossings, none on the road under a bridge (the build's answer:
     // tools/network.py over_bridge. Asked here, the ground under the span was past the window at Start, #823)
@@ -827,10 +708,8 @@ export class Game {
     this.data.crossings.forEach((s, k) => {
       if (s < this.stops[this.opts.startStop].target + 50 || this.rand() > p * 0.15) return;
       if (under.has(k)) return;
-      const mesh = makePerson(Math.floor(this.rand() * 8));
-      mesh.visible = false;
-      this.objects.add(mesh);
-      this.obstacles.push({ type: 'pedestrian', s, lat: this.rand() < 0.5 ? -6 : 6, mesh, state: 'idle', timer: 0, rung: false, speed: 1.3 });
+      const model = Math.floor(this.rand() * 8);
+      this.obstacles.push({ type: 'pedestrian', model, s, lat: this.rand() < 0.5 ? -6 : 6, turn: 0, state: 'idle', timer: 0, rung: false, speed: 1.3 });
     });
   }
 
@@ -842,22 +721,16 @@ export class Game {
     this.muBase = ADHESION[this.weather] ?? ADHESION.dry;
     this.patches = [];
     this.icy = this.weather === 'snow' ? this.data.crossings.map((s) => [s - 4, s + 4]) : [];
+    this.leafSmears = []; // { s, lat, turn, size }: the mash's smears, drawn by src/gameView.js
     if (this.weather !== 'leaves') return;
-    const mat = new THREE.MeshLambertMaterial({ map: leafTexture(true), alphaTest: 0.35, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    const geo = new THREE.PlaneGeometry(1, 1);
     for (let s = 150 + this.rand() * 200; s < this.route.length - 50; s += 180 + this.rand() * 420) {
       const len = 15 + this.rand() * 45;
       this.patches.push([s, s + len]);
       // overlapping irregular smears, thickest in the middle of the patch
       for (let k = s; k < s + len; k += 1.6 + this.rand() * 1.4) {
-        const smear = new THREE.Mesh(geo, mat);
-        smear.rotation.set(-Math.PI / 2, 0, this.rand() * Math.PI * 2);
+        const turn = this.rand() * Math.PI * 2;
         const size = (1.4 + this.rand() * 1.4) * (0.6 + 0.4 * Math.sin(Math.PI * (k - s) / len));
-        smear.scale.set(size, size, 1);
-        const holder = new THREE.Group();
-        holder.add(smear);
-        place(holder, this.route, k, (this.rand() - 0.5) * 1.2, 0.27, false);
-        this.objects.add(holder);
+        this.leafSmears.push({ s: k, lat: (this.rand() - 0.5) * 1.2, turn, size });
       }
     }
   }
@@ -976,34 +849,16 @@ export class Game {
     if (!sw) { this.msg(t('msg.noSwitch'), 'warn'); return; }
     if (this.tram.v > 0.05) { this.msg(t('msg.stopFirst'), 'warn'); return; }
     const door = this.tram.s - 1.5, walk = (sw.s - 0.6 - door) / 1.6, total = Math.max(9, 2 * walk + 2);
-    const driver = makePerson(4);
-    driver.children[1].material.color.set(0xff7a1a); // (the torso: a high-visibility vest)
-    this.objects.add(driver);
+    // (driver: out of the cab while the action lasts, drawn by src/gameView.js)
     this.action = {
-      label: t('msg.crowbar'), t: total, total, walk, door, at: sw.s - 0.6, driver,
+      label: t('msg.crowbar'), t: total, total, walk, door, at: sw.s - 0.6, driver: true,
       done: () => {
-        this.objects.remove(driver);
         sw.pos = sw.pos === 'straight' ? 'diverging' : 'straight';
         this._showSwitch(sw);
         this.audio.emit('switch.iron');
         this.msg(t('msg.switchManual', { dir: t(`dirShort.${sw.pos === 'straight' ? 'straight' : sw.divSide}`) }), 'info');
       },
     };
-    this._poseDriver();
-  }
-
-  // the driver out with the switch iron: out along the side of the tram, at the points, back
-  _poseDriver() {
-    const a = this.action;
-    if (!a?.driver) return;
-    const el = a.total - a.t, back = a.total - a.walk;
-    let along, lat = -1.7, crouch = 1;
-    if (el < a.walk) along = a.door + (a.at - a.door) * (el / a.walk);
-    else if (el < back) { along = a.at; lat = -0.6; crouch = 0.7 + 0.08 * Math.sin(el * 5); }
-    else along = a.at - (a.at - a.door) * Math.min(1, (el - back) / a.walk);
-    const o = this.route.offset(along, lat);
-    a.driver.position.set(o.x, this.profile.height(along) + 0.05, -o.y);
-    a.driver.scale.y = crouch;
   }
 
   // Late passengers (C14): when the tram arrives they come running along the platform side from behind
@@ -1013,10 +868,8 @@ export class Game {
   _spawnRunners(st) {
     const tr = this.tram;
     for (let k = 0; k < st.runners; k++) {
-      const mesh = makePerson(11 + st.i + k);
-      this.objects.add(mesh);
       const target = tr.s - tr.length + 2.2 + k * 0.6;
-      this.runners.push({ mesh, st, s: target - 6 - k * 2.5 - 3.4 * st.runnerDelay, lat: -3.4 + (k % 2) * 0.5, v: 3.4 + this.rand() * 0.6, target, state: 'run' });
+      this.runners.push({ model: 11 + st.i + k, st, s: target - 6 - k * 2.5 - 3.4 * st.runnerDelay, lat: -3.4 + (k % 2) * 0.5, v: 3.4 + this.rand() * 0.6, target, state: 'run' });
     }
     this.msg(t('msg.runners', { n: st.runners }), 'info');
     st.runners = 0;
@@ -1041,11 +894,8 @@ export class Game {
           this.penalty('leftBehind', 15, t('msg.runnerLeft'));
         }
       }
-      const o = this.route.offset(r.s, r.lat), bob = r.state === 'run' ? Math.abs(Math.sin(r.s * 2.2)) * 0.08 : 0;
-      r.mesh.position.set(o.x, this.profile.height(r.s) + 0.18 + bob, -o.y);
     }
     // aboard, or left far behind: gone
-    for (const r of this.runners) if (r.state === 'aboard' || (r.state === 'left' && tr.s - r.s > 150)) this.objects.remove(r.mesh);
     this.runners = this.runners.filter((r) => !(r.state === 'aboard' || (r.state === 'left' && tr.s - r.s > 150)));
   }
 
@@ -1075,7 +925,6 @@ export class Game {
     if (this.action) {
       this.action.t -= dt;
       tram.forcedStop = true;
-      this._poseDriver();
       if (this.action.t <= 0) { const a = this.action; this.action = null; a.done(); }
     } else if (this.holdTimer > 0) {
       this.holdTimer -= dt;
@@ -1232,7 +1081,7 @@ export class Game {
       // the indicator blinks while the switch is locked under/for the approaching tram
       if (Math.abs(sw.s - tram.s) < 250) {
         sw.locked = (sw.auto ? tram.s > sw.s - 8 : tram.panto > sw.contact) && tram.s - tram.length < sw.s + 2;
-        sw.indicator.userData.set(sw.pos === 'straight' ? 'straight' : sw.divSide, sw.locked && blinkOff);
+        sw.shown = { dir: sw.pos === 'straight' ? 'straight' : sw.divSide, off: sw.locked && blinkOff };
       }
       if (sw.passed) continue;
       if (!sw.passedContact && prevS - PANTO_FROM_FRONT < sw.contact && tram.panto >= sw.contact) {
@@ -1327,7 +1176,7 @@ export class Game {
       if (sig.gauntlet) {
         let call = 'off';
         if (sig.gauntlet.reqOurs && sig.state === 'stop') call = sig.gauntlet.state === 'clearing' && Math.floor(this.clock * 3) % 2 ? 'off' : 'on';
-        sig.mesh.userData.set(sig.state, { goDir: 'straight', call });
+        sig.show = { aspect: sig.state, goDir: 'straight', call };
         if (prevS < sig.s && tram.s >= sig.s && sig.state === 'stop' && this.clock - (sig.stopSince ?? -1e9) > 1.0) {
           this.penalty('signal', 300, t('msg.passedGauntlet'));
         }
@@ -1338,14 +1187,13 @@ export class Game {
       // call lamp: lit once the tram request is registered, blinking in the last 3 s before GO
       let call = 'off';
       if (sig.preferred && sig.state === 'stop') call = sig.timer < 3 && Math.floor(this.clock * 3) % 2 ? 'off' : 'on';
-      sig.mesh.userData.set(sig.state, { goDir: sig.goDir, blink, call });
+      sig.show = { aspect: sig.state, goDir: sig.goDir, blink, call };
 
       if (prevS < sig.s && tram.s >= sig.s && sig.state === 'stop' && this.clock - (sig.stopSince ?? -1e9) > 1.5) {
         this.penalty('signal', 200, t('msg.passedSignal'));
       }
       this._crossTraffic(sig, dt);
     }
-    for (const d of this.distants) d.mesh.userData.set(d.main.state === 'go' ? 'go' : 'stop', { goDir: 'straight' });
   }
 
   // Junction controller (fixed cycle, see _initSignals) with tram priority: a tram detected 140 m
@@ -1414,15 +1262,10 @@ export class Game {
         sig.spawn = 3 + this.rand() * 4;
         const dir = X.oneway || (this.rand() < 0.5 ? 1 : -1);
         const start = dir > 0 ? 0 : X.length;
-        if (!sig.cars.some((c) => c.dir === dir && Math.abs(c.s - start) < 9)) {
-          const mesh = makeCar(sig.seed++);
-          mesh.rotation.order = 'YXZ';
-          this.objects.add(mesh);
-          sig.cars.push({ s: start, dir, mesh, v: 0 });
-        }
+        // (its look from the signal's own counter, not the run's stream; drawn by src/gameView.js on the street's right side)
+        if (!sig.cars.some((c) => c.dir === dir && Math.abs(c.s - start) < 9)) sig.cars.push({ s: start, dir, model: sig.seed++, v: 0 });
       }
     }
-    const ground = this.route.ground;
     for (const car of sig.cars) {
       // distance to the crossing point along the car's way (+ = still before it)
       const toX = (X.sX - car.s) * car.dir;
@@ -1437,13 +1280,6 @@ export class Game {
       const vt = waiting ? 0 : Math.min(9, Math.max(0, (gap - 3) * 0.9));
       car.v = vt > car.v ? Math.min(vt, car.v + dt * 2.5) : Math.max(vt, car.v - dt * 6);
       car.s += car.dir * car.v * dt;
-      const p = X.at(car.s), hx = p.hx * car.dir, hy = p.hy * car.dir;
-      const lane = X.oneway ? 0 : Math.max(1.5, X.w / 4); // right-hand traffic
-      const x = p.x + hy * lane, y = p.y - hx * lane;
-      const zf = ground.at(x + hx * 1.6, y + hy * 1.6), zb = ground.at(x - hx * 1.6, y - hy * 1.6);
-      car.mesh.position.set(x, (zf + zb) / 2 + 0.1, -y);
-      car.mesh.rotation.y = Math.atan2(hx, -hy);
-      car.mesh.rotation.x = -Math.atan2(zf - zb, 3.2);
       // a hit: the car inside the tram's body on the crossing (its front plus the car's half width), not
       // the 4 m ahead in which drivers see it coming (a car 4 m ahead counted, line 9 seed 7, #268)
       const inBody = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 1;
@@ -1452,10 +1288,7 @@ export class Game {
         this._collision(t('obj.crossingCar'));
       }
     }
-    sig.cars = sig.cars.filter((c) => {
-      if (c.s < -1 || c.s > X.length + 1) { this.objects.remove(c.mesh); disposeModel(c.mesh); return false; }
-      return true;
-    });
+    sig.cars = sig.cars.filter((c) => !(c.s < -1 || c.s > X.length + 1));
   }
 
   _updateObstacles(dt) {
@@ -1477,30 +1310,26 @@ export class Game {
           ob.s += ds;
           ob.lat -= dl;
           ob.driven = (ob.driven || 0) + ds;
-          place(ob.mesh, this.route, ob.s, ob.lat, 0, false);
-          ob.mesh.rotation.y -= ds > 0 ? Math.atan2(dl, ds) : 0;
-          if (ob.driven > 45) { ob.state = 'gone'; ob.mesh.visible = false; }
+          ob.turn = ds > 0 ? -Math.atan2(dl, ds) : 0;
+          if (ob.driven > 45) ob.state = 'gone';
         }
       } else {
         if (ob.state === 'idle' && d > 0 && d < 55 + tram.v * 2) {
           ob.state = 'walking';
-          ob.mesh.visible = true;
           ob.dir = ob.lat < 0 ? 1 : -1;
         }
         if (ob.state === 'walking') {
           const sp = ob.rung ? 3.2 : ob.speed;
           // pedestrians pause in the middle when the tram is very close and slow
           ob.lat += ob.dir * sp * dt;
-          place(ob.mesh, this.route, ob.s, ob.lat, 0, false);
-          ob.mesh.rotation.y += ob.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
-          if (Math.abs(ob.lat) > 7) { ob.state = 'gone'; ob.mesh.visible = false; }
+          ob.turn = ob.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+          if (Math.abs(ob.lat) > 7) ob.state = 'gone';
         }
       }
       // collision with tram body
       if (ob.state !== 'gone' && Math.abs(ob.lat) < 1.55 && ob.s <= tram.s + 0.2 && ob.s >= tram.s - tram.length) {
         if (tram.v > 0.15 || ob.type === 'pedestrian') {
           ob.state = 'gone';
-          ob.mesh.visible = false;
           this._collision(t(ob.type === 'parked' ? 'obj.parkedCar' : 'obj.pedestrian'), ob.type === 'pedestrian' ? 500 : 300);
         }
       }
@@ -1511,7 +1340,7 @@ export class Game {
       if (!ai.hit && tram.s > rear - 0.3 && tram.s < ai.s) {
         ai.hit = true;
         tram.s = rear - 0.4;
-        this._collision(t('obj.tramAhead', { line: ai.mesh.userData.line ?? '?' }), 400);
+        this._collision(t('obj.tramAhead', { line: ai.line ?? '?' }), 400);
       }
       if (tram.s < rear - 5) ai.hit = false;
     }
@@ -1633,45 +1462,5 @@ export class Game {
   _end(failed = false) {
     this.finished = true;
     this.failed = failed;
-  }
-
-  // ------------------------------------------------------------------ visuals
-  // what the steps move, for the page to draw between the last two (src/between.js): the cross streets' cars at the
-  // signalled crossings, the late passengers running for the doors, the obstacles, the driver with the switch iron
-  movers() {
-    const out = [];
-    for (const sig of this.signals) for (const c of sig.cars || []) out.push(c.mesh);
-    for (const r of this.runners) out.push(r.mesh);
-    for (const ob of this.obstacles) if (ob.state !== 'gone') out.push(ob.mesh);
-    if (this.action?.driver) out.push(this.action.driver);
-    return out;
-  }
-
-  updateVisuals() {
-    // crowd at the next stop platform
-    const st = this.stops[this.nextStop];
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
-    let n = 0;
-    // people on the platforms of the stop ahead and the one just passed
-    for (const stop of [this.stops[this.nextStop - 1], st]) {
-      if (!stop || Math.abs(stop.target - this.tram.s) > 450) continue;
-      const r = rng(stop.i * 977);
-      const count = Math.min(stop === st ? st.waiting + st.ambient : stop.ambient, 55);
-      for (let k = 0; k < count && n < 120; k++) {
-        const along = stop.target - 2 - r() * 24, lat = -2.4 - r() * 1.6;
-        const o = this.route.offset(along, lat);
-        p.set(o.x, this.profile.height(along) + 0.18, -o.y);
-        sc.set(1, 0.85 + r() * 0.3, 1);
-        // facing the track (within ±40°), 3 in 10 towards where the tram comes from (±25°); one draw of r()
-        // as before, so everyone stands where they stood (#251)
-        const h = this.route.heading(along), v = r();
-        const yaw = v < 0.3 ? Math.atan2(-h.hx, h.hy) + (v / 0.3 - 0.5) * 0.9 : Math.atan2(-h.hy, -h.hx) + ((v - 0.3) / 0.7 - 0.5) * 1.4;
-        q.setFromEuler(new THREE.Euler(0, yaw, 0));
-        m.compose(p, q, sc);
-        this.crowd.setMatrixAt(n++, m);
-      }
-    }
-    this.crowd.count = n;
-    this.crowd.instanceMatrix.needsUpdate = true;
   }
 }

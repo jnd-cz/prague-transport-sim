@@ -68,6 +68,41 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
 
 
+# the tiles of a window not drawn in detail (src/groundFile.js; the reach as in dry weather, WINDOW_NEAR)
+MISSING = "(pts) => { const g = window.groundTiles; return [...g.near(pts, g.reach(1e9))].filter((k) => !g.drawn.has(k)); }"
+
+
+def ground_window(page, check):
+    """The ground's window (#711): round the stop the menu shows, moved with it, in the scene when Start returns; a
+    tile that fails is asked for again only after a pause, its far ground drawn, the failure in the performance log."""
+    check("the load's window is round the menu's stop", page.evaluate(f"() => ({MISSING})(window.menuWindow())") == [])
+    page.select_option("#selStop", index=page.evaluate("document.getElementById('selStop').options.length - 1"))
+    page.wait_for_function(f"() => ({MISSING})(window.menuWindow()).length === 0", timeout=30000)
+    check("another stop moves it", True)
+    got = page.evaluate(f"""async () => {{
+      const run = await window.startRun({{ seed: 1, autopilot: true }});
+      const r = run.game.route, s = run.tram.s, p = r.at(s), pts = [[p.x, p.y]];
+      for (let d = 0; d <= 1000; d += 100) {{ const q = r.at(Math.min(r.length, s + d)); pts.push([q.x, q.y]); }}
+      return {{ missing: ({MISSING})(pts), shown: !document.getElementById('loading').classList.contains('hidden'),
+               stop: run.game.opts.startStop }};
+    }}""")
+    check("Start returns with the tram's window in the scene", got["missing"] == [] and not got["shown"])
+    got = page.evaluate("""async () => {
+      const g = window.groundTiles, bad = [...g.tiles.keys()].find((k) => !g.drawn.has(k) && !g.busy.has(k));
+      const t = g.tiles.get(bad), [x, y] = g.box(t), at = [[x + g.T / 2, y + g.T / 2]], job = g._job.bind(g);
+      let asked = 0;
+      g._job = (k, m) => (k === bad ? (asked++, Promise.reject(new Error('a test tile'))) : job(k, m));
+      for (let i = 0; i < 3; i++) await g.update(at, 10);
+      const f = g.failed.get(bad), wait = f.next - performance.now();
+      g._job = job;
+      return { asked, n: f.n, wait, far: g.coarse.get(bad)?.visible === true, logged: window.perfLog.tileFails };
+    }""")
+    check("a failing tile is asked for once, not again at once", got["asked"] == 1 and got["n"] == 1)
+    check("and waits about a second before the next try", 500 < got["wait"] <= 1000)
+    check("its far ground stays drawn", got["far"])
+    check("the failure is in the performance log", got["logged"] == 1)
+
+
 def messages(pw, check):
     """The screen when the page stops: a file that arrives as raw bytes, is refused or is not there, a build that throws,
     a module that does not arrive; and a normal load, which says none of it."""
@@ -140,6 +175,7 @@ def messages(pw, check):
             page.evaluate("setTimeout(() => { throw new Error('after the load'); })")
             page.wait_for_timeout(300)
             check("a later error does not bring the screen back", page.evaluate("document.getElementById('loading').classList.contains('hidden')"))
+            ground_window(page, check)
             page.close()
         else:
             print("skip a normal load: needs data/line23.json (python -I tools/snapshot.py data-fetch)")

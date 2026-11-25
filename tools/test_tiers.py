@@ -37,12 +37,15 @@ class Rows(unittest.TestCase):
         self.assertEqual(k("tools/line_heights.py"), ["track heights"])
         self.assertEqual(k("src/main.js"), ["drawing", "simulation"])  # (the loop: both)
         self.assertEqual(k("src/review.js"), ["review"])
+        self.assertEqual(k("src/groundFile.js"), ["drawing", "loading"])  # (as a player loads it, #710)
+        self.assertEqual(k("src/world.js"), ["drawn geometry", "loading"])
         self.assertEqual(k("tools/bench/redruns.js"), ["simulation"])
         self.assertEqual(k("src/new.js"), ["unplaced"])
 
     def test_the_commands(self):
         c = "\n".join(tiers.commands(tiers.kinds(["src/tram.js"], BUILD)))
-        self.assertIn("--checks u3,redruns,stops,traffic,lint --seeds 1-5 --compare", c)
+        self.assertIn("--checks u3,redruns,stops,traffic,lint,giveway --seeds 1-5 --compare", c)
+        self.assertIn("--checks u3 --seeds 1 --player", "\n".join(tiers.commands(tiers.kinds(["src/groundWorker.js"], BUILD))))
         self.assertIn("-k test_traction", c)
         c = "\n".join(tiers.commands(tiers.kinds(["tools/tiers.py", "tools/test_tiers.py"], BUILD)))
         self.assertIn("python -I tools/test_all.py -k test_tiers", c)
