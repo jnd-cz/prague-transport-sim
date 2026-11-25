@@ -194,7 +194,7 @@ class Queue(unittest.TestCase):
         self.addCleanup(lambda: (other.kill(), other.wait()))
         os.makedirs(self.locks)
         ticket = {"what": "theirs", "root": "C:/x/transport-game-1", "pid": other.pid, "t": 0, "state": "running",
-                  "since": time.time(), "stops": True}
+                  "since": time.time(), "stops": True, "queue": baseline_store.QUEUE}
         with open(os.path.join(self.locks, f"{other.pid}.lock"), "w", encoding="utf-8") as f:
             json.dump(ticket, f)
         r = subprocess.run(self.heavy("--stop", str(other.pid)), env=self.env, capture_output=True, text=True, timeout=60)

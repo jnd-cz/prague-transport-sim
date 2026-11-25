@@ -446,6 +446,24 @@ def job_expect(j, records=None):
     return j.get("expect") or (expected(j.get("kind"), records, least=1) if j.get("kind") else None)
 
 
+QUEUE = 2  # (the version of the queue's rules a ticket was written by, #856: 0 first come first served, before #851;
+# 1 the short ones first and the night's hold, #851; 2 with #854's fallback and the versions read. Raise it with a rule
+# that orders the waiting jobs otherwise)
+
+
+def turn_key(jobs, now=None, records=None):
+    """The key the waiting jobs take their turns by (#856): their queue time while a waiting job of a queue older than
+    #851 (version 0) is among `jobs`, which orders by it alone; else rank()."""
+    if any(j["state"] == "waiting" and queue_version(j) == 0 for j in jobs):
+        return lambda j: (j.get("t") or 0, j["pid"])
+    return lambda j: rank(j, now, records)
+
+
+def queue_version(j):
+    """The queue rules' version that wrote ticket j (QUEUE): its own; without one, #851's (1) when it has "held", else 0."""
+    return j.get("queue", 1 if "held" in j else 0)
+
+
 def rank(j, now=None, records=None):
     """A waiting job's place among the waiting ones (#851), as a sortable tuple: first the long ones that have waited
     PASS_MAX, then the short ones (SHORT or less), then the rest; in each, first come first."""
@@ -719,7 +737,7 @@ class HeavyJob:
                            "t": night_starts() if self.parked else self.t, "state": state,
                            "since": self.since, "share": self.share, "kind": self.kind, "expect": self.expect_s,
                            "warn": self.warn, "gb": self.gb, "watch": bool(self.thread) and self.limits,
-                           "stops": bool(self.thread), "in": self.within, "held": bool(self.parked),
+                           "stops": bool(self.thread), "in": self.within, "held": bool(self.parked), "queue": QUEUE,
                            "day": self.day}, f)
                 # (watch: it ends itself; stops: heavy.py --stop reaches it; in: the job whose turn it runs in, #844)
             for wait in (0.05, 0.2, 0.5, 1, 2, 0):  # (Windows refuses while a queue() in another process reads the
@@ -895,9 +913,12 @@ class HeavyJob:
         the shared ones queued behind the first of those;
         with none, the shared jobs running while its cores or its memory do not fit beside them (self.why says which)."""
         now, records = time.time(), history()
-        me = rank({"t": self.t, "pid": os.getpid(), "expect": self.expect_s, "kind": self.kind}, now, records)
         jobs = queued_turns()  # (a step in another job's turn is that job's, #844)
         others = [j for j in jobs if not own_turn(j) and not j.get("held")]  # (held for the night: ahead of none, #851)
+        # (with a job of a queue older than #851 waiting, first come first served: its own order, so neither waits for
+        # the other, #856; else by rank(), the short ones first, #851)
+        key = turn_key(others, now, records)
+        me = key({"t": self.t, "pid": os.getpid(), "expect": self.expect_s, "kind": self.kind})
         self.why = ""
         # (nothing runs and this job still waits: from STALL s on it waits only for the jobs queued before it by their
         # time, the order every version of the queue keeps. A checkout's queue of another version orders otherwise, and
@@ -913,17 +934,17 @@ class HeavyJob:
                           f"come first served until one runs (#854)", file=self.out, flush=True)
                 return [j for j in others if (j["t"], j["pid"]) < (self.t, os.getpid())]
 
-        def first(j):  # (a running job counts below; the waiting ones by rank(): the short ones first, #851)
-            return j["state"] == "waiting" and rank(j, now, records) < me
+        def first(j):  # (a running job counts below; the waiting ones by key)
+            return j["state"] == "waiting" and key(j) < me
         if not self.share:
             return [j for j in others if first(j) or j["state"] == "running"]
         turn = [j for j in others if (first(j) or j["state"] == "running") and (not j.get("share") or j["state"] == "waiting")]
         beside = [j for j in others if j["state"] == "running"]
-        alone = [rank(j, now, records) for j in turn if not j.get("share") and j["state"] == "waiting"]
+        alone = [key(j) for j in turn if not j.get("share") and j["state"] == "waiting"]
         if alone and backfills(self.expect_s or expected(self.kind, least=1), beside, self.BACKFILL):
             # (the waiting alone jobs, and the shared ones queued behind the first of them: none of those starts
             # before the jobs running now end, and this one ends sooner)
-            turn = [j for j in turn if j["state"] == "running" or (j.get("share") and rank(j, now, records) < min(alone))]
+            turn = [j for j in turn if j["state"] == "running" or (j.get("share") and key(j) < min(alone))]
         if turn or not beside:
             return turn
         room = self.room(jobs)
@@ -1160,6 +1181,7 @@ def describe(j, now=None):
             + (f" (shared: {s['gb']:.0f} GB, {s['cores']} core{'s' * (s['cores'] != 1)})" if s else "")
             + (f", its step{'s' * (len(steps) > 1)} {', '.join(steps)} running" if steps else "")
             + (", held for the night" if j.get("held") else "")
+            + (", its queue code is older (merge main)" if queue_version(j) < QUEUE else "")
             + (f": {j['warn']}" if j.get("warn") else ""))
 
 
@@ -1233,7 +1255,8 @@ def schedule(jobs, now=None, records=None, free=None, cores=None, keep=None, par
     alone = False
     backfill = bool(run) and all(est(j)[0] for j in run) and max(iv[1] for iv in ivals)
     # (the waiting ones as HeavyJob.ahead() takes them: by rank(), the ones held for the night last and from its start)
-    for j in sorted((j for j in jobs if j["state"] != "running"), key=lambda j: (bool(j.get("held")), rank(j, now, records))):
+    key = turn_key([j for j in jobs if not j.get("held")], now, records)  # (as HeavyJob.ahead() takes them, #856)
+    for j in sorted((j for j in jobs if j["state"] != "running"), key=lambda j: (bool(j.get("held")), key(j))):
         e, src = est(j)
         frm = max(after, night_starts(now)) if j.get("held") else after
         if j.get("share") and alone and e and backfill and bf + HeavyJob.BACKFILL * e <= backfill:

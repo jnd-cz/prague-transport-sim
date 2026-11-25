@@ -609,7 +609,11 @@ the pinned #291 and only proposes.
 - Checkouts of different queue versions may order the waiting jobs differently, and then wait for each other: on
   2026-11-25 three jobs did so for hours with nothing running (#854). From #854 on, a job that waits while none runs
   for 2 min (`HeavyJob.STALL`) waits only for the jobs queued before it by time, the order every version keeps, and
-  says so once.
+  says so once. Each ticket carries its queue version (`baseline_store.QUEUE`, #856); while a job of a version older
+  than #851 waits, the newer ones take their turns first come first served too, its own order, so the two cannot wait
+  for each other. The board marks a job whose queue code is older: "its queue code is older (merge main)". Merge main
+  into that checkout before its next job (the same night #812's jobs and an older checkout's short job stood still
+  that way at 06:24).
 - A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that
   names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
