@@ -524,6 +524,14 @@ def seeds_of(spec):
     return out
 
 
+PAGE_ERROR_GRACE = 30.0  # (s a run may still finish after an error its page did not catch, #851)
+
+
+class PageError(Exception):
+    """A run's page threw and the run did not finish within PAGE_ERROR_GRACE (#851: a ReferenceError in a step held
+    the queue for 30 min, three seeds each waiting out the timeout)."""
+
+
 def stop_server(p):
     """Reap only the child we started, including failed or interrupted startup."""
     if p.poll() is None:
@@ -547,8 +555,12 @@ def serve(port, startup_timeout=10):
         try:
             while time.monotonic() < deadline:
                 if os.path.exists(ready):
-                    with open(ready, encoding='utf-8') as f:
-                        info = json.load(f)
+                    try:
+                        with open(ready, encoding='utf-8') as f:
+                            info = json.load(f)
+                    except (PermissionError, ValueError):  # (Windows refuses it while serve.py replaces it, #851)
+                        time.sleep(0.05)
+                        continue
                     if info.get('error'):
                         raise SystemExit(f"tools/serve.py: {info['error']}; choose another --port or --port 0")
                     if p.poll() is not None:
@@ -769,13 +781,23 @@ def run_one(page, errors, check, seed, timeout, load=0):
         # evaluate has no timeout: launch without returning the bench's promise, then wait outside it.
         page.evaluate(f"""() => {{
             window._job = {{ done: false }};
+            // (an error the page does not catch: the run ends PAGE_ERROR_GRACE s after it unless it finishes, #851)
+            if (!window._jobErrors) {{
+                window._jobErrors = true;
+                const note = (e) => {{ if (!window._job.err) {{ window._job.err = performance.now(); window._job.errText = String(e); }} }};
+                addEventListener('error', (e) => note(e.error || e.message));
+                addEventListener('unhandledrejection', (e) => note(e.reason));
+            }}
             const lk = window.groundTiles?.lookup;
             if (lk) lk.missed = {{ reads: 0, tiles: new Set(), at: [] }};  // (this run's, #710)
             (async () => {{ {js} }})().then(
                 result => {{ window._job.result = result; window._job.done = true; }},
                 error => {{ window._job.result = {{ error: String(error) }}; window._job.done = true; }});
         }}""")
-        page.wait_for_function("() => window._job.done", timeout=remaining(timeout * 1000), polling=100)
+        page.wait_for_function(f"() => window._job.done || (window._job.err && performance.now() - window._job.err > "
+                               f"{PAGE_ERROR_GRACE * 1000:.0f})", timeout=remaining(timeout * 1000), polling=100)
+        if not page.evaluate("() => window._job.done"):
+            raise PageError(page.evaluate("() => window._job.errText"))
         r = page.evaluate("() => window._job.result")
         r = json.loads(json.dumps(r, default=str)) if r is not None else {}
         if isinstance(r, dict):
@@ -789,11 +811,22 @@ def run_one(page, errors, check, seed, timeout, load=0):
                 r["farGround"] = far
     except PlaywrightTimeoutError:
         r = {"error": "timeout"}
+    except PageError as e:
+        r = {"error": f"page error, the run stopped {PAGE_ERROR_GRACE:g} s after it: {e}"}
     except Exception as e:  # noqa: BLE001 (a failed run is a result)
         r = {"error": f"{type(e).__name__}: {e}"}
     if errors:
         r["pageErrors"] = errors[:20]
     return r, round(time.monotonic() - t0) + load
+
+
+def run_time(runs, pages, t, batch, player=False):
+    """(batches, their seconds, the run's expected seconds) of `runs` on `pages` pages from the timings `t`."""
+    batches = plan(runs, pages, t, batch)
+    dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
+    if player:  # (a player's page takes as long as the checks' one: 402 s against 406 s on the five lines, #710)
+        dur += dur
+    return batches, dur, finish(dur, pages)
 
 
 def player_rows(kept, streamed):
@@ -1001,6 +1034,11 @@ def main():
     # (waits its turn among the heavy jobs, and the nightly baseline for it: #280. A count run: it runs beside other
     # counts and builds, a page being PAGE_GB of memory and PAGE_CORES cores, #728)
     heavy = HeavyJob("headless", share={"gb": PAGE_GB * (a.jobs or 1), "cores": PAGE_CORES * (a.jobs or 1)})
+    # (its expected time before its turn: by day a run over 20 min waits for the night, #851; on the pages it would
+    # open now, sized again once its turn comes)
+    pj = a.jobs or workers(PAGE_GB, most=PAGES)
+    heavy.expect(run_time(list(jobs) if a.separate else merge_drives(jobs), pj,
+                          load_timings() if TIMINGS else {"runs": {}, "loads": {}}, a.batch and max(1, a.batch), a.player)[2])
     try:
         heavy.__enter__()
         t0 = time.time()  # (the run's time, not the wait's)
@@ -1014,13 +1052,10 @@ def main():
         # (u3, redruns and stops of a line and seed: one drive; then batches of one line's runs, each in one page)
         runs = list(jobs) if a.separate else merge_drives(jobs)
         t = load_timings() if TIMINGS else {"runs": {}, "loads": {}}
-        batches = plan(runs, a.jobs, t, a.batch and max(1, a.batch))
+        batches, dur, secs = run_time(runs, a.jobs, t, a.batch and max(1, a.batch), a.player)
         pages = min(a.jobs, len(batches))  # (what the queue keeps for this run: the pages it opens, #728)
         heavy.claim(gb=PAGE_GB * pages, cores=PAGE_CORES * pages)
-        dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
-        if a.player:  # (a player's page takes as long as the checks' one: 402 s against 406 s on the five lines, #710)
-            dur += dur
-        heavy.expect(finish(dur, a.jobs))  # (its watch's time, #815)
+        heavy.expect(secs)  # (its watch's time, #815)
         print(f"{len(runs)} runs in {len(batches)} batches on {min(a.jobs, len(batches))} pages, longest first; "
               f"expected {finish(dur, a.jobs):.0f} s from {len(t['runs'])} timed runs", flush=True)
         i = 0

@@ -123,6 +123,32 @@ class OtherTracks(unittest.TestCase):
         own = T.track_sections({"path": [[0.0, 0.0], [600.0, 0.0]], "tracks": [{"p": [[300.0, 20.0], [300.0, 220.0]]}]}, sv)
         self.assertEqual([(a, b, st) for a, b, st in own[0]], [(20.0, 100.0, "grass")])
 
+    def test_a_side_tracks_rails_over_ipr_by_the_ballast_band_for_40_m_are_open_ballast(self):
+        # (#548: a side track 200 m long, its rails 0.18 m over IPR from 40 to 140 m along it, at IPR elsewhere; its own
+        # embedded crossing at 80-90 m stays; a second stretch over IPR only 30 m long, 160-190 m, is no ballast)
+        def ipr(xs, ys):
+            return [100.0 - (0.18 if 40 <= y - 20 <= 140 or 160 <= y - 20 <= 190 else 0.0) for y in ys]
+        tr = {"p": [[300.0, 20.0], [300.0, 220.0]], "zs": [100.0] * 101, "styles": [[80.0, 90.0, "embedded"]]}
+        data = {"path": [[0.0, 0.0], [600.0, 0.0]], "tracks": [tr]}
+        laid = T.ballast_runs(data, ipr)
+        got = [(round(a), round(b), st) for a, b, st in tr["styles"]]
+        self.assertEqual([g[2] for g in got], ["ballast", "embedded", "ballast"])
+        self.assertTrue(all(abs(g[0] - w[0]) <= 12 and abs(g[1] - w[1]) <= 12 for g, w in zip(got, [(40, 80), (80, 90), (90, 140)])), got)
+        self.assertAlmostEqual(laid, sum(b - a for a, b, st in tr["styles"] if st == "ballast"), places=0)
+        self.assertEqual(got[1], (80, 90, "embedded"))
+        # (laid anew on a rerun, and its bed's lift is the ballast's 0.17 m inside the run, 0 at the crossing)
+        T.ballast_runs(data, ipr)
+        self.assertEqual([(round(a), round(b), st) for a, b, st in tr["styles"]], got)
+        T.own_lifts(data, {"embedded": 0, "setts": 0, "panels": 0, "grass": 0.04, "ballast": 0.17})
+        at = lambda s: tr["lift"]["v"][int(s / tr["lift"]["step"])] * tr["lift"]["unit"]  # noqa: E731
+        self.assertAlmostEqual(at(64), 0.17, places=2)
+        self.assertAlmostEqual(at(84), 0.0, places=2)
+        self.assertAlmostEqual(at(5), 0.0, places=2)
+        # (a track at IPR's height throughout: panels, no lift)
+        flat = {"p": [[300.0, 20.0], [300.0, 220.0]], "zs": [100.0] * 101}
+        T.ballast_runs({"path": data["path"], "tracks": [flat]}, lambda xs, ys: [100.0] * len(xs))
+        self.assertNotIn("styles", flat)
+
 
 def styled(style, **extra):
     """A 600 m straight route, one mark of `style` over all of it, and what crosses it."""

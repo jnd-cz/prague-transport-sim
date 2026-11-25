@@ -43,6 +43,15 @@ class Rows(unittest.TestCase):
         self.assertAlmostEqual(b.surface(x + 0.5, y), 200.0 - 0.15 - bs.BED_BELOW)
         self.assertIsNone(b.surface(x + 2.5, y))
 
+    def test_a_track_off_the_route_lies_its_own_lift_under_its_rails(self):
+        # (#548: another line's open ballast, 20 m off our route, its own `lift` 0.17 m; the route's lift 0.15 does not
+        # reach it, and without its own it lies at its rails' height as before)
+        off = track([[20, 0], [20, 100]], 200.0)
+        off["lift"] = {"step": 2, "unit": 0.001, "v": [170] * 60}
+        b = bs.Beds(line([off, track([[-20, 0], [-20, 100]], 200.0)], lift=0.15))
+        self.assertTrue(np.allclose(b.zBed[0], 200.0 - 0.17 - bs.BED_BELOW))
+        self.assertTrue(np.allclose(b.zBed[1], 200.0 - bs.BED_BELOW))
+
     def test_cant_tilts_the_rails_and_the_bed_on_their_plane(self):
         # (+ cant: the left rail lower; the track runs with the route)
         b = bs.Beds(line([track([[0, 0], [0, 100]], 200.0)], cant=0.06))

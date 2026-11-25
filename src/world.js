@@ -189,11 +189,28 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   };
   // (how far a track's bed lies under its top of rail, by the route's track styles: src/heights.js)
   // (each track its own: the other direction's beside the route takes its `liftBack`, #584)
-  const liftAt = (x, y) => { const n = route.nearest(x, y); return n && n.d < 6 ? ground.profile.lift(n.s, lateralOf(route, n, x, y)) : 0; };
+  // (off the route, the track's own `lift` at s along its p: its own styles' offsets, another line's open ballast,
+  // tools/track_styles.py own_lifts, #548)
+  const ownLift = (L, s) => {
+    const n = L ? L.v.length : 0;
+    if (!n) return 0;
+    const f = Math.max(0, Math.min(n - 1.001, s / L.step)), i = Math.floor(f), u = f - i;
+    return n < 2 ? L.v[0] * L.unit : (L.v[i] * (1 - u) + L.v[i + 1] * u) * L.unit;
+  };
+  const liftAt = (x, y, t, s) => {
+    const n = route.nearest(x, y);
+    return n && n.d < 6 ? ground.profile.lift(n.s, lateralOf(route, n, x, y)) : ownLift(t.lift, s);
+  };
   // (each track's bed and tilt: a bed meeting its paired track's lays its edge at the mean of their near rails; the
   // survey and the terrain are laid under the same cross-section, #548)
+  const lenOf = (L) => { let a = 0; for (let i = 1; i < L.length; i++) a += Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); return a; };
   const beds = data.tracks.map((t) => {
-    const lift = t.smooth.map(([x, y]) => liftAt(x, y));
+    const k = lenOf(t.p) / (lenOf(t.smooth) || 1);
+    let acc = 0;
+    const lift = t.smooth.map(([x, y], i) => {
+      if (i) acc += Math.hypot(x - t.smooth[i - 1][0], y - t.smooth[i - 1][1]);
+      return liftAt(x, y, t, acc * k);
+    });
     return { lift, zBed: t.z.map((z, i) => z - lift[i] - BED_BELOW), tilt: tiltOf(t) };
   });
   const bedGrid = new Map(), cell = (x, y) => `${Math.floor(x / 4)},${Math.floor(y / 4)}`;

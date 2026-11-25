@@ -24,6 +24,11 @@ const COLS = 4, ROWS = 16, PW = 256, PH = 64;
 // the far model (the handoff's 8 were for near cars drawn each as its own copy, about 14 draw calls a car). FAR_MAX far
 // ones of a type
 export const NEAR_MAX = COLS * ROWS, NEAR_IN = 65, NEAR_OUT = 73, VIEW_IN = 3, VIEW_OUT = 4;
+// and in the right mirror's view within MIRROR_IN m of its camera (kept to MIRROR_OUT), while it is shown: the cars beside
+// and behind the tram with their indicators (one turning across the tracks, to warn with the bell) and brake lamps (the
+// user, 2026-11-24: "checking traffic on the side too, like cars that want to turn left over the tracks"). The mirror's
+// picture is about 300 px tall for 30 degrees: a car at 50 m there is as tall as one at about 85 m on a 1080 px screen
+export const MIRROR_IN = 50, MIRROR_OUT = 55;
 const FAR_MAX = 64;
 const BODY = new Set(['paint', 'glass', 'trim', 'alloy', 'cargo_door']);
 const LAMPS = ['headlamp', 'brake', 'indicator_left', 'indicator_right'];
@@ -190,6 +195,7 @@ export class Cars {
     this._p = new THREE.Vector3(); this._s = new THREE.Vector3(); this._e = new THREE.Euler(0, 0, 0, 'YXZ');
     this._c = new THREE.Color(); this._cam = new THREE.Vector3();
     this._f = new THREE.Frustum(); this._pv = new THREE.Matrix4(); this._sp = new THREE.Sphere();
+    this._mf = new THREE.Frustum(); this._mcam = new THREE.Vector3();
   }
 
   // a box car to draw: `key` its identity (a plate and a wheel's roll belong to it), `n` its number (its plate)
@@ -210,8 +216,9 @@ export class Cars {
   }
 
   // after the game's and the traffic's step, before drawing (as People.sync); trafficView: src/trafficView.js, gameView:
-  // src/gameView.js (the parked cars and the signalled crossings' cars, by their box cars there)
-  sync(camera, trafficView, gameView) {
+  // src/gameView.js (the parked cars and the signalled crossings' cars, by their box cars there); mirror: the right
+  // mirror's camera, posed for this frame, while the mirror is shown (else null)
+  sync(camera, trafficView, gameView, mirror = null) {
     this.recs.length = 0;
     if (trafficView) for (const [c, m] of trafficView.cars) this._box(m, c.id === undefined ? c : `t${c.id}`, c.id ?? 0);
     const game = gameView?.game;
@@ -249,11 +256,13 @@ export class Cars {
       const i = this.cell.get(k);
       if (i !== undefined) { this.free.push(i); this.cell.delete(k); }
     }
-    // the ones in view within NEAR_IN (a near one keeps its place until NEAR_OUT and VIEW_OUT): the near model, the
-    // nearest NEAR_MAX; the rest: the far one
+    // the ones in view within NEAR_IN (a near one keeps its place until NEAR_OUT and VIEW_OUT), or else in the mirror's
+    // within MIRROR_IN (by their distance to its camera): the near model, the nearest NEAR_MAX; the rest: the far one
     const c = camera.getWorldPosition(this._cam);
     camera.updateMatrixWorld();
     this._f.setFromProjectionMatrix(this._pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const mc = mirror && mirror.getWorldPosition(this._mcam);
+    if (mirror) { mirror.updateMatrixWorld(); this._mf.setFromProjectionMatrix(this._pv.multiplyMatrices(mirror.projectionMatrix, mirror.matrixWorldInverse)); }
     for (const r of this.recs) {
       const was = this.near.has(r.key);
       r.raw = Math.hypot(r.x - c.x, r.y - c.y, r.z - c.z);
@@ -261,6 +270,11 @@ export class Cars {
       this._sp.center.set(r.x, r.y, r.z);
       this._sp.radius = r.type.length / 2 + (was ? VIEW_OUT : VIEW_IN);
       r.view = r.d < NEAR_IN && this._f.intersectsSphere(this._sp);
+      r.mirror = false;
+      if (!r.view && mc) {
+        const dm = Math.hypot(r.x - mc.x, r.y - mc.y, r.z - mc.z);
+        if (dm < (was ? MIRROR_OUT : MIRROR_IN) && this._mf.intersectsSphere(this._sp)) { r.view = r.mirror = true; r.d = dm; }
+      }
     }
     const near = this.recs.filter((r) => r.view).sort((a, b) => a.d - b.d).slice(0, NEAR_MAX);
     const keep = new Set(near.map((r) => r.key));
@@ -327,7 +341,7 @@ export class Cars {
     }
     this.wheels.instanceMatrix.needsUpdate = true;
     this.wheels.geometry.attributes.instanceFade.needsUpdate = true;
-    Object.assign(this.stats, { cars: this.recs.length, near: near.length, far, clock });
+    Object.assign(this.stats, { cars: this.recs.length, near: near.length, mirror: near.filter((r) => r.mirror).length, far, clock });
   }
 
   // a plate in the atlas's cell: white with the blue EU band, black characters
