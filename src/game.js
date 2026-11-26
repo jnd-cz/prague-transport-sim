@@ -132,10 +132,11 @@ export class Game {
     // stream of their own (a passenger's draws leave the rules' and the traffic's as they were); the count is theirs
     this.pax = createConsist(opts.cabin, { cars: tram.cars, crush: T3.crushCapacity, rand: rng((opts.seed ?? 12345) ^ 0x2490) });
     this.paxProblems = []; // (what pax.check() found at the stops: none, or a count or a place gone wrong)
-    // a run from a line's first stop (a terminus, or the stop where the run takes its next line) starts empty and nobody alights
-    // there (the user, 2026-11-26, #249: "The first stop off any line should always start with empty car and people are only
-    // going inside"); from a stop on the way, with those aboard already (drawn either way: the stream after it stays)
-    const first = this.segments.some((g) => g.from === opts.startStop);
+    // a run from the line's first stop, its terminus, starts empty and nobody alights there (the user, 2026-11-26, #249: "The
+    // first stop off any line should always start with empty car and people are only going inside", "The rule should apply
+    // only at first terminus stop"); from any other stop, the one where the run takes its next line too, with those aboard
+    // already (drawn either way: the stream after it stays)
+    const first = opts.startStop === 0;
     const load = Math.min(tram.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock)));
     tram.passengers = this.pax.load(first ? 0 : load);
     if (first) st.alightFrac = 0;
@@ -178,9 +179,10 @@ export class Game {
       stop.ambient = others === 0 ? 0 : request ? Math.floor(u * 2) : Math.floor(u * others * (3 + central * 3) * demand);
       stop.otherLines = others;
       if (i === n - 1) { stop.waiting = 0; stop.alightFrac = 1; stop.runners = 0; }
-      // end of one line of the run: everybody leaves, the tram continues as the next line
+      // the run continues as its next line here: those aboard may stay (the user, 2026-11-26, #249: "if the run continues as
+      // different line then people can stay aboard"), the stop's share alights as anywhere
       const change = this.segments.find((g) => g.from === i && g.from > 0);
-      if (change) { stop.alightFrac = 1; stop.lineChange = change.line; }
+      if (change) stop.lineChange = change.line;
       this._buildStop(stop);
       return stop;
     });

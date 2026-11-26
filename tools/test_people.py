@@ -108,7 +108,7 @@ GAME = """async () => {
   g.audio.setMuted?.(true);
   // (#249: the run from the line's first stop has nobody aboard and nobody to alight there; those waiting for other lines are
   // only where other lines stop, by the platforms' lines)
-  const start = { first: g.segments.some((s) => s.from === g.opts.startStop), aboard: g.pax.aboard, alightFrac: g.stops[g.nextStop].alightFrac,
+  const start = { first: g.opts.startStop === 0, aboard: g.pax.aboard, alightFrac: g.stops[g.nextStop].alightFrac,
     lone: g.stops.filter((st, i) => g.data.stops[i].lines?.every((l) => g.segments.some((s) => s.line === l))).map((st) => st.ambient) };
   let k = 0;
   for (let t = 0; t < 90; t += dt) { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt); view.sync(window.camera); if (++k % 30 === 0) draw(); }

@@ -52,7 +52,8 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
   nastupují, čekající jdou z nástupiště ke dveřím a v pravém zrcátku uvidíte, kdo ještě nastupuje. Ty nad 105 vůz jen
   počítá a vidět jsou jen na schodech a venku.
 - Změna linky: spoj může na trase linky a na konečné změnit číslo (linka 9 pokračuje na Nákladovém nádraží Žižkov jako 10):
-  všichni vystoupí, přepnou se směrové tabule i údaje na obrazovce a tramvaj odjíždí jako 10.
+  cestující mohou zůstat ve voze, vystoupí jen ti, kdo tu vystupují i jinak; přepnou se směrové tabule i údaje na obrazovce
+  a tramvaj odjíždí jako 10.
 
 ### Klávesy
 

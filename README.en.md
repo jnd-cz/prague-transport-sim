@@ -55,7 +55,8 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   on by the steps, those waiting walking from the platform to the doors, and in the right mirror who is still
   boarding. Those above the 105 a car only counts are seen on the steps and outside only.
 - Line changes: a trip can change its number along the line's route and at a terminus (line 9 continues as 10 at Nákladové
-  nádraží Žižkov): everybody gets out, the route boxes and the HUD switch, the tram departs as 10.
+  nádraží Žižkov): passengers may stay aboard, only those who would get off there anyway do; the route boxes and the HUD
+  switch, the tram departs as 10.
 
 ### Keys
 

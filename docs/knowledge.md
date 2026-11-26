@@ -1362,9 +1362,11 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   seed 4 31 → 72 s; so more brake applies and pedal changes). Ready turned off, the branch repeats main's run exactly.
 - **The first stop and those waiting for other lines** (#249; the user, 2026-11-26: "The first stop off any line should
   always start with empty car and people are only going inside", and "some of them left waiting even if the stop is served
-  only by single line, our tram"). A run from a line's first stop (a terminus, or the stop where the run takes its next
-  line) starts empty and nobody alights there; from a stop on the way it starts with 10-35 aboard by the time of day, as
-  before. Those waiting for other lines (`ambient`, drawn only, they stay when we leave) stand only where other lines stop:
+  only by single line, our tram"). A run from the line's first stop, its terminus, starts empty and nobody alights there
+  (the user, the same day: "The rule should apply only at first terminus stop"); from any other stop it starts with 10-35
+  aboard by the time of day, as before. Where the run continues as its next line (line 9 as 10 at Nákladové nádraží
+  Žižkov), those aboard may stay ("if the run continues as different line then people can stay aboard"): the stop's share
+  alights as anywhere, where before everybody did. Those waiting for other lines (`ambient`, drawn only, they stay when we leave) stand only where other lines stop:
   the draw times the other lines (the platform's `lines` less the run's own) times 3 (6 in the centre) times the demand;
   none at a stop of our line only (line 9 with its 10: 6 of 60 stops, 17: 6 of 37, 22: 4 of 39, 23: 4 of 18, 37: 0 of 20),
   the mean at demand 1 5.4 → 5.2, 4.8 → 3.0, 5.7 → 5.8, 5.8 → 8.5, 5.0 → 2.9. The platforms' `lines` come from the
