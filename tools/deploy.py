@@ -277,7 +277,7 @@ class Host:
             except DROPS as e:
                 if k == TRIES - 1:
                     raise SystemExit(f"{what}: the host dropped the connection {TRIES} times ({e!r}); run the deploy "
-                                     "again: the files recorded as up are not sent again")
+                                     "again: the files recorded as up are not sent again") from e
                 print(f"  ({what}: {e!r}; connecting again in {PAUSE * (k + 1)} s)", flush=True)
                 time.sleep(PAUSE * (k + 1))
                 try:
@@ -524,7 +524,7 @@ def main(argv=None, connect=connect):
             ftp.again(MANIFEST, lambda: upload(ftp, MANIFEST, body, made))
 
         for i, r in enumerate(up + ["version.json"], 1):
-            ftp.again(r, lambda: upload(ftp, r, local[r], made))
+            ftp.again(r, lambda r=r: upload(ftp, r, local[r], made))
             now[r] = hashes[r]
             print(f"  [{i}/{len(up) + 1}] {r}", flush=True)
             if i % MANIFEST_EVERY == 0 and i < len(up):
@@ -537,7 +537,7 @@ def main(argv=None, connect=connect):
                 pass
 
         for r in gone:
-            ftp.again(r, lambda: delete(r))
+            ftp.again(r, lambda r=r: delete(r))
         record(hashes)
     finally:
         try:
