@@ -471,6 +471,19 @@ export class Traffic {
     return c || null;
   }
 
+  // A car's identity: its id (unique: the priority tie-breaks use it), the next one unless given (a scene's car,
+  // tools/bench/scenes.js), and from it the driver's boldness and the car's type (#250)
+  _identify(c, id = (this.nextCarId = (this.nextCarId || 0) + 1)) {
+    c.id = id;
+    // one driver in eight crosses the tram's track with a small margin (from the id, not this.rand:
+    // the seeded traffic runs stay comparable)
+    c.bold = ((c.id * 2654435761) >>> 0) % 8 === 0;
+    // its type (#250), from the id too: its half length and half width (over the tyres) in every rule
+    c.type = carTypeOf(c.id);
+    c.half = c.type.length / 2;
+    c.halfW = c.type.width / 2;
+  }
+
   _fade(c, dt) {
     const target = c.active ? 1 : 0;
     if (c.alpha === target) return;
@@ -522,18 +535,14 @@ export class Traffic {
     }
     const tram = this.game.tram;
     const live = cars.filter((c) => c.active);
+    for (const c of live) if (c.id === undefined) this._identify(c);
+    // (every pass below goes by the cars' ids, not by their slots: the order the slots stand in decides nothing, the
+    // draws for their next lanes included, #566)
+    const byId = (a, b) => a.id - b.id;
+    cars.sort(byId);
+    live.sort(byId);
     const obstacles = this._pathObstacles();
     live.forEach((c) => {
-      if (c.id === undefined) {
-        c.id = this.nextCarId = (this.nextCarId || 0) + 1; // unique: the priority tie-breaks use it
-        // one driver in eight crosses the tram's track with a small margin (from the id, not this.rand:
-        // the seeded traffic runs stay comparable)
-        c.bold = ((c.id * 2654435761) >>> 0) % 8 === 0;
-        // its type (#250), from the id too: its half length and half width (over the tyres) in every rule below
-        c.type = carTypeOf(c.id);
-        c.half = c.type.length / 2;
-        c.halfW = c.type.width / 2;
-      }
       c.toEnd = c.conn ? 0 : c.path.length - c.s;
       // the next lane is chosen ahead of time, so the following distance can look across the junction
       if (!c.conn && c.next === undefined && c.toEnd < 40) c.next = this._chooseNext(c.lane);
@@ -563,6 +572,10 @@ export class Traffic {
       }
     }
     const crossing = []; // cars on, or committed to, a crossing of our track (game.carsCrossing)
+    // Each car plans from the state at the step's start: where the others stand and how fast they go, whom they followed
+    // and what held them in the last step. None moves before all have planned, so which car the loop takes first decides
+    // nothing (#566; before, a car planned after another saw it already moved, and its leader and its hold of this step).
+    const plans = new Map();
     for (const c of cars) {
       if (c.active) {
         const seq = this._seq(c);
@@ -609,7 +622,6 @@ export class Traffic {
             ring.push(x);
           }
         }
-        c.lead = lead;
         // trams and walkers on the path ahead (shared lanes on the tracks, a tram stopped at a
         // stop, someone crossing): stop or follow behind
         const ob = c.seen;
@@ -737,21 +749,36 @@ export class Traffic {
         // 2-6 m into short lanes; looking only at lanes under 12 m, cars came onto such a lane at the line
         // at 4-11 m/s and crossed it on red, line 17 s 11785, 14839, 16161, 17244; a short lane's line is
         // at its start, back = its length)
-        if (!L && !c.conn && c.next?.light) { const d = c.toEnd + (c.plan ? c.plan.path.length : 0) + c.next.path.length - c.next.light.back; if (d < 60) { L = c.next.light; lane = c.next; toLine = d; } }
+        // (also past its own lane's line, not held by it: lane 2979, 6.7 m, its line at its start, green, hid the red of the
+        // next one, 2763, 2.9 m; a car came off it at 5 m/s onto the junction on red, line 9 s 11935, seed 3, #566)
+        // (not one going through its own amber: it keeps to that until it is off the lane)
+        const pastOwn = L && toLine - c.half - 1 <= -0.5 && c.lightHold !== c.lane && c.lightGo !== c.lane;
+        if ((!L || pastOwn) && !c.conn && c.next?.light) { const d = c.toEnd + (c.plan ? c.plan.path.length : 0) + c.next.path.length - c.next.light.back; if (d < 60) { L = c.next.light; lane = c.next; toLine = d; } }
         // (and from a junction connector onto such a lane)
         if (!L && c.conn && c.conn.to.light) { const d = c.conn.path.length - c.s + c.conn.to.path.length - c.conn.to.light.back; if (d < 60) { L = c.conn.to.light; lane = c.conn.to; toLine = d; } }
         if (L) {
           const a = this.lightAspect(L), v = c.vNow ?? 0, front = toLine - c.half - 1;
           if (a === 'green') { c.lightGo = null; c.lightHold = null; }
-          else if (a === 'amber' && c.lightGo !== lane && c.lightHold !== lane && front < (v * v) / 6 + v) c.lightGo = lane;
+          // (one that went on amber but came to a stand before the line, behind a car held at the junction, waits there: it
+          // kept going on amber and went on red 1.4 s after it stood 5 m short, line 9 s 25601, seed 5, #560's compare)
+          else if (c.lightGo === lane && v < 0.3 && front > 0.5) c.lightGo = null;
+          if (a === 'amber' && c.lightGo !== lane && c.lightHold !== lane && front < (v * v) / 6 + v) c.lightGo = lane;
           if (a !== 'green' && c.lightGo !== lane && (front > -0.5 || c.lightHold === lane)) { lGap = Math.max(0, front) + 8; c.lightHold = lane; } // (following() halts 8 m short)
         }
         const terms = { lead: following(gap, vLead), junction: jStop === null ? Infinity : following(jStop, 0), tram: following(xGap, 0), light: following(lGap, 0), curve: vCurve };
         const vt = Math.min(c.v, ...Object.values(terms));
         // (what holds the car, for the stuck scene)
-        c.why = vt < 0.3 ? Object.keys(terms).find((k) => terms[k] === vt) || 'speed' : null;
-        c.waitFor = c.why === 'lead' ? gapFor : c.why === 'junction' ? jFor : c.why === 'tram' ? (keepClear ? gapFor : yieldAi || tram) : null;
-        c.vNow = this._approach(c.vNow ?? vt, vt, dt);
+        const why = vt < 0.3 ? Object.keys(terms).find((k) => terms[k] === vt) || 'speed' : null;
+        plans.set(c, { vt, lead, why, waitFor: why === 'lead' ? gapFor : why === 'junction' ? jFor : why === 'tram' ? (keepClear ? gapFor : yieldAi || tram) : null });
+      }
+    }
+    // then every car moves by its plan; its leader and what holds it are kept for the next step, which reads them for the
+    // other cars "as the last step left them" (nextOf above, _circleGoes)
+    for (const c of cars) {
+      const P = c.active && plans.get(c);
+      if (P) {
+        c.lead = P.lead; c.why = P.why; c.waitFor = P.waitFor;
+        c.vNow = this._approach(c.vNow ?? P.vt, P.vt, dt);
         c.s += c.vNow * dt;
         while (c.active && c.s > c.path.length) this._advance(c);
       }
