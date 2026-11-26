@@ -326,6 +326,26 @@ export const SCENES = {
     }, report: () => ({ clear: car.clear, through: car.through, atCross }) };
   },
 
+  // A one-way street south over the opposite track (y 3.4) and ours (y 0), a short lane over both, its exit full by a
+  // standing queue; the car on that lane, its front on the opposite track's band. The queue moves off at 0.2 s as our tram
+  // comes at 12 m/s, 85 m off: the car, past the group's first band, waits for it there and crosses after its tail (#602,
+  // line 17 s 9950, seed 14 on #833: such a car pulled out across ours and was hit).
+  heldOnOpposite() {
+    const T = build({ roads: [{ p: [[0, 40], [0, 9]], o: 1 }, { p: [[0, 9], [0, -6]], o: 1 }, { p: [[0, -6], [0, -70]], o: 1 }],
+      track: [[-200, 0], [200, 0]], back: [[200, 3.4], [-200, 3.4]], tram: { s: 115, v: 12 } });
+    const q = [addCar(T, { road: 2, dir: 1, s: 6.5, v: 0, vNow: 0, id: 10 })];
+    q.push(addCar(T, { road: 2, dir: 1, s: 0, v: 10, vNow: 0, id: 11 }));
+    q[1].s = q[0].s - q[0].half - 1.5 - q[1].half;
+    const car = addCar(T, { road: 1, dir: 1, s: 0.3, v: 10, vNow: 0, next: 2, id: 1 });
+    let crossedAt = null, tailPast = null;
+    return { T, t: 20, tram: 12, each: (T, clock) => {
+      if (clock >= 0.2) q[0].v = 10;
+      const p = car.active && car.path.at(car.s), tr = T.game.tram;
+      if (crossedAt === null && p && p.y + car.half < -1.5) crossedAt = r1(clock); // (its rear off our far rail)
+      if (tailPast === null && tr.s - tr.length > 200 + 2.5) tailPast = r1(clock); // (route s 200: x 0)
+    }, report: () => ({ crossedAt, tailPast }) };
+  },
+
   // #496 (line 23 s 3349, seed 1): walk A's end links 1 m back to a link crossing a car lane to walk B, 1 m before B's
   // end; B's end links through a second link to A, 1 m before A's end. At each end the least bad way on leads round that
   // 8 m ring, and walkers on it held a car for good. The walkers now turn back off a walk they entered less than 15 m ago

@@ -130,6 +130,14 @@ class TrafficScenes(unittest.TestCase):
         self.assertGreater(r['clear'], 2.6)
         self.assertIsNotNone(r['through'])
 
+    def test_a_car_on_the_opposite_track_waits_there_for_our_tram(self):
+        # (#602: past the group's first band it went on over ours, stopping only for a tram's body there; our tram hit it,
+        # 3 m deep)
+        r = self.play('heldOnOpposite')
+        self.clean(r)
+        self.assertIsNotNone(r['crossedAt'])
+        self.assertGreater(r['crossedAt'], r['tailPast'])
+
     def test_walkers_round_a_ring_of_walks_no_longer_hold_a_car(self):
         # (#496: before #608 the walkers circled the ring for good and the car stood behind them)
         jam = self.play('walkerRing', fixOff=True, t=90)
