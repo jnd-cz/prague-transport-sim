@@ -430,9 +430,11 @@ def osm_water(box, F):
     Střelecký ostrov levelled with the Vltava and drawn as water, #632.) One geometry in the city frame."""
     import osm_local
     x0, y0, x1, y1 = box.bounds
-    (s, w), (n, e) = F.ll(x0, y0), F.ll(x1, y1)
     parts = []
-    for el in osm_local.ways(_wet, bbox=(s, w, n, e)):
+    # (lat/lon round the box's corners and edges, the frame turned ~8° against them: from two corners alone a pond in
+    # either other corner was left out, 174 m from a place's box's corner at (-368, -2803) by vysehrad-wall-over-the-ramp
+    # and in by the next ring's, #812)
+    for el in osm_local.ways(_wet, bbox=F.bbox([(x0, y0), (x1, y1)])):
         if el["nodes"][0] != el["nodes"][-1] or len(el["geometry"]) < 4:
             continue
         ll = np.array([(g["lat"], g["lon"]) for g in el["geometry"]], float)
@@ -462,9 +464,8 @@ def water_cuts(W, F, ext=None):
     import osm_local
     ext = WATER_CUT_EXT if ext is None else ext
     x0, y0, x1, y1 = W.bounds
-    (s, w), (n, e) = F.ll(x0, y0), F.ll(x1, y1)
     out = []
-    for el in osm_local.ways(lambda t: t.get("waterway") in WATER_CUTS, bbox=(s, w, n, e)):
+    for el in osm_local.ways(lambda t: t.get("waterway") in WATER_CUTS, bbox=F.bbox([(x0, y0), (x1, y1)])):
         ll = np.array([(g["lat"], g["lon"]) for g in el["geometry"]], float)
         p = np.column_stack(F.xy(ll[:, 0], ll[:, 1]))
         if len(p) < 2:
@@ -506,6 +507,47 @@ def bank_samples(line, step=WATER_STEP):
         return P
     _, first = np.unique(np.round(P * 1000).astype(np.int64), axis=0, return_index=True)  # (a point on two segments)
     return P[np.sort(first)]
+
+
+def wet_cells(g, kx0, ky1, nx, ny, r=WATER_RES):
+    """Of a raster of r m on the S-JTSK grid (geo.ORIGIN), nx columns from the cell kx0 and ny rows down from ky1, the
+    cells whose centre lies in g: along each row's centre every ring's edges crossed, a cell wet where an odd number of
+    them lie at or before its centre, outer rings and holes alike. A cell goes by g round its centre alone. (Drawn as
+    polygons, an outer ring's fill took its boundary's cells and a hole's fill took them back: Císařská louka, an island
+    1.5 km long by vysehrad-wall-over-the-ramp (line 17, -930, -2450), was a hole in the river with two rings of tiles
+    and a bay cut open by the raster's extent with one, its bank's cells dry or wet, and 24 of 91 banks in sight went
+    with them, the level 187.31 or 187.65 m, #812.)"""
+    from geo import ORIGIN
+    out = np.zeros((ny, nx + 1), np.uint8)
+    S = [np.zeros((0, 4))]
+    for p in shapely.get_parts(g):
+        if p.geom_type == "Polygon":
+            for ring in (p.exterior, *p.interiors):
+                c = shapely.get_coordinates(ring)
+                S.append(np.column_stack([c[:-1], c[1:]]))
+    S = np.concatenate(S)
+    u, v = (S[:, 0::2] + ORIGIN[0]) / r, (S[:, 1::2] + ORIGIN[1]) / r
+    # (each edge from its lower end, whichever way its ring runs: the crossings the same arithmetic in an outer ring
+    # and in a hole)
+    o = np.argsort(v, 1, kind="stable")
+    u, v = np.take_along_axis(u, o, 1), np.take_along_axis(v, o, 1)
+    flat = v[:, 0] == v[:, 1]
+    u, v = u[~flat], v[~flat]
+    # (the rows whose centre ky1 - row - 0.5 lies in [lower, upper) of an edge: one more either way, then tested)
+    r0 = np.clip(np.floor(ky1 - 0.5 - v[:, 1]).astype(np.int64), 0, ny)
+    r1 = np.clip(np.floor(ky1 - 0.5 - v[:, 0]).astype(np.int64) + 2, 0, ny)
+    n = np.maximum(r1 - r0, 0)
+    if not n.sum():
+        return out[:, :nx].astype(bool)
+    e = np.repeat(np.arange(len(u)), n)
+    row = r0[e] + np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n)
+    vc = ky1 - row - 0.5
+    ok = (v[e, 0] <= vc) & (vc < v[e, 1])
+    e, row, vc = e[ok], row[ok], vc[ok]
+    x = u[e, 0] + (vc - v[e, 0]) * (u[e, 1] - u[e, 0]) / (v[e, 1] - v[e, 0])
+    col = np.clip(np.ceil(x - 0.5).astype(np.int64) - kx0, 0, nx)
+    np.add.at(out, (row, col), 1)
+    return np.bitwise_xor.accumulate(out & 1, axis=1)[:, :nx].astype(bool)
 
 
 class WaterLevels:
@@ -567,19 +609,11 @@ class WaterLevels:
         self.x0 = self.kx0 * r - ORIGIN[0]
         self.y1 = self.ky1 * r - ORIGIN[1]
         nx, ny = int((x1 - self.x0) / r) + 2, int((self.y1 - y0) / r) + 2
-        im = Image.new("1", (nx, ny), 0)
-        d = ImageDraw.Draw(im)
 
         def px(c):
             c = np.asarray(c)
             return list(zip(((c[:, 0] + ORIGIN[0]) / r - self.kx0).tolist(), (self.ky1 - (c[:, 1] + ORIGIN[1]) / r).tolist()))
-        for g in shapely.get_parts(polygonal(ex)):
-            if g.geom_type != "Polygon":
-                continue
-            d.polygon(px(g.exterior.coords), fill=1)
-            for h in g.interiors:
-                d.polygon(px(h.coords), fill=0)
-        grid = binary_dilation(np.asarray(im, bool))
+        grid = binary_dilation(wet_cells(ex, self.kx0, self.ky1, nx, ny, r))
         im = Image.fromarray(grid)
         d = ImageDraw.Draw(im)
         for c in cuts or []:

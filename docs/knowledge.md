@@ -900,7 +900,13 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     S-JTSK grid, the banks are sampled where they cross a 10 m grid, and no bank is read farther than a tile's side.
     A sight line's cells are counted from the point's S-JTSK coordinates: from the local point less the raster's
     origin, the float noise of a line along a cell's edge went by the box (rasinovo-quay's pool: 10 banks seen or 9,
-    186.28 or 186.00 m).
+    186.28 or 186.00 m). The raster's cells were drawn as polygons, an outer ring's fill taking its boundary's cells and
+    a hole's fill taking them back. Císařská louka, an island 1.5 km long, was a hole in the Vltava with two rings of
+    tiles round vysehrad-wall-over-the-ramp and a bay cut open by the raster's extent with one: its bank's cells went
+    wet or dry, a point by it saw 91 banks or 67, and its level was 187.31 or 187.65 m. A cell is wet by its centre in
+    the water now (`wet_cells`). OSM's water and weirs were looked up in lat/lon from the box's two corners, which
+    leave out the frame's other corners (turned ~8°): a pond 174 m from one was in the next ring's build only. They
+    are looked up round the corners and the edges' middles now (`Frame.bbox`).
   - Float noise of the box-wide overlays: the cover's union left needles 9 m long and 1e-13 m wide, and GEOS's buffer
     of the whole box's terrain (the thin strips by a plot) put a vertex 0.2 mm apart, 1 mm on the ground file's grid.
     The pieces go on the 1 mm grid before they are united; the strips are opened per tile with a 4 m margin. United on

@@ -3,6 +3,7 @@
 
     python -P -E tools/test_ground_partition.py
 """
+import math
 import os
 import sys
 import unittest
@@ -372,6 +373,58 @@ class WaterLocality(unittest.TestCase):
             lv.P = np.array([[edges[0] - 1e-13, 20.0]])
             seen.append(lv._seen(np.array([edges[0] - 1e-13, -20.0]), np.array([0])).tolist())
         self.assertEqual(seen[0], seen[1])
+
+    def test_a_cell_is_wet_by_its_centre_in_the_water(self):
+        from geo import ORIGIN
+        W = shapely.Polygon([(-40.3, -20.7), (60.2, -25.1), (75.9, 30.4), (-10.6, 44.8)],
+                            [[(-5.25, -4.6), (20.45, -6.35), (12.7, 15.15)], [(40.3, 0.7), (50.6, 0.9), (50.4, 10.2), (40.7, 10.4)]])
+        kx0, ky1, nx, ny = math.floor(-60 + ORIGIN[0]), math.ceil(60 + ORIGIN[1]), 160, 130
+        g = gp.wet_cells(W, kx0, ky1, nx, ny)
+        cx = (kx0 + np.arange(nx) + 0.5) - ORIGIN[0]
+        cy = (ky1 - np.arange(ny) - 0.5) - ORIGIN[1]
+        X, Y = np.meshgrid(cx, cy)
+        np.testing.assert_array_equal(g, shapely.contains_xy(W, X, Y))
+        self.assertGreater(g.sum(), 5000)
+
+    def test_an_island_cut_open_by_the_extent_is_the_same_cells_as_whole(self):
+        # (#812, Císařská louka by vysehrad-wall-over-the-ramp: an island 1.5 km long, a hole in the river with two rings
+        # of tiles and a bay opened by the raster's extent with one. Drawn as polygons, an outer ring's fill took its
+        # boundary's cells and a hole's took them back, and the sight lines grazing the island saw 91 banks or 67)
+        from PIL import Image, ImageDraw
+        island = shapely.Polygon([(-50.2, -30.4), (300.7, -25.3), (1500.5, -10.2), (1480.1, 30.1), (200.3, 28.7), (-40.6, 12.2)])
+        W = shapely.box(-3000.3, -100.7, 3000.6, 100.2).difference(island)
+        ipr = Ipr(lambda x, y: 180.0 + 0.002 * x + 0.3 * np.cos(y / 11.0) + 0.2 * np.sin(x / 23.0))
+        boxes = shapely.box(-400.4, -200.2, 400.3, 200.6), shapely.box(-1400.8, -200.2, 1450.1, 200.6)
+        small, large = (b.buffer(gp.WATER_FAR) for b in boxes)
+        self.assertEqual(len(W.intersection(small).interiors), 0)  # (cut open: a bay)
+        self.assertEqual(len(W.intersection(large).interiors), 1)
+        lvs = [gp.WaterLevels(W, [], ipr, Frame(), extent=e) for e in (small, large)]
+
+        def cells(lv, grid):
+            # (the cells of x -800 .. 800, y -95 .. 95, each by its S-JTSK column and row)
+            from geo import ORIGIN
+            c = np.arange(math.floor(-800 + ORIGIN[0]), math.floor(800 + ORIGIN[0])) - lv.kx0
+            r = lv.ky1 - np.arange(math.ceil(95 + ORIGIN[1]), math.ceil(-95 + ORIGIN[1]), -1)
+            return grid[np.ix_(r, c)]
+        np.testing.assert_array_equal(cells(lvs[0], lvs[0].grid), cells(lvs[1], lvs[1].grid))
+        px, py = np.linspace(-300.3, 250.7, 23), np.full(23, 40.2)
+        self.assertEqual(lvs[0].at(px, py).tolist(), lvs[1].at(px, py).tolist())
+        # (drawn as polygons, the old raster: the island's bank wet in the bay, dry round the hole)
+        old = []
+        for lv, e in zip(lvs, (small, large)):
+            from geo import ORIGIN
+            im = Image.new("1", lv.grid.shape[::-1], 0)
+            d = ImageDraw.Draw(im)
+
+            def px_(c, lv=lv):
+                c = np.asarray(c)
+                return list(zip(((c[:, 0] + ORIGIN[0]) - lv.kx0).tolist(), (lv.ky1 - (c[:, 1] + ORIGIN[1])).tolist()))
+            for g in shapely.get_parts(W.intersection(e)):
+                d.polygon(px_(g.exterior.coords), fill=1)
+                for h in g.interiors:
+                    d.polygon(px_(h.coords), fill=0)
+            old.append(cells(lv, np.asarray(im, bool)))
+        self.assertGreater((old[0] != old[1]).sum(), 100)
 
     def test_no_bank_farther_than_water_far(self):
         # (a lake's middle, 600 m from every bank: no level, where the old fallback read banks at any distance; the
