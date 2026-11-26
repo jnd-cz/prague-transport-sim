@@ -833,7 +833,9 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   (`src/groundDraw.js` `buildDtm`). Eight such covers on the five lines (`tools/covers.py`'s text names them):
   Národní divadlo, Wilsonova over the route's tram tunnel by Hlavní nádraží, U Kina's road and cycleway under the
   tram's and the railway's bridges, a platform over Simbirská and Turkmenská, and three pedestrian underpasses.
-  Národní's largest step along the street 5.11 → 0.07 m.
+  Two of them close a road under them until #449 (U Kina's service road, Simbirská and Turkmenská), as Divadelní
+  is closed under Národní; the user, asked whether to keep them or cover only footways and the tram's streets
+  (PR #873, 2026-11-26): "Ok keep all 8". Národní's largest step along the street 5.11 → 0.07 m.
 - **A paved strip is a wall for the sidewalk beside it** (#786, measured 2026-11-21). The survey has many a
   retaining wall and parapet as a paved area 0.2-0.5 m across and nothing else: no wall area, no `Zeď` line. What
   kept a sidewalk off IPR's smear at a wall (#653: the cells along a wall held at its level, a street corner on its
