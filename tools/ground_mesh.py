@@ -1961,6 +1961,13 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, k
     - corners `apart` (a wall area's, lifted to its top on its foot's outline: wall_face) are welded among themselves
       only, and the others at their point without them: the wall's face stands on the ground at its foot.
     - a road's corner at a raised tram belt's edge (`kerbs`, belt_kerbs) keeps its own as at any kerb.
+    - a lidar corner under a raised top corner (a lawn or a yard on the lidar at a sidewalk's or a platform's edge) is
+      no kerb: within MEET_STEP of it it takes the edge's height, and its face rises to the lawn's own ground from
+      there. As a kerb it kept every difference over 3 cm upright: within 45 m of Královka's loop (line 23 (-2890,
+      140)) 234 m of such faces of 3-30 cm between grass and sidewalk, the lidar having the same difference a metre
+      either side (12 of 13 faces within 5 cm) and no way to tell a kerb from a bank; the user, 2026-11-26: "the only
+      raised areas with kerb above track seem to be the stop platforms. Other raise areas like the green patches rise
+      with smoother slope" (#770). A larger difference stands (a terrace; a sidewalk off the lidar).
     `label`: what gave each corner its height (default `kind`), for the report and the lidar's rule."""
     key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
     if apart is not None:
@@ -1999,6 +2006,12 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, k
                              np.where((kind == "terrain") != (top_kind[inv] == "terrain"), "wall", ""))))))
     if kerbs is not None:
         pair = np.where(kerbs & (pair == ""), "kerb", pair)
+    # (a lawn or a yard on the lidar at a raised area's edge is no carriageway at a kerb: within MEET_STEP it meets
+    # the edge and rises to its own ground over its first faces, #770)
+    label = kind if label is None else label
+    with np.errstate(invalid="ignore"):
+        met = (label == "lidar") & (pair == "kerb") & (top_kind[inv] == "raised") & (np.abs(dz) <= MEET_STEP)
+    pair = np.where(met, "", pair)
     lim = np.array([STEP.get(p, np.inf) for p in pair]) if len(pair) else np.zeros(0)
     # (a weir's two sides share the water's priority: both are top, each keeps its own level more than STEP off the
     # middle; welded to the first's, the second's triangles sloped 1.5 m up to the weir at Šítkovský)
@@ -2006,7 +2019,6 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, k
     # (a corner on the lidar that yielded to a surveyed one of its rank keeps the lidar's height where its own outline
     # stands more than LIDAR_APART off that one's: two levels, not one edge)
     rank = np.round(prio, 2) == np.round(top_p[inv], 2)
-    label = kind if label is None else label
     apart = np.zeros(len(zc), bool)
     if zown is not None:
         with np.errstate(invalid="ignore"):
@@ -2034,6 +2046,7 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, k
     ties["max m"] = round(float(np.nanmax(rng[np.isfinite(rng)])), 3) if np.isfinite(rng).any() else 0.0
     ties["survey steps"] = int(split.sum())
     ties["lidar apart"] = int(apart.sum())
+    ties["lidar corners met a raised edge"] = {f"over {c} cm": int((np.abs(dz[met]) > c / 100).sum()) for c in (3, 10, 20)}
     # (the corners that yielded to one of their rank, YIELD: by how far each moved, a step kept for the water and where
     # apart)
     for lb in ("lidar", "pool"):

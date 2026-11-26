@@ -414,6 +414,21 @@ class Walls(unittest.TestCase):
         self.assertEqual(np.round(zf, 3).tolist(), [248.16, 248.16, 199.94, 205.43])
         self.assertEqual(steps["ties"]["lidar apart"], 1)
 
+    def test_a_lawn_on_the_lidar_meets_a_sidewalks_edge_and_a_road_keeps_its_kerb(self):
+        # (#770, Královka's loop, line 23: the lawn's corner at (-2857.88, 147.92) on the lidar, 299.004 m, the sidewalk's
+        # there 299.146: no kerb, the lawn meets the edge; at (-2884.76, 199.0) the sidewalk stands 0.328 m over the
+        # lawn, more than MEET_STEP: that stands; a road's corner under a sidewalk's keeps its kerb at any height)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 2.0]), np.zeros(6)
+        zc = np.array([299.146, 299.004, 297.450, 297.122, 299.146, 299.004])
+        walk, lawn, road = 2.0 + (10 - 6) / 100, 2.0 + (10 - 2) / 100 + gm.YIELD, 2.0 + (10 - 8) / 100
+        prio = np.array([walk, lawn, walk, lawn, walk, road])
+        kind = np.array(["raised", "survey"] * 3, dtype=object)
+        label = np.array(["street", "lidar", "street", "lidar", "street", "street"], dtype=object)
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind, label)
+        self.assertEqual(np.round(zf, 3).tolist(), [299.146, 299.146, 297.450, 297.122, 299.146, 299.004])
+        self.assertEqual(steps["ties"]["lidar corners met a raised edge"], {"over 3 cm": 1, "over 10 cm": 1, "over 20 cm": 0})
+        self.assertEqual(steps["kerb"]["corners"], 2)
+
     def test_a_lidar_corner_a_wall_holds_keeps_the_walls_level(self):
         # (#770: line 37 (3389.13, -10.60), the cutting's wall north of Ohrada: the paved ground's corner on the wall's
         # line, held at the foot's 244.59 m; its area's own outline there 248.44 (the area runs behind the wall's top
