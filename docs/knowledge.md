@@ -682,6 +682,13 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   a difference over 0.3 m; the faces between grass and the tram's area, which are the bed 0.10-0.18 m under the
   street surface on the loop's other tracks (#539's kind); a branch track's bed against the route's in a switch
   (#732).
+  - **The shift fades into the lawn** (`ground_mesh.meet_lidar`, over `MEET_FADE`, an area's corners from its own
+    edge corners). Moved at its edge corner alone, a lawn stood as a sliver wherever one of its 5 m lattice corners
+    lay near the border: at (-2889.000, 144.000), 4.6 cm inside the border corner welded to the tram's area, 7 cm
+    over it, two slivers at 57-67 degrees running out along the lattice's lines for 3.7 and 4.7 m. The page draws
+    the ground double-sided, and such a sliver's back side shows as a dotted dark line at a grazing angle (the
+    user's second picture, the grass strip from the cab; the drawing side is on #734). A section across it: a
+    largest step of 0.09 m on the published ground, 0.03 m faded.
 - **A parking area is such a yard** (#800, measured 2026-11-21 on ground batch C). It has heights on its outline only,
   from the survey's lines in height class 5 (a mean error of 0.35 m). The bay along Vinohradská's north carriageway
   (line 9 s 15360-15420, area 3091, 822 m², 0.42 m at p95) shares one such line with the sidewalk behind it; one

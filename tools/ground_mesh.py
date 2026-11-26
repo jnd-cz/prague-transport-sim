@@ -1282,6 +1282,50 @@ def meet_raised(sc, x, y, zs):
     return zs, shift
 
 
+def meet_lidar(x, y, zc, zf, lidar, area, held=None):
+    """The lidar corners' heights zc with what the weld moved at their areas' edges faded into the areas: (heights, how
+    many corners moved by over 5 mm). zf: the welded heights; lidar: the corners laid on the lidar (a lawn, a yard);
+    area: each one's survey area (-1 none); held: corners a wall line holds, left as they are.
+    - An edge corner is a lidar corner at a point it shares with a corner that is not one (a bed, a street, a sidewalk,
+      the terrain). Its shift is what the weld moved it by, none where that is over MEET_STEP (two levels: the weld's
+      own business) or where it kept its height (a pin).
+    - Every lidar corner within MEET_FADE of its own area's edge corners takes their inverse-distance-weighted shift,
+      faded linearly to none at MEET_FADE, as meet_raised fades a yard's. An edge corner takes its own.
+    Without it the weld moved the edge corner alone. Královka's loop, line 23: the lawn's corner on its border with the
+    tram's area at (-2889.000, 144.046) welded to 298.916 m, its lattice corner (-2889.000, 144.000), 4.6 cm inside,
+    on the lidar at 298.986: two slivers at 57-67 degrees, 7 cm tall there, 3.7 and 4.7 m long along the lattice's
+    lines, whose back sides the page drew as dotted dark lines (the user, 2026-11-26: "visible only from shallow
+    angle [...] Is there a step too?", #770)."""
+    from scipy.spatial import cKDTree
+    ok = lidar & np.isfinite(zc) & np.isfinite(zf) & (area >= 0)
+    if held is not None:
+        ok &= ~held
+    own = np.flatnonzero(ok)
+    if not len(own):
+        return zc, 0
+    key = np.round(x * Q).astype(np.int64) * 10_000_000_000 + np.round(y * Q).astype(np.int64)
+    edge = own[np.isin(key[own], np.unique(key[~lidar & np.isfinite(zc)]))]
+    if not len(edge):
+        return zc, 0
+    dl = zf[edge] - zc[edge]
+    dl[np.abs(dl) > MEET_STEP] = 0.0
+    if not (dl != 0).any():
+        return zc, 0
+    apart = 100.0 * MEET_FADE  # (a third coordinate: another area's corners are out of reach)
+    d, i = cKDTree(np.column_stack([x[edge], y[edge], area[edge] * apart])).query(
+        np.column_stack([x[own], y[own], area[own] * apart]), k=min(MEET_NEAR, len(edge)), distance_upper_bound=MEET_FADE)
+    d, i = d.reshape(len(own), -1), i.reshape(len(own), -1)
+    near = np.isfinite(d)
+    w = np.where(near, 1.0 / np.maximum(d, 1e-3) ** 2, 0.0)
+    dv = np.where(near, dl[np.minimum(i, len(edge) - 1)], 0.0)
+    has = near.any(1)
+    sh = np.zeros(len(own))
+    sh[has] = (w[has] * dv[has]).sum(1) / w[has].sum(1) * np.clip(1 - d[has, 0] / MEET_FADE, 0, 1)
+    out = zc.copy()
+    out[own] += sh
+    return out, int((np.abs(sh) > 0.005).sum())
+
+
 WALL_LATTICE = 1.0  # m: a survey wall's faces cut to this, their corners between its sides (across_outline, #653)
 WALL_SNAP = 0.3  # m: a street corner on a wall's or stairs' outline this near its height there takes it (#653)
 WALL_ON = 0.01  # m: a corner this near the outline lies on it (the faces are noded on it)
@@ -2556,6 +2600,16 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     log(f"  {n_sides:,} stairs corners on their sides' stretches stand apart")
     zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"),
                                belt & (kind != "bed"))
+    # (what the weld moved at a lawn's or a lidar yard's edge fades into it: meet_lidar, #770; then the weld again)
+    c_area = np.full(len(cx), -1, np.int64)
+    c_area[sv_m] = sa
+    zc, n_faded = meet_lidar(cx, cy, zc, zf, label == "lidar", c_area, at_wall)
+    if n_faded:
+        met = steps["ties"]["lidar corners met a raised edge"]
+        zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"),
+                                   belt & (kind != "bed"))
+        steps["ties"]["lidar corners met a raised edge"] = met  # (the first weld's: the second finds them met)
+    steps["ties"]["lidar corners faded to their edge"] = n_faded
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
     vkey = np.stack([np.round(cx * Q).astype(np.int64), np.round(cy * Q).astype(np.int64), zq], 1)
@@ -2592,7 +2646,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     if len(sf):
         area[sf] = [pieces["survey"][owners[o][1]]["c"] for o in owner[tf[sf]].tolist()]
     fcls_id = np.array([CLASS_IDS[c] for c in tcls])
-    log(f"  weld: {n_points:,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items() if p != 'ties']}, ties over 1 cm {steps['ties']['over 1 cm']}, survey steps {steps['ties']['survey steps']}, yielded over 5 cm: lidar {steps['ties']['lidar corners yielded']['over 5 cm']}, pool {steps['ties']['pool corners yielded']['over 5 cm']}, "
+    log(f"  weld: {n_points:,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items() if p != 'ties']}, ties over 1 cm {steps['ties']['over 1 cm']}, survey steps {steps['ties']['survey steps']}, yielded over 5 cm: lidar {steps['ties']['lidar corners yielded']['over 5 cm']}, pool {steps['ties']['pool corners yielded']['over 5 cm']}, lidar corners over 3 cm off a raised edge met {steps['ties']['lidar corners met a raised edge']['over 3 cm']:,}, faded to their edge {n_faded:,}, "
         f"{time.time() - t1:.0f} s")
 
     # the kept terrain triangles, as they are

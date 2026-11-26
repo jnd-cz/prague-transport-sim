@@ -6740,6 +6740,21 @@
       "largest step m": 0.06
      },
      "why": "a face of 0.22-0.25 m, the sidewalk 0.18 m over the lawn 0.2 m either side; IPR rises 0.14, 0.24 and 0.34 m over 0.5, 1 and 1.5 m either side: a bank"
+    },
+    {
+     "name": "across the lawn's cell line by the track, 1.75 m along x = -2888.8",
+     "from": [
+      -2888.8,
+      142.5
+     ],
+     "to": [
+      -2888.8,
+      144.25
+     ],
+     "expect": {
+      "largest step m": 0.04
+     },
+     "why": "the user's second picture, the dotted lines in the grass strip right of the track: \"visible only from shallow angle [...] Is there a step too?\". The lawn's border corner (-2889.000, 144.046) is welded to the tram area's 298.916 m, its lattice corner (-2889.000, 144.000) kept the lidar's 298.986: a sliver 7 cm tall there, 6.6 cm on this section, running out along y = 144. Faded, the lattice corner comes down with the border"
     }
    ]
   }
