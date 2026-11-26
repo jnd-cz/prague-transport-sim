@@ -912,6 +912,89 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   4.2-7.8 % more triangles a line (18.25 M -> 19.28 M on the five) and the ground lies a little nearer the raster:
   within 10 m of a track its mean distance 3.98-5.66 -> 3.94-5.33 cm, the p99 27.9-54.9 -> 27.0-41.4 cm. At the
   places picked for their walls the cost is 2-28 %.
+- **What a tile's ground reads** (#812, measured 2026-11-22). A tile's ground is built from the tile and its ring of
+  tiles (`ground_place.py --rings` builds it with one ring and with two and compares the middle tile). On main
+  lattice-cell's middle tile had 220 triangles in one build only, modrany-viaduct-ramps' 10. What read past the ring,
+  or took what the box held into account:
+  - The water levels (`ground_partition.WaterLevels`): the sight raster started at the box's corner, the banks were
+    sampled evenly from wherever each ring starts, and banks up to 1,000 m off were read. Now the raster is on the
+    S-JTSK grid, the banks are sampled where they cross a 10 m grid, and no bank is read farther than a tile's side.
+    A sight line's cells are counted from the point's S-JTSK coordinates: from the local point less the raster's
+    origin, the float noise of a line along a cell's edge went by the box (rasinovo-quay's pool: 10 banks seen or 9,
+    186.28 or 186.00 m). The raster's cells were drawn as polygons, an outer ring's fill taking its boundary's cells and
+    a hole's fill taking them back. Císařská louka, an island 1.5 km long, was a hole in the Vltava with two rings of
+    tiles round vysehrad-wall-over-the-ramp and a bay cut open by the raster's extent with one: its bank's cells went
+    wet or dry, a point by it saw 91 banks or 67, and its level was 187.31 or 187.65 m. A cell is wet by its centre in
+    the water now (`wet_cells`). OSM's water and weirs were looked up in lat/lon from the box's two corners, which
+    leave out the frame's other corners (turned ~8°): a pond 174 m from one was in the next ring's build only. They
+    are looked up round the corners and the edges' middles now (`Frame.bbox`).
+  - Float noise of the box-wide overlays: the cover's union left needles 9 m long and 1e-13 m wide, and GEOS's buffer
+    of the whole box's terrain (the thin strips by a plot) put a vertex 0.2 mm apart, 1 mm on the ground file's grid.
+    The pieces go on the 1 mm grid before they are united; the strips are opened per tile with a 4 m margin. United on
+    the grid, the cover is no more local: which pieces are united first goes by everything in the box, and with it
+    whether a wedge a fraction of a mm wide between two pieces stays open, and whether a crossing's node stays as a
+    vertex on an edge (modranska-skola-ramp: needles 1.9-7.8 m long and 0.2-0.3 mm wide cut from the terrain's
+    triangles along a building in one box only; yard-at-a-sidewalk: a vertex on a building's edge). The terrain's cut
+    unites its cover per world tile from the pieces near it, in an order by place, and a remain thinner than the grid
+    is none.
+  - Ties broken by an STRtree's order: its hits come in the order of its traversal, which every geometry in the
+    tree moves, and `query_nearest(all_matches=False)` takes the first of the equally near. A sidewalk corner on
+    the vertex two wall edges share read the surface on one side or the other, 230.21 or 230.37 m; a lidar corner
+    0.343 m from two stretches laid over one wall in opposite directions 228.78 or 228.81 m. Ten picks settle a tie
+    by place now (`tools/ties.py`), the wall rules first by meaning: of edges as near, the one whose line runs
+    nearest the corner's triangle. Settled by place, two ties showed defects that main's tree order had happened to
+    step round, settled in their rules by meaning:
+    - At a turn `wall_lines` ends the piece before on the point beside the turn and starts the piece after on the
+      turn's own reading, taken along the wall before it: by street-over-an-underpass a stairwell's floor 216.76 m
+      for 210.50. A corner 0.77 m past both, as near each, took the piece after by its line, 216.20 m (main's tree
+      order: 211.56). Of stretches as near, `hold_at_walls` takes one starting there last now, with the distances to
+      1 µm (the float noise of a segment's end at t = 1 had chosen). Copying the point beside the turn onto the
+      piece after's start (tried) took the low side round turns into ground 3-5 m higher (line 37 (3940.7, 812.1))
+      and moved 1-6 m at seven places: the turn's readings want a rule of their own.
+    - Past a wall's corner, `own_side` and `off_the_smear` read square to one of the two edges at the vertex. A
+      sidewalk corner under Letná's wall read the sidewalk on the wall's top that way, 6.8 m up. They read from the
+      vertex towards the corner now where the outline turns there (`out_of`, `turning`). Past a line's open end, at a
+      straight run's vertex and for a corner on the outline the read stays square: from such an end towards the
+      corner the point out ran along the line (notches of 1.8 m at yard-at-a-sidewalk, 0.7 m at belohorska-median),
+      and towards its triangle a corner on the outline read beside it (teeth of 7 cm at modranska-skola-ramp).
+  - A lowered kerb's corner stood its stretch's height over the road corner at its point taken first by the
+    corners' order (`np.unique`'s first index), which the box sets: where two road areas meet at the point at another
+    height, 225.809 or 225.826 m at sidewalk-under-a-road-wall (1890.79, -2067.04), and the platform's plane fitted
+    over it moved the corners 1 mm on the grid. It takes the lowest road corner there (`lowest_at`).
+  - `meet_raised` weighed the edge per corner: its 8 nearest were copies of one point (12 corners, 1 mm apart),
+    which by the KD tree's order. It weighs points now.
+  - GEOS keeps a geometry's grid (`set_precision`, `grid_size`), which its WKB does not carry, and an overlay with
+    such an input snap-rounds to it. The thin strips, on the 1 mm grid, gave it to the plots they joined, and the union
+    of the classes over the water bent a survey edge to a plot's vertex 0.4 mm off it in the box where its pairing
+    took the plot first: line 22's river edge crossed that edge at (-928.0614, 105.3350) or 0.38 mm east. On the grid
+    a chunk of terrain also opened by where its rings start, which float noise 300 m off chose: a needle 6 m long and
+    0.5 mm wide along a plot's edge at stairs-beside-a-building in one box. The strips are opened in a normal form
+    without the grid, and come out on it without one. Where a ring starts goes by the box too, and a union keeps
+    that start as a node: a bed's edge cut back from the beds' outline (`bed_edges`) by a buffer with coarse caps at
+    the node ended 0.25 mm apart at rasinovo-quay, where a small ring started at the corner 5 cm off the edge in the
+    larger box. The lines it is cut back from are merged where only two meet (`cut_back`). And a vertex at exactly
+    half a mm, as an intersection of the data's own mm can lie, went to the mm on either side by the sign of its
+    float noise: hlavni-nadrazi's plot at x 1051.2025000000003 and stairs-not-there's at y 1242.4725000000017 held a
+    vertex 1 mm off its neighbour in one box only. Everything goes on the grid through the µm now
+    (`ground_partition.on_grid`). Not tile_faces' lines: there a segment passing a hot pixel's edge within a µm snapped
+    through it or not by that rounding, and ohrada-cutting-walls had 23,748 triangles cut another than the written
+    file's for 8,441.
+  - A ray from a wall line to the next wall crossing two of its segments at one point took the first by the tree's
+    order: under the Magistrála a wall's top and foot lines lie over each other, and the strip beside hlavni-nadrazi's
+    wall read 198.57 m in one box and 198.02 m in another (`wall_lines._side`). Of the heights crossed as near, the
+    strip takes the one its middle's raster stands nearest, as it chooses between the line's own and the next's.
+  - The covers over passages (`covers.Covers`) looked for the raster's cut on a lattice from the passages' bounds, and
+    a passage merges with those the box holds (lattice-cell's one ring held one cover of 153 m², its two rings three of
+    273 m²): with a passage joining from a larger box the lattice moved, and the cut with it. The lattice is on STEP's
+    grid now. A cut connected along a passage was labelled whole, so a passage only a larger box holds could join it
+    and decide whether it is a slot. Each world tile's points are judged by the cut's parts within 30 m of the tile now
+    (`covers.WINDOW`, twice LIMIT); the five lines' covers are the same as before (5, 11, 5, 2 and 4, 115-1028 m²).
+  - What a tile may read, then: the tile and its ring of tiles (the build's box, which `ground_place.py --rings` widens
+    by a ring) and inputs computed once for the whole line or city (the city terrain mesh, the street surface
+    `lineN.streets.*`, the survey, OSM, IPR's raster). Rules reach into the ring by at most: a tile's side for the water
+    levels' banks, 30 m for the covers' cut, 4 m for the thin strips, 18 m (LIMIT + NEAR) for the passages a cover
+    looks at, a platform's length for its plane. Ties are settled by place or by meaning, never by an order the box
+    sets, and every snap to the grid goes through the µm.
 - **Where walls stand** (#697, measured 2026-11-19 on the five lines; the user: "can we use the open data sources to
   infer where walls should really stand as opposed to blending between the different height points?"). Four sources,
   best first:
@@ -1381,6 +1464,19 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   call comes 140 m before it (`_runController`), so at a stop before a junction it comes on arrival and the cross street's
   8 s and change-over can outlast a shorter exchange (held at signals: line 9 seed 1 178 → 233 s, seed 2 126 → 180 s, line 17
   seed 4 31 → 72 s; so more brake applies and pedal changes). Ready turned off, the branch repeats main's run exactly.
+- **The first stop and those waiting for other lines** (#249; the user, 2026-11-26: "The first stop off any line should
+  always start with empty car and people are only going inside", and "some of them left waiting even if the stop is served
+  only by single line, our tram"). A run from the line's first stop, its terminus, starts empty and nobody alights there
+  (the user, the same day: "The rule should apply only at first terminus stop"); from any other stop it starts with 10-35
+  aboard by the time of day, as before. Where the run continues as its next line (line 9 as 10 at Nákladové nádraží
+  Žižkov), those aboard may stay ("if the run continues as different line then people can stay aboard"): the stop's share
+  alights as anywhere, where before everybody did. Those waiting for other lines (`ambient`, drawn only, they stay when we leave) stand only where other lines stop:
+  the draw times the other lines (the platform's `lines` less the run's own) times 3 (6 in the centre) times the demand;
+  none at a stop of our line only (line 9 with its 10: 6 of 60 stops, 17: 6 of 37, 22: 4 of 39, 23: 4 of 18, 37: 0 of 20),
+  the mean at demand 1 5.4 → 5.2, 4.8 → 3.0, 5.7 → 5.8, 5.8 → 8.5, 5.0 → 2.9. The platforms' `lines` come from the
+  timetable's `route_stops.txt` (`tools/build_line.py`), which lists each line's pattern in the feed's two weeks (2026-10-21
+  to 11-03) with that time's diversions: lines 22 and 23 skip Pražský hrad and Královský letohrádek there (23 also Pohořelec,
+  via Hládkov), line 17 runs by Myslíkova, so those stops list only the line file's own line (our line is always added).
 - **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
   is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
   model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body

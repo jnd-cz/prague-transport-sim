@@ -41,7 +41,8 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   nothing.
 - Passengers: an on-board counter (normal capacity 110, crush 160 per car). Demand follows the time of day:
   morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a full car leaves people
-  for the next tram.
+  for the next tram. At a line's first stop the car starts empty and people only get on. People waiting for other
+  lines stand only at stops that other lines serve.
 - Getting on and off takes as long as the passengers need to pass the doors: each door has two streams, those
   standing or sitting nearest the doors get off first, then those waiting board and go to sit or stand. Those getting
   off stand up as the tram comes into the stop and wait at the doors, so they are out as soon as the doors open. A car has
@@ -54,7 +55,8 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   on by the steps, those waiting walking from the platform to the doors, and in the right mirror who is still
   boarding. Those above the 105 a car only counts are seen on the steps and outside only.
 - Line changes: a trip can change its number along the line's route and at a terminus (line 9 continues as 10 at Nákladové
-  nádraží Žižkov): everybody gets out, the route boxes and the HUD switch, the tram departs as 10.
+  nádraží Žižkov): passengers may stay aboard, only those who would get off there anyway do; the route boxes and the HUD
+  switch, the tram departs as 10.
 
 ### Keys
 

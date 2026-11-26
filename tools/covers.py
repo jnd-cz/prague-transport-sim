@@ -61,6 +61,7 @@ NEAR = 3.0  # m round the raster's cut: the cover holds this far (the smear, and
 GRADE = 0.15  # rise over run: an outline triangle steeper, rising more than SPAN, joins the cover with the floor
 SPAN = 1.0  # m (half of CUT)
 STEP = 0.5  # m: the lattice the cut is looked for on
+WINDOW = 2 * LIMIT  # m round a world tile: the cut's parts its points are judged by (#812)
 NOT_COVER = {"stairs", "wall", "roof", "water"}
 
 
@@ -133,6 +134,7 @@ class Covers:
 
     def __init__(self, D, lidar, box=None, ways=()):
         from scipy import ndimage
+        from geo import tile_box, tile_index
         A = D["areas"]
         self.places = []
         low = [_poly(a) for a in A if a.get("l", 0) == -1 and len(a["r"]) >= 3] + [w.buffer(WAY, cap_style="flat") for w in ways]
@@ -153,8 +155,11 @@ class Covers:
             if not len(tris):
                 continue
             place = {"tris": tris, "tree": shapely.STRtree(shapely.polygons(tris[:, [0, 1, 2, 0], :2]))}
+            # (on STEP's grid, not from the passages' bounds: a larger box takes in a passage joining this one, and from
+            # its bounds the lattice moved and the cut with it, hlavni-nadrazi-under-the-magistrala's lidar 3.4 cm, #812)
             x0, y0, x1, y1 = near.bounds
-            X, Y = np.meshgrid(np.arange(x0, x1 + STEP, STEP), np.arange(y0, y1 + STEP, STEP))
+            X, Y = np.meshgrid(np.arange(np.floor(x0 / STEP), np.ceil(x1 / STEP) + 1) * STEP,
+                               np.arange(np.floor(y0 / STEP), np.ceil(y1 / STEP) + 1) * STEP)
             k = shapely.contains_xy(near, X.ravel(), Y.ravel())
             d = np.full(X.size, np.nan)
             with np.errstate(invalid="ignore"):
@@ -162,17 +167,29 @@ class Covers:
                 cut = (d >= CUT).reshape(X.shape)
             if not cut.any():
                 continue
-            # (the slots: the cut's connected parts that lie over the passage and close within LIMIT of it)
-            lab, n = ndimage.label(cut, structure=np.ones((3, 3)))
-            lc = lab[cut]
-            far = shapely.distance(shapely.points(X[cut], Y[cut]), g)
-            size = np.bincount(lc, minlength=n + 1)
-            on_it = np.bincount(lc, weights=far <= TOUCH, minlength=n + 1) >= OVER * np.maximum(size, 1)
-            runs_on = np.zeros(n + 1, bool)
-            np.logical_or.at(runs_on, lc, far > LIMIT)
-            slot = on_it & ~runs_on & (size * STEP * STEP >= MIN_CUT)
+            # (the slots: the cut's connected parts that lie over the passage and close within LIMIT of it; each world
+            # tile's points judged by the parts of the cut within WINDOW of the tile, so a tile reads that far and no
+            # further: the cut along a passage joined by one only a larger box holds was a part of another size, #812)
+            far = np.full(cut.shape, np.inf)
+            far[cut] = shapely.distance(shapely.points(X[cut], Y[cut]), g)
             sel = np.zeros(cut.shape, bool)
-            sel[cut] = slot[lc] & (far <= REACH)
+            xs, ys = X[0, :], Y[:, 0]
+            te, tn = tile_index(X[cut], Y[cut])
+            for e, n_ in sorted(set(zip(te.tolist(), tn.tolist()))):
+                bx = tile_box(e, n_)
+                c0, c1 = np.searchsorted(xs, bx[0] - WINDOW), np.searchsorted(xs, bx[2] + WINDOW, "right")
+                r0, r1 = np.searchsorted(ys, bx[1] - WINDOW), np.searchsorted(ys, bx[3] + WINDOW, "right")
+                win, fw = cut[r0:r1, c0:c1], far[r0:r1, c0:c1]
+                lab, n = ndimage.label(win, structure=np.ones((3, 3)))
+                lc = lab[win]
+                size = np.bincount(lc, minlength=n + 1)
+                on_it = np.bincount(lc, weights=fw[win] <= TOUCH, minlength=n + 1) >= OVER * np.maximum(size, 1)
+                runs_on = np.zeros(n + 1, bool)
+                np.logical_or.at(runs_on, lc, fw[win] > LIMIT)
+                slot = on_it & ~runs_on & (size * STEP * STEP >= MIN_CUT)
+                we, wn = tile_index(X[r0:r1, c0:c1], Y[r0:r1, c0:c1])
+                mine = win & (we == e) & (wn == n_)
+                sel[r0:r1, c0:c1][mine] = slot[lab[mine]] & (fw[mine] <= REACH)
             if not sel.any():
                 continue
             spots = shapely.union_all(shapely.buffer(shapely.points(X[sel], Y[sel]), STEP * 0.75, quad_segs=2))
