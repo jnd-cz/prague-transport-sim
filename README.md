@@ -43,8 +43,10 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
   čekat na další spoj. Na první zastávce linky je vůz prázdný a cestující jen nastupují. Kdo čeká na jiné linky,
   stojí jen na zastávkách, kde nějaké jiné linky jezdí. Dokud tramvaj v zastávce stojí, přicházejí další z obou konců
   nástupiště, tolik, kolik jich za interval linky podle jízdního řádu přijde, a nastoupí, když dojdou ke dveřím
-  ještě otevřeným; v čase odjezdu na ty, kdo teprve jdou, řidič nečeká. Kdo vystoupil, odchází k bližšímu konci
-  nástupiště. Kdo běží na tramvaj, je jedna postava od běhu až po místo ve voze.
+  ještě otevřeným. Kdo vidí, že by chůzí odjezd nestihl, ale během ano, rozběhne se. Na ty, kdo jdou, řidič
+  nečeká; na ty, kdo běží ve chvíli, kdy je tramvaj připravená odjet, počkat může: každý z nich, kdo nastoupí,
+  dá 5 bodů, ale zpoždění body bere. Kdo tramvaj nestihne, zůstane na zastávce bez trestu. Kdo vystoupil, odchází
+  k bližšímu konci nástupiště. Kdo přijde nebo přiběhne, je jedna postava od nástupiště až po místo ve voze.
 - Nástup a výstup trvají tak dlouho, jak cestujícím trvá projít dveřmi: každé dveře mají dva proudy, nejdřív
   vystoupí ti, kdo stojí nebo sedí nejblíž dveřím, pak nastoupí čekající a jdou si sednout nebo stoupnout. Kdo
   vystupuje, vstane už při příjezdu k zastávce a postaví se ke dveřím, takže vyjde hned, jak se otevřou. Ve voze

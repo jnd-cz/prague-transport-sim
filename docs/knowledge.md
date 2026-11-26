@@ -1466,10 +1466,19 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   on lines 9, 17, 22 and 37, 24-60 on 23), as a Poisson stream from a seeded stream of their own (`comeRand`, seed ^ 0x249c),
   so the passengers', the rules' and the traffic's draws stay. Each walks in at 1.2-1.5 m/s from the platform's back or front
   end (`platformEnds`: the OSM platform, else the crowd's 26 m behind the stop point to 2 m past it) to the door nearest that
-  end, along the edge (1.9-2.3 m right of the track; the crowd stands 2.4-4 m off it). At an open door they join its queue as a
-  runner does; the autopilot waits for those at the doors, not for those walking (`runnersFor` counts runners only), and one
-  the tram leaves walks on to where their door was and waits there, without a penalty. A runner or a walker keeps their look (`look`, the figure's person number; `model`,
-  the box figure's shirt) into the passenger core: the core's boarder carries `who`, queued at once (`board`), and its figure
+  end, along the edge (1.9-2.3 m right of the track; the crowd stands 2.4-4 m off it). At an open door they join its queue.
+  One who sees that a walk would not reach the door 2 s before the departure time (the tram past it: now) but a run at 3.4-4
+  m/s would by 8 s after it runs (the user, the same day: "people who would see the tram, have time to catch it and start
+  running towards it rather than randomly appearing runners out of nowhere"); the late runners drawn per stop (C14, 0-3 at
+  35 % of the stops, a penalty of 15 each left behind) are drawn no more, their draws kept so the stream stays. The tram ready
+  to leave (`st.readyAt`: its time come, nobody at the doors, the doors open), those running then are waited for: the
+  autopilot keeps the doors open for them (`runnersFor`), not for those walking or setting off later, and each who gets on is
+  5 points (`WAITED_FOR`, at the stop's end) against the departure's lateness ("give extra points for waiting for passenger
+  trying to board which the player has to trade off against running late"); the lateness scores a band (0-60 s late +40,
+  to 180 s +10, then -1 per 6 s). One the tram leaves walks on to where their door was and waits there, without a penalty
+  ("Some people really will run towards to tram but miss it and the driver would be right to leave"). A walker or runner keeps
+  their look (`look`, the figure's person number; `model`, the box figure's shirt) into the passenger core: the core's boarder
+  carries `who`, queued at once (`board`), and its figure
   (`src/passengerView.js`) has their key, number and shirt and walks on from where they stood. Before, the boarder was a new
   person at the queue (a number from the car and its index, a shirt by it). Those who alight walk from where the core lets them
   go (clear of the door, up to about 6 m off the track) to a lane 2.3-2.6 m off it and along it to the platform's nearer end and

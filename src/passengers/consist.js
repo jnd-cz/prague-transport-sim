@@ -78,8 +78,8 @@ export function createConsist(layout, { cars, crush, rand }) {
     return out;
   }
 
-  // the boarders not yet given a car go to the one with the most room (the fewest coming, then the front first); a runner to the
-  // rear car's rear door (src/game.js _spawnRunners), one who walked in while the tram stood to the door they came to (_spawnWalker)
+  // the boarders not yet given a car go to the one with the most room (the fewest coming, then the front first); one who walked or
+  // ran in while the tram stood to the door they came to (src/game.js _spawnWalker)
   function assign() {
     for (let i = 0; i < platform.length;) {
       const b = platform[i];
@@ -110,7 +110,7 @@ export function createConsist(layout, { cars, crush, rand }) {
       for (const car of set) for (const a of actorsOf(car)) if (!a.aboard && !a.exiting && a.tag === tag) n++;
       return n;
     },
-    // n boarders of a stop (tag) on the platform; car and door for a runner's or one who came while the tram stood there, and who
+    // n boarders of a stop (tag) on the platform; car and door for one who came while the tram stood there (walking or running), and who
     // they were (src/game.js: their figure walks on as the boarder, src/passengerView.js; queued at once, so that it does in the
     // same step)
     board(n, tag, { car = null, door = null, who = null } = {}) {
