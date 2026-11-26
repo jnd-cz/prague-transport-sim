@@ -438,11 +438,24 @@ class WaterLocality(unittest.TestCase):
     def test_osms_water_and_its_cuts_are_looked_up_round_every_corner_of_the_box(self):
         # (vysehrad-wall-over-the-ramp: OSM was looked up in lat/lon from the box's two corners, which with the frame
         # turned ~8° against lat/lon leave the other two out; a pond 174 m from one was in the next ring's build only,
-        # #812. A fake extract here: a way is found when one of its nodes lies in the lookup's box, as osm_local's)
+        # #812. A fake extract here: a way is found when one of its nodes lies in the lookup's box, as osm_local's; and a
+        # frame turned 8° by a plain rotation, geo.Frame's lookup box over it, so the test needs no raw/proj grid)
         from unittest import mock
         import geo
         import osm_local
-        F, box = geo.Frame(), shapely.box(-1500.0, -3500.0, 0.0, -2000.0)
+
+        class Turned:
+            bbox = geo.Frame.bbox
+            c, s = math.cos(math.radians(8.0)), math.sin(math.radians(8.0))
+
+            def ll(self, x, y):
+                x, y = np.asarray(x, float), np.asarray(y, float)
+                return 50.07 + (self.s * x + self.c * y) / 111_000, 14.42 + (self.c * x - self.s * y) / 71_000
+
+            def xy(self, lat, lon):
+                u, v = (np.asarray(lon, float) - 14.42) * 71_000, (np.asarray(lat, float) - 50.07) * 111_000
+                return self.c * u + self.s * v, -self.s * u + self.c * v
+        F, box = Turned(), shapely.box(-1500.0, -3500.0, 0.0, -2000.0)
         la, lo = F.ll([-1500.0, 0.0], [-3500.0, -2000.0])
         two = (min(la), min(lo), max(la), max(lo))
 
