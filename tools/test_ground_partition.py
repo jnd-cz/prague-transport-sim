@@ -435,6 +435,48 @@ class WaterLocality(unittest.TestCase):
         self.assertTrue(np.isnan(z[0]))
         self.assertEqual(z[1], 10.0)
 
+    def test_osms_water_and_its_cuts_are_looked_up_round_every_corner_of_the_box(self):
+        # (vysehrad-wall-over-the-ramp: OSM was looked up in lat/lon from the box's two corners, which with the frame
+        # turned ~8° against lat/lon leave the other two out; a pond 174 m from one was in the next ring's build only,
+        # #812. A fake extract here: a way is found when one of its nodes lies in the lookup's box, as osm_local's; and a
+        # frame turned 8° by a plain rotation, geo.Frame's lookup box over it, so the test needs no raw/proj grid)
+        from unittest import mock
+        import geo
+        import osm_local
+
+        class Turned:
+            bbox = geo.Frame.bbox
+            c, s = math.cos(math.radians(8.0)), math.sin(math.radians(8.0))
+
+            def ll(self, x, y):
+                x, y = np.asarray(x, float), np.asarray(y, float)
+                return 50.07 + (self.s * x + self.c * y) / 111_000, 14.42 + (self.c * x - self.s * y) / 71_000
+
+            def xy(self, lat, lon):
+                u, v = (np.asarray(lon, float) - 14.42) * 71_000, (np.asarray(lat, float) - 50.07) * 111_000
+                return self.c * u + self.s * v, -self.s * u + self.c * v
+        F, box = Turned(), shapely.box(-1500.0, -3500.0, 0.0, -2000.0)
+        la, lo = F.ll([-1500.0, 0.0], [-3500.0, -2000.0])
+        two = (min(la), min(lo), max(la), max(lo))
+
+        def inside(q, lat, lon):
+            return q[0] <= lat <= q[2] and q[1] <= lon <= q[3]
+        corner = next(c for c in ((-1500.0, -2000.0), (0.0, -3500.0)) if not inside(two, *F.ll(*c)))
+        sx, sy = (5.0 if corner[0] < 0 else -15.0), (-15.0 if corner[1] > -3000 else 5.0)
+        xs = [corner[0] + sx, corner[0] + sx + 10, corner[0] + sx + 10, corner[0] + sx, corner[0] + sx]
+        ys = [corner[1] + sy, corner[1] + sy, corner[1] + sy + 10, corner[1] + sy + 10, corner[1] + sy]
+        lat, lon = F.ll(xs, ys)
+        pond = {"nodes": [1, 2, 3, 4, 1], "geometry": [{"lat": a, "lon": b} for a, b in zip(lat, lon)]}
+
+        def ways(keep, bbox):
+            return [pond] if any(inside(bbox, g["lat"], g["lon"]) for g in pond["geometry"]) else []
+        self.assertEqual(ways(None, two), [])  # (the two corners' box leaves the pond out)
+        with mock.patch.object(osm_local, "ways", ways), mock.patch.object(osm_local, "relations", lambda keep: []):
+            W = gp.osm_water(box, F)
+            cuts = gp.water_cuts(box, F)
+        self.assertAlmostEqual(W.area, 100.0, delta=0.5)
+        self.assertEqual(len(cuts), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
