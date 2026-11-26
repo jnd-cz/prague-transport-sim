@@ -17,7 +17,7 @@ starts with nobody aboard and nobody to alight there, and nobody waits for other
 At the next stop, the departure 12 s off, one walking in from the platform's front end and one from its back end who runs (a walk
 would not make it) are each one figure from the platform into the car (the same key, look and shirt in every drawn step, none
 missing, no jump); the doors closed on four at them and opened again, they wait at the doors and get on, 15 points off each
-once; with the doors shut the switch iron is refused, with the front door alone open (Dveře I, U) the driver gets out; six
+once; with the doors shut the switch iron opens the front door alone by itself, the driver goes out and back and it shuts; six
 queued at the shut doors of both cars walk to the front door alone, each one figure, and get on there with one walking in, nobody
 into the second car, that door alone drawn open, then Dveře II opens all; then the departure time come, one running 25 m from
 their door is waited for and gets on (the points for waiting), one 45 m off is not waited for, left without a penalty (#249)."""
@@ -210,23 +210,24 @@ SCENE = """async () => {
   for (let t = 0; t < 40 && st.waiting > 0; t += dt) still(dt);
   out.shut = { out0, w0, closed, again, after: st.waiting, aboard: g.pax.aboard };
   // (Dveře I, the user, 2026-11-26: "only the 1st door in car where driver sits"; the driver gets out by it, "like for switch")
-  // the doors shut: the switch iron refused until the front door alone is open (U), then the driver gets out; six more queued at
-  // the shut doors of both cars and the front door alone opened: they walk to it, each one figure, and get on there, as does one
-  // walking in from the back end; nobody gets into the second car; the drawn doors: that one open, the others shut; then Dveře II
-  // (D): all of them
+  // the doors shut, the switch iron ("I would auto open and close front door for the switch iron operation"): the front door alone
+  // opens by itself, the driver gets out once it is open, throws the switch and is back, and it shuts; six more queued at the shut
+  // doors of both cars and the front door alone opened (U): they walk to it, each one figure, and get on there, as does one walking
+  // in from the back end; nobody gets into the second car; the drawn doors: that one open, the others shut; then Dveře II (D): all
   const { poseT3 } = await import('/src/models.js');
   const rigs = () => model.userData.cars.map((c) => c.userData.rig.doorClips.map((a, i) => `${c.userData.rig.doorNames[i]}:${(a.time / a.getClip().duration).toFixed(2)}`).join(' '));
   const drawn = () => { poseT3(model, { doors: g.otherDoorsOpenness, front: g.frontDoorOpenness }); return rigs(); };
   const car1 = () => { const c = g.pax.cars[1]; let n = c.counted; for (const a of c.c.actors.values()) if (a.aboard) n++; return n; };
   st.sched = g.clock + 300; // (the tram not ready to leave meanwhile: nobody marked as waited for, src/game.js readyAt)
   g.toggleDoors(); still(3.5);
-  const iron = {};
-  g.switches.push({ s: g.tram.s + 20, passed: false, pos: 'straight', test: true });
-  g.crowbar(); iron.shut = { action: !!g.action, msg: g.messages.at(-1)?.text };
-  g.toggleFrontDoor(); still(2.5);
-  g.crowbar(); iron.front = { action: !!g.action, doors: drawn() };
-  g.action = null; g.switches.pop();
-  g.toggleFrontDoor(); still(3.5);
+  const iron = {}, sw = { s: g.tram.s + 20, passed: false, pos: 'straight', divSide: 'left', test: true };
+  g.switches.push(sw);
+  g.crowbar(); iron.asked = { action: !!g.action, front: g.frontOnly, doors: g.doorState };
+  still(2.5); iron.out = { action: !!g.action, doors: drawn() };
+  for (let t = 0; t < 60 && g.action; t += dt) still(dt);
+  iron.back = { action: !!g.action, pos: sw.pos, doors: g.doorState };
+  still(3.5); iron.shut = { doors: g.doorState, drawn: drawn() };
+  g.switches.pop();
   g.pax.board(6, st.i); st.waiting += 6;
   for (let t = 0; t < 2; t += dt) { g.update(dt, hold); traffic.update(dt); draw(); }
   const keys = g.pax.cars.flatMap((c, k) => c.c.outside((a) => a.tag === st.i).map((a) => ({ key: a.who || a.id, car: k })));
@@ -405,9 +406,12 @@ def main():
                     on, ir = sc["only"], sc["only"]["iron"]
                     on2 = [x for x in on["who"] if x["car"] == 1]
                     want = {
-                        f"the switch iron with the doors shut: refused ({ir['shut']})": not ir["shut"]["action"] and "(U)" in (ir["shut"]["msg"] or ""),
-                        f"the front door alone open (U): the driver gets out, the doors drawn {ir['front']['doors']}":
-                            ir["front"]["action"] and doors_open(ir["front"]["doors"], front_only=True),
+                        f"the switch iron with the doors shut: the front door alone opens by itself, the driver waits for it ({ir['asked']})":
+                            not ir["asked"]["action"] and ir["asked"]["front"] and ir["asked"]["doors"] == "opening",
+                        f"the switch iron: out once it is open, the doors drawn {ir['out']['doors']}": ir["out"]["action"] and doors_open(ir["out"]["doors"], front_only=True),
+                        f"the switch iron: back, the switch thrown, the front door shutting and shut ({ir['back']}, {ir['shut']})":
+                            not ir["back"]["action"] and ir["back"]["pos"] == "diverging" and ir["back"]["doors"] == "closing"
+                            and ir["shut"]["doors"] == "closed" and all(float(v.split(":")[1]) == 0 for c in ir["shut"]["drawn"] for v in c.split()),
                         f"Doors I drawn while they board: the first car's front door alone open ({on['doors']})": doors_open(on["doors"], front_only=True),
                         f"Doors I: those at the shut doors and one walking in get on through it ({on['left']} left; the walker by "
                         f"{on['walker']}, {on['walkerState']})": on["front"] and on["left"] == 0 and on["walkerState"] == "aboard" and on["walker"] == [0, "Front"],

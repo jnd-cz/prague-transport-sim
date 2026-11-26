@@ -83,7 +83,7 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 | `B` | bell |
 | `Y` | the **Výhybka** button: current through the contact (held) |
 | `C` | heating cut-out (held under a contact, to coast through) |
-| `X` | set a switch with the switch iron (tram stopped, the front door open) |
+| `X` | set a switch with the switch iron (tram stopped; the front door opens and shuts for the driver by itself) |
 | `H` / `K` / `F` | saloon seat heaters / cab heater / waste-heat flap |
 | `Q` / `E` or `←` / `→` | look out of the left / right window (held) |
 | `G` | zoom the cab view three times, as a driver looks into the distance: a sign reads at 75 m (held, also while paused) |

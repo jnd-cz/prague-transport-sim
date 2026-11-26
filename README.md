@@ -80,7 +80,7 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `B` | zvonec |
 | `Y` | tlačítko **Výhybka**: proud přes kontakt (držet) |
 | `C` | odpojení topení (držet pod kontaktem, pro průjezd bez proudu) |
-| `X` | přestavit výhybku stavěcím klíčem (stojící vůz, otevřené přední dveře) |
+| `X` | přestavit výhybku stavěcím klíčem (stojící vůz; přední dveře se řidiči otevřou a zavřou samy) |
 | `H` / `K` / `F` | topení sedaček v salónu / kalorifer / klapka odpadního tepla |
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
 | `G` | přiblížit pohled ze stanoviště třikrát, jako když se řidič zahledí do dálky: přečtete návěst na 75 m (držet, i v pauze) |

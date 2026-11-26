@@ -78,6 +78,7 @@ export class Game {
     // opening after it, it open meanwhile)
     this.frontOnly = false;
     this.frontAhead = false;
+    this.ironWait = null; // (the driver with the switch iron waiting for the front door, crowbar)
     this.doorsMovingFlag = false;
     this.overspeedAcc = 0;
     this.comfortAcc = 0;
@@ -941,14 +942,21 @@ export class Game {
   // The driver gets out with the switch iron (stavěcí klíč; C14; the code keeps the name crowbar): walks
   // from the cab door along the tram's right side to
   // the switch (1.6 m/s), throws it (2 s crouched over the points) and walks back; at least 9 s.
+  // Out by the front door: shut, it opens by itself (alone, Dveře I), the driver sets off once it is open, and it shuts behind them
+  // on the way back unless somebody waits at it (#249, the user, 2026-11-26: "first door opening is usually used only for driver (like for
+  // switch)", "I would auto open and close front door for the switch iron operation")
   crowbar() {
-    if (this.action) return;
+    if (this.action || this.ironWait) return;
     const sw = this.switches.find((w) => !w.passed && w.s - this.tram.s > 0 && w.s - this.tram.s < 40);
     if (!sw) { this.msg(t('msg.noSwitch'), 'warn'); return; }
     if (this.tram.v > 0.05) { this.msg(t('msg.stopFirst'), 'warn'); return; }
-    // (out by the front door: open it first, Dveře I, or all of them; #249, the user, 2026-11-26: "first door opening is usually used
-    // only for driver (like for switch)")
-    if (this.frontDoorOpenness < 1) { this.msg(t('msg.frontDoorFirst'), 'warn'); return; }
+    if (this.frontDoorOpenness >= 1) { this._ironOut(sw, false); return; }
+    const auto = this.doorState === 'closed' || this.doorState === 'closing';
+    if (auto) this._openDoors(true);
+    this.ironWait = { sw, auto }; // (out once the front door is open: _updateDoors)
+  }
+
+  _ironOut(sw, auto) {
     const door = this.tram.s - 1.5, walk = (sw.s - 0.6 - door) / 1.6, total = Math.max(9, 2 * walk + 2);
     // (driver: out of the cab while the action lasts, drawn by src/gameView.js)
     this.action = {
@@ -958,6 +966,9 @@ export class Game {
         this._showSwitch(sw);
         this.audio.emit('switch.iron');
         this.msg(t('msg.switchManual', { dir: t(`dirShort.${sw.pos === 'straight' ? 'straight' : sw.divSide}`) }), 'info');
+        // (back in: the front door opened for the driver shuts behind them, unless somebody waits at it to get on)
+        const st = this.stops[this.nextStop], waiting = st?.arrived && this._atStop(st) && this.pax.outside(st.i).length > 0;
+        if (auto && this.frontOnly && this.doorState === 'open' && !waiting) this._closeDoors();
       },
     };
   }
@@ -1166,6 +1177,12 @@ export class Game {
     if (this.doorState === 'opening' || this.doorState === 'closing') {
       this.doorTimer -= dt;
       if (this.doorTimer <= 0) { this.doorState = this.doorState === 'opening' ? 'open' : 'closed'; this.frontAhead = false; }
+    }
+    // (the driver with the switch iron waiting for the front door: out once it is open; it shut again, or the tram moving: not)
+    const w = this.ironWait;
+    if (w && !this.action) {
+      if (this.frontDoorOpenness >= 1) { this.ironWait = null; this._ironOut(w.sw, w.auto); }
+      else if (this.doorState === 'closing' || this.doorState === 'closed' || Math.abs(this.tram.v) > 0.05) this.ironWait = null;
     }
     if (this.doorState !== 'closed' && Math.abs(this.tram.v) > 0.4) {
       if (!this.doorsMovingFlag) { this.doorsMovingFlag = true; this.penalty('doors', 100, t('msg.doorsMoving')); }

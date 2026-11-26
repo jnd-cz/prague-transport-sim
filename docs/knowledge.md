@@ -1496,12 +1496,14 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   are handed to the first car where they stand (x less the 15.04 m between the cars' middles, CAR_PITCH, on a straight platform)
   and walk there as its queue moves up, the same figure (`from`, `src/passengerView.js`); its alighters stay aboard (no way
   through between the cars) until all the doors open or the next stop, and those still aboard when the tram leaves cost 10 each
-  as before. Those walking in go to it. Its closing lets go of the rule: those at it wait there. The switch iron needs the front
-  door open (Dveře I or all). The detailed model draws the first car's front door apart (`src/rigged.js` `poseRigged`'s
-  `front`), as does the cab's frame. The autopilot opens all the doors at a stop where it finds the front one alone open.
-  Measured (`tools/test_consist.py`, two cars, 60 aboard): 24 queued at both cars' shut doors and the first car's 10 alighters
-  through the front door alone in 40.4 s, the hand-over between the cars 0.03 m; on line 17 (`tools/test_people.py`) six at
-  the shut doors walk to it, at most 0.11 m between drawn steps.
+  as before. Those walking in go to it. Its closing lets go of the rule: those at it wait there. The driver gets out with the
+  switch iron by it: shut, it opens by itself (alone), the driver sets off once it is open, and it shuts behind them unless
+  somebody waits at it (the user, the same day: "I would auto open and close front door for the switch iron operation"). The
+  detailed model draws the first car's front door apart (`src/rigged.js` `poseRigged`'s `front`), as does the cab's frame. The
+  autopilot opens all the doors at a stop where it finds the front one alone open. Measured (`tools/test_consist.py`, two cars,
+  60 aboard): 24 queued at both cars' shut doors and the first car's 10 alighters through the front door alone in 40.4 s, the
+  hand-over between the cars 0.03 m; on line 17 (`tools/test_people.py`) six at the shut doors walk to it, at most 0.11 m
+  between drawn steps.
 - **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
   is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
   model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body
