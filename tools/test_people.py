@@ -13,7 +13,10 @@ leaves the box figures. Our set's passengers (#249 step 3, src/passengerView.js)
 drawn (the counted ones only on the steps and outside), those on a car as its node's children (the animated ones) or
 in its own batches (the distant ones, standing and seated); and the same seeded drive, drawn once a second, ends the
 same with the figures and with ?boxpeople (nothing drawn feeds back into the run). The run, from the line's first stop,
-starts with nobody aboard and nobody to alight there, and nobody waits for other lines at a stop of our line only (#249)."""
+starts with nobody aboard and nobody to alight there, and nobody waits for other lines at a stop of our line only (#249).
+At the next stop two walking in from the platform's ends and one running for the tram are each one figure from the platform
+into the car (the same key, look and shirt in every drawn step, none missing, no jump); at the departure time the doors close
+for one still walking in, who is left without a penalty (#249)."""
 import argparse
 import faulthandler
 import functools
@@ -142,6 +145,62 @@ GAME = """async () => {
 }"""
 
 
+# (#249) after GAME's drive, on to the next stop: two walking in from the platform's ends and one running for the tram, each
+# one figure from the platform into the car (the same key, number and shirt in every drawn step, no step missing, no jump);
+# then the departure time come, one walking in from the back end is not waited for and leaves no penalty
+SCENE = """async () => {
+  const { Autopilot } = await import('/src/autopilot.js');
+  const g = window.game, traffic = window.traffic, view = window.run.trafficView, ap = new Autopilot(), dt = 1 / 30;
+  const gv = window.run.gameView, people = window.people, model = window.tramModel, { placeConsist } = await import('/src/models.js');
+  model.visible = true;
+  const step = () => { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt); view.sync(window.camera); };
+  // (the model where the tram is, as the page places it each frame, src/main.js placeTram: the passengers on its cars go with it)
+  const place = () => placeConsist(model, g.tram.s, (q) => { const p = g.route.at(q); return [p.x, p.y, g.profile.height(q), g.route.rollAt(q)]; });
+  const draw = () => { place(); gv.sync(); gv.syncCrowd(); people.sync(window.camera, view, gv, null, window.paxView.sync(g, model, gv)); };
+  for (let t = 0; t < 900 && !(g.stops[g.nextStop].arrived && g.doorState === 'open'); t += dt) step();
+  const st = g.stops[g.nextStop], [lo, hi] = g.platformEnds(st);
+  st.nextCome = Infinity; // (the stream off: the test's three only)
+  st.sched = g.clock + 90; // (and time for them)
+  g._spawnWalker(st, 'front'); g._spawnWalker(st, 'back'); st.runners = 1; g._spawnRunners(st);
+  const who = g.runners.slice(-3), out = { stop: st.name, ends: [lo, hi].map((x) => +x.toFixed(1)), tram: +g.tram.s.toFixed(1), who: [] };
+  const start = who.map((r) => ({ s: +r.s.toFixed(1), walk: !!r.walk, car: r.car, door: r.door }));
+  const tracks = who.map(() => []);
+  const actorOf = (r) => { for (const c of g.pax.cars) for (const a of c.c.actors.values()) if (a.who === r) return a; return null; };
+  const aboard = who.map(() => null);
+  for (let t = 0; t < 80 && aboard.some((x) => x === null || g.clock - x < 3); t += dt) {
+    step(); draw();
+    who.forEach((r, i) => {
+      const rec = people.recs.find((x) => x.key === r), a = actorOf(r);
+      if (a?.aboard && aboard[i] === null) aboard[i] = g.clock;
+      tracks[i].push(rec ? { x: rec.x, y: rec.y, z: rec.z, n: rec.n, shirt: rec.shirt.getHex(), pax: !!rec.pax } : null);
+    });
+  }
+  who.forEach((r, i) => {
+    const tr = tracks[i], first = tr.findIndex(Boolean);
+    let gaps = 0, jump = 0, box = false, pax = false;
+    const looks = new Set();
+    for (let k = first; k >= 0 && k < tr.length; k++) {
+      const p = tr[k];
+      if (!p) { gaps++; continue; }
+      looks.add(`${p.n}/${p.shirt}`);
+      if (p.pax) pax = true; else if (!pax) box = true;
+      const q = tr[k - 1];
+      if (q && k > first) jump = Math.max(jump, Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z));
+    }
+    out.who.push({ ...start[i], seen: first >= 0, gaps, looks: [...looks], jump: +jump.toFixed(3), boxThenPax: box && pax, aboard: aboard[i] !== null });
+  });
+  // the departure time come: one walking in from the back end, not waited for
+  g._spawnWalker(st, 'back');
+  const late = g.runners[g.runners.length - 1], pen = g.penalties.leftBehind || 0, sched = (st.sched = g.clock);
+  let closing = null;
+  for (let t = 0; t < 60 && st.departClock === null; t += dt) { step(); if (closing === null && g.doorState !== 'open') closing = g.clock; }
+  for (let t = 0; t < 8; t += dt) step(); // (on its way: those left behind are left)
+  out.late = { s: +late.s.toFixed(1), state: late.state, closingAfter: closing === null ? null : +(closing - sched).toFixed(2),
+    penalty: (g.penalties.leftBehind || 0) - pen, boarded: !!actorOf(late) };
+  return out;
+}"""
+
+
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -237,6 +296,29 @@ def main():
                             len(gm["start"]["lone"]) > 0 and not any(gm["start"]["lone"]),
                     }
                     fails += [f"game: {k}" for k, ok in want.items() if not ok]
+                    # (#249: those walking in and the runner, one figure each into the car; the late one not waited for)
+                    r["scene"] = sc = page.evaluate(SCENE)
+                    lo, hi = sc["ends"]
+                    for i, w in enumerate(sc["who"]):
+                        name = f"{'walker' if w['walk'] else 'runner'} {i + 1} at {sc['stop']}"
+                        want = {
+                            f"{name}: boarded": w["aboard"],
+                            f"{name}: one figure, no drawn step without it ({w['gaps']})": w["seen"] and w["gaps"] == 0,
+                            f"{name}: one look, number and shirt ({w['looks']})": len(w["looks"]) == 1,
+                            f"{name}: from their own figure on into the core's boarder": w["boxThenPax"],
+                            f"{name}: no jump between drawn steps ({w['jump']} m)": w["jump"] < 0.6,
+                        }
+                        if w["walk"]:
+                            want[f"{name}: in from a platform end ({w['s']}; ends {lo}, {hi})"] = min(abs(w["s"] - (lo - 1)), abs(w["s"] - (hi + 1))) < 0.15
+                        fails += [f"scene: {k}" for k, ok in want.items() if not ok]
+                    late = sc["late"]
+                    want = {
+                        f"the departure time come, the doors close for one still walking in ({late['closingAfter']} s)":
+                            late["closingAfter"] is not None and late["closingAfter"] < 1,
+                        f"the one walking in is left ({late['state']}), not aboard": late["state"] == "left" and not late["boarded"],
+                        f"no penalty for them ({late['penalty']})": late["penalty"] == 0,
+                    }
+                    fails += [f"scene: {k}" for k, ok in want.items() if not ok]
                     if gm["people"] < gm["walkers"] or gm["walkers"] == 0:
                         fails.append(f"game: {gm['walkers']} walkers, {gm['people']} drawn as figures")
                     if gm["near"] == 0 or gm["near"] > 64:

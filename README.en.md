@@ -42,7 +42,10 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 - Passengers: an on-board counter (normal capacity 110, crush 160 per car). Demand follows the time of day:
   morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a full car leaves people
   for the next tram. At a line's first stop the car starts empty and people only get on. People waiting for other
-  lines stand only at stops that other lines serve.
+  lines stand only at stops that other lines serve. While the tram stands at a stop, more people come from both ends
+  of the platform, as many as come in the line's interval by the timetable, and board if they reach a door still open;
+  at the departure time the driver does not wait for those still walking. Those who got off walk to the nearer end of
+  the platform. Someone running for the tram is one figure from the run to their place inside.
 - Getting on and off takes as long as the passengers need to pass the doors: each door has two streams, those
   standing or sitting nearest the doors get off first, then those waiting board and go to sit or stand. Those getting
   off stand up as the tram comes into the stop and wait at the doors, so they are out as soon as the doors open. A car has

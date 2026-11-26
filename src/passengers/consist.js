@@ -79,14 +79,14 @@ export function createConsist(layout, { cars, crush, rand }) {
   }
 
   // the boarders not yet given a car go to the one with the most room (the fewest coming, then the front first); a runner to the
-  // rear car's rear door (src/game.js _spawnRunners)
+  // rear car's rear door (src/game.js _spawnRunners), one who walked in while the tram stood to the door they came to (_spawnWalker)
   function assign() {
     for (let i = 0; i < platform.length;) {
       const b = platform[i];
       const car = b.car != null ? (room(set[b.car]) > 0 ? set[b.car] : null)
         : set.filter((c) => room(c) > 0).sort((x, y) => room(y) - room(x) || incoming(x) - incoming(y) || x.k - y.k)[0];
       if (!car) { i++; continue; }
-      car.c.enqueue(1, null, b.door, { waitForPlace: true, extra: { tag: b.tag, stands: b.stands, runner: b.car != null } });
+      car.c.enqueue(1, null, b.door, { waitForPlace: true, extra: { tag: b.tag, stands: b.stands, runner: b.car != null, who: b.who } });
       platform.splice(i, 1);
     }
   }
@@ -110,8 +110,13 @@ export function createConsist(layout, { cars, crush, rand }) {
       for (const car of set) for (const a of actorsOf(car)) if (!a.aboard && !a.exiting && a.tag === tag) n++;
       return n;
     },
-    // n boarders of a stop (tag) on the platform; car and door for a runner's
-    board(n, tag, { car = null, door = null } = {}) { for (let i = 0; i < n; i++) platform.push({ tag, car, door, stands: stands() }); },
+    // n boarders of a stop (tag) on the platform; car and door for a runner's or one who came while the tram stood there, and who
+    // they were (src/game.js: their figure walks on as the boarder, src/passengerView.js; queued at once, so that it does in the
+    // same step)
+    board(n, tag, { car = null, door = null, who = null } = {}) {
+      for (let i = 0; i < n; i++) platform.push({ tag, car, door, who, stands: stands() });
+      if (who) assign();
+    },
     // n of those aboard and not yet leaving alight: the nearest to a door in the whole set by walking, the counted ones first
     // (in the doorways), one car after another; the number scheduled
     // (the ones chosen when the stop came near, if it was this many: ready)

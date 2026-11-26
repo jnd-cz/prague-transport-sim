@@ -161,6 +161,8 @@ export function stopsWatch(game) {
         // (the passengers, #249: the stops where their counts or places went wrong, game.paxProblems; the exchanges' seconds from the
         // doors open to the last one across, mean and longest)
         paxProblems: (game.paxProblems || []).length, paxProblem: (game.paxProblems || [])[0] ?? null,
+        // (those walking in while the tram stood at a stop, #249: boarded, left behind)
+        cameAboard: game.came?.aboard ?? null, cameLeft: game.came?.left ?? null,
         exchangeMean: R.exchanges?.length ? +(R.exchanges.reduce((t, x) => t + x, 0) / R.exchanges.length).toFixed(1) : null, exchangeMax: R.exchanges?.length ? +Math.max(...R.exchanges).toFixed(1) : null,
         devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5),
         // (arrival against the timetable's time, which is the departure: arrOnTime the share within ±30 s of it, arrEarly the stops

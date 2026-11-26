@@ -246,7 +246,8 @@ export class People {
     const game = gameView?.game;
     if (game) {
       this._crowd(gameView.crowd, null, 's');
-      game.runners.forEach((r, k) => this._box(gameView.meshOf(r), r, 1000 + k));
+      // (a runner or a walker by their own look, kept as their passenger's, src/passengerView.js)
+      game.runners.forEach((r, k) => this._box(gameView.meshOf(r), r, r.look ?? 1000 + k));
       game.obstacles.forEach((o, k) => { if (o.type === 'pedestrian') this._box(gameView.meshOf(o), o, 2000 + k); });
       if (gameView.driver) this._box(gameView.driver, game.action, 3000);
     }

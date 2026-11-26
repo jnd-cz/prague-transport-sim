@@ -191,7 +191,7 @@ def judge(check, r):
         more = (f"{r.get('stops')} stops, flips short/ahead/signal/car/contact {r.get('flipsShort')}/{r.get('flipsAhead')}/{r.get('flipsSignal')}/{r.get('flipsCar')}/{r.get('flipsContact')}, pulses {r.get('pulses')}, "
                 f"shoes at speed {r.get('shoesAtSpeed')}, decel {r.get('maxDecel')}, jerk {r.get('maxJerk')}, err p90 {r.get('errP90')} max {r.get('errMax')}, comfort {r.get('comfort')}, pedal/km {r.get('pedalChangesPerKm')}, "
                 f"late {r.get('late')}, dev mean {r.get('devMean')} s, over 3 min {r.get('lateStops')}, on time by D 1/2 {r.get('depOnTime')}, "
-                f"exchange mean {r.get('exchangeMean')} s max {r.get('exchangeMax')}, presses {r.get('presses')} ({r.get('pressesRolling')} rolling), brakes {r.get('brakeApplies')}, wire {r.get('lineKWh')} kWh/km of it waste {r.get('wasteKWh')}"
+                f"exchange mean {r.get('exchangeMean')} s max {r.get('exchangeMax')}, came aboard {r.get('cameAboard')} left {r.get('cameLeft')}, presses {r.get('presses')} ({r.get('pressesRolling')} rolling), brakes {r.get('brakeApplies')}, wire {r.get('lineKWh')} kWh/km of it waste {r.get('wasteKWh')}"
                 + (f", slip {r.get('slipSecs')} s ({r.get('slips')}), slide {r.get('slideSecs')} s ({r.get('slides')}, {r.get('slidesAtStops')} at stops), emergencies {r.get('emergencies')}" if check in WEATHER else ""))
     elif check == "canted":
         c = (r.get("checks") or {}).get("cantedRailVisibility", {})
@@ -315,7 +315,7 @@ def counts(check, r):
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     if check in STOPS_LIKE:
         keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "slips", "slides", "slidesAtStops", "sandSecs", "sandLeft", "emergencies") if check in WEATHER else ("simSeconds",) if check.startswith("load") else ()
-        return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "overspeed", "late", "devMean", "lateStops", "depOnTime", "paxProblems", "exchangeMean", "exchangeMax", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm", "lineKWh", "wasteKWh", "brakeKWh")}
+        return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "overspeed", "late", "devMean", "lateStops", "depOnTime", "paxProblems", "exchangeMean", "exchangeMax", "cameAboard", "cameLeft", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm", "lineKWh", "wasteKWh", "brakeKWh")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}
     if check == "traffic":

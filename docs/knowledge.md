@@ -1456,6 +1456,23 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   timetable's `route_stops.txt` (`tools/build_line.py`), which lists each line's pattern in the feed's two weeks (2026-10-21
   to 11-03) with that time's diversions: lines 22 and 23 skip Pražský hrad and Královský letohrádek there (23 also Pohořelec,
   via Hládkov), line 17 runs by Myslíkova, so those stops list only the line file's own line (our line is always added).
+- **Those coming while the tram stands, and one figure from the run to the seat** (#249; the user, 2026-11-26: "This will also
+  allow showing more people getting into tram as they keep coming, so waiting for departure time makes sense", "Driver should
+  not wait for walkers past the departure time", and of the runner seen changing colour at the door: "Can we keep the single
+  model and transition him smoothly from running to queueing for door and getting inside, with the same stats?"). From the
+  tram's arrival at a stop until it leaves, people come at the rate of those who wait for a tram on the mean (`stop.come`:
+  4, in the centre 11, at request stops 0.45 of it, times the demand by the time of day) over the line's headway at that stop
+  (`_comeTo`: the trip before ours in the timetable, else the one after, held to 3-30 min; the timetables' gaps run 4-20 min
+  on lines 9, 17, 22 and 37, 24-60 on 23), as a Poisson stream from a seeded stream of their own (`comeRand`, seed ^ 0x249c),
+  so the passengers', the rules' and the traffic's draws stay. Each walks in at 1.2-1.5 m/s from the platform's back or front
+  end (`platformEnds`: the OSM platform, else the crowd's 26 m behind the stop point to 2 m past it) to the door nearest that
+  end, along the edge (1.9-2.3 m right of the track; the crowd stands 2.4-4 m off it). At an open door they join its queue as a
+  runner does; the autopilot waits for those at the doors, not for those walking (`runnersFor` counts runners only), and one
+  the tram leaves stays without a penalty. A runner or a walker keeps their look (`look`, the figure's person number; `model`,
+  the box figure's shirt) into the passenger core: the core's boarder carries `who`, queued at once (`board`), and its figure
+  (`src/passengerView.js`) has their key, number and shirt and walks on from where they stood. Before, the boarder was a new
+  person at the queue (a number from the car and its index, a shirt by it). Those who alight step off the edge to a lane 2.3 m
+  off the track and walk to the platform's nearer end and 1.5 m past it, and go (drawn only; before, 3 s on the way they faced).
 - **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
   is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
   model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body
