@@ -41,6 +41,12 @@ body.pcompact #dash .full, body:not(.pcompact) #dash .cmp, body:not(.pportrait) 
 .ctl .plate { width: 100%; height: 3.1em; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 .2em; white-space: nowrap;
   font: 600 .8em/1.12 var(--f-label); font-stretch: condensed; letter-spacing: .01em; text-transform: uppercase; border-radius: .9em .9em .25em .25em;
   background: linear-gradient(#e8ebe9, #b9bebb 60%, #d4d8d6); color: var(--plate-ink); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+/* a label's words, scaled back where the browser's minimum font size holds them larger (src/panel.js fit) */
+.ctl .plate > .t, .lstrip .lab > .t, .alamp > .t { display: inline-block; }
+.scr > .t, .paper > .t { transform-origin: 0 0; }
+.lstrip .ed { transform-origin: 100% 100%; }
+.ctl .kb { transform-origin: 100% 0; }
+.lstrip .lab > .t { vertical-align: top; transform-origin: 50% 0; }
 .ctl .plate.r { color: var(--engr-red); }
 .ctl .plate.y { background: linear-gradient(#f6d23c, var(--sticker)); color: var(--sticker-ink); border-radius: .25em; }
 .ctl .plate.yr { background: linear-gradient(#f6d23c, var(--sticker)); color: var(--engr-red); border-radius: .25em; }

@@ -137,7 +137,7 @@ function ctl(id, x, y, kind, o = {}) {
   if (kind === 'cam') inner = `<span class="cam"><span class="marks">${o.marks === false ? '' : camMarks()}</span><i class="handle" data-k="${id}"></i></span>`;
   const cls = ['ctl', kind, c.sim === true ? '' : 'inert'].join(' ');
   return `<div class="${cls}" data-c="${id}" style="left:${px(x)};top:${px(y)}${o.fs ? `;font-size:${o.fs}px` : ''}">` +
-    `<span class="plate ${o.plate || ''}" data-lab="${id}">${lab(id)}</span>${inner}${k && c.sim === true ? `<i class="kb">${k[0]}</i>` : ''}${c.q ? '<i class="q">?</i>' : ''}</div>`;
+    `<span class="plate ${o.plate || ''}" data-lab="${id}"><span class="t">${lab(id)}</span></span>${inner}${k && c.sim === true ? `<i class="kb">${k[0]}</i>` : ''}${c.q ? '<i class="q">?</i>' : ''}</div>`;
 }
 // 6921's edgewise meters, flat as from straight above (the user's photo, 2026-11-17: "draw them as rectangles rather
 // than curved surface from perspective ... the needle comes from the right side"): a black frame, the scale plate under
@@ -193,7 +193,7 @@ const LED = {
 function lampStrip(x, y, w, fs, labels = true) {
   const cs = getLang() === 'cs';
   return `<div class="lstrip${labels ? '' : ' nolab'}" data-c="lstrip" style="left:${px(x)};top:${px(y)};width:${px(w)};font-size:${fs}px">` +
-    STRIP.map(([l, c, e, shape]) => `<div class="it"><span class="lab" data-strip="${l}">${cs ? c : e}</span><span class="led">${LED[shape](l)}</span></div>`).join('') +
+    STRIP.map(([l, c, e, shape]) => `<div class="it"><span class="lab" data-strip="${l}"><span class="t">${cs ? c : e}</span></span><span class="led">${LED[shape](l)}</span></div>`).join('') +
     '<span class="ed">ED – OPRAVNY</span></div>';
 }
 // 6921's speedometer: a black face, white figures 0-80, the odometer, the limit's red mark (assist)
@@ -258,7 +258,7 @@ function wallSec() {
 }
 function consoleSec() {
   return `<div class="surface con"></div><div class="sill"></div>
-    <div class="terminal" data-c="term" style="left:14px;top:14px;width:250px;height:212px"><div class="bezelT"></div><div class="scr" id="info"></div></div>
+    <div class="terminal" data-c="term" style="left:14px;top:14px;width:250px;height:212px"><div class="bezelT"></div><div class="scr"><div class="t" id="info"></div></div></div>
     <div class="pedestal" style="left:268px;top:20px;width:202px;height:202px"></div>
     <div class="speedo" data-c="speedo" style="left:276px;top:28px">${speedo(186)}</div>`;
 }
@@ -292,7 +292,7 @@ function wingSec() {
     ${ctl('zarivky', 600, 40, 'rot', { fs: 14 })}
     ${ctl('prepos', 700, 24, 'cam', { plate: 'y', fs: 13, marks: false })}
     <div class="warnplate" style="left:690px;top:148px;width:130px" data-warn="1"></div>
-    <div class="paper" data-c="tt" style="left:880px;top:12px;width:420px;height:212px"><h4><span class="ttLine"></span><span class="ttEnd"></span></h4><table class="tt"></table></div>`;
+    <div class="paper" data-c="tt" style="left:880px;top:12px;width:420px;height:212px"><div class="t"><h4><span class="ttLine"></span><span class="ttEnd"></span></h4><table class="tt"></table></div></div>`;
 }
 const SECS = { wall: wallSec, console: consoleSec, panel: panelSec, wing: wingSec };
 // the game's block: the pedal bar and the helper lamps
@@ -498,9 +498,9 @@ export class Panel {
   relabel() {
     const cs = getLang() === 'cs';
     const all = (sel) => [...this.dash.querySelectorAll(sel), ...this.sheet.querySelectorAll(sel)];
-    for (const p of all('[data-lab]')) p.innerHTML = lab(p.dataset.lab);
-    for (const s of all('[data-strip]')) { const it = STRIP.find(([l]) => l === s.dataset.strip); s.textContent = cs ? it[1] : it[2]; }
-    for (const a of all('[data-a]')) a.innerText = t(`lamp.${a.dataset.a}`);
+    for (const p of all('[data-lab]')) p.innerHTML = `<span class="t">${lab(p.dataset.lab)}</span>`;
+    for (const s of all('[data-strip]')) { const it = STRIP.find(([l]) => l === s.dataset.strip); s.firstElementChild.textContent = cs ? it[1] : it[2]; }
+    for (const a of all('[data-a]')) { const s = document.createElement('span'); s.className = 't'; s.innerText = t(`lamp.${a.dataset.a}`); a.replaceChildren(s); }
     for (const w of this.el.warn) w.textContent = t('panel.terminus');
     for (const b of this.sheet.querySelectorAll('.tabs [data-tab]')) if (b.dataset.tab !== 'close') b.textContent = t(`panel.tab.${b.dataset.tab}`);
     for (const b of this.sheet.querySelectorAll('.gamepane [data-l]')) b.textContent = b.dataset.l.startsWith('tb.') ? t(b.dataset.l) : b.dataset.l;
@@ -508,15 +508,58 @@ export class Panel {
     this.fitted = false;
   }
 
-  // shrinks a plate's letters where its words don't fit its width (the fonts differ by system)
+  // shrinks a plate's letters where its words don't fit its width (the fonts differ by system). The panel lays its letters out
+  // at 6-14 px and is scaled up whole: where the browser keeps letters from getting smaller than a minimum size (its fonts
+  // setting), they would stand larger than their plates (the user's Firefox at 3840 x 2008, 2026-11-25: "příliš velký text na
+  // popiskách ovládacího panelu"; reproduced with a 12 px minimum), so the words are scaled back to the size they should have and
+  // into their plate
   fit() {
+    const min = this.minFont();
     for (const p of [...this.dash.querySelectorAll('.plate, .lstrip .lab'), ...this.sheet.querySelectorAll('.pane.on .plate')]) {
       if (!p.offsetParent) continue;
+      const tx = p.firstElementChild?.classList.contains('t') ? p.firstElementChild : null;
       p.style.fontSize = '';
+      if (tx) Object.assign(tx.style, { transform: '', margin: '' });
+      const cs = getComputedStyle(p), fs = parseFloat(cs.fontSize);
+      if (tx && min > fs) {
+        const w = tx.offsetWidth, h = tx.offsetHeight, room = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        let k = fs / min;
+        if (p.classList.contains('plate') && w * k > room) k = room / w;
+        // (and taking the room of their size, not the larger letters': the lamp strip's labels stand over their lamps, from the top)
+        const dy = p.classList.contains('plate') ? (-h * (1 - k) / 2).toFixed(1) : 0;
+        Object.assign(tx.style, { transform: `scale(${k.toFixed(3)})`, margin: `${dy}px ${(-w * (1 - k) / 2).toFixed(1)}px` });
+        continue;
+      }
       let f = 1;
       while (p.scrollWidth > p.clientWidth + 0.5 && f > 0.62) { f -= 0.04; p.style.fontSize = `${f.toFixed(2)}em`; }
     }
+    // (the other letters, likewise: the helper lamps', the strip's plate, the keys' hints and the knobs' marks scaled back to their
+    // size; the info screen's and the timetable's laid out larger by as much to fill their boxes. The hints hidden too: shown with
+    // the assist option)
+    const others = '.alamp > .t, .lstrip .ed, .scr > .t, .paper > .t, .ctl .kb, .ctl .pos, .ctl .cam .marks b';
+    for (const el of [...this.dash.querySelectorAll(others), ...this.sheet.querySelectorAll(others)]) {
+      const base = el.matches('.pos, .marks b') ? 'translate(-50%, -50%) ' : '';
+      Object.assign(el.style, { transform: '', width: '', height: '' });
+      const fs = parseFloat(getComputedStyle(el).fontSize);
+      if (!(min > fs)) continue;
+      const k = fs / min;
+      el.style.transform = `${base}scale(${k.toFixed(3)})`;
+      if (el.matches('.scr > .t, .paper > .t')) Object.assign(el.style, { width: `${(100 / k).toFixed(2)}%`, height: `${(100 / k).toFixed(2)}%` });
+    }
     this.fitted = true;
+  }
+
+  // the browser's minimum font size, px (0: none): a probe's letters at 1 px against at 100 px, in the panel's language
+  minFont() {
+    const s = document.createElement('span');
+    s.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;white-space:nowrap;font:100px/1 sans-serif';
+    s.textContent = 'MMMMMMMMMM';
+    this.dash.appendChild(s);
+    const big = s.offsetWidth;
+    s.style.fontSize = '1px';
+    const m = big ? (s.offsetWidth / big) * 100 : 0;
+    s.remove();
+    return m > 2 ? m : 0;
   }
 
   setFold(on) {
