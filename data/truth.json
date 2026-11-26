@@ -6683,6 +6683,93 @@
      "why": "the bank begins about a metre off the kerb: IPR's raster is 236.5-236.6 m from the side to 0.75 m out, the stairs' 236.5 m. Read 2.5-4 m out and carried back by its slope, as at a wall line, it stood 1.1 m over the stairs at their side, an upright face where none is (wall_lines.STAIRS_SEEN)"
     }
    ]
+  },
+  "taboritska-road-pit": {
+   "line": "9",
+   "at": [
+    2520.7,
+    -898.4
+   ],
+   "reach": 25,
+   "issue": 867,
+   "what": "a pit in IPR's 2023 lidar in Táboritská's road near Olšanská: 5 x 4 cells, vertical sides, a flat floor 4.0 m under the road round it (241.16 m, the survey's outline 240.87 m); DMR 5G (2009-2013) has level road there. The published ground of 2026-11-23 stood 3.7 m low in it",
+   "source": "a player's note (fb-20261125-222653-ebe6a362, alpha-5, \"deep pit in a road\"), the scan of 2026-11-26 (#867)",
+   "sections": [
+    {
+     "name": "across the pit along the road",
+     "from": [
+      2510.7,
+      -898.4
+     ],
+     "to": [
+      2530.7,
+      -898.4
+     ],
+     "expect": {
+      "off the chord m": 0.3,
+      "largest step m": 0.3
+     },
+     "why": "the road level within 0.3 m from 10 m west of the pit to 10 m east (IPR round it 241.0-241.3 m): the pit's cells take the rim's plane (tools/ipr_pits.py)"
+    }
+   ]
+  },
+  "platnerska-road-pit": {
+   "line": "9",
+   "at": [
+    -474.3,
+    65.6
+   ],
+   "reach": 25,
+   "issue": 867,
+   "what": "a round crater in IPR's 2023 lidar in Platnéřská's road: 6 x 5 cells, 6.9 m deep at its deepest; DMR 5G (2009-2013) has level road there. The published ground of 2026-11-23 stood 3.1 m low in it",
+   "source": "the scan of 2026-11-26 (#867), its picture of the place",
+   "sections": [
+    {
+     "name": "across the crater along the road",
+     "from": [
+      -484.3,
+      65.6
+     ],
+     "to": [
+      -466.3,
+      65.6
+     ],
+     "expect": {
+      "off the chord m": 0.3,
+      "largest step m": 0.3
+     },
+     "why": "the road level within 0.3 m from 10 m west of the crater to the sidewalk's edge east of it (IPR round it within 0.2 m)"
+    }
+   ]
+  },
+  "belohorska-sidewalk-pit": {
+   "line": "22",
+   "at": [
+    -4156.3,
+    148.6
+   ],
+   "reach": 25,
+   "issue": 867,
+   "what": "two pits in IPR's 2023 lidar in Bělohorská's sidewalk at its kerb, 2 x 2 cells each, 13.9 m and 13.0 m deep, 4 m apart; the road beside them lies 0.1-0.2 m under the sidewalk. The published ground of 2026-11-23 stood 2.7 m low",
+   "source": "the scan of 2026-11-26 (#867; on #732's list since 2026-11-24)",
+   "sections": [
+    {
+     "name": "along the sidewalk over both pits",
+     "from": [
+      -4166.3,
+      148.6
+     ],
+     "to": [
+      -4154.3,
+      148.6
+     ],
+     "expect": {
+      "off the chord m": 0.3,
+      "largest step m": 0.3
+     },
+     "why": "the sidewalk level within 0.3 m along its kerb, the pits' cells at the sidewalk's own rim (the road's side of the kerb is not their level)"
+    }
+   ]
   }
  },
  "openTrackReview": {

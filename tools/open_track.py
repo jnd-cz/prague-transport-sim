@@ -131,7 +131,7 @@ def lidar():
     if _LIDAR is None:
         from geo import Frame
         from ipr_dtm import IprDtm
-        D, F = IprDtm(), Frame()
+        D, F = IprDtm(fills=None), Frame()  # (as it is: track_styles runs before the pits' fills, tools/ipr_pits.py)
         _LIDAR = lambda xs, ys: D.sample(*F.to_jtsk(xs, ys))  # noqa: E731
     return _LIDAR
 
