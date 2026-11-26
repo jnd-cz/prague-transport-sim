@@ -169,6 +169,16 @@ and its ring only, so with unchanged tools every difference is a rule that reads
 what gave the vertex its height. A ground rule is tried on its places first; the lines are rebuilt once for a
 batch of changes.
 
+**Which places a ground change runs** (#865). Two sets:
+- **`--locality`:** a fixed set of 8, one place for each kind of defect #812 found reading past the ring (`tools/ground_rules.py` `LOCALITY`). It is built with one ring and with two in 13.5 min at 4 at once (2026-11-26), and each place must come out with 0 triangles and 0 heights differing.
+- **`--rule R`:** the places of the rules the diff changes. `tools/ground_rules.py` `RULES` gives each rule's code (functions, classes and constants of the six tools a place's build runs) and the places that guard it. `tools/tiers.py` names the rules from the definitions that differ from the merge base's.
+
+What changes in no rule (`build`, the weld, the partition's frame) runs the set and places chosen by hand. `--all --rings` runs once a batch, with #757's rebuild, at night. Before this, the places grew from 36 to 48 during #812, and its proof of 61 places with one ring and two took 2 h 10 min of the queue a round.
+
+When places are added:
+- a new place goes into a rule (`tools/test_ground_rules.py` holds every place to one);
+- a new kind of defect that reads past the ring adds its place to the set, and a unit test that shows it without a place.
+
 A place says how it should look and how that is measured. `seen` is what street-level imagery shows there, in
 words, with the points and headings it was looked at from (the pictures themselves are not kept: they are the
 provider's). `sections` are lines across the place, each with the most of a measure it may have: the ground is
@@ -738,6 +748,7 @@ replayed up to route s and handed over paused: a stuck scene as it was, #157).
 | a finding's own issue only for the next step or a failing check, after a search; one issue for a place's or a batch's reports | 202 open on 2026-11-21, 120-129 opened a week against 41-87 closed; a session opened #797 and #800 in a day and reported a build race on #735 that #701 already held. The user, 2026-11-21, on "their number is still slowly but steadily climbing": "yes let's do this" |
 | merges in batches, the heaviest work at night | the user, 2026-11-21, having stopped the other lanes' sessions to save "resources, time as well as attention": "If we can merge in batches like today, keep the heavy work for nights, I'll be happy to resume the other lanes and sessions"; night from 22:00 to 07:00, plus any time the user says go: "yes". From 23:00 (the user, 2026-11-23: "I want to adjust the night runs to start at 23:00 instead of 22") |
 | a ground rule's issue closes at the rule's merge | it stayed open as "Part of" until the batch's rebuild, 5-10 issues between batches, while #757 tracks the batch. The user, 2026-11-21: "ok, let's try this approach" |
+| a ground change runs the locality set and its rules' places, `--all --rings` the batch | #812's proof, 61 places with one ring and two, took 2 h 10 min of the queue a round and ran six times as main's merges brought rules and places. The user, 2026-11-26: "the number of places to check are steadily climbing which is becoming not sustainable to keep checking in a loop"; the proposal (#865): "Yes to all three" |
 | a security hole is not written up in public | the repository is public and the alpha is live. The user, 2026-11-19: "fix and file privately" |
 
 ## How the game's parts work
