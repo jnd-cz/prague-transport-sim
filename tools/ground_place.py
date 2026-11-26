@@ -340,6 +340,8 @@ def overlay(ln, built, mid, out, root=ROOT):
         parts.append(b)
         off += len(b)
     layout["tiles"] = tiles
+    # (and the level-1 areas the place's ground holds as a cover: the page draws no slab of theirs, #824)
+    layout["covered"] = sorted(set(layout.get("covered") or []) | set(built.get("covered") or []))
     layout["vertices"] = int(sum(t["layout"]["vertices"] for t in tiles))
     layout["classes"] = {c: int(sum(t["layout"]["classes"].get(c, 0) for t in tiles)) for c in gm.CLASS_IDS}
     layout["triangles"] = int(sum(layout["classes"].values()))

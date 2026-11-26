@@ -26,7 +26,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The tools a place's build runs (ground_mesh.build and what it imports at build time): a change to one is a ground
 # rule's, tried on places (tools/tiers.py).
 TOOLS = ("tools/ground_mesh.py", "tools/ground_partition.py", "tools/bed_surface.py", "tools/wall_lines.py",
-         "tools/covers.py", "tools/ties.py")
+         "tools/covers.py", "tools/ties.py", "tools/ipr_dtm.py", "tools/ipr_pits.py")
 
 # (name: a place of groundPlaces, or {line, at} for one that is not; the kind of defect it showed, #812)
 LOCALITY = {
@@ -63,7 +63,7 @@ RULES = {
                    "wall-end-in-a-path", "sidewalk-under-a-road-wall", "sidewalk-on-a-quay-wall", "branik-platform-ramps",
                    "cerny-kun-platform-wall", "modranska-skola-ramp", "na-vapence-garage-ramp", "modrany-viaduct-ramps",
                    "garden-beds", "zizkov-wall-at-the-kerb", "motol-wall-at-the-kerb", "wall-above-a-lower-walkway",
-                   "hlavni-nadrazi-under-the-magistrala"],
+                   "hlavni-nadrazi-under-the-magistrala", "motol-bridge-parapets"],
     },
     "kerbs": {
         "what": "kerbs: raised edges, lowered kerbs, belts, parking bays (#606, #638, #800)",
@@ -74,7 +74,7 @@ RULES = {
                    "vysehrad-wall-over-the-ramp", "motol-wall-at-the-kerb", "repy-parking-kerb", "vystaviste-flush-parking",
                    "verge-by-a-car-park-no-wall", "wall-above-a-lower-walkway", "belohorska-plain-kerb", "yard-at-a-sidewalk",
                    "sidewalk-under-a-road-wall", "vinohradska-raised-corridor", "vinohradska-crossing", "motol-platform",
-                   "hlusickova-platforms"],
+                   "hlusickova-platforms", "kralovka-lawn-at-a-sidewalk"],
     },
     "beds": {
         "what": "track beds: their surface, edges and rails in the street (#539, #548, #606, #676)",
@@ -100,22 +100,31 @@ RULES = {
                    "modranska-skola-ramp", "cerny-kun-platform-wall"],
     },
     "structures": {
-        "what": "what the ground meets at structures: decks, abutments, tunnels, covers over passages (#742, #763, #771, #783, #788)",
+        "what": "what the ground meets at structures: decks, abutments, tunnels, covers over passages (#742, #763, #771, #783, #788, #824)",
         "code": ["covers.*", "ground_mesh.span_decks", "ground_mesh.rock_tunnels", "ground_mesh.in_the_rock",
                  "ground_mesh.portal_masonry", "ground_mesh.off_the_hill", "ground_mesh.bed_ends", "ground_mesh.abutments",
-                 "ground_mesh.off_the_deck", "ground_mesh.fit_mouths", "ground_partition.route_decks", "ground_mesh.ABUT_*",
-                 "ground_mesh.TUNNEL_*", "ground_mesh.PORTAL_*", "ground_mesh.BRIDGE_NEAR", "ground_mesh.MOUTH_FIT"],
+                 "ground_mesh.off_the_deck", "ground_mesh.under_decks", "ground_mesh.DECK_EDGE", "ground_mesh.fit_mouths",
+                 "ground_partition.route_decks", "ground_mesh.ABUT_*", "ground_mesh.TUNNEL_*", "ground_mesh.PORTAL_*",
+                 "ground_mesh.BRIDGE_NEAR", "ground_mesh.MOUTH_FIT"],
         "places": ["hlavni-nadrazi-under-the-magistrala", "vysehrad-tunnel-mouths", "street-over-an-underpass",
-                   "krejcarek-abutment", "modrany-viaduct-ramps"],
+                   "krejcarek-abutment", "modrany-viaduct-ramps", "slanska-street-under-a-bridge",
+                   "narodni-divadlo-bridgehead", "motol-bridge-parapets"],
     },
     "plots": {
-        "what": "plots, lawns, yards and beds in a sidewalk: their heights, terraces, pits and thin strips (#638, #663, #696, #738, #764)",
+        "what": "plots, lawns, yards and beds in a sidewalk: their heights, terraces, pits and thin strips, a lawn at a raised edge (#638, #663, #696, #738, #764, #770)",
         "code": ["ground_mesh.terraces", "ground_mesh.pits", "ground_mesh.bare_holes", "ground_mesh.over_lidar",
-                 "ground_mesh.beside", "ground_partition.plot_height", "ground_partition.plot_pieces",
+                 "ground_mesh.beside", "ground_mesh.meet_lidar", "ground_partition.plot_height", "ground_partition.plot_pieces",
                  "ground_partition.thin_parts", "ground_partition.thin_strips", "ground_mesh.TERRACE*",
                  "ground_mesh.PIT*", "ground_partition.PLOT_*"],
         "places": ["garden-beds", "yard-at-a-sidewalk", "garden-edgings", "bed-in-a-sidewalk", "lattice-cell",
-                   "verge-by-a-car-park-no-wall", "vystaviste-flush-parking", "wall-end-in-a-path", "stairs-beside-a-building"],
+                   "verge-by-a-car-park-no-wall", "vystaviste-flush-parking", "wall-end-in-a-path", "stairs-beside-a-building",
+                   "kralovka-lawn-at-a-sidewalk"],
+    },
+    "lidar-pits": {
+        "what": "IPR's pits under the survey's streets, filled from their rim in every reader of the raster (#867)",
+        "code": ["ipr_pits.*", "ipr_dtm.IprDtm", "ipr_dtm.FILLS"],
+        "places": ["taboritska-road-pit", "platnerska-road-pit", "belohorska-sidewalk-pit", "stairs-beside-a-building",
+                   "yard-at-a-sidewalk"],
     },
 }
 

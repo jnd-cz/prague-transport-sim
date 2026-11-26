@@ -208,7 +208,9 @@ def build(LINE, SOURCES=(), root=ROOT):
     import numpy as np  # noqa: E402
     from ipr_dtm import IprDtm  # noqa: E402
     import zps_ground  # noqa: E402
-    _ipr = IprDtm()  # (the IPR 1 m terrain: the ground level's reference, the spikes' judge, the kerbs' reference below)
+    # (the IPR 1 m terrain: the ground level's reference, the spikes' judge, the kerbs' reference below; as it is: the
+    # pits' fills are built from this step's areas, tools/ipr_pits.py)
+    _ipr = IprDtm(fills=None)
 
 
     def terrain(x, y):

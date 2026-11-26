@@ -426,6 +426,45 @@ class Walls(unittest.TestCase):
         self.assertEqual(np.round(zf, 3).tolist(), [248.16, 248.16, 199.94, 205.43])
         self.assertEqual(steps["ties"]["lidar apart"], 1)
 
+    def test_a_lawn_on_the_lidar_meets_a_sidewalks_edge_and_a_road_keeps_its_kerb(self):
+        # (#770, Královka's loop, line 23: the lawn's corner at (-2857.88, 147.92) on the lidar, 299.004 m, the sidewalk's
+        # there 299.146: no kerb, the lawn meets the edge; at (-2884.76, 199.0) the sidewalk stands 0.328 m over the
+        # lawn, more than MEET_STEP: that stands; a road's corner under a sidewalk's keeps its kerb at any height)
+        cx, cy = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 2.0]), np.zeros(6)
+        zc = np.array([299.146, 299.004, 297.450, 297.122, 299.146, 299.004])
+        walk, lawn, road = 2.0 + (10 - 6) / 100, 2.0 + (10 - 2) / 100 + gm.YIELD, 2.0 + (10 - 8) / 100
+        prio = np.array([walk, lawn, walk, lawn, walk, road])
+        kind = np.array(["raised", "survey"] * 3, dtype=object)
+        label = np.array(["street", "lidar", "street", "lidar", "street", "street"], dtype=object)
+        zf, steps, _ = gm.weld(cx, cy, zc, prio, kind, label)
+        self.assertEqual(np.round(zf, 3).tolist(), [299.146, 299.146, 297.450, 297.122, 299.146, 299.004])
+        self.assertEqual(steps["ties"]["lidar corners met a raised edge"], {"over 3 cm": 1, "over 10 cm": 1, "over 20 cm": 0})
+        self.assertEqual(steps["kerb"]["corners"], 2)
+
+    def test_what_the_weld_moves_at_a_lawns_edge_fades_into_the_lawn(self):
+        # (#770, Královka's loop, line 23: the lawn's border corner (-2889.000, 144.046) welded from the lidar's 298.986 m
+        # to the tram area's 298.916; its lattice corner 4.6 cm inside stayed, a sliver 7 cm tall. Here the edge corner
+        # at (0, 0), corners 0.046, 1.5 and 4 m inside, a pin at (1.5, 2) where the lawn meets a path at its own height,
+        # and another lawn's corners at the same places)
+        x = np.array([0.0, 0.0, 0.046, 1.5, 4.0, 0.046, 1.5, 1.5, 1.5])
+        y = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0])
+        lidar = np.array([True, False, True, True, True, True, True, True, False])
+        area = np.array([7, -1, 7, 7, 7, 8, 8, 7, -1])
+        zc = np.array([298.986, 298.916, 298.986, 299.1, 299.4, 298.986, 299.1, 299.2, 299.2])
+        zf = zc.copy()
+        zf[0] = 298.916
+        out, n = gm.meet_lidar(x, y, zc, zf, lidar, area)
+        # (the edge corner its own shift; 4.6 cm in nearly all of it; 1.5 m in half of what the edge and the pin give by
+        # their distances; none past MEET_FADE, in the other lawn or at the pin)
+        self.assertEqual(np.round(out - zc, 4).tolist(), [-0.07, 0.0, -0.0689, -0.0224, 0.0, 0.0, 0.0, 0.0, 0.0])
+        self.assertEqual(n, 3)
+        # (a corner a wall line holds stays; a shift over MEET_STEP is two levels, not an edge to fade from)
+        held = np.zeros(9, bool)
+        held[2] = True
+        self.assertEqual(np.round(gm.meet_lidar(x, y, zc, zf, lidar, area, held)[0] - zc, 4)[2], 0.0)
+        zf[0] = 298.986 - gm.MEET_STEP - 0.01
+        self.assertEqual(gm.meet_lidar(x, y, zc, zf, lidar, area)[1], 0)
+
     def test_a_lidar_corner_a_wall_holds_keeps_the_walls_level(self):
         # (#770: line 37 (3389.13, -10.60), the cutting's wall north of Ohrada: the paved ground's corner on the wall's
         # line, held at the foot's 244.59 m; its area's own outline there 248.44 (the area runs behind the wall's top
@@ -1000,6 +1039,18 @@ class UnderADeck(unittest.TestCase):
         self.assertEqual(low.tolist(), [True, False, False, False])
         self.assertEqual(z[:3].tolist(), [197.6, 204.7, 198.3])
         self.assertTrue(np.isnan(z[3]))
+
+    def test_a_deck_that_is_not_ours_is_any_survey_area_over_level_0_but_a_roof(self):
+        # (#824: Slánská's road bridge, line 9 (-8253, -1375), the survey's deck and road at level 1; a shelter's roof
+        # over a sidewalk is none, nor a level-0 area)
+        def sq(c, x0, l):
+            return {"c": c, "l": l, "r": [[x0, 0, 1.0], [x0 + 10, 0, 1.0], [x0 + 10, 10, 1.0], [x0, 10, 1.0]]}
+        D = {"areas": [sq("deck", 0, 1), sq("road", 20, 2), sq("roof", 40, 1), sq("road", 60, 0)]}
+        x, y = np.array([5.0, 25.0, 45.0, 65.0, 15.0, 11.0]), np.full(6, 5.0)
+        got = gm.under_decks(D, shapely.box(-10, -10, 80, 20), x, y)
+        # (and under its edge, DECK_EDGE: the Slánská deck's south-west corner, 0.5 m outside its outline)
+        self.assertEqual(got.tolist(), [True, True, False, False, False, True])
+        self.assertFalse(gm.under_decks(D, shapely.box(30, -10, 80, 20), x[2:], y[2:]).any())
 
     def test_the_trams_area_under_a_cover_lies_at_the_rails(self):
         # (#788: in a tunnel of the route, off the rock: a corner of the tram's area 4 m over the rails beside it at
