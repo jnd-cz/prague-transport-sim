@@ -4993,19 +4993,19 @@
      "why": "the road's edge, the wall's top, one upright face of 4.7 m at the strip's edge to the track (3396.8, 3.2), the ledge and the ballast at the track's level. The written file of 2026-11-20 has 3.25 m of the 7.5 sloping (the foot in the raster's smear), the build with the strips as wall lines 0.5 m (the top's crossfall)"
     },
     {
-     "name": "across the east wall, 6.5 m from the track to the wall's top",
+     "name": "across the east wall, 4.1 m from the track to 1 m behind the wall's top",
      "from": [
       3402.8,
       -0.14
      ],
      "to": [
-      3408.46,
-      -3.32
+      3406.37,
+      -2.15
      ],
      "expect": {
       "sloping m": 1.0
      },
-     "why": "the ballast, the ledge at the track's level, one upright face of 5.8 m at the strip's edge to the track, the ground behind the wall's top at 249.5 m. The written file has 1.82 m of the 6.5 sloping and no step over 1.7 m; the build one step of 6.3 m and 0.78 m sloping (the top's fall to the road)"
+     "why": "the ballast, the ledge at the track's level, one upright face of 5.8 m at the strip's edge to the track (3.1 m along the section), the wall's top at 249.9 m and 1 m of the ground behind it. The written file of 2026-11-20 had 1.82 m of the first 6.5 m sloping and no step over 1.7 m; the build one step of 6.3 m. The section ended 6.5 m out at (3408.46, -3.32) until 2026-11-26: the lawn from 4.2 m on falls to the road at 20 %, the measure's threshold of sloping, so 0.78 m of it counted on main and 1.3 m with the lawn's fade (#770: the lawn 1-7 cm lower, the wall the same), which is the lawn's own slope and not the wall's. The section guards the wall standing upright; the user, 2026-11-26, on PR 868's question 1 (end it 1 m behind the wall's top): \"Ok shorten the section\""
     },
     {
      "name": "along the west wall's foot, 24 m on the ledge from (3397.5, 2.9) south-west",
