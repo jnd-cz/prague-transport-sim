@@ -200,7 +200,10 @@ export function trafficWatch(g, tr, { sample = 0.2, dt = 1 / 30, view = window.r
       // the walkers that had nowhere to go and left (src/traffic.js _leave, #366): how many, and the places most left at
       const leaves = [...(tr.walkLeaves || new Map())].sort((a, b) => b[1] - a[1]);
       return {
-        stats: { simSeconds: Math.round(T), samples, finished: stuck === null, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, junctionCircles: tr.junctionCircles || 0, recoveredCycles: g.trafficCycles || [], carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
+        stats: { simSeconds: Math.round(T), samples, finished: stuck === null, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, circlesLetGo: tr.circlesLetGo || {}, givenUp: tr.givenUp || 0, gaveUp: tr.gaveUp || [], recoveredCycles: g.trafficCycles || [], carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
+          // (the waits-for graph, #560: the heads of chains standing a minute or more by kind, and the circles by class,
+          // with the last of each)
+          chainHeads: tr.longChainCount || {}, waitCircles: tr.waitCircleCount || {}, longChains: (tr.longChains || []).slice(-20), circlesSeen: (tr.waitCircles || []).slice(-20),
           walkersLeft: leaves.reduce((n, [, c]) => n + c, 0), walkLeaves: Object.fromEntries(leaves.slice(0, TOP)),
           // (a run that did not get through: what held the tram at the end, as u3 and redruns report it)
           ...(stuck === null ? {} : { stuck, stuckScene: scene }) },

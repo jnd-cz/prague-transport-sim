@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""AI waiting cycles: python -P -E tools/test_tram_cycles.py (own free-port server)."""
+"""Circles of waits through a tram (#154, #168; on the waits-for graph since #560): python -P -E tools/test_tram_cycles.py
+(own free-port server)."""
 import faulthandler
 from pathlib import Path
 import re
@@ -34,7 +35,7 @@ class TramCycles(unittest.TestCase):
             tr.ahead=[]; tr.oncoming=[t]; tr.cars=cars; tr.game={clock:800};
             return {tr,t,cars};
           };
-          window.tick = (tr,n) => { for(let i=0;i<n;i++) tr._clearAiTramCycles(1); };
+          window.tick = (tr,n) => { for(let i=0;i<n;i++) tr._tramCircles(1); };
         }''')
 
     @classmethod

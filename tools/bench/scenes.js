@@ -80,7 +80,7 @@ export const laneOf = (T, k, dir = 1) => T.laneList.find((l) => l.k === k && l.d
 export function addCar(T, { road, dir = 1, s, v = 10, vNow = null, next = null, id }) {
   const lane = laneOf(T, road, dir);
   const c = { model: 0, active: true, alpha: 1, kind: 'road', lane, road: lane.road, dir: lane.dir, conn: null, next: undefined, next2: undefined,
-    next2From: null, lightGo: null, lightHold: null, lead: null, path: lane.path, s, v, vNow, coast: null, hitTram: false, cycleT: 0,
+    next2From: null, lightGo: null, lightHold: null, lead: null, path: lane.path, s, v, vNow, coast: null, hitTram: false, stood: 0,
     z: undefined, seen: null, why: null };
   if (next !== null) c.next = T.nextLanes(lane).find((b) => b.k === next) || null;
   T._identify(c, id);
@@ -141,7 +141,11 @@ export function run(T, { t = 60, tram = null, each = null, focus = [0, 0], trace
     if (traceEvery && k % Math.round(traceEvery / STEP) === 0) trace.push(state(T));
   }
   return { clock: Math.round(g.clock * 10) / 10, hits: g.hits, overlaps: [...worst.values()], cars: state(T).cars, trace,
-    walkLoops: [...T.walkLoops.entries()], walkLeaves: [...T.walkLeaves.entries()] };
+    walkLoops: [...T.walkLoops.entries()], walkLeaves: [...T.walkLeaves.entries()],
+    // (the waits-for graph, #560: heads of chains standing a minute or more by kind, circles by class; of circles of cars,
+    // those let go by class; circles through a tram broken; cars given up)
+    heads: T.longChainCount || {}, circles: T.waitCircleCount || {}, longChains: T.longChains || [],
+    letGo: T.circlesLetGo || {}, broken: T.cyclesBroken || 0, givenUp: T.givenUp || 0 };
 }
 
 // every car and walker, rounded: what the order test compares and the scenes report
@@ -325,9 +329,10 @@ export const SCENES = {
   },
 };
 
-// run scene `name` (with its args): run()'s result and the scene's own report
+// run scene `name` (with its args; args.t: for so many seconds instead of the scene's own): run()'s result and the
+// scene's own report
 export function play(name, args = {}) {
   const sc = SCENES[name](args);
-  const r = run(sc.T, { t: sc.t, tram: sc.tram ?? null, each: sc.each });
+  const r = run(sc.T, { t: args.t ?? sc.t, tram: sc.tram ?? null, each: sc.each });
   return { ...r, ...sc.report() };
 }

@@ -52,6 +52,9 @@ class Handler(BaseHTTPRequestHandler):
         if path in ('/tools/bench/redruns.js', '/tools/bench/stuck.js', '/tools/bench/shift.js'):
             body = (Path(__file__).parent / 'bench' / path.rsplit('/', 1)[1]).read_bytes()
             mime = 'text/javascript'
+        elif path == '/src/waits.js':  # (stuck.js names each chain's head with it, #560)
+            body = (Path(__file__).parent.parent / 'src' / 'waits.js').read_bytes()
+            mime = 'text/javascript'
         elif path == '/src/autopilot.js':
             body = b'export class Autopilot { constructor() { this.input = {}; } step() {} }'
             mime = 'text/javascript'
