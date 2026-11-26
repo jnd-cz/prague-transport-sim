@@ -1290,11 +1290,10 @@ def meet_raised(sc, x, y, zs):
         at = ku[ju] == key[edge]
         dl[at] = zu[ju[at]] - zs[edge[at]]
     dl[np.abs(dl) > MEET_STEP] = 0.0
-    ke, first, ie = np.unique(key[edge], return_index=True, return_inverse=True)
-    dp = np.bincount(ie, weights=dl, minlength=len(ke)) / np.bincount(ie, minlength=len(ke))
+    ex, ey, ie = mm_points(x[edge], y[edge])  # (a point's copies lie a float's noise apart: its grid point, #865)
+    dp = np.bincount(ie, weights=dl, minlength=len(ex)) / np.bincount(ie, minlength=len(ex))
     if not (dp != 0).any():
         return zs, shift
-    ex, ey = x[edge[first]], y[edge[first]]
     P = np.column_stack([x[own], y[own]])
     nb = cKDTree(np.column_stack([ex, ey])).query_ball_point(P, r=MEET_FADE)
     cnt = np.fromiter(map(len, nb), int, len(nb))
@@ -1303,7 +1302,7 @@ def meet_raised(sc, x, y, zs):
     d = np.hypot(P[row, 0] - ex[col], P[row, 1] - ey[col])
     k = d < MEET_FADE
     row, col, d = row[k], col[k], d[k]
-    o = np.lexsort((ke[col], d, row))  # (per corner its nearest points first; of points as near, the first by place)
+    o = np.lexsort((col, d, row))  # (per corner its nearest points first; of points as near, the first by place: mm_points' order)
     row, col, d = row[o], col[o], d[o]
     start = np.r_[0, np.flatnonzero(row[1:] != row[:-1]) + 1] if len(row) else np.zeros(0, int)
     k = (np.arange(len(row)) - np.repeat(start, np.diff(np.r_[start, len(row)]))) < MEET_NEAR
@@ -1934,6 +1933,16 @@ def bed_edges(beds, outline):
     return out
 
 
+def mm_points(x, y):
+    """The distinct points of (x, y) on the mm grid: (their x, their y, each input's index into them), sorted by the
+    grid and taken from it. A point's copies (a corner of each face round it) lie a float's noise apart, and the first
+    of them by the order they came in, which the box sets, read the water's level, the rail or a meeting edge's
+    distances there; at a half mm that turns a height either way (#812's on_grid, #865)."""
+    X, Y = np.round(x * Q).astype(np.int64), np.round(y * Q).astype(np.int64)
+    _, first, inv = np.unique(X * 10_000_000_000 + Y, return_index=True, return_inverse=True)
+    return X[first] / Q, Y[first] / Q, inv.ravel()
+
+
 def lowest_at(keys, z):
     """Per distinct key (a point on the mm grid), the lowest of its heights: (the sorted keys, their heights), whatever
     the order they come in."""
@@ -2400,9 +2409,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
             if on.any():
                 cen = fc[ci[on] // 3].mean(1)
                 vx[on], vy[on] = off_cuts(vx[on], vy[on], cen[:, 0], cen[:, 1], cuts)
-        key = np.round(vx * Q).astype(np.int64) * 10_000_000_000 + np.round(vy * Q).astype(np.int64)
-        uk_, first_, back = np.unique(key, return_index=True, return_inverse=True)
-        return levels.at(vx[first_], vy[first_])[back]
+        ux, uy, back = mm_points(vx, vy)
+        return levels.at(ux, uy)[back]
     m = np.flatnonzero(corner_cls == "water")
     zc[m], prio[m], kind[m] = water_level(m), WATER_PRIO, "pool"
     # plots: the ground under a building's footprint, the city mesh's (a flat pad at the median ground round it stood on walls
@@ -2918,9 +2926,8 @@ def on_rails(cx, cy, beds, outline):
     zr, zl = np.full(len(cx), np.nan), np.full(len(cx), np.nan)
     if not len(lines) or outline.is_empty:
         return zr, zl
-    key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
-    uk, first, inv = np.unique(key, return_index=True, return_inverse=True)
-    pts = shapely.points(cx[first], cy[first])
+    ux, uy, inv = mm_points(cx, cy)
+    pts = shapely.points(ux, uy)
     pi, li = shapely.STRtree(lines).query(pts, predicate="dwithin", distance=RAIL_NEAR)
     if not len(pi):
         return zr, zl
@@ -2929,7 +2936,7 @@ def on_rails(cx, cy, beds, outline):
     shapely.prepare(outline)
     keep = shapely.dwithin(outline, shapely.points(fc[:, 0], fc[:, 1]), 1e-6)
     pi, fc = pi[keep], fc[keep]
-    z, low = np.full(len(uk), np.nan), np.full(len(uk), np.nan)
+    z, low = np.full(len(ux), np.nan), np.full(len(ux), np.nan)
     if len(pi):
         np.fmin.at(z, pi, fc[:, 2])
         np.fmin.at(low, pi, beds.surface_at(fc[:, 0], fc[:, 1]))
@@ -3308,9 +3315,9 @@ def decode(blob, layout, draw=False, area=False):
                 k += 1
         nv += len(got[0])
     V = np.vstack(Vs) if Vs else np.zeros((0, 3))
-    keys, first, inv = np.unique(np.round(V * Q).astype(np.int64), axis=0, return_index=True, return_inverse=True)
+    keys, inv = np.unique(np.round(V * Q).astype(np.int64), axis=0, return_inverse=True)
     inv = inv.ravel()
-    V = V[first]
+    V = keys / Q  # (a border vertex's copies from two tiles: the grid's point, not the first tile's, #865)
     out = {c: inv[np.vstack(f)] if f else np.zeros((0, 3), np.int64) for c, f in by.items()}
     extra = ()
     for name, want in (("draw", draw), ("area", area)):
