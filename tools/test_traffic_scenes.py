@@ -138,6 +138,15 @@ class TrafficScenes(unittest.TestCase):
         self.assertIsNotNone(r['crossedAt'])
         self.assertGreater(r['crossedAt'], r['tailPast'])
 
+    def test_a_car_on_both_tracks_of_a_street_taken_out_and_back_holds_our_tram_on_either(self):
+        # (#602, line 9 s 24330, seed 2 on 1e23f0b: the car was reported only on the part of the route nearest its middle,
+        # the outbound one, 20 km behind our tram on the return part, which drove into it)
+        r = self.play('outAndBack')
+        self.clean(r)
+        self.assertIsNotNone(r['short'])
+        self.assertGreater(r['short'], 2)  # (stood short of x 0, its front clear of the car's nose)
+        self.assertIsNotNone(r['tailPast'])  # (and went on once the car was across)
+
     def test_walkers_round_a_ring_of_walks_no_longer_hold_a_car(self):
         # (#496: before #608 the walkers circled the ring for good and the car stood behind them)
         jam = self.play('walkerRing', fixOff=True, t=90)

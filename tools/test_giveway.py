@@ -53,6 +53,7 @@ LOOP = r"""async () => {
   const read = (T, pts, d = 0) => {
     const xs = T._wayCrossings([[new Route(pts), -d, false]], Infinity);
     return xs.map((x) => ({ rt: x.rt === T.route ? 'ours' : 'back', kind: x.kind, along: x.along, against: x.against, lo: r(x.spans[0].lo), hi: r(x.spans[0].hi), spans: x.spans.map((o) => [r(o.lo), r(o.hi), o.along, o.against]),
+      ways: x.spans.map((o) => [r(o.lo), r(o.wa), r(o.wb)]),
       dC: r(x.dC), gdC: r(x.g.dC), group: xs.indexOf(xs.find((o) => o.g === x.g)), goesOn: T._goesOn(x, xs) }));
   };
   return {
@@ -160,6 +161,14 @@ class GiveWay(unittest.TestCase):
         self.assertLess(back_[1] - back_[0], 6)
         self.assertLess(abs(out_[0] - 60), 3)
         self.assertLess(abs(out_[1] - 60), 3)
+        # (where along the way each part is, from the car's middle at y 15: the return track's band from y 6.1 to the line
+        # midway between the tracks, y 1.75; the outbound one's from there to y -2.6. The car is reported on each part it
+        # is on, line 9 s 24330, seed 2 on 1e23f0b)
+        wb_, wo_ = sorted(t['ways'], reverse=True)
+        self.assertLess(abs(wb_[1] - 8.9), 1.1)
+        self.assertLess(abs(wb_[2] - 13.25), 1.1)
+        self.assertLess(abs(wo_[1] - wb_[2]), 1.1)
+        self.assertLess(abs(wo_[2] - 17.6), 1.1)
         # (onto the rails with the trams, then across the same route's other track: the first part is along the rails, where
         # it turns in only (band at x 106.5, rails at 107.7); the other is against the trams, whole. Each part's own direction
         # sets the time the car takes to clear it, not the place's: line 9 s 27291, seed 4)

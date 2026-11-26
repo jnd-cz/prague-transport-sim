@@ -346,6 +346,29 @@ export const SCENES = {
     }, report: () => ({ crossedAt, tailPast }) };
   },
 
+  // A street our route takes out and back: east along y 0, round, west along y 3. A one-way street north over both at x 0,
+  // a car on it standing with its middle on the outbound rails and its front 0.65 m into the return track's path, held by
+  // a standing car 8 m ahead until `until` s; our tram comes on the return part at 10 m/s, 80 m off. It stops for the car
+  // (#602, line 9 s 24330, seed 2 on 1e23f0b: the car was reported only on the outbound part, nearest its middle, and our
+  // tram on the return part drove into it). Reports how far short of x 0 the tram's front stood, and when its tail was past.
+  outAndBack({ until = 10 } = {}) {
+    const round = Array.from({ length: 9 }, (_, i) => [200 + 1.5 * Math.sin(Math.PI * (i + 1) / 10), 1.5 - 1.5 * Math.cos(Math.PI * (i + 1) / 10)]);
+    const T = build({ roads: [{ p: [[0, -40], [0, 9]], o: 1 }, { p: [[0, 9], [0, 60]], o: 1 }], track: [[-200, 0], [200, 0], ...round, [200, 3], [-200, 3]] });
+    const sX = T.route.nearestOnHeading(0, 3, -1, 0).s;
+    T.game.tram.s = sX - 80; T.game.tram.v = 10;
+    const car = addCar(T, { road: 0, dir: 1, s: 0, v: 10, vNow: 0, next: 1, id: 1 });
+    car.s = 2.4 - car.half - car.path.at(0).y; // (its front at y 2.4: the return track's body from y 1.75)
+    const B = addCar(T, { road: 1, dir: 1, s: 0, v: 0, vNow: 0, id: 10 });
+    B.s = 2.4 + 7.6 + B.half - B.path.at(0).y; // (its rear 7.6 m past the car's front: following() stands 8 m short)
+    let short = null, tailPast = null;
+    return { T, t: 30, tram: 10, each: (T, clock) => {
+      if (clock >= until) B.v = 10;
+      const tr = T.game.tram;
+      if (short === null && clock > 1 && tr.v < 0.05) short = r1(sX - tr.s);
+      if (tailPast === null && tr.s - tr.length > sX + 2.5) tailPast = r1(clock);
+    }, report: () => ({ short, tailPast }) };
+  },
+
   // #496 (line 23 s 3349, seed 1): walk A's end links 1 m back to a link crossing a car lane to walk B, 1 m before B's
   // end; B's end links through a second link to A, 1 m before A's end. At each end the least bad way on leads round that
   // 8 m ring, and walkers on it held a car for good. The walkers now turn back off a walk they entered less than 15 m ago
