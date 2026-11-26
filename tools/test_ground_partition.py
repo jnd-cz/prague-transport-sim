@@ -3,6 +3,7 @@
 
     python -P -E tools/test_ground_partition.py
 """
+import math
 import os
 import sys
 import unittest
@@ -148,6 +149,16 @@ class Plots(unittest.TestCase):
         self.assertEqual([q["z"] for q in p], [200.0, 200.0])
 
 
+class OnGrid(unittest.TestCase):
+    def test_a_vertex_half_a_mm_off_the_grid_goes_one_way_whatever_its_float_noise(self):
+        # (hlavni-nadrazi-under-the-magistrala's plot: x 1051.2025 plus or minus the overlays' noise went to 1051.203 in
+        # one box and to 1051.202 in the other, #812)
+        got = [shapely.get_coordinates(gp.on_grid(shapely.Polygon([(1040.0, -410.0), (x, -400.79), (1040.0, -390.0)])))
+               for x in (1051.2025000000003, 1051.2024999999998)]
+        np.testing.assert_array_equal(got[0], got[1])
+        self.assertIn(1051.203, got[0][:, 0].tolist())
+
+
 class Strips(unittest.TestCase):
     def test_a_thin_strip_by_a_plot_joins_it_a_wide_one_stays(self):
         box = shapely.box(0, 0, 30, 10)
@@ -158,6 +169,52 @@ class Strips(unittest.TestCase):
         self.assertEqual(r["pieces"], 1)
         self.assertAlmostEqual(r["area"], 4.0, places=3)
         self.assertAlmostEqual(plots[0]["g"].area, 104.0, places=3)
+
+    def test_a_plot_that_took_a_strip_has_no_grid_of_its_own(self):
+        # (the strip is on the grid, but GEOS's grid stays with a geometry: a union over the plot snap-rounded every
+        # piece in it, a survey vertex 0.3 mm off the grid moved to it, #812)
+        plots = [{"building": 0, "z": 0, "g": shapely.box(10, 0, 20, 10)}]
+        gp.thin_strips(shapely.box(0, 0, 30, 10).difference(shapely.box(0, 0, 9.6, 10).union(plots[0]["g"])), plots)
+        self.assertEqual(float(shapely.get_precision(plots[0]["g"])), 0.0)
+        survey = shapely.Polygon([(20.0003, 5), (20.0003, 15), (25, 15), (25, 5)])
+        U = shapely.union_all([plots[0]["g"], survey])
+        self.assertIn(20.0003, shapely.get_coordinates(U)[:, 0].tolist())
+
+    def test_strips_do_not_go_by_where_the_terrains_rings_start(self):
+        # (stairs-beside-a-building's terrain by a plot, on the grid: opened with the grid, a needle 6 m long and 0.5 mm
+        # wide along the plot's edge (-2726.399, -1336.031) to (-2725.6, -1344.2) for three of its ring's starts and none
+        # for the fourth, and float noise 300 m off chose which, #812)
+        ring = [(-2725.024, -1351.031), (-2725.64, -1351.031), (-2725.0, -1350.9), (-2725.6, -1344.2), (-2726.399, -1336.031),
+                (-2720.85, -1334.77), (-2719.02, -1342.41), (-2718.42, -1342.33), (-2717.75, -1342.83), (-2716.48, -1348.89)]
+        edge = shapely.box(-2727.4, -1345.0, -2724.9, -1335.5)
+        got = []
+        for k in range(4):
+            r = ring[k:] + ring[:k]
+            th = gp.thin_parts(shapely.Polygon(r + r[:1]))
+            self.assertLess(th.intersection(edge).area, 1e-6)
+            got.append(shapely.normalize(th))
+        self.assertTrue(all(g.equals_exact(got[0], 0.0) for g in got))
+
+    def test_strips_read_their_tile_and_its_margin_alone(self):
+        # (a footprint and a survey area 0.4 m apart across a tile's edge: the strip between them as the opening of the
+        # whole terrain gives it, one piece across the edge; and the same strip whatever terrain lies beyond the margin,
+        # #812: GEOS's buffer of the whole box's terrain moved its vertices with the box)
+        from geo import tile_box, tile_index
+        (e, _), (n, _) = tile_index([0.0, 0.0], [0.0, 0.0])
+        X = tile_box(int(e), int(n))[2]  # (the tile's east edge)
+        plot = shapely.box(X - 20, 0, X + 20, 10)
+        survey = shapely.box(X - 20, 10.4, X + 20, 30)
+        box = shapely.box(X - 40, -20, X + 40, 50)
+        terrain = box.difference(plot.union(survey))
+        thin = gp.thin_parts(terrain)
+        whole = terrain.difference(terrain.buffer(-0.5).buffer(0.5, join_style="mitre"))
+        self.assertEqual(len(shapely.get_parts(thin)), 1)
+        self.assertAlmostEqual(thin.area, whole.area, places=2)
+        self.assertAlmostEqual(thin.area, 16.0, delta=0.1)  # (40 m by 0.4 m, its ends rounded where they open)
+        far = shapely.box(X + 900, 2000, X + 1400, 2600).difference(shapely.box(X + 1000, 2100, X + 1000.3, 2400))
+        thin2 = gp.thin_parts(terrain.union(far))
+        near = shapely.box(X - 40, -20, X + 40, 50)
+        self.assertTrue(thin2.intersection(near).equals_exact(thin.intersection(near), 0.0))
 
 
 class Terrain(unittest.TestCase):
@@ -182,6 +239,42 @@ class Terrain(unittest.TestCase):
         r = gp.cut_terrain(self.x, self.y, self.T, shapely.Polygon(), shapely.box(0, 0, 5, 10), threads=1)
         self.assertEqual(r["cut"], 2)
         self.assertAlmostEqual(r["kept_area"] + r["new_area"], 50, places=6)
+
+    def test_a_needle_thinner_than_the_grid_is_no_remain(self):
+        # (#812, modranska-skola-ramp: needles 0.2-0.3 mm wide along a building's edge, kept in one box and not in
+        # another. A cover leaving a strip 0.3 mm wide and 10 m long (3e-3 m2, over SLIVER) leaves no remain; 2 mm wide
+        # it does)
+        for w, n in ((0.0003, 0), (0.002, 1)):
+            r = gp.cut_terrain(self.x, self.y, self.T, shapely.box(-1, -1, 10 - w, 11), self.box, threads=1, geometry=True)
+            self.assertEqual(len(r["remains"]), n, w)
+
+    def test_the_cover_from_its_pieces_per_tile(self):
+        # (#812, yard-at-a-sidewalk: the cover united for the whole box kept a crossing's node as a vertex by what else
+        # the box held; from the pieces each tile unites its own, in an order by place, and cuts as the united cover)
+        pieces = [shapely.box(6, 1, 8, 3), shapely.box(7, 2, 9, 4), shapely.box(-50, -50, -40, -40)]
+        a = gp.cut_terrain(self.x, self.y, self.T, shapely.union_all(pieces), self.box, threads=1, geometry=True)
+        for order in (pieces, pieces[::-1]):
+            b = gp.cut_terrain(self.x, self.y, self.T, order, self.box, threads=1, geometry=True)
+            self.assertEqual((b["cut"], b["kept"], b["dropped"]), (a["cut"], a["kept"], a["dropped"]))
+            self.assertAlmostEqual(b["new_area"], a["new_area"], places=6)
+            self.assertEqual([round(g.area, 9) for _, g in b["remains"]], [round(g.area, 9) for _, g in a["remains"]])
+
+    def test_a_piece_along_the_tiles_cut_unites(self):
+        # (vinohradska-raised-corridor, line 9: a plot reaching past the edge of the box its tile's cover is cut to
+        # (y = -1464) and back twice; clip_by_rect's ring of it crossed itself there and the union failed, #812)
+        ring = [(2612.12, -1463.38), (2611.781, -1463.331), (2611.78, -1463.331), (2611.49, -1463.29), (2610.7, -1464.38),
+                (2610.79, -1464.71), (2608.584, -1464.545), (2608.52, -1464.54), (2608.555, -1464.444), (2608.66, -1464.16),
+                (2608.22, -1463.419), (2608.219, -1463.417), (2608.03, -1463.1), (2607.04, -1463.09), (2606.95, -1465.57),
+                (2606.4, -1465.539), (2606.4, -1458), (2630.4, -1458), (2630.4, -1466.977), (2626.91, -1466.74),
+                (2626.95, -1464.24), (2626.17, -1464.21), (2626.162, -1464.22), (2625.4, -1465.25), (2625.42, -1465.51),
+                (2623.25, -1465.36), (2623.262, -1465.276), (2623.3, -1465.02), (2622.7, -1464), (2622.402, -1464.007),
+                (2621.79, -1464.02), (2621.68, -1466.49), (2621.4, -1466.475), (2612.4, -1465.995), (2612.31, -1465.99),
+                (2612.468, -1463.467), (2612.47, -1463.43)]
+        piece = shapely.Polygon(ring)
+        self.assertFalse(shapely.clip_by_rect(piece, 2295, -1982, 2814, -1464).is_valid)
+        x, y = np.array([2296.0, 2813.0, 2813.0, 2296.0]), np.array([-1981.0, -1981.0, -1465.0, -1465.0])
+        r = gp.cut_terrain(x, y, np.array([[0, 1, 2], [0, 2, 3]]), [piece], shapely.box(2290, -1990, 2820, -1460), threads=1)
+        self.assertAlmostEqual(r["kept_area"] + r["new_area"], 517 * 516 - piece.intersection(shapely.box(2296, -1981, 2813, -1465)).area, places=2)
 
 
 class Water(unittest.TestCase):
@@ -208,6 +301,139 @@ class Water(unittest.TestCase):
         lv = gp.WaterLevels(W, [], Ipr(lambda x, y: np.where(y > 50, 30.0, 10.0)), Frame())
         z = lv.at(np.array([215.0, 215.0]), np.array([70.0, 20.0]))
         self.assertEqual(z.tolist(), [30.0, 10.0])
+
+
+def keyed(P):
+    return sorted(map(tuple, np.round(P, 6).tolist()))
+
+
+class Grid(unittest.TestCase):
+    def test_a_needle_of_float_noise_is_gone_on_the_grid(self):
+        # (building 1174's plot in lattice-cell's tile, #812: a needle 9.4 m long, its base a few 1e-13 m wide)
+        base = (-1009.7171, 518.4534)
+        ring = [(-1030.0, 491.1), (-975.4, 500.0), (-997.44, 529.25), (-1004.8, 526.53), base, (-1004.9, 526.6),
+                (base[0] + 3e-13, base[1] - 2e-13), (-1014.27, 509.35)]
+        plain = [(-1030.0, 491.1), (-975.4, 500.0), (-997.44, 529.25), (-1004.8, 526.53), base, (-1014.27, 509.35)]
+        a, b = [{"g": shapely.Polygon(ring)}], [{"g": shapely.Polygon(plain)}]
+        gp.on_the_grid(a)
+        gp.on_the_grid(b)
+        self.assertTrue(shapely.equals_exact(shapely.normalize(a[0]["g"]), shapely.normalize(b[0]["g"]), 0))
+        self.assertFalse(np.isclose(shapely.get_coordinates(a[0]["g"]), (-1004.9, 526.6)).all(1).any())
+        # (and a piece left under SLIVER goes)
+        c = [{"g": shapely.box(0, 0, 0.005, 0.01)}, {"g": shapely.box(0, 0, 1, 1)}]
+        self.assertEqual(len(gp.on_the_grid(c)), 1)
+
+
+class WaterLocality(unittest.TestCase):
+    """#812: a level reads the water within WATER_FAR of its point, and nothing of where the box ends."""
+    # (a pond with corners off the grid, and a river that runs out of either box)
+    POND = shapely.Polygon([(13.3, 7.1), (61.7, 4.4), (78.2, 39.9), (40.6, 71.3), (9.8, 48.2)])
+    RIVER = shapely.Polygon([(-2000.3, -40.2), (2000.7, -60.4), (2000.2, 30.6), (300.1, 45.3), (-2000.9, 20.1)])
+
+    def test_a_banks_samples_do_not_follow_where_its_ring_starts(self):
+        c = list(self.POND.exterior.coords)[:-1]
+        turned = shapely.Polygon(c[2:] + c[:2])
+        self.assertEqual(keyed(gp.bank_samples(self.POND.boundary)), keyed(gp.bank_samples(turned.boundary)))
+        # (nor how far the water runs: another pond merged in at its far end leaves the near samples as they were)
+        more = shapely.union_all([self.POND, shapely.box(75, 30, 140, 36)])
+        near = lambda P: keyed(P[P[:, 0] < 60])  # noqa: E731
+        self.assertEqual(near(gp.bank_samples(self.POND.boundary)), near(gp.bank_samples(more.boundary)))
+        # (about one sample every WATER_STEP m)
+        n = len(gp.bank_samples(self.POND.boundary))
+        self.assertTrue(self.POND.length / gp.WATER_STEP <= n <= 1.5 * self.POND.length / gp.WATER_STEP, n)
+        # (the old samples, spaced evenly from the ring's first point, moved with it)
+        old = lambda g: shapely.get_coordinates(shapely.line_interpolate_point(g, np.linspace(0, g.length, int(g.length / 10))))  # noqa: E731
+        self.assertNotEqual(keyed(old(self.POND.boundary)), keyed(old(turned.boundary)))
+
+    def test_a_level_is_the_same_in_a_small_box_and_a_larger(self):
+        from geo import ORIGIN
+        ipr = Ipr(lambda x, y: 180.0 + 0.002 * x + 0.5 * np.sin(x / 37.0) + 0.3 * np.cos(y / 11.0))
+        px, py = np.linspace(-300.5, 300.5, 41), np.linspace(-35.2, 20.3, 41)
+        out = []
+        for box in (shapely.box(-700.37, -400.81, 700.12, 400.55), shapely.box(-1203.9, -900.4, 1207.6, 903.2)):
+            lv = gp.WaterLevels(self.RIVER, [], ipr, Frame(), extent=box.buffer(gp.WATER_FAR))
+            self.assertEqual(((lv.x0 + ORIGIN[0]) % gp.WATER_RES, (lv.y1 + ORIGIN[1]) % gp.WATER_RES), (0.0, 0.0))
+            out.append(lv.at(px, py))
+        self.assertTrue(np.isfinite(out[0]).all())
+        self.assertEqual(out[0].tolist(), out[1].tolist())
+
+    def test_a_sight_line_along_a_cells_edge_reads_one_cell_in_any_box(self):
+        # (#812, rasinovo-quay: a line of sight along x = -744, its sample's x -744 within 1e-13 m, read the wet cell
+        # west of the edge with one ring of tiles and the dry one east of it with two. Here the line runs along the
+        # lake's east edge in the raster, and a pond far west moves the raster's origin from -50 to -2000)
+        lake, pond = shapely.box(-50, -50, 0, 50), shapely.box(-2000, -1000, -1990, -990)
+        W = shapely.union_all([lake, pond])
+        ipr = Ipr(lambda x, y: np.full(np.shape(x), 10.0))
+        lvs = [gp.WaterLevels(W, [], ipr, Frame(), extent=e) for e in (shapely.box(-100, -100, 100, 100), shapely.box(-2100, -1100, 100, 100))]
+        # (the first dry cell's west edge on the row of y = 0; past the raster's end a cell is dry)
+        edges = [lv.x0 + np.flatnonzero(lv.grid[int(lv.y1), :])[-1] + 1 for lv in lvs]
+        self.assertEqual(edges[0], edges[1])
+        seen = []
+        for lv in lvs:
+            lv.P = np.array([[edges[0] - 1e-13, 20.0]])
+            seen.append(lv._seen(np.array([edges[0] - 1e-13, -20.0]), np.array([0])).tolist())
+        self.assertEqual(seen[0], seen[1])
+
+    def test_a_cell_is_wet_by_its_centre_in_the_water(self):
+        from geo import ORIGIN
+        W = shapely.Polygon([(-40.3, -20.7), (60.2, -25.1), (75.9, 30.4), (-10.6, 44.8)],
+                            [[(-5.25, -4.6), (20.45, -6.35), (12.7, 15.15)], [(40.3, 0.7), (50.6, 0.9), (50.4, 10.2), (40.7, 10.4)]])
+        kx0, ky1, nx, ny = math.floor(-60 + ORIGIN[0]), math.ceil(60 + ORIGIN[1]), 160, 130
+        g = gp.wet_cells(W, kx0, ky1, nx, ny)
+        cx = (kx0 + np.arange(nx) + 0.5) - ORIGIN[0]
+        cy = (ky1 - np.arange(ny) - 0.5) - ORIGIN[1]
+        X, Y = np.meshgrid(cx, cy)
+        np.testing.assert_array_equal(g, shapely.contains_xy(W, X, Y))
+        self.assertGreater(g.sum(), 5000)
+
+    def test_an_island_cut_open_by_the_extent_is_the_same_cells_as_whole(self):
+        # (#812, Císařská louka by vysehrad-wall-over-the-ramp: an island 1.5 km long, a hole in the river with two rings
+        # of tiles and a bay opened by the raster's extent with one. Drawn as polygons, an outer ring's fill took its
+        # boundary's cells and a hole's took them back, and the sight lines grazing the island saw 91 banks or 67)
+        from PIL import Image, ImageDraw
+        island = shapely.Polygon([(-50.2, -30.4), (300.7, -25.3), (1500.5, -10.2), (1480.1, 30.1), (200.3, 28.7), (-40.6, 12.2)])
+        W = shapely.box(-3000.3, -100.7, 3000.6, 100.2).difference(island)
+        ipr = Ipr(lambda x, y: 180.0 + 0.002 * x + 0.3 * np.cos(y / 11.0) + 0.2 * np.sin(x / 23.0))
+        boxes = shapely.box(-400.4, -200.2, 400.3, 200.6), shapely.box(-1400.8, -200.2, 1450.1, 200.6)
+        small, large = (b.buffer(gp.WATER_FAR) for b in boxes)
+        self.assertEqual(len(W.intersection(small).interiors), 0)  # (cut open: a bay)
+        self.assertEqual(len(W.intersection(large).interiors), 1)
+        lvs = [gp.WaterLevels(W, [], ipr, Frame(), extent=e) for e in (small, large)]
+
+        def cells(lv, grid):
+            # (the cells of x -800 .. 800, y -95 .. 95, each by its S-JTSK column and row)
+            from geo import ORIGIN
+            c = np.arange(math.floor(-800 + ORIGIN[0]), math.floor(800 + ORIGIN[0])) - lv.kx0
+            r = lv.ky1 - np.arange(math.ceil(95 + ORIGIN[1]), math.ceil(-95 + ORIGIN[1]), -1)
+            return grid[np.ix_(r, c)]
+        np.testing.assert_array_equal(cells(lvs[0], lvs[0].grid), cells(lvs[1], lvs[1].grid))
+        px, py = np.linspace(-300.3, 250.7, 23), np.full(23, 40.2)
+        self.assertEqual(lvs[0].at(px, py).tolist(), lvs[1].at(px, py).tolist())
+        # (drawn as polygons, the old raster: the island's bank wet in the bay, dry round the hole)
+        old = []
+        for lv, e in zip(lvs, (small, large)):
+            from geo import ORIGIN
+            im = Image.new("1", lv.grid.shape[::-1], 0)
+            d = ImageDraw.Draw(im)
+
+            def px_(c, lv=lv):
+                c = np.asarray(c)
+                return list(zip(((c[:, 0] + ORIGIN[0]) - lv.kx0).tolist(), (lv.ky1 - (c[:, 1] + ORIGIN[1])).tolist()))
+            for g in shapely.get_parts(W.intersection(e)):
+                d.polygon(px_(g.exterior.coords), fill=1)
+                for h in g.interiors:
+                    d.polygon(px_(h.coords), fill=0)
+            old.append(cells(lv, np.asarray(im, bool)))
+        self.assertGreater((old[0] != old[1]).sum(), 100)
+
+    def test_no_bank_farther_than_water_far(self):
+        # (a lake's middle, 600 m from every bank: no level, where the old fallback read banks at any distance; the
+        # build gives such a corner the lidar's height. Prague's widest water, the Vltava, is under 400 m across)
+        W = shapely.Point(0, 0).buffer(600, 64)
+        lv = gp.WaterLevels(W, [], Ipr(lambda x, y: np.full(np.shape(x), 10.0)), Frame())
+        z = lv.at(np.array([0.0, 450.0]), np.array([0.0, 0.0]))
+        self.assertTrue(np.isnan(z[0]))
+        self.assertEqual(z[1], 10.0)
 
 
 if __name__ == "__main__":

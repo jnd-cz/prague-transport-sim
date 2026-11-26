@@ -205,6 +205,17 @@ class Stretches(unittest.TestCase):
         self.assertEqual(wl.of_lines([self.SIDE], bank, own={0: "l"}), [])
         self.assertEqual(len(wl.of_lines([self.SIDE], bank)), 1)  # (as a wall line it steps)
 
+    def test_a_strip_to_a_wall_whose_top_and_foot_lie_over_each_other_reads_the_one_by_its_middle(self):
+        # (the next wall 1 m off, its top line at 203 m and its foot line at 200 m over each other, the raster in the
+        # strip 200.1 m: the foot, whichever line comes first; by the lines' order it was the top or the foot, #812)
+        S = wl.sample(np.array([[0.0, 0.0, np.nan], [0.0, 10.0, np.nan]]))
+        top, foot = np.array([[-1.0, -5.0, 203.0], [-1.0, 15.0, 203.0]]), np.array([[-1.0, 15.0, 200.0], [-1.0, -5.0, 200.0]])
+        flat = lambda x, y: np.full(np.shape(x), 200.1)  # noqa: E731
+        for walls in ([top, foot], [foot, top]):
+            lvl, _, surveyed, _ = wl._side(S, flat, 1.0, wl.segments(walls))
+            self.assertTrue(surveyed.all())
+            np.testing.assert_allclose(lvl, 200.0)
+
     def test_runs_close_small_gaps_and_drop_short_ones(self):
         d = np.arange(12.0)
         on = np.array([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0], bool)

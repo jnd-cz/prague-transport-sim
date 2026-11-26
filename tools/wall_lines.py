@@ -53,6 +53,7 @@ FIT = (2.5, 3.0, 3.5, 4.0)  # m off the line: where IPR's raster is read for a s
 SLOPE = 1.5  # rise over run: a side's slope is held to this (a reading on another wall or a tree's foot tilts the fit)
 FLAT = 0.15  # rise over run: a side sloping less is level (a sidewalk's crossfall is 2 %, a kerb in the readings 10 %)
 CLEAR = 0.3  # m: a side's readings stop this short of the next wall line across it
+TIE = 1e-9  # of a ray's length: crossings this near its first are as near (_cross)
 PAIR = 1.0  # m: two wall lines nearer than this are one wall's (its two faces, or its face's foot and top)
 OWN = 0.5  # m: the line's own height this near a side's raster level is that side's level
 STEP = 0.7  # m: the ground steps across the line by this or more (a kerb and a garden's edge are under it)
@@ -94,19 +95,22 @@ def sample(p, spacing=SPACING):
     return np.vstack(out + [last])
 
 
-def _cross(P, Q, A, B):
+def _cross(P, Q, A, B, ties=False):
     """Per ray P->Q (n, 2) the parameter t in (0, 1] of its first crossing with segments A->B (m, 2) and the crossed
-    segment's index and parameter there: (t (inf where none), index, u)."""
+    segment's index and parameter there: (t (inf where none), index, u). ties: and every crossing as near as a ray's
+    first (within TIE of t), as (rays, indexes, u): which of them comes first goes by the tree's order, and that by
+    everything in it."""
     import shapely
     t = np.full(len(P), np.inf)
     seg = np.full(len(P), -1)
     us = np.zeros(len(P))
+    none = (np.zeros(0, int), np.zeros(0, int), np.zeros(0))
     if not len(A) or not len(P):
-        return t, seg, us
+        return (t, seg, us, none) if ties else (t, seg, us)
     tree = shapely.STRtree(shapely.linestrings(np.stack([A, B], 1)))
     ri, si = tree.query(shapely.linestrings(np.stack([P, Q], 1)), predicate="intersects")
     if not len(ri):
-        return t, seg, us
+        return (t, seg, us, none) if ties else (t, seg, us)
     r, e, w = Q[ri] - P[ri], B[si] - A[si], A[si] - P[ri]
     den = r[:, 0] * e[:, 1] - r[:, 1] * e[:, 0]
     with np.errstate(all="ignore"):
@@ -118,25 +122,34 @@ def _cross(P, Q, A, B):
     first = np.concatenate([[True], ri[order][1:] != ri[order][:-1]]) if len(order) else np.zeros(0, bool)
     k = order[first]
     t[ri[k]], seg[ri[k]], us[ri[k]] = tt[k], si[k], np.clip(uu[k], 0, 1)
-    return t, seg, us
+    if not ties:
+        return t, seg, us
+    tie = tt <= t[ri] + TIE
+    return t, seg, us, (ri[tie], si[tie], np.clip(uu[tie], 0, 1))
 
 
 def _next_wall(S, sign, walls):
     """Along each sampled point's normal on one side: (the distance to the first wall segment across it, inf where none
-    within the readings' reach; that segment's height there, NaN where it has none). walls: (A, B) (m, 3) segments."""
+    within the readings' reach; the heights there of the segments crossed that near, (n, k), NaN where one has none or
+    past a point's own). walls: (A, B) (m, 3) segments."""
     n = len(S)
     if walls is None or not len(walls[0]):
-        return np.full(n, np.inf), np.full(n, np.nan)
+        return np.full(n, np.inf), np.full((n, 1), np.nan)
     A, B = walls
     far = FIT[-1] + CLEAR
     nrm = sign * S[:, 3:5]
     P = S[:, :2] + nrm * 0.05  # (off the line itself: its own segments start no crossing)
     Q = S[:, :2] + nrm * far
-    t, seg, u = _cross(P, Q, A[:, :2], B[:, :2])
-    hit = seg >= 0
-    reach = np.where(hit, 0.05 + t * (far - 0.05), np.inf)
-    z = np.full(n, np.nan)
-    z[hit] = A[seg[hit], 2] + (B[seg[hit], 2] - A[seg[hit], 2]) * u[hit]
+    t, seg, _, (ri, si, u) = _cross(P, Q, A[:, :2], B[:, :2], ties=True)
+    reach = np.where(seg >= 0, 0.05 + t * (far - 0.05), np.inf)
+    # (a wall's top and foot lines over each other, crossed at one point: both heights, #812)
+    rank = np.zeros(len(ri), int)
+    if len(ri):
+        o = np.argsort(ri, kind="stable")
+        start = np.concatenate([[0], np.flatnonzero(np.diff(ri[o])) + 1])
+        rank[o] = np.arange(len(ri)) - np.repeat(start, np.diff(np.concatenate([start, [len(ri)]])))
+    z = np.full((n, max(int(rank.max()) + 1 if len(ri) else 1, 1)), np.nan)
+    z[ri, rank] = A[si, 2] + (B[si, 2] - A[si, 2]) * u
     return reach, z
 
 
@@ -171,8 +184,15 @@ def _side(S, lidar, sign, walls=None):
     past = np.full(len(S), np.nan)
     if strip.any():
         i = np.flatnonzero(strip)
-        own, other = S[i, 2], zhit[i]
+        own = S[i, 2]
         mid = np.asarray(lidar(S[i, 0] + sign * S[i, 3] * reach[i] / 2, S[i, 1] + sign * S[i, 4] * reach[i] / 2), float)
+        # (of the next wall's heights there, the one the strip's middle stands nearest: the top's or the foot's where its
+        # two lines lie over each other; by the tree's order hlavni-nadrazi-under-the-magistrala's strip by the
+        # Magistrála's wall read the top in one box, 198.57 m, and the foot in another, 198.02 m, #812)
+        zs = np.sort(zhit[i], 1)  # (lowest first: of heights as near the middle, or where it has no reading, the lowest)
+        with np.errstate(invalid="ignore"):
+            off = np.where(np.isfinite(zs), np.where(np.isfinite(mid)[:, None], np.abs(zs - mid[:, None]), zs), np.inf)
+        other = zs[np.arange(len(i)), np.argmin(off, 1)]
         with np.errstate(all="ignore"):
             pick_other = np.isfinite(other) & (~np.isfinite(own) | (np.abs(other - mid) < np.abs(own - mid)))
         z = np.where(pick_other, other, own)
