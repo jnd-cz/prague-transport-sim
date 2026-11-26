@@ -10,6 +10,8 @@
 // out first through the doors in turn), seatAboard (passengers on board at the start), reseat (a free seat to the nearest standing
 // passenger who does not wish to stand, round the others: cabin-navigation.js), abandon (boarders not yet on the steps leave the
 // queues), a walk's own speed, a boarder on the steps finishing the climb when the doors close, and an idle step that only counts time.
+// #249 step 4: changed, likewise: ready (before a stop, those to alight there go to their doors' doorway places) and alight's ids (the
+// ones chosen then alight, one still on the way from where they get to).
 import {createPassengerCore,doorIsOpen} from './passenger-core.js';
 import {createExitFlow} from './exit-flow.js';
 import {planExitDoors} from './exit-routing.js';
@@ -79,13 +81,16 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
  }
  // (#249: the walking distance from a passenger's place to the nearest door's head of the steps, along the aisle and across)
  const doorDistance=a=>{const s=a.seatId?bySeat.get(a.seatId):null,x=s?s.anchor.x+s.forward.x*.23:a.x,z=s?Math.sign(s.anchor.z)*.43:a.z;return Math.min(...doors.map(d=>Math.abs(x-innerX({x:d.x,door:d}))+Math.abs(z-.37)));};
- function alight(count=1,{balanced=false,nearest=false,counted=0}={}){let selected=[...actors.values()].filter(a=>occupied(a)&&!a.counted).sort(nearest?(a,b)=>doorDistance(a)-doorDistance(b)||a.index-b.index:(a,b)=>Number(!a.doorBufferId)-Number(!b.doorBufferId)||Number(!!a.seatId)-Number(!!b.seatId)||a.index-b.index);
+ // (#249 step 4: ids, the passengers chosen when the stop was near (ready): those alight, whatever the count; one still on the way
+ // to the door's place alights when there, and one who has not set off yet stays where they are)
+ function alight(count=1,{balanced=false,nearest=false,counted=0,ids=null}={}){let late=0;for(const a of actors.values()){a.toAlight=false;if(ids?.has(a.id)){a.readyAt=null;if(a.readyPlace){a.alightOnArrive=true;late++;}}}
+  let selected=[...actors.values()].filter(a=>occupied(a)&&!a.counted&&(!ids||ids.has(a.id))).sort(nearest?(a,b)=>doorDistance(a)-doorDistance(b)||a.index-b.index:(a,b)=>Number(!a.doorBufferId)-Number(!b.doorBufferId)||Number(!!a.seatId)-Number(!!b.seatId)||a.index-b.index);
   if(balanced){const groups=doors.map(d=>selected.filter(a=>a.doorId===d.id).sort((a,b)=>Number(!a.doorBufferId)-Number(!b.doorBufferId)||Number(!!a.seatId)-Number(!!b.seatId)||a.index-b.index));selected=[];while(groups.some(g=>g.length))for(const g of groups)if(g.length)selected.push(g.shift());}
   // (#249: the counted passengers stand in the doorways, one door after another, and leave first)
   const out=[];for(let i=0;i<counted;i++){const d=doors[i%doors.length],{id,index}=core.nextIdentity(),a={id,index,seatId:null,standingId:null,doorBufferId:d.id,counted:true,aboard:true,channel:`${d.id}:0`,doorId:d.id,boardedDoorId:d.id,x:innerX({x:d.x,door:d}),y:layout.floorY,z:.6,heading:-Math.PI/2,distanceMetres:0,speedMps:0,motion:'Idle',animationPhase:0,legPose:null,poseBlend:null,stage:'standing',actions:null};actors.set(id,a);out.push(a);}
-  selected=out.concat(selected.slice(0,count));if(!selected.length)return 0;const plan=planExitDoors(selected,doors,{policy:exitPolicy,active:[...actors.values()].filter(a=>a.exiting),service:exitPace?.service??{},walk:exitPace?.walk??.95});exitPlan=plan.summary;let n=0;for(const a of selected){
+  selected=out.concat(ids?selected:selected.slice(0,count));if(!selected.length)return late;const plan=planExitDoors(selected,doors,{policy:exitPolicy,active:[...actors.values()].filter(a=>a.exiting),service:exitPace?.service??{},walk:exitPace?.walk??.95});exitPlan=plan.summary;let n=0;for(const a of selected){
    const d=doors.find(d=>d.id===plan.assignment.get(a.id));a.doorId=d.id;core.requestAlighting(a,'exit queue');a.motion=a.seatId?'Sit':'Idle';n++;
-  }if(exitFlow.pending.length===0)waitForEntries=[...actors.values()].some(a=>a.actions&&!a.exiting);exitFlow.schedule(selected);message=`${n} passengers requested to alight; two-stream route reservations, door clearance places first.`;return n;}
+  }if(exitFlow.pending.length===0)waitForEntries=[...actors.values()].some(a=>a.actions&&!a.exiting);exitFlow.schedule(selected);message=`${n} passengers requested to alight; two-stream route reservations, door clearance places first.`;return n+late;}
  const walk=(x,y,z)=>({type:'walk',x,y,z});
  function planBoard(a,c){
   // (#249: a counted passenger climbs the steps like the others and joins the count at their head)
@@ -119,7 +124,8 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
  }
  function tick(dt,doorsOpen){
   if(exitFlow.preparing){exitFlow.prepare(2);if(prepareStops)return;}time+=dt;const currentEntries=[...actors.values()].some(a=>a.actions&&!a.exiting);if(!currentEntries)waitForEntries=false;exitFlow.update(waitForEntries?0:dt,doorsOpen);
-  const outbound=d=>[...actors.values()].some(a=>a.doorId===d&&(a.stage==='exit queue'||a.exiting&&a.egressClearAt==null));
+  startReady();
+  const outbound=d=>[...actors.values()].some(a=>a.doorId===d&&(a.stage==='exit queue'||a.toAlight||a.alightOnArrive||a.exiting&&a.egressClearAt==null));
   for(const c of channels){const back=entryActors(c).sort((a,b)=>b.z-a.z)[0];if(!outbound(c.door.id)&&c.queue.length&&time>=c.next&&(!back||back.z<=2.45-entryGap)){
    const a=c.queue[0];if(!a.seatId&&!a.standingId&&!a.counted)reservePlace(a,c);
    if(!a.seatId&&!a.standingId&&!a.counted&&overflow?.(a))a.counted=true;
@@ -141,7 +147,9 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
    }else if(action.type==='turn'){a.stage='aligning with place';a.motion='Idle';a.speedMps=0;a.heading=angle(a.actionStart.heading,action.heading,smooth(Math.min(1,a.actionTime/.4)));if(a.actionTime>=.4)advance(a);
    }else if(action.type==='sit'){
     a.stage='sitting down';a.motion='Sit';a.speedMps=0;const t=smooth(Math.min(1,a.actionTime/.8)),s=action.seat,p=seatRoot(s);a.poseBlend={from:'Idle',to:'Sit',weight:t};a.x=lerp(a.actionStart.x,p.x,t);a.z=lerp(a.actionStart.z,p.z,t);a.y=lerp(a.actionStart.y,p.y,t);a.heading=s.heading;if(a.actionTime>=.8){settle(a);core.occupySeat(a.id,s.id);if(a.reseatFrom){standingLedger.releasePlace(a.reseatFrom,a.id);a.reseatFrom=null;a.standingId=null;a.doorBufferId=null;record('reseated',a);}else boarded++;}
-   }else if(action.type==='stand'){settle(a);standingLedger.occupy(a.standingId,a.id);boarded++;
+   }else if(action.type==='rise'){a.stage='standing up';a.motion='Idle';a.speedMps=0;const t=smooth(Math.min(1,a.actionTime/.7));a.poseBlend={from:'Sit',to:'Idle',weight:t};a.y=lerp(a.actionStart.y,layout.floorY,t);if(a.actionTime>=.7)advance(a);
+   }else if(action.type==='ready')readyAt(a,action.place);
+   else if(action.type==='stand'){settle(a);standingLedger.occupy(a.standingId,a.id);boarded++;
    }
   }
  }
@@ -157,14 +165,14 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
   return k;
  }
  // (#249: a door's exchange is over: nobody waits or climbs there, nobody is to leave or leaving through it)
- const quietDoor=d=>!channels.some(c=>c.door.id===d.id&&(c.queue.length||entryActors(c).length))&&![...actors.values()].some(a=>a.doorId===d.id&&(a.stage==='exit queue'||a.exiting||a.actions&&!a.aboard));
+ const quietDoor=d=>!channels.some(c=>c.door.id===d.id&&(c.queue.length||entryActors(c).length))&&![...actors.values()].some(a=>a.doorId===d.id&&(a.stage==='exit queue'||a.alightOnArrive||a.exiting||a.actions&&!a.aboard));
  let navigator=sharedNavigator; // (#249: one for the set's cars, built before the run: about 20 ms)
  // (#249, the user's rule 3: a free seat by a door whose exchange is over goes to the nearest standing passenger who does not wish to
  // stand (of the three nearest, the first with a way round the others), walking at speed m/s; the seat reserved first, the standing
  // place freed on arrival. The seats with the nearest such passenger first; at most limit moves begun and tries ways looked for a
  // call; the number begun)
  function reseat({speed=.8,limit=1,tries=3}={}){
-  if(!layout.navigation)return 0;let n=0,left=tries;const standing=[...actors.values()].filter(a=>a.stage==='standing'&&a.standingId&&!a.stands&&!a.counted&&!a.actions&&!a.exiting&&!a.yielding);if(!standing.length)return 0;
+  if(!layout.navigation)return 0;let n=0,left=tries;const standing=[...actors.values()].filter(a=>a.stage==='standing'&&a.standingId&&!a.stands&&!a.counted&&!a.toAlight&&!a.actions&&!a.exiting&&!a.yielding);if(!standing.length)return 0;
   const goalOf=s=>({x:s.anchor.x+s.forward.x*.23,z:Math.sign(s.anchor.z)*.45}),reach=s=>{const g=goalOf(s);return Math.min(...standing.map(a=>Math.hypot(a.x-g.x,a.z-g.z)));};
   const free=ledger.seats.filter(s=>s.status==='free').map(s=>bySeat.get(s.id)).filter(s=>quietDoor(sectorOf(s.anchor.x))).sort((a,b)=>reach(a)-reach(b));if(!free.length)return 0;navigator??=createCabinNavigator(layout);
   for(const s of free){if(n>=limit||left<=0)break;const goal=goalOf(s),near=standing.filter(a=>!a.actions).sort((a,b)=>Math.hypot(a.x-goal.x,a.z-goal.z)-Math.hypot(b.x-goal.x,b.z-goal.z)).slice(0,3);
@@ -172,13 +180,44 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
     a.seatId=s.id;a.reseatFrom=a.standingId;a.actions=[...route.path.slice(1).map(p=>({type:'walk',x:p.x,y:layout.floorY,z:p.z,speed,free:true})),{type:'turn',heading:s.heading},{type:'sit',seat:s}];a.actionIndex=0;a.actionTime=0;a.actionStart=null;a.stage='walking';record('reseat-admitted',a);n++;break;}}
   return n;
  }
+ // (#249 step 4, the user, 2026-11-26: "those getting off at the stop needs to be prepared often, to be ready to go once door
+ // opens". The stop near, the passengers chosen to alight there (ids) go to the free doorway places of the doors they will leave by
+ // (planExitDoors, as alight assigns them), the nearest to the door first, one a door every gap s: from a seat they stand up first,
+ // then walk at speed m/s round the others to the free place nearest the door that has a way (of the three nearest). A doorway
+ // place is a door's (doorBufferId): alight sends them through it, and first. Those already in one, or with none free or no way,
+ // stay where they are. The chosen ones keep out of reseat. The number set off or to set off)
+ function ready(ids,{speed=.8,gap=.8}={}){
+  for(const a of actors.values())a.toAlight=false;const chosen=[...actors.values()].filter(a=>ids.has(a.id)&&occupied(a)&&!a.counted);for(const a of chosen)a.toAlight=true;
+  if(!layout.navigation||!chosen.length)return 0;readySpeed=speed;
+  const plan=planExitDoors(chosen,doors,{policy:exitPolicy,active:[],service:exitPace?.service??{},walk:exitPace?.walk??.95}),byDoor=new Map();
+  for(const a of chosen){const d=plan.assignment.get(a.id);if(a.doorBufferId===d)continue;if(!byDoor.has(d))byDoor.set(d,[]);byDoor.get(d).push(a);}
+  let n=0;for(const [id,list]of byDoor){const d=doors.find(d=>d.id===id),to=a=>{const p=a.seatId?bySeat.get(a.seatId).anchor:a;return Math.abs(p.x-innerX({x:d.x,door:d}))+Math.abs(p.z-.37);};
+   list.sort((a,b)=>to(a)-to(b)||a.index-b.index).forEach((a,k)=>{a.readyDoorId=id;a.readyAt=time+k*gap;n++;});}
+  return n;
+ }
+ let readySpeed=.8;
+ function startReady(){for(const a of actors.values()){if(a.readyAt==null||a.readyAt>time)continue;a.readyAt=null;if(!occupied(a)||a.actions)continue;
+  const d=doors.find(d=>d.id===a.readyDoorId),seat=a.seatId?bySeat.get(a.seatId):null,from=seat?{x:seat.anchor.x+seat.forward.x*.23,z:Math.sign(seat.anchor.z)*.43}:{x:a.x,z:a.z},landing={x:innerX({x:d.x,door:d}),z:.37};
+  const free=standingLedger.seats.filter(p=>p.status==='free').map(p=>byStand.get(p.id)).filter(p=>p.doorBufferId===d.id).sort((p,q)=>Math.hypot(p.x-landing.x,p.z-landing.z)-Math.hypot(q.x-landing.x,q.z-landing.z));
+  navigator??=createCabinNavigator(layout);const others=[...actors.values()].filter(b=>b!==a&&(b.stage==='seated'||b.stage==='standing'));
+  for(const p of free.slice(0,3)){const route=navigator.route(from,{x:p.x,z:p.z},others);if(!route.path)continue;if(!(seat?standingLedger.reserve(a.id,[p.id]):standingLedger.reserveMove(a.id,p.id)))continue;
+   const walk=q=>({type:'walk',x:q.x,y:layout.floorY,z:q.z,speed:readySpeed,free:true});
+   a.readyFrom=seat?{seat:seat.id}:{place:a.standingId};a.readyPlace=p.id;a.doorId=d.id;
+   a.actions=[...(seat?[{type:'rise'},walk(from)]:[]),...route.path.slice(1).map(walk),{type:'turn',heading:p.heading},{type:'ready',place:p}];a.actionIndex=0;a.actionTime=0;a.actionStart=null;a.stage='walking';record('ready-admitted',a);break;}
+ }}
+ // (at the doorway place: the old place given back, the new one held; one whose stop came on the way sets off out from here)
+ function readyAt(a,p){
+  if(a.readyFrom.seat){ledger.releasePlace(a.readyFrom.seat,a.id);a.seatId=null;}else standingLedger.releasePlace(a.readyFrom.place,a.id);
+  a.standingId=p.id;a.doorBufferId=p.doorBufferId;a.readyFrom=null;a.readyPlace=null;settle(a);standingLedger.occupy(p.id,a.id);record('ready',a);
+  if(a.alightOnArrive){a.alightOnArrive=false;core.requestAlighting(a,'exit queue');exitFlow.schedule([a]);}
+ }
  // (#249: the boarders not yet on the entry steps for whom test(a) holds leave the queues and the controller, their places given back:
  // the doors closed on them, or the car is full. They are returned)
  function abandon(test=()=>true){const gone=[...actors.values()].filter(a=>!a.aboard&&!a.exiting&&(a.stage==='queue'||a.actions&&(a.actionIndex<3||a.actionIndex===3&&!a.actionTime))&&test(a));
   for(const a of gone){core.releasePlace(a);for(const c of channels){const i=c.queue.indexOf(a);if(i>=0)c.queue.splice(i,1);}actors.delete(a.id);}return gone;}
  // (#249: nothing moving, queued or planned: a step only counts the time)
- const idle=()=>!exitFlow.preparing&&channels.every(c=>!c.queue.length)&&![...actors.values()].some(a=>a.actions||a.exiting||a.yielding||a.stage==='exit queue');
- return {setExitPolicy(value){if(!['balanced','boarding'].includes(value))throw new Error('Unknown exit policy');exitPolicy=value;},layout,ledger,standingLedger,actors,channels,events,enqueue,preload,alight,seatAboard,reseat,abandon,doorDistance,quietDoor,get time(){return time;},get active(){return [...actors.values()].find(a=>a.actions||a.exiting||a.yielding)||null;},get message(){return message;},
+ const idle=()=>!exitFlow.preparing&&channels.every(c=>!c.queue.length)&&![...actors.values()].some(a=>a.actions||a.exiting||a.yielding||a.stage==='exit queue'||a.readyAt!=null);
+ return {setExitPolicy(value){if(!['balanced','boarding'].includes(value))throw new Error('Unknown exit policy');exitPolicy=value;},layout,ledger,standingLedger,actors,channels,events,enqueue,preload,alight,seatAboard,reseat,ready,abandon,doorDistance,quietDoor,get time(){return time;},get active(){return [...actors.values()].find(a=>a.actions||a.exiting||a.yielding)||null;},get message(){return message;},
  update(dt,{doorsOpen=true}={}){if(!Number.isFinite(dt)||dt<0)throw new Error('Non-negative finite dt required');if(dt===0){tick(0,doorsOpen);return;}if(!prepareStops&&idle()){time+=dt;return;}for(let left=dt;left>1e-8;left-=.025)tick(Math.min(left,.025),doorsOpen);},
  snapshot(){const active=[...actors.values()].filter(a=>a.actions||a.exiting||a.yielding),st=standingLedger.snapshot();return {waitingAvoidance:exitFlow.diagnostics,planningExits:exitFlow.preparing,scheduledExits:exitFlow.pending.length,exitPolicy,exitPlan,vehicleId,simulationTime:time,boarded,lastBoardDoorAt,lastExitDoorAt,lastExitRouteAt,...ledger.snapshot(),standing:st.seated,standingReserved:st.reserved,studyStandingPlaces:st.mappedSeats,queued:channels.reduce((n,c)=>n+c.queue.length,0),waitingForPlace:[...actors.values()].filter(a=>a.stage==='queue'&&!a.seatId&&!a.standingId).length,exited,active:active[0]?{id:active[0].id,stage:active[0].stage,seatId:active[0].seatId}:null,moving:active.length,doorStreams:channels.map(c=>({id:c.id,queued:c.queue.length,alighted:c.alighted,entry:c.entry??entryActors(c)[0]?.id??null,climbing:entryActors(c).filter(a=>a.legPose).length,descending:[...actors.values()].filter(a=>a.channel===c.id&&a.exiting&&a.legPose).length,direction:[...actors.values()].some(a=>a.doorId===c.door.id&&(a.stage==='exit queue'||a.exiting&&a.egressClearAt==null))?'out':'in'})),message};}};
 }
