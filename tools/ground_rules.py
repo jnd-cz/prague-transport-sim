@@ -74,7 +74,7 @@ RULES = {
                    "vysehrad-wall-over-the-ramp", "motol-wall-at-the-kerb", "repy-parking-kerb", "vystaviste-flush-parking",
                    "verge-by-a-car-park-no-wall", "wall-above-a-lower-walkway", "belohorska-plain-kerb", "yard-at-a-sidewalk",
                    "sidewalk-under-a-road-wall", "vinohradska-raised-corridor", "vinohradska-crossing", "motol-platform",
-                   "hlusickova-platforms"],
+                   "hlusickova-platforms", "kralovka-lawn-at-a-sidewalk"],
     },
     "beds": {
         "what": "track beds: their surface, edges and rails in the street (#539, #548, #606, #676)",
@@ -111,13 +111,14 @@ RULES = {
                    "narodni-divadlo-bridgehead", "motol-bridge-parapets"],
     },
     "plots": {
-        "what": "plots, lawns, yards and beds in a sidewalk: their heights, terraces, pits and thin strips (#638, #663, #696, #738, #764)",
+        "what": "plots, lawns, yards and beds in a sidewalk: their heights, terraces, pits and thin strips, a lawn at a raised edge (#638, #663, #696, #738, #764, #770)",
         "code": ["ground_mesh.terraces", "ground_mesh.pits", "ground_mesh.bare_holes", "ground_mesh.over_lidar",
-                 "ground_mesh.beside", "ground_partition.plot_height", "ground_partition.plot_pieces",
+                 "ground_mesh.beside", "ground_mesh.meet_lidar", "ground_partition.plot_height", "ground_partition.plot_pieces",
                  "ground_partition.thin_parts", "ground_partition.thin_strips", "ground_mesh.TERRACE*",
                  "ground_mesh.PIT*", "ground_partition.PLOT_*"],
         "places": ["garden-beds", "yard-at-a-sidewalk", "garden-edgings", "bed-in-a-sidewalk", "lattice-cell",
-                   "verge-by-a-car-park-no-wall", "vystaviste-flush-parking", "wall-end-in-a-path", "stairs-beside-a-building"],
+                   "verge-by-a-car-park-no-wall", "vystaviste-flush-parking", "wall-end-in-a-path", "stairs-beside-a-building",
+                   "kralovka-lawn-at-a-sidewalk"],
     },
     "lidar-pits": {
         "what": "IPR's pits under the survey's streets, filled from their rim in every reader of the raster (#867)",

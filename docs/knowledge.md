@@ -699,6 +699,27 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   (0.29) and the walls over 0.3 m in its 80 m square fall from 99.2 to 40.3 m. The old limit's reason was the
   page's drape (a yard on its 2 m terrain in 5 m triangles: 8 cm waves the street check read); the ground file lays
   lidar ground in 5 m cells of the city mesh, and the lines' `streetWaviness` comes with the batch.
+- **A lawn at a sidewalk's edge is no kerb** (#770, measured 2026-11-26 on the published ground of batch D). A lawn
+  or a yard on the lidar and a sidewalk on its street surface part by 0.05-0.3 m at their shared edge, and the weld
+  took the pair for a road at a kerb (`STEP`'s 3 cm): an upright face along the edge, a dark line at a grazing angle
+  (the user's note from Královka, line 23, 2026-11-26: "faint black lines on the ground [...] on both sides in the
+  green grassy area too"). Within 45 m of (-2890, 140): 234 m of such faces of 3-30 cm between grass and sidewalk,
+  100 m between grass and the tram's area, 83 m between sidewalk and the tram's area. IPR has the same difference
+  a metre either side (12 of 13 faces within 5 cm) and, at 1 m a cell, cannot tell a kerb from a bank; the user:
+  "the only raised areas with kerb above track seem to be the stop platforms. Other raise areas like the green
+  patches rise with smoother slope". The weld now lets a lidar corner within `MEET_STEP` of a raised top corner take
+  the edge's height (`ground_mesh.weld`); its face rises to the lawn's own ground from there. In the 1.5 km square
+  round the loop 13,299 lidar corners stood over 3 cm off a raised edge and meet it (5,454 over 10 cm). What stays:
+  a difference over 0.3 m; the faces between grass and the tram's area, which are the bed 0.10-0.18 m under the
+  street surface on the loop's other tracks (#539's kind); a branch track's bed against the route's in a switch
+  (#732).
+  - **The shift fades into the lawn** (`ground_mesh.meet_lidar`, over `MEET_FADE`, an area's corners from its own
+    edge corners). Moved at its edge corner alone, a lawn stood as a sliver wherever one of its 5 m lattice corners
+    lay near the border: at (-2889.000, 144.000), 4.6 cm inside the border corner welded to the tram's area, 7 cm
+    over it, two slivers at 57-67 degrees running out along the lattice's lines for 3.7 and 4.7 m. The page draws
+    the ground double-sided, and such a sliver's back side shows as a dotted dark line at a grazing angle (the
+    user's second picture, the grass strip from the cab; the drawing side is on #734). A section across it: a
+    largest step of 0.09 m on the published ground, 0.03 m faded.
 - **A parking area is such a yard** (#800, measured 2026-11-21 on ground batch C). It has heights on its outline only,
   from the survey's lines in height class 5 (a mean error of 0.35 m). The bay along Vinohradská's north carriageway
   (line 9 s 15360-15420, area 3091, 822 m², 0.42 m at p95) shares one such line with the sidewalk behind it; one
