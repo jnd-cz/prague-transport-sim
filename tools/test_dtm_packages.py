@@ -183,6 +183,7 @@ class Readers(unittest.TestCase):
                          'zps_shelters.py','zps_layers.py','heavy.py','baseline_store.py'):
                 shutil.copyfile(Path(__file__).parent / name, tools / name)
             (tools / 'ipr_dtm.py').write_text('import numpy as np\n\n\nclass IprDtm:\n'
+                                              '    def __init__(self, fills=None):\n        pass\n\n'
                                               '    def sample(self, E, N):\n        return np.full(np.shape(E), 200.0)\n',
                                               encoding='utf-8')
             (root / 'data').mkdir()
@@ -213,6 +214,7 @@ class Readers(unittest.TestCase):
                 shutil.copyfile(Path(__file__).parent / name, tools / name)
             # (the IPR terrain is a 2 GB raster: a flat stand-in at the test's 200 m)
             (tools / 'ipr_dtm.py').write_text('import numpy as np\n\n\nclass IprDtm:\n'
+                                              '    def __init__(self, fills=None):\n        pass\n\n'
                                               '    def sample(self, E, N):\n        return np.full(np.shape(E), 200.0)\n',
                                               encoding='utf-8')
             (root / 'data').mkdir()
