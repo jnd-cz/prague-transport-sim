@@ -1485,6 +1485,23 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   person at the queue (a number from the car and its index, a shirt by it). Those who alight walk from where the core lets them
   go (clear of the door, up to about 6 m off the track) to a lane 2.3-2.6 m off it and along it to the platform's nearer end and
   1.5 m past it, and go (drawn only; before, 3 s on the way they faced).
+- **The front door alone, Dveře I** (#249; the user, 2026-11-26: "only the 1st door in car where driver sits"; "first door
+  opening is usually used only for driver (like for switch) or is someone runs from the front side of tram"; those waiting walk
+  to it and get on, those to alight leave through it: "yes"; using it is the player's choice, no points). `U` (the panel's DVEŘE
+  I; not Shift+D: the dead-man pedal is a held Shift) opens the first car's front door with the others shut, or closes it; `D`
+  (DVEŘE II) then opens the others, it staying open. With it alone open the passenger core sends everyone bound for another door
+  to it (`src/passengers/consist.js` `onlyDoor`, `gather`; `boarding-state.js` `redirect`): in the first car the boarders not
+  yet on the steps join its queue (keeping the places they reserved) and the alighters not yet set off are planned out through
+  it (`exit-flow.js` `drop`: their plans taken from the other doors, whose reservations are rebuilt); the second car's boarders
+  are handed to the first car where they stand (x less the 15.04 m between the cars' middles, CAR_PITCH, on a straight platform)
+  and walk there as its queue moves up, the same figure (`from`, `src/passengerView.js`); its alighters stay aboard (no way
+  through between the cars) until all the doors open or the next stop, and those still aboard when the tram leaves cost 10 each
+  as before. Those walking in go to it. Its closing lets go of the rule: those at it wait there. The switch iron needs the front
+  door open (Dveře I or all). The detailed model draws the first car's front door apart (`src/rigged.js` `poseRigged`'s
+  `front`), as does the cab's frame. The autopilot opens all the doors at a stop where it finds the front one alone open.
+  Measured (`tools/test_consist.py`, two cars, 60 aboard): 24 queued at both cars' shut doors and the first car's 10 alighters
+  through the front door alone in 40.4 s, the hand-over between the cars 0.03 m; on line 17 (`tools/test_people.py`) six at
+  the shut doors walk to it, at most 0.11 m between drawn steps.
 - **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
   is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
   model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body

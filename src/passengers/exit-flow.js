@@ -3,6 +3,7 @@
 // accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
 // #249: changed: the alighting pace an option (PACE, the lab's values by default: the lab's times hold).
 // #249 step 2: changed: an alighter already on the steps when the door closes finishes the way out (the lab froze them there).
+// #249 (2026-11-26, Dveře I): changed: drop (exits not yet set off taken from their door's plans, for another door).
 import {createCabinNavigator,pointPolygonDistance} from './cabin-navigation.js';
 // Cooperative time/space reservations for the stationary cabin's authored exit routes.
 // No scene objects. Optional root-core/waiting-outline guard is a bounded experiment.
@@ -94,5 +95,15 @@ export function createExitFlow(layout,channels,{pace=PACE,onRelease,onOutside,on
    // Past reservations cannot affect newly scheduled routes.
    const past=Math.floor(group.time/STEP)-3;for(const key of group.table.keys())if(key<past)group.table.delete(key);
   }if(wake){wake=false;retryBlocked();}}
- return {schedule,prepare,update,get preparing(){return pending.length;},get diagnostics(){return {mode:avoidWaiting?'guarded':'reference',rootRadius:navigator?.radius??null,detours,yields,blocked:[...blockedPlans.values()].map(a=>({id:a.id,...a.navigationBlocked}))};},reset(){pending.length=0;blockedPlans.clear();detours=0;yields=0;navigator?.clearCache();for(const g of groups.values()){g.time=0;g.table.clear();g.plans.clear();g.bufferRelease=0;g.assigned=[0,0];g.nextEntry=[0,0];}},get pending(){return [...groups.values()].flatMap(g=>[...g.plans.keys()]);}};
+ // (#249, Dveře I: the front door alone) the exits of `test` not yet set off dropped: those planned and not under way from their
+ // door's plans (not admitted, or admitted with their door shut before they moved: back in the exit queue; its reservations rebuilt
+ // from the plans kept), those not planned yet from the queue; the caller sends them to another door and schedules them again.
+ // The passengers dropped
+ function drop(test){const out=[];for(const group of groups.values()){let n=0;for(const [id,plan]of group.plans)if(plan.kind!=='yield'&&(plan.baseDistance==null||group.time/STEP-plan.start<=0)&&test(plan.a)){
+    if(plan.baseDistance!=null)Object.assign(plan.a,{exiting:false,exitAdmittedAt:null,stage:'exit queue',motion:plan.a.seatId?'Sit':'Idle',speedMps:0});
+    group.plans.delete(id);out.push(plan.a);n++;}
+   if(n){group.table.clear();for(const plan of group.plans.values())reserve(group,plan.trace,plan.start);}}
+  for(let i=pending.length-1;i>=0;i--)if(test(pending[i]))out.push(...pending.splice(i,1));
+  return out;}
+ return {schedule,prepare,update,drop,get preparing(){return pending.length;},get diagnostics(){return {mode:avoidWaiting?'guarded':'reference',rootRadius:navigator?.radius??null,detours,yields,blocked:[...blockedPlans.values()].map(a=>({id:a.id,...a.navigationBlocked}))};},reset(){pending.length=0;blockedPlans.clear();detours=0;yields=0;navigator?.clearCache();for(const g of groups.values()){g.time=0;g.table.clear();g.plans.clear();g.bufferRelease=0;g.assigned=[0,0];g.nextEntry=[0,0];}},get pending(){return [...groups.values()].flatMap(g=>[...g.plans.keys()]);}};
 }

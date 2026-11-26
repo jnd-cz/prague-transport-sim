@@ -12,7 +12,7 @@
 // stood (src/game.js runners, the boarder's `who`), is the same figure on: their key, look and place go on into the queue (the
 // user, 2026-11-26: "Can we keep the single model and transition him smoothly from running to queueing for door and getting
 // inside, with the same stats?"). One who alighted walks from where the core lets them go to a lane along the platform and on
-// to its nearer end, and goes.
+// to its nearer end, and goes. With the front door alone open (Dveře I), one sent there from the other car is the same figure on.
 import * as THREE from 'three';
 
 const EASE = 1.3; // m/s: from the crowd's place, or where a runner stopped, to the queue (only drawn: the core has them queued already)
@@ -57,9 +57,11 @@ export class PassengerView {
         alive.add(a.id);
         const on = a.z < edge || !!a.legPose;
         let s = this.seen.get(a.id);
+        // (one sent from another car to the front door alone, Dveře I: the same figure on, consist.js gather's `from`)
+        if (!s && a.from && this.seen.has(a.from)) { s = this.seen.get(a.from); this.seen.delete(a.from); this.seen.set(a.id, s); }
         if (!s) { s = { spot: null, off: null, walked: 0, last: null, n: null, shirt: null }; this.seen.set(a.id, s); }
         const who = a.who || null; // (a runner's or a walker's figure goes on: their record's key)
-        const r = { key: who || a.id, parent: null, local: null, m: new THREE.Matrix4(), x: 0, y: 0, z: 0, shirt: null, n: 0, shown: true, pax: null };
+        const r = { key: who || s.key || a.id, parent: null, local: null, m: new THREE.Matrix4(), x: 0, y: 0, z: 0, shirt: null, n: 0, shown: true, pax: null };
         // the car-local pose (the figure faces +X, as the cabin's frame; scaled to the cabin's fit, as the lab drew them)
         this._q.setFromAxisAngle(UP, a.heading ?? 0);
         const local = new THREE.Matrix4().compose(this._p.set(a.x, a.y, a.z), this._q, this._s.set(fit.x, fit.y, fit.z));

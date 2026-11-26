@@ -17,8 +17,10 @@ starts with nobody aboard and nobody to alight there, and nobody waits for other
 At the next stop, the departure 12 s off, one walking in from the platform's front end and one from its back end who runs (a walk
 would not make it) are each one figure from the platform into the car (the same key, look and shirt in every drawn step, none
 missing, no jump); the doors closed on four at them and opened again, they wait at the doors and get on, 15 points off each
-once; then the departure time come, one running 25 m from their door is waited for and gets on (the points for waiting), one
-45 m off is not waited for, left without a penalty (#249)."""
+once; with the doors shut the switch iron is refused, with the front door alone open (Dveře I, U) the driver gets out; six
+queued at the shut doors of both cars walk to the front door alone, each one figure, and get on there with one walking in, nobody
+into the second car, that door alone drawn open, then Dveře II opens all; then the departure time come, one running 25 m from
+their door is waited for and gets on (the points for waiting), one 45 m off is not waited for, left without a penalty (#249)."""
 import argparse
 import faulthandler
 import functools
@@ -207,6 +209,53 @@ SCENE = """async () => {
   g.toggleDoors();
   for (let t = 0; t < 40 && st.waiting > 0; t += dt) still(dt);
   out.shut = { out0, w0, closed, again, after: st.waiting, aboard: g.pax.aboard };
+  // (Dveře I, the user, 2026-11-26: "only the 1st door in car where driver sits"; the driver gets out by it, "like for switch")
+  // the doors shut: the switch iron refused until the front door alone is open (U), then the driver gets out; six more queued at
+  // the shut doors of both cars and the front door alone opened: they walk to it, each one figure, and get on there, as does one
+  // walking in from the back end; nobody gets into the second car; the drawn doors: that one open, the others shut; then Dveře II
+  // (D): all of them
+  const { poseT3 } = await import('/src/models.js');
+  const rigs = () => model.userData.cars.map((c) => c.userData.rig.doorClips.map((a, i) => `${c.userData.rig.doorNames[i]}:${(a.time / a.getClip().duration).toFixed(2)}`).join(' '));
+  const drawn = () => { poseT3(model, { doors: g.otherDoorsOpenness, front: g.frontDoorOpenness }); return rigs(); };
+  const car1 = () => { const c = g.pax.cars[1]; let n = c.counted; for (const a of c.c.actors.values()) if (a.aboard) n++; return n; };
+  st.sched = g.clock + 300; // (the tram not ready to leave meanwhile: nobody marked as waited for, src/game.js readyAt)
+  g.toggleDoors(); still(3.5);
+  const iron = {};
+  g.switches.push({ s: g.tram.s + 20, passed: false, pos: 'straight', test: true });
+  g.crowbar(); iron.shut = { action: !!g.action, msg: g.messages.at(-1)?.text };
+  g.toggleFrontDoor(); still(2.5);
+  g.crowbar(); iron.front = { action: !!g.action, doors: drawn() };
+  g.action = null; g.switches.pop();
+  g.toggleFrontDoor(); still(3.5);
+  g.pax.board(6, st.i); st.waiting += 6;
+  for (let t = 0; t < 2; t += dt) { g.update(dt, hold); traffic.update(dt); draw(); }
+  const keys = g.pax.cars.flatMap((c, k) => c.c.outside((a) => a.tag === st.i).map((a) => ({ key: a.who || a.id, car: k })));
+  const tr2 = keys.map(() => []), in1 = car1();
+  g.toggleFrontDoor();
+  g._spawnWalker(st, 'back');
+  const w = g.runners[g.runners.length - 1], only = { front: g.frontOnly, walker: [w.car, w.door] };
+  let doors1 = null;
+  for (let t = 0; t < 90 && (st.waiting > 0 || w.state !== 'aboard'); t += dt) {
+    g.update(dt, hold); traffic.update(dt); draw();
+    if (doors1 === null && t > 2.5) doors1 = drawn();
+    keys.forEach(({ key }, i) => { const rec = people.recs.find((x) => x.key === key); tr2[i].push(rec ? { x: rec.x, y: rec.y, z: rec.z, n: rec.n, shirt: rec.shirt.getHex() } : null); });
+  }
+  only.left = st.waiting; only.walkerState = w.state; only.car1 = [in1, car1()]; only.doors = doors1;
+  only.who = keys.map(({ car }, i) => {
+    const tr = tr2[i], first = tr.findIndex(Boolean), looks = new Set();
+    let gaps = 0, jump = 0;
+    for (let k = first; k >= 0 && k < tr.length; k++) {
+      const p = tr[k], q = tr[k - 1];
+      if (!p) { gaps++; continue; }
+      looks.add(`${p.n}/${p.shirt}`);
+      if (q && k > first) jump = Math.max(jump, Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z));
+    }
+    return { car, seen: first >= 0, gaps, looks: looks.size, jump: +jump.toFixed(3) };
+  });
+  // (gaps: steps after the first drawn one without the figure, the last ones aboard out of view counted too: they are inside)
+  g.toggleDoors(); still(2.5);
+  only.all = { front: g.frontOnly, doors: drawn() };
+  out.only = { iron, ...only };
   // the departure time a second off: one 25 m from their door, one 45 m
   g._spawnWalker(st, 'back'); g._spawnWalker(st, 'back');
   const [near, far] = g.runners.slice(-2);
@@ -226,6 +275,16 @@ SCENE = """async () => {
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
+
+
+def doors_open(cars, front_only):
+    """The drawn doors ("Front:1.00 ..." a car, its clips' share of their way): all open, or the first car's front door alone."""
+    for k, s in enumerate(cars or []):
+        for part in s.split():
+            name, v = part.split(":")
+            if abs(float(v) - (1.0 if not front_only or (k == 0 and name == "Front") else 0.0)) > 0.02:
+                return False
+    return bool(cars)
 
 
 def importmap():
@@ -341,6 +400,21 @@ def main():
                         f"15 points each, once a person ({sh['closed']['penalty']}, after closing again {sh['again']})":
                             sh["closed"]["penalty"] == 15 * sh["out0"] == sh["again"],
                         f"opened again, all of them got on (still waiting {sh['after']})": sh["after"] == 0,
+                    }
+                    fails += [f"scene: {k}" for k, ok in want.items() if not ok]
+                    on, ir = sc["only"], sc["only"]["iron"]
+                    on2 = [x for x in on["who"] if x["car"] == 1]
+                    want = {
+                        f"the switch iron with the doors shut: refused ({ir['shut']})": not ir["shut"]["action"] and "(U)" in (ir["shut"]["msg"] or ""),
+                        f"the front door alone open (U): the driver gets out, the doors drawn {ir['front']['doors']}":
+                            ir["front"]["action"] and doors_open(ir["front"]["doors"], front_only=True),
+                        f"Doors I drawn while they board: the first car's front door alone open ({on['doors']})": doors_open(on["doors"], front_only=True),
+                        f"Doors I: those at the shut doors and one walking in get on through it ({on['left']} left; the walker by "
+                        f"{on['walker']}, {on['walkerState']})": on["front"] and on["left"] == 0 and on["walkerState"] == "aboard" and on["walker"] == [0, "Front"],
+                        f"Doors I: nobody into the second car ({on['car1']})": on["car1"][0] == on["car1"][1],
+                        f"Doors I: the {len(on['who'])} at the shut doors ({len(on2)} at the second car's) each one figure on into the first car ({on['who']})":
+                            len(on["who"]) == 6 and on2 and all(x["seen"] and x["gaps"] == 0 and x["looks"] == 1 and x["jump"] < 0.6 for x in on["who"]),
+                        f"Doors II after it: all open ({on['all']})": not on["all"]["front"] and doors_open(on["all"]["doors"], front_only=False),
                     }
                     fails += [f"scene: {k}" for k, ok in want.items() if not ok]
                     dep = sc["dep"]

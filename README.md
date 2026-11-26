@@ -54,6 +54,9 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
   nastupujících zůstane stát, i když je volno; uvolněná sedadla zaberou stojící, kteří chtějí sedět, i za jízdy. Kdo už je na schodech,
   když zavřete dveře, projde; ostatní počkají u dveří a nastoupí, když je znovu otevřete (zavřít jim dveře před nosem
   stojí 15 bodů za každého); když odjedete, zůstanou na zastávce. Kdo nestihl vystoupit, vystoupí na další.
+  Klávesou `U` (Dveře I) otevřete jen přední dveře u řidiče: tudy řidič vystupuje se stavěcím klíčem a tudy
+  pustíte toho, kdo přiběhne zepředu. Čekající k nim dojdou a nastoupí, z prvního vozu se jimi vystupuje, z druhého
+  vozu se vystoupit nedá, dokud klávesou `D` neotevřete všechny dveře.
   S podrobným modelem tramvaje (výchozím) jsou cestující vidět: okny sedí a stojí ve voze, po schodech vystupují a
   nastupují, čekající jdou z nástupiště ke dveřím a v pravém zrcátku uvidíte, kdo ještě nastupuje. Ty nad 105 vůz jen
   počítá a vidět jsou jen na schodech a venku.
@@ -72,11 +75,12 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 | `1`–`5` | jízdní stupeň; se `Shift` brzdný |
 | `R` | zabrzdit a odbrzdit zajišťovací brzdu (pokročilé ovládání) |
 | `A` | pískování (držet) |
-| `D` | dveře |
+| `D` | dveře (Dveře II: všechny) |
+| `U` | jen přední dveře u řidiče (Dveře I) |
 | `B` | zvonec |
 | `Y` | tlačítko **Výhybka**: proud přes kontakt (držet) |
 | `C` | odpojení topení (držet pod kontaktem, pro průjezd bez proudu) |
-| `X` | přestavit výhybku stavěcím klíčem (stojící vůz) |
+| `X` | přestavit výhybku stavěcím klíčem (stojící vůz, otevřené přední dveře) |
 | `H` / `K` / `F` | topení sedaček v salónu / kalorifer / klapka odpadního tepla |
 | `Q` / `E` nebo `←` / `→` | pohled z levého / pravého okna (držet) |
 | `G` | přiblížit pohled ze stanoviště třikrát, jako když se řidič zahledí do dálky: přečtete návěst na 75 m (držet, i v pauze) |

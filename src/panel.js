@@ -41,7 +41,10 @@ const C = {
   nevyst: { cs: 'Nevystu-<br>povat', en: 'Do not<br>alight', sim: true, src: 'ckd03 p. 10',
     en_: 'Buzzers at all doors while held; closing all doors needs it first. In the game D does both.',
     cs_: 'Bzučáky u všech dveří, dokud je stisknuto; zavření všech dveří jej vyžaduje. Ve hře obojí udělá D.' },
-  dvere1: { cs: 'Dveře I', en: 'Doors I', sim: false, src: 'ckd24 § 7.1', en_: 'The front door alone.', cs_: 'Jen přední dveře.' },
+  // (#249, the user, 2026-11-26: "only the 1st door in car where driver sits")
+  dvere1: { cs: 'Dveře I', en: 'Doors I', sim: true, src: 'ckd24 § 7.1',
+    en_: "The front door alone, by the driver: open, or close. Those waiting walk to it; those in the second car can't get off.",
+    cs_: 'Jen přední dveře u řidiče: otevřít, nebo zavřít. Čekající k nim dojdou; z druhého vozu se vystoupit nedá.' },
   dvere2: { cs: 'Dveře II', en: 'Doors II', sim: true, src: 'ckd24 § 7.1',
     en_: 'All doors: open, or close after the warning.', cs_: 'Všechny dveře: otevřít, nebo zavřít po výstraze.' },
   houk: { cs: 'Světelná<br>houkačka', en: 'Light<br>horn', sim: true, src: 'schema TSH',
@@ -107,7 +110,7 @@ const C = {
     en_: "The run's timetable, the next stop marked.", cs_: 'Jízdní řád pořadí, příští zastávka vyznačena.' },
 };
 // the game's key for a control (shown on it with the assist option); held: the key is held while the control is
-const KEYS = { bezp: ['Space', ' ', true], nevyst: ['D', 'd'], dvere2: ['D', 'd'], houk: ['L', 'l', true], zvonek: ['B', 'b'],
+const KEYS = { bezp: ['Space', ' ', true], nevyst: ['D', 'd'], dvere1: ['U', 'u'], dvere2: ['D', 'd'], houk: ['L', 'l', true], zvonek: ['B', 'b'],
   svetl: ['⇧L', 'L'], smer: [', .'], vyhybka: ['Y', 'y', true], vystr: ['/', '/'], kalor: ['K', 'k'], salon: ['H', 'h'],
   vyptop: ['C', 'c', true], pisek: ['A', 'a', true] };
 // the lamp strip, left to right (6921's "ED – OPRAVNY" plate): [lamp, cs, en, the LED's shape]. V is the stop request,
@@ -452,8 +455,10 @@ export class Panel {
       if (!k || !k[1] || C[id].sim !== true) return;
       if (id === 'nevyst' && document.body.dataset.doors === 'closed') return; // (it only warns: the doors are shut)
       e.preventDefault();
-      send('keydown', k[1]);
-      if (!k[2]) { send('keyup', k[1]); return; }
+      // (with the front door alone open, Dveře I, the warning and the closing are its: U)
+      const key = id === 'nevyst' && document.body.dataset.front === '1' ? 'u' : k[1];
+      send('keydown', key);
+      if (!k[2]) { send('keyup', key); return; }
       down.set(e.pointerId, k[1]);
       try { el.setPointerCapture(e.pointerId); } catch { /* (gone) */ }
     });
@@ -597,6 +602,7 @@ export class Panel {
     const tram = game.tram, eq = tram.eq, lamps = game.lamps || {}, e = this.el, now = performance.now();
     const set = (k, v, f) => { if (this.state[k] !== v) { this.state[k] = v; f(v); } };
     set('doors', game.doorState, (v) => { b.dataset.doors = v; });
+    set('front', !!game.frontOnly, (v) => { b.dataset.front = v ? '1' : ''; });
     b.classList.toggle('passist', !!opts.assist);
     b.classList.toggle('pdeadman', !!opts.deadman);
     // the dial, the meters
@@ -629,7 +635,8 @@ export class Panel {
     cl('bezp', 'down', h[' ']); cl('houk', 'down', lamps.held); cl('vyhybka', 'down', h.y); cl('vyptop', 'down', h.c);
     cl('zvonek', 'down', now - this.bellT < 300); cl('nevyst', 'down', game.doorState === 'closing'); cl('nevyst', 'lit', game.doorState === 'closing');
     cl('napeti', 'lit', tram.voltage > 200); cl('vystr', 'lit', ind === 'hazard' && blink);
-    knob('dvere2', game.doorState === 'closed' || game.doorState === 'closing' ? OFF : ON); knob('dvere1', OFF);
+    const opened = game.doorState === 'open' || game.doorState === 'opening';
+    knob('dvere2', opened && !game.frontOnly ? ON : OFF); knob('dvere1', opened && game.frontOnly ? ON : OFF);
     knob('kalor', POS.kalor[game.climate.cab][1]); knob('salon', POS.salon[game.climate.saloon][1]);
     knob('svetl', lamps.high ? -26 : 26); knob('smer', ind === 'left' ? -28 : ind === 'right' ? 28 : 0);
     knob('pisek', h.a || tram.sanding ? -30 : 20); knob('vystr', ind === 'hazard' ? ON : OFF);
