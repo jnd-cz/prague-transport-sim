@@ -72,7 +72,7 @@ class TrafficScenes(unittest.TestCase):
 
     def test_the_order_the_cars_stand_in_decides_nothing(self):
         # (each step plans every car from the state at its start, and goes through them by id, #566)
-        for name in ('junction', 'queueBeyond', 'sideRoad'):
+        for name in ('junction', 'queueBeyond', 'sideRoad', 'queuePastTrack', 'crossPastTrack'):
             with self.subTest(name):
                 r = self.page.evaluate(ORDER, name)
                 self.assertGreaterEqual(r['cars'], 3)
@@ -113,6 +113,23 @@ class TrafficScenes(unittest.TestCase):
         self.assertGreaterEqual(r['tramVMin'], 9.9)  # (the tram never braked for it)
         self.assertGreater(r['crossedAt'], r['tailPast'])
 
+    def test_a_car_waits_before_the_track_for_room_past_it(self):
+        # (#602: the car ahead moving, the queue it will stop behind standing past the track; before, the second car followed
+        # the first and stood across the track, its nearer end 1.2 m past the centre)
+        r = self.play('queuePastTrack')
+        self.clean(r)
+        self.assertGreater(r['clear'], 2.6)  # (outside the band, 2.6 m each side of the centre)
+        self.assertIsNotNone(r['through'])
+
+    def test_a_car_waits_before_the_track_for_one_crossing_its_way_past_it(self):
+        # (#602, line 23 s 329, seed 31, the user's picture: before, the car went on and met the crossing one 8 m past the
+        # track, the two 0.23 m inside each other)
+        r = self.play('crossPastTrack')
+        self.clean(r)
+        self.assertGreater(r['atCross'], 2.6)
+        self.assertGreater(r['clear'], 2.6)
+        self.assertIsNotNone(r['through'])
+
     def test_walkers_round_a_ring_of_walks_no_longer_hold_a_car(self):
         # (#496: before #608 the walkers circled the ring for good and the car stood behind them)
         jam = self.play('walkerRing', fixOff=True, t=90)
@@ -140,6 +157,8 @@ class TrafficScenes(unittest.TestCase):
           const out = {};
           // two cars from the south and the east, each held by the other: the east one has nobody on its right
           { const tr = make(), s = S(), e = E(); s.waitFor = e; e.waitFor = s; out.two = goes(tr, [s, e]); out.cls = tr.circlesLetGo; }
+          // the same, the east one held off a track for want of room past it: not sent onto it, the south one goes (#602)
+          { const tr = make(), s = S(), e = E(); s.waitFor = e; e.waitFor = s; e.keepClear = true; out.offTracks = goes(tr, [s, e]); }
           // every arm taken, each waiting for the one on its right: the one that has stood longest
           { const tr = make(), cs = [S(), E(), N(), W()]; cs.forEach((c, i) => { c.waitFor = cs[(i + 1) % 4]; }); cs[3].stood = 40; out.four = goes(tr, cs); }
           // the east car follows the south one on its way (not a rule's hold): the south one goes
@@ -152,6 +171,7 @@ class TrafficScenes(unittest.TestCase):
         }''')
         self.assertEqual(r['two'], [2])
         self.assertEqual(r['cls'], {'rules': 1})
+        self.assertEqual(r['offTracks'], [1])
         self.assertEqual(r['four'], [4])
         self.assertEqual(r['follower'], [1])
         self.assertEqual(r['right']['hx'], 1)

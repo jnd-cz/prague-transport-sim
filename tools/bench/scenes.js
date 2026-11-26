@@ -181,6 +181,17 @@ function queue(T, road, dir, s, cars, next = null) {
   return out;
 }
 
+// a car going south over our track at y 0: its least clearance of the track's centre while it stands (its box's nearer end,
+// car.clear; Infinity: it never stood near it) and when it is 20 m past it (car.through); the queue's head `A` goes at `until`
+function clearance(car, clock, until, A) {
+  car.clear ??= Infinity;
+  if (A && clock >= until) A.v = 10;
+  if (!car.active) return;
+  const p = car.path.at(car.s);
+  if ((car.vNow ?? 1) < 0.3 && Math.abs(p.y) < 20) car.clear = Math.min(car.clear, r1(Math.abs(p.y) - car.half));
+  if (car.through === undefined && p.y < -20) car.through = r1(clock);
+}
+
 // when each car first stands on its goal road (off a junction's connector): { id: clock }
 function arrivals(goal) {
   const at = {};
@@ -285,6 +296,34 @@ export const SCENES = {
       if (crossedAt === null && p && car.lane.k === 1 && p.y + car.half < -1.5) crossedAt = r1(clock); // (its rear off the far rail)
       if (tailPast === null && tr.s - tr.length > 160 + 2.5) tailPast = r1(clock); // (route s 160: x 60)
     }, report: () => ({ yielded, tramVMin: r1(vMin), crossedAt, tailPast }) };
+  },
+
+  // A one-way street south over our track (along x at y 0) into a junction 14 m past it, a queue standing 20 m on beyond it
+  // until `until` s, and two cars coming, the first moving: the second waits before the track, not behind the first on it
+  // where the queue would stop them (#602). Reports car 1's least clearance of the track's centre while it stands: its box's
+  // nearest end to y 0 (the band is 2.6 m), and when every car is past the junction.
+  queuePastTrack({ until = 20 } = {}) {
+    const T = build({ roads: [{ p: [[0, 60], [0, -14]], o: 1 }, { p: [[0, -14], [0, -80]], o: 1 }], track: [[-150, 0], [150, 0]] });
+    const A = addCar(T, { road: 1, dir: 1, s: 9, v: 0, vNow: 0, id: 10 });
+    addCar(T, { road: 0, dir: 1, s: 37, vNow: 6, v: 6, next: 1, id: 2 });
+    const car = addCar(T, { road: 0, dir: 1, s: 24, vNow: 6, v: 6, next: 1, id: 1 });
+    return { T, t: 45, each: (T, clock) => clearance(car, clock, until, A), report: () => ({ clear: car.clear, through: car.through }) };
+  },
+
+  // The same street, and a one-way street east over it 8 m past the track with no junction there (as short lanes inside a
+  // junction in the data): a car on it from car 1's right gets to where their ways cross with car 1. Car 1 waits before
+  // the track, not on it for that car (line 23 s 329, seed 31, the user's picture, #602). Reports also car 1's clearance of
+  // the track's centre as car 3 crosses its way (x 0).
+  crossPastTrack() {
+    const T = build({ roads: [{ p: [[0, 60], [0, -60]], o: 1 }, { p: [[-60, -8], [60, -8]], o: 1 }], track: [[-150, 0], [150, 0]] });
+    const x = addCar(T, { road: 1, dir: 1, s: 15, vNow: 8, v: 8, id: 3 });
+    const car = addCar(T, { road: 0, dir: 1, s: 30, vNow: 6, v: 6, id: 1 });
+    addCar(T, { road: 0, dir: 1, s: 16, vNow: 6, v: 6, id: 4 }); // (one behind it)
+    let atCross = null;
+    return { T, t: 30, each: (T, clock) => {
+      clearance(car, clock, Infinity, null);
+      if (atCross === null && x.path.at(x.s).x > 0) atCross = r1(Math.abs(car.path.at(car.s).y) - car.half);
+    }, report: () => ({ clear: car.clear, through: car.through, atCross }) };
   },
 
   // #496 (line 23 s 3349, seed 1): walk A's end links 1 m back to a link crossing a car lane to walk B, 1 m before B's

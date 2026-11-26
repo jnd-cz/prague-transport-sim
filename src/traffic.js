@@ -499,7 +499,11 @@ export class Traffic {
       const set = new Set(ring);
       const onWay = (c, o) => this._seq(c).some(([path]) => path === o.path);
       const byRule = (c) => (c.why === 'junction' && set.has(c.waitFor)) || (set.has(c.seen?.car) && !onWay(c, c.seen.car));
-      const ruled = ring.filter(byRule), cand = ruled.length ? ruled : ring;
+      // (not one held off the tracks for want of room past them: it would stand on them, and it stays held, so another of
+      // the circle goes; line 23 s 326, seed 80: one let go so crept into the band for 54 s, #602)
+      const able = ring.filter((c) => !c.keepClear);
+      if (!able.length) continue;
+      const ruled = able.filter(byRule), cand = ruled.length ? ruled : able;
       const pose = new Map(ring.map((c) => [c, c.path.at(c.s)]));
       const clear = cand.filter((c) => !ring.some((o) => o !== c && fromRight(pose.get(c), pose.get(o))));
       const stood = (c) => c.stood || 0;
@@ -508,7 +512,8 @@ export class Traffic {
       go.letGoAt = clock; // (when it last went so: the checks read it)
       const key = ring.map((c) => c.id).join('>');
       if (!this._letGoAt.has(key)) {
-        const cls = ruled.length === ring.length ? 'rules' : ruled.length ? 'tangled' : 'followers';
+        const held = ruled.length + ring.length - able.length; // (one held off the tracks is held by a rule)
+        const cls = held === ring.length ? 'rules' : held ? 'tangled' : 'followers';
         this.circlesLetGo ||= {};
         this.circlesLetGo[cls] = (this.circlesLetGo[cls] || 0) + 1;
       }
@@ -754,7 +759,7 @@ export class Traffic {
         // (#602, the user, 2026-11-14: "they dont stop in front of the opposite direction's track when yielding to oncoming
         // trams": both tracks, each with its trams, ours and the AI trams ahead of it on ours, the oncoming ones on the other;
         // and a car waits before the first track it reaches: tracks with no room for a car between them are crossed as one)
-        let xGap = null, keepClear = false, yieldAi = null;
+        let xGap = null, keepClear = false, kcFor = null, yieldAi = null;
         // (dC: the car's middle to where the band begins; a band entered on the path before, the next one starting
         // inside it, is one place with its entry there: a car turning into a lane along the track stood with its nose on
         // it, giving way at the second copy past the first's edge, and the tram hit it, line 17 s 9903, seed 1; at Újezd
@@ -770,6 +775,9 @@ export class Traffic {
             if (d > -2 && (path !== c.path || o.s > c.s) && (gap === null || d < gap)) { gap = d; vLead = o.vNow ?? 0; lead = o; }
           }
         }
+        // (the car ahead whatever a circle lets this one do: no circle sends a car onto the tracks without room past them,
+        // below, #602)
+        const gap0 = gap, lead0 = lead;
         // the one of a circle that goes does not follow a car of it (three cars at a junction: one on the connector
         // ahead of the next, who waited for the third, who overlapped the first; line 17 s 21178, the tram stuck
         // behind); what it sees still stops it
@@ -842,17 +850,29 @@ export class Traffic {
           // the way across (the group's bands and a car's length). A car stood on the track behind a queue that
           // waited, round the junction, for a car giving way to our tram, which waited for the first
           // (line 9 s 11221, seed 2)
-          if (!across && gap !== null && vLead < 1 && gap < Math.max(0, wait) + (x.g.dOut - x.g.dC) + 2 * c.half && canStop && wait > 0) {
-            xGap = wait - YIELD_GAP + 8; if (ours) c.xing = x; keepClear = true; break;
+          // (the room the queue ahead will leave, not the gap to the car ahead now: one that stops behind a standing car stands
+          // 8 m short of it, following(), and cars moving ahead stop so behind where the queue stands; with the gap alone a
+          // car went over behind a moving one, or stood up to 8 m short of clearing the place, #602)
+          if (!across && canStop && wait > 0) {
+            const q = this._queueRoom(gap0, lead0, Math.max(0, wait) + (x.g.dOut - x.g.dC) + 2 * c.half);
+            if (q) { xGap = wait - YIELD_GAP + 8; if (ours) c.xing = x; keepClear = true; kcFor = q; break; }
           }
           // nor while the junction after them holds it and the car could not wait clear of the tracks before it: one held at a
           // junction halts where it is within 9 m of it (look, below), so that is the room it needs past the tracks; else it
           // would wait on the rails (#602: line 37 s 4713, a car through two short lanes and two junctions found the second
           // held only on the lane past the track, standing on it; 33 cars on our track, 37 on the other, held so in 25 runs)
+          // (whatever a circle lets the car do at that junction: one let go crept into the band on line 23 s 326, seed 80, and
+          // stood there 54 s, the tram 4.5 m short of it, #602)
           if (!across && canStop && wait > 0) {
             const Jn = seq.find(([, off, isJ, cn]) => isJ && cn && off >= x.g.dC && off < x.g.dOut + c.half + 10);
-            const held = Jn && this._junctionHeld(c, Jn[3], Jn[1], Jn[1] + 0.1, live);
-            if (held && (held.exitFull || held.blocker)) { xGap = wait - YIELD_GAP + 8; if (ours) c.xing = x; keepClear = true; c.jBlock = held.exitFull ? 'exit full' : held.blocker.id; break; }
+            const held = Jn && this._junctionHeld(c, Jn[3], Jn[1], Jn[1] + 0.1, live, false);
+            if (held && (held.exitFull || held.blocker)) { xGap = wait - YIELD_GAP + 8; if (ours) c.xing = x; keepClear = true; kcFor = held.exitFull || held.blocker; c.jBlock = held.exitFull ? 'exit full' : held.blocker.id; break; }
+          }
+          // nor while another car's way cuts across its own where it would stand on the tracks for it, that car there first
+          // (_crossedBy)
+          if (!across && canStop && wait > 0) {
+            const o = this._crossedBy(c, seq, x.g.dC, x.g.dOut + 2 * c.half + 8, live);
+            if (o) { xGap = wait - YIELD_GAP + 8; if (ours) c.xing = x; keepClear = true; kcFor = o; break; }
           }
           // crossing: on our track, or moving onto it (a car standing before it, held by a queue, is not:
           // the tram waited for two such cars for good, line 17 s 11629)
@@ -871,7 +891,7 @@ export class Traffic {
         }
         c.yielding = xGap !== null && !keepClear && !yieldAi; // (to our tram: what u3 counts)
         c.yieldAi = yieldAi; // (to an AI tram)
-        c.keepClear = keepClear;
+        c.keepClear = keepClear; c.kcFor = kcFor; // (what keeps it off the tracks: _crossedBy reads its own, the next step)
         // junctions, from braking distance on: wait while a car is on a crossing connector, nearer
         // to its own crossing one, or standing at the mouth of a lane the connector passes close to
         let jStop = null, jFor = null;
@@ -926,7 +946,7 @@ export class Traffic {
         const vt = Math.min(c.v, ...Object.values(terms));
         // (what holds the car, for the stuck scene)
         const why = vt < 0.3 ? Object.keys(terms).find((k) => terms[k] === vt) || 'speed' : null;
-        plans.set(c, { vt, lead, why, waitFor: why === 'lead' ? gapFor : why === 'junction' ? jFor : why === 'tram' ? (keepClear ? gapFor : yieldAi || tram) : null });
+        plans.set(c, { vt, lead, why, waitFor: why === 'lead' ? gapFor : why === 'junction' ? jFor : why === 'tram' ? (keepClear ? kcFor : yieldAi || tram) : null });
       }
     }
     // then every car moves by its plan; its leader and what holds it are kept for the next step, which reads them for the
@@ -1006,11 +1026,13 @@ export class Traffic {
   // (nor one of a circle of waits through c, when c is the one of it to go, _letGo: car 875 stood on a connector waiting
   // for 851, held at the junction by 882, held by 875; line 17 seed 5 s 17693, #607. One goes, the others keep waiting:
   // all of them going drove them into each other)
-  _junctionHeld(c, plan, dist, look, live) {
+  // (pass false: whatever a circle lets c do, for the room past the tracks, #602)
+  _junctionHeld(c, plan, dist, look, live, pass = true) {
     const J = plan.at;
+    const passes = (o) => pass && this._passes(c, o);
     // (the exit's room: the car on it leaves less than c's length and 0.4 m behind its rear; with their own lengths, #250:
     // its middle under 7 m in when every car was 4.4 m long. In a lane's mouth: its end within 2.8 m, its middle 5 m)
-    const exitFull = live.find((o) => o !== c && o.path === plan.to.path && o.s - o.half < 2 * c.half + 0.4 && o.seen?.car !== c && o.lead !== c && !this._passes(c, o));
+    const exitFull = live.find((o) => o !== c && o.path === plan.to.path && o.s - o.half < 2 * c.half + 0.4 && o.seen?.car !== c && o.lead !== c && !passes(o));
     const blocker = live.find((o) => o !== c && (
       (o.conn && o.conn.at === J && this._conflict(o.conn, plan) && o.seen?.car !== c)
       || (!o.conn && o.plan && o.plan.at === J && o.toEnd < look && this._conflict(o.plan, plan)
@@ -1019,7 +1041,7 @@ export class Traffic {
         && !(o.seen && (o.seen.gap < 4 || ((o.vNow ?? 0) < 0.3 && o.seen.v < 0.3)))
         && (o.toEnd < dist - 0.05 || (Math.abs(o.toEnd - dist) <= 0.05 && o.id < c.id)))
       || (!o.conn && o.lane !== plan.from && o.lane.to === J && o.toEnd - o.half < 2.8 && !(o.plan && o.plan.at === J) && this._nearLaneEnd(plan, o.lane, true))
-      || (!o.conn && o.lane !== plan.to && o.lane.from === J && o.s - o.half < 2.8 && o.seen?.car !== c && this._nearLaneEnd(plan, o.lane, false))) && !this._passes(c, o));
+      || (!o.conn && o.lane !== plan.to && o.lane.from === J && o.s - o.half < 2.8 && o.seen?.car !== c && this._nearLaneEnd(plan, o.lane, false))) && !passes(o));
     return { exitFull, blocker };
   }
 
@@ -1033,11 +1055,11 @@ export class Traffic {
   // path, spans }]. sIn and sOut along the path where it comes within NEAR and leaves it again (the path's end if it does
   // not), sx and sxOut the track's route positions there; bIn and bOut where it comes within BAND of the centre (the tram's
   // swept edge and a margin) and leaves it, the first and the last time (null: never), bsx and bsxOut there; spans the
-  // track's s on each part of the route it comes near (addSpan); railsLen the metres
-  // within RAILS of it; rt that route, sOurs our route's position at sIn (for the heights; null where the opposite track
-  // runs apart from ours); the least distance to the centre, the side of it the path is on first and last (+1 left, -1
-  // right) and how often it changed sides. Every approach at any angle: what it is, the way it is part of tells
-  // (_wayCrossings). Not where our track passes over the path on a bridge.
+  // track's s on each part of the route it comes near (addSpan); railsLen the metres within RAILS of it, rsx the track's s
+  // where it first comes within RAILS (null: never); rt that route, sOurs our route's position at sIn (for the heights;
+  // null where the opposite track runs apart from ours); the least distance to the centre, the side of it the path is on
+  // first and last (+1 left, -1 right) and how often it changed sides. Every approach at any angle: what it is, the way it
+  // is part of tells (_wayCrossings). Not where our track passes over the path on a bridge.
   _trackCrossings(path) {
     if (path._xings) return path._xings;
     const out = [];
@@ -1050,7 +1072,7 @@ export class Traffic {
           const q = rt.at(n.s), side = Math.sign(q.hx * (p.y - q.y) - q.hy * (p.x - q.x)) || 1;
           if (!cur) {
             const o = rt === this.route ? n : this.route.nearest(p.x, p.y), sOurs = o && o.d < 10 ? o.s : null;
-            cur = { sIn: s, sOut: path.length, sx: n.s, sxOut: n.s, bIn: null, bOut: null, bsx: null, bsxOut: null, spans: [], railsLen: 0, rt, sOurs, minD: n.d,
+            cur = { sIn: s, sOut: path.length, sx: n.s, sxOut: n.s, bIn: null, bOut: null, bsx: null, bsxOut: null, rsx: null, spans: [], railsLen: 0, rt, sOurs, minD: n.d,
               sides: [side, side], flips: 0, startsIn: s === 0, endsIn: true, path, skip: sOurs !== null && this.ground.profile.overBridge(sOurs) };
             out.push(cur);
           }
@@ -1063,7 +1085,7 @@ export class Traffic {
             // (it leaves the band at the next metre, or runs on in it past the path's end)
             cur.bOut = Math.min(path.length, s + 1); cur.bsxOut = n.s;
           }
-          if (n.d < RAILS) cur.railsLen += s - last;
+          if (n.d < RAILS) { cur.railsLen += s - last; if (cur.rsx === null) cur.rsx = n.s; }
         } else if (cur) {
           cur.sOut = s; cur.endsIn = false;
           cur = null;
@@ -1097,9 +1119,10 @@ export class Traffic {
   // comes in on), or, never in it, where it comes within NEAR and leaves that. Its kind: 'rails' (on them RAILS_RUN m and
   // more: a lane along the rails), 'cross' (out on the other side, or over the centre line), 'reach' (beside the track,
   // within a passing body's reach); one clear of the body is no place. spans: the stretches of track it takes up, [{ lo, hi,
-  // along, against, slo, shi }], one per part of the route it comes near (where the car turns onto the rails with the trams, only that point; a way
-  // over a street the route takes out and back, one for each way: line 9 s 907 and 27560, seed 4, taken as one stretch,
-  // the car watched only the second and was hit on the first, #602); against: the car goes along it towards the trams.
+  // along, against, slo, shi }], one per part of the route it comes near (where the car turns onto the rails with the
+  // trams, only where it turns in: from the band to the rails; a way over a street the route takes out and back, one for
+  // each way: line 9 s 907 and 27560, seed 4, taken as one stretch, the car watched only the second and was hit on the
+  // first, #602); against: the car goes along it towards the trams.
   // One place seen twice (a loop of the route) counts once; places with no room for a car between them are one group,
   // crossed as one (g: its first band and its end). Those within `ahead` m.
   _wayCrossings(seq, ahead = 45, car = { half: REF_HALF, halfW: REF_HALFW }) {
@@ -1113,11 +1136,12 @@ export class Traffic {
           x.sides = [x.sides[0], st.sides[1]]; x.minD = Math.min(x.minD, st.minD); x.parts.push(st);
         } else {
           x = { dNear: off + st.sIn, sxNear: st.sx, dBand: null, dBandOut: null, sxBand: null, sxBandOut: null, rt: st.rt, sOurs: st.sOurs, k, kBand: null,
-            sides: [...st.sides], flips: st.flips, minD: st.minD, railsLen: 0, parts: [st], spans: [] };
+            sides: [...st.sides], flips: st.flips, minD: st.minD, railsLen: 0, sxRails: null, parts: [st], spans: [] };
           xs.push(x);
         }
         for (const o of st.spans) addPart(x.spans, o);
         x.dNearOut = off + st.sOut; x.sxNearOut = st.sxOut; x.endsIn = st.endsIn; x.railsLen += st.railsLen;
+        if (x.sxRails === null) x.sxRails = st.rsx;
         if (st.bIn !== null) {
           if (x.dBand === null) { x.dBand = off + st.bIn; x.sxBand = st.bsx; x.kBand = k; }
           x.dBandOut = off + st.bOut; x.sxBandOut = st.bsxOut;
@@ -1147,7 +1171,11 @@ export class Traffic {
       // whole. slo and shi: the whole stretch on each part, where a car on it is)
       const first = spans.find((o) => x.sx >= o.lo && x.sx <= o.hi);
       x.along = x.kind === 'rails' && !!first && first.a - first.b <= 2;
-      x.spans = spans.map((o) => (o === first && x.along ? { lo: x.sx, hi: x.sx, along: true, against: false, slo: o.lo, shi: o.hi }
+      // (where it turns in: from where it comes into the band to where it is on the rails, on that part. A way coming in
+      // shallow held its car only at the point where it came into the band, short of where it reached the rails; line 22
+      // s 13078, seed 1 on #850: the car went in beside the tram's front and was hit on the rails, #602)
+      const onRails = x.along && x.sxRails !== null && x.sxRails > x.sx && x.sxRails <= first.hi + S_JUMP ? x.sxRails : x.sx;
+      x.spans = spans.map((o) => (o === first && x.along ? { lo: x.sx, hi: onRails, along: true, against: false, slo: o.lo, shi: o.hi }
         : { lo: o.lo, hi: o.hi, along: false, against: o.a - o.b > 2, slo: o.lo, shi: o.hi }));
       out.push(x);
     }
@@ -1170,6 +1198,88 @@ export class Traffic {
   _goesOn(x, xs, half = REF_HALF) {
     const tail = x.dC - YIELD_GAP - 2 * half, front = x.dC - YIELD_GAP;
     return xs.some((o) => o !== x && o.g === x.g && !o.along && o.dC < front && o.dOut > tail);
+  }
+
+  // Whether the queue ahead of a car leaves it less than `need` m to drive on (its front) before it must stand: the car it
+  // follows `gap` m ahead (bumper to bumper), then each one's leader as the last step left it. The first standing one (under
+  // 1 m/s) is where the queue stands; each moving one before it will stop behind it with its own length and the 8 m
+  // following() halts short of the car ahead, and this car 8 m short of the last. Returns that standing car, or null:
+  // nothing stands within 8 cars or 120 m, or the room is enough (#602)
+  _queueRoom(gap, lead, need) {
+    let d = gap, o = lead, taken = 0;
+    for (let n = 0; o && o.active && d !== null && n < 8 && d < 120; n++) {
+      if ((o.vNow ?? 0) < 1) return d - taken - 8 < need ? o : null;
+      taken += 2 * o.half + 8;
+      const l = o.lead, g = l && this._gapTo(o, l);
+      if (g === null || g === undefined) return null;
+      d += 2 * o.half + g;
+      o = l;
+    }
+    return null;
+  }
+
+  // The car whose way cuts across c's where c would stand on the tracks for it (from..to m along c's way from its middle: the
+  // place's bands and past them a car's length and the 8 m it halts short of what is in its way), and which is there first:
+  // c would drive on and stand in the place for it. Line 23 s 329, seed 31: a car on the connector over our track stopped
+  // 3.4 m short of one that came off a short lane in the junction at 5 m/s, its middle 2.4 m from our track's centre, for
+  // 1.4 s; the user's picture of a car in the tram's side there, 2026-11-26 (#602). Lanes inside a junction have no turns
+  // there: the first to get to where the ways cross goes, the other waits before the tracks. A car standing on that stretch
+  // of c's way, not one ahead of c on it (the queue, _queueRoom), holds c too; one standing short of it does not.
+  _crossedBy(c, seq, from, to, live) {
+    const at = (sq, d) => {
+      for (const [path, off] of sq) { const ls = d - off; if (ls >= 0 && ls <= path.length) return path.at(ls); }
+      return null;
+    };
+    const pts = [];
+    for (let d = Math.max(from, 0); d <= to; d += 1) { const q = at(seq, d); if (q) pts.push([d, q]); else break; }
+    if (!pts.length) return null;
+    const mid = pts[pts.length >> 1][1], mine = new Set(seq.map(([path]) => path));
+    const vc = Math.max(c.vNow ?? 0, 2);
+    for (const o of live) {
+      if (o === c || mine.has(o.path)) continue;
+      const p = o.path.at(o.s);
+      if ((p.x - mid.x) ** 2 + (p.y - mid.y) ** 2 > 40 * 40) continue;
+      const near = c.halfW + o.halfW + 0.3, sq = this._seq(o), vo = o.vNow ?? 0;
+      let hit = null;
+      for (let d = -o.half; d <= 25 && !hit; d += 1) { // (from its tail: one over it now)
+        const q = at(sq, d);
+        if (!q) { if (d < 0) continue; break; }
+        for (const [dc, k] of pts) if ((q.x - k.x) ** 2 + (q.y - k.y) ** 2 < near * near) { hit = { dc, d, k }; break; }
+      }
+      if (!hit) continue;
+      if (hit.d <= o.half) { // (on it now: holds c unless it is leaving along c's way)
+        if (!(vo > 2 && p.hx * hit.k.hx + p.hy * hit.k.hy > 0.5)) return o;
+        continue;
+      }
+      if (vo < 0.5) continue; // (standing short of it: not coming)
+      // (one waiting for it keeps waiting until it is by: else, slowing for it, it would get there later, find it by first
+      // and go on, and slow again)
+      if (c.keepClear && c.kcFor === o) return o;
+      const tO = (hit.d - o.half) / vo, tOut = (hit.d + o.half) / vo;
+      const tC = Math.max(0, hit.dc - c.half) / vc, tCout = (hit.dc + c.half) / vc;
+      // (one is over it before the other comes, by 2 s: its speed now, and it slows for its turns; seed 31's came on at
+      // 8.8 m/s, slowed to 2.7 for the junction and was 1 s later than so foreseen)
+      if (tCout + 2 < tO || tOut + 2 < tC) continue;
+      // (who goes: one that could not stop short of it any more; else the one from the right, as the circles (the user,
+      // 2026-11-24); else the first there. Each decides the same of the other, so one waits: by the times alone, both
+      // nearly alike and changing with each one's speed, the two cars took turns to wait, and both went, seed 31)
+      if (hit.d - o.half < (vo * vo) / 8) return o;
+      const pc = c.path.at(c.s);
+      if (fromRight(pc, p)) return o;
+      if (fromRight(p, pc)) continue;
+      if (tO < tC || (tO === tC && o.id < c.id)) return o;
+    }
+    return null;
+  }
+
+  // a car's bumper gap to car l on its way (its paths ahead, _seq), or null where l is not on it
+  _gapTo(o, l) {
+    for (const [path, off] of this._seq(o)) {
+      if (l.path !== path) continue;
+      const d = off + l.s - l.half - o.half;
+      return d > -2 && (path !== o.path || l.s > o.s) ? d : null;
+    }
+    return null;
   }
 
   // The paths a car drives next, each with the distance from the car to its start. Past a short next
