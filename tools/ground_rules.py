@@ -37,7 +37,7 @@ LOCALITY = {
     "street-over-an-underpass": "ties by an STRtree's order, tile_faces' lines",
     "lattice-cell": "the cover's union for the whole box: needles, nodes by grouping",
     "sidewalk-under-a-road-wall": "lowered kerbs: the first road corner by the corners' order",
-    "line22_-943_418": {"line": "22", "at": [-943.0, 418.0],
+    "line22_-943_418": {"line": "22", "at": [-943.2, 417.6],
                         "why": "GEOS's hidden grid: the strips' 1 mm grid given to the plots, a union snap-rounded by its pairing"},
 }
 
