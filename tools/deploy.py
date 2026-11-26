@@ -27,7 +27,9 @@ What goes up: tools/make_dist.py's files, plus version.json (commit, data snapsh
 .htaccess hands that file to every request for <name>, and the rest stays plain, for the host to compress on the
 fly. The server keeps .deploy-manifest.json (path -> sha256, of what is on the server): only
 changed files are uploaded (each to a .part name, then renamed), files no longer in the site are
-deleted, the manifest is written last. A rollback is a deploy from the older commit.
+deleted, the manifest is written last, and every 20 files on the way of what is up by then. A connection the host
+drops is opened again and the step tried again (#861); a deploy that stops all the same is resumed by the next run.
+A rollback is a deploy from the older commit.
 --reports also uploads reports/headless/*.json (for ?review=reports/headless/line17-lint.json).
 Review verdicts (#136): tools/review.php goes up as review.php and stores them in reviews/ (no direct
 access); --pull-reviews only fetches reviews/*.json into reports/reviews/, merged with what is there.
@@ -45,6 +47,7 @@ import netrc
 import os
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -246,6 +249,45 @@ def connect(cfg, pw):
     ftp.prot_p()  # (the data connection encrypted too, not only the login)
     ftp.cwd(cfg.get("dir", "/"))
     return ftp
+
+
+# A host that closes the connection mid-deploy (#861: the alpha's, twice after ~130 of 199 files, EOFError from
+# ftplib): the step is tried again on a new connection, a few times with a growing pause.
+DROPS = (EOFError, OSError, ftplib.error_temp)
+TRIES, PAUSE = 4, 5
+# the manifest of what is up goes up every so many files, so a deploy that stops is resumed, not started over
+MANIFEST_EVERY = 20
+
+
+class Host:
+    """The FTP connection, opened again when the host drops it (#861). Hands every other call to the connection."""
+
+    def __init__(self, connect, cfg, pw):
+        self.connect, self.cfg, self.pw = connect, cfg, pw
+        self.ftp = connect(cfg, pw)
+
+    def __getattr__(self, name):
+        return getattr(self.ftp, name)
+
+    def again(self, what, fn):
+        """fn(), tried again on a new connection while the host drops it; stops after TRIES."""
+        for k in range(TRIES):
+            try:
+                return fn()
+            except DROPS as e:
+                if k == TRIES - 1:
+                    raise SystemExit(f"{what}: the host dropped the connection {TRIES} times ({e!r}); run the deploy "
+                                     "again: the files recorded as up are not sent again")
+                print(f"  ({what}: {e!r}; connecting again in {PAUSE * (k + 1)} s)", flush=True)
+                time.sleep(PAUSE * (k + 1))
+                try:
+                    self.ftp.close()
+                except Exception:  # (a connection already gone)
+                    pass
+                try:
+                    self.ftp = self.connect(self.cfg, self.pw)
+                except DROPS as e2:
+                    print(f"  (connecting failed: {e2!r})", flush=True)  # (the next try reconnects or stops)
 
 
 def remote_manifest(ftp):
@@ -456,9 +498,9 @@ def main(argv=None, connect=connect):
                          "(git tag alpha-N, git push origin alpha-N), the version its testers name")
     local = site(commit, args.reports, public=public)
     hashes = {r: digest(v) for r, v in local.items()}
-    ftp = connect(cfg, password(cfg))
+    ftp = Host(connect, cfg, password(cfg))
     try:
-        remote = remote_manifest(ftp)
+        remote = ftp.again("the manifest", lambda: remote_manifest(ftp))
         # (version.json changes every time; it goes up last, whatever else does. Planned with the rest, so
         # the manifest's entry for it is not taken for a file gone from the site: #207)
         up, gone = plan(hashes, remote)
@@ -473,15 +515,30 @@ def main(argv=None, connect=connect):
                 print("  del", r)
             return
         made = set()
+        # (what is on the host as it goes: the old record with each file sent since; a deploy that stops leaves it
+        # there, and the next one sends only the rest, #861)
+        now = dict(remote)
+
+        def record(m):
+            body = json.dumps(m, indent=0).encode()
+            ftp.again(MANIFEST, lambda: upload(ftp, MANIFEST, body, made))
+
         for i, r in enumerate(up + ["version.json"], 1):
-            upload(ftp, r, local[r], made)
+            ftp.again(r, lambda: upload(ftp, r, local[r], made))
+            now[r] = hashes[r]
             print(f"  [{i}/{len(up) + 1}] {r}", flush=True)
-        for r in gone:
+            if i % MANIFEST_EVERY == 0 and i < len(up):
+                record(now)
+
+        def delete(r):
             try:
                 ftp.delete(r)
             except ftplib.error_perm:
                 pass
-        upload(ftp, MANIFEST, json.dumps(hashes, indent=0).encode(), made)
+
+        for r in gone:
+            ftp.again(r, lambda: delete(r))
+        record(hashes)
     finally:
         try:
             ftp.quit()
