@@ -1355,7 +1355,11 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   alighter out at 3.3 s on average (median 2.5 s: the 2.2 s down the steps), its first boarder up at 3.6 s; the boardings
   begun with alighters at the car's other doors 60 of 134 (those doors' alighters still on the steps). In `tools/test_consist.py`
   (50 aboard, 15 off, 20 on): out 2.3 s to 6.9 s after the doors open against 3.5 s to 8.3 s from their places, the first
-  boarder in at 6.7 s against 8.5 s.
+  boarder in at 6.7 s against 8.5 s. Every line, seeds 1–5, against main (f8d8453): the exchange mean 10–11 s → 8.4–9.4 s
+  (line 23, one car, 16.4 → 15.9 s), lateness inside main's spread: part of the time is spent at the next signal, whose tram
+  call comes 140 m before it (`_runController`), so at a stop before a junction it comes on arrival and the cross street's
+  8 s and change-over can outlast a shorter exchange (held at signals: line 9 seed 1 178 → 233 s, seed 2 126 → 180 s, line 17
+  seed 4 31 → 72 s; so more brake applies and pedal changes). Ready turned off, the branch repeats main's run exactly.
 - **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
   is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
   model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body
