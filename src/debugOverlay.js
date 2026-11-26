@@ -13,8 +13,12 @@
 //     0.6 m up            assembled height: fill, a hold over 60 m)
 //   cyan / green / blue  kerb lowered at a crossing (tools/kerbs.py, #303): an untagged crossing end (the norm's 2 cm) /
 //     / orange dot        OSM kerb=lowered / kerb=flush / a crossing end OSM tags kerb=raised (kept)
+//   orange / yellow /    over a standing car (live): what holds it: the car, tram or walker ahead / a junction's rule
+//     red / green dot,   / a tram it gives way to / a red light; the white line to the head of its chain (#560)
+//     white line
 import * as THREE from 'three';
 import { findKerbs } from './review.js';
+import { chainHead } from './waits.js';
 
 // What the rules decided at run time, as the compiled-world GeoJSON of docs/architecture.md §10.4
 // In S-JTSK (EPSG:5514): game metres plus the city origin (data.frame, docs/decisions/2026-10-29-city-frame-and-tiles.md).
@@ -117,17 +121,73 @@ export function createDebugOverlay(scene) {
     return g;
   }
 
+  // The waits-for graph live (#560, src/waits.js), redrawn each frame while the overlay is on: over each standing car a
+  // dot by what holds it (orange: the car, tram or walker ahead; yellow: a junction's rule; red: a tram it gives way to;
+  // green: a red light; grey: else) and a white line from it to the head of its chain where that is another
+  let holds = null;
+  const HOLD = { lead: 0xff8c00, junction: 0xffee00, tram: 0xff2020, light: 0x22cc55 };
+  const MAX_LINES = 64;
+  function dropHolds() {
+    if (!holds) return;
+    holds.line.geometry.dispose();
+    scene.remove(holds.group);
+    holds = null;
+  }
+  function updateHolds(game, traffic) {
+    if (!holds) {
+      holds = { group: new THREE.Group(), balls: [] };
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_LINES * 6), 3));
+      holds.line = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false }));
+      holds.line.renderOrder = 999;
+      holds.line.frustumCulled = false;
+      holds.group.add(holds.line);
+      scene.add(holds.group);
+    }
+    const tram = game.tram;
+    // (where an agent stands, in the scene's frame: x, a little over it, −y)
+    const at = (a) => {
+      if (a === tram) { const q = game.route.at(tram.s); return [q.x, game.profile.height(tram.s) + 4, -q.y]; }
+      if (a.kind === 'road') return a.pose ? [a.pose.x, a.pose.z + 2.4, -a.pose.y] : null;
+      if (a.walk !== undefined) return a.x === undefined ? null : [a.x, (a.z ?? 0) + 2.2, -a.y];
+      const b = a.boxes?.[0];
+      return b ? [b.x, b.z + 4, -b.y] : null;
+    };
+    const standing = traffic.cars.filter((c) => c.kind === 'road' && c.active && c.why);
+    while (holds.balls.length < standing.length) {
+      const m = new THREE.Mesh(geo.dot, mat(0x888888));
+      m.renderOrder = 999;
+      holds.group.add(m);
+      holds.balls.push(m);
+    }
+    const pos = holds.line.geometry.attributes.position.array;
+    let n = 0;
+    holds.balls.forEach((m, i) => {
+      const c = standing[i], p = c && at(c);
+      m.visible = !!p;
+      if (!p) return;
+      m.material = mat(HOLD[c.why] ?? 0x888888);
+      m.position.set(p[0], p[1], p[2]);
+      const h = chainHead(c, tram), q = h.head !== c && at(h.head);
+      if (q && n < MAX_LINES) { pos.set([p[0], p[1], p[2], q[0], q[1], q[2]], n * 6); n++; }
+    });
+    holds.line.geometry.setDrawRange(0, n * 2);
+    holds.line.geometry.attributes.position.needsUpdate = true;
+  }
+
   return {
     get on() { return !!group; },
     toggle(game, traffic, view) {
-      if (group) { group.traverse((o) => o.userData.dispose?.()); scene.remove(group); group = null; diag(shown, false); shown = null; return false; }
+      if (group) { group.traverse((o) => o.userData.dispose?.()); scene.remove(group); group = null; dropHolds(); diag(shown, false); shown = null; return false; }
       if (!game) return false;
       group = build(game, traffic, view);
       scene.add(group);
       diag((shown = view), true);
       return true;
     },
+    // each frame while on: what holds each standing car, and its chain's head (#560)
+    update(game, traffic) { if (group && game && traffic) updateHolds(game, traffic); },
     // a new shift (new game / traffic objects): drop the old markers
-    reset() { if (group) { group.traverse((o) => o.userData.dispose?.()); scene.remove(group); group = null; } diag(shown, false); shown = null; },
+    reset() { if (group) { group.traverse((o) => o.userData.dispose?.()); scene.remove(group); group = null; } dropHolds(); diag(shown, false); shown = null; },
   };
 }

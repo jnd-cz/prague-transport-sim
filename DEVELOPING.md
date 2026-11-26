@@ -191,6 +191,7 @@ CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown 
 To a web host over FTPS (#131): `python -P -E tools/deploy.py` uploads the same files from a clean commit
 whose data matches the manifest:
 - only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
+- a connection the host drops (the alpha's did after ~130 files, #861) is opened again and the step tried again, up to 4 times; the manifest goes up every 20 files too, so a deploy that stops is resumed by the next run, not started over;
 - the data heavy packs (`.json`, `.bin`, `.glb`, `.gltf` in `data/` and `assets/`) go up only compressed, as `<name>.brotli` at quality 11 (#275), and the `.htaccess` hands that file to every request for `<name>`. The rest stays plain, for the host to compress on the fly. The site was 114.6 MB plain and is 31.5 MB this way. Browsers accept brotli only over HTTPS, so the host must redirect HTTP (Plesk: Permanent SEO-safe 301 redirect from HTTP to HTTPS). Without it Chromium refuses the files (`ERR_CONTENT_DECODING_FAILED`), a browser that hands the page the raw bytes shows the bar at 5 % with every file ticked, and the loading screen says to open the page over https (#371);
 - it adds `version.json`, shown in the menu's credits, and that `.htaccess`;
 - `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
@@ -372,6 +373,12 @@ the same counts every time (a second run in the same page differs slightly).
 
 Reports go to `reports/lineN.json` (not in git). Regression checks use `tools/headless.py --compare`
 (above), whose baseline follows main.
+
+**Traffic scenes** (`tools/bench/scenes.js`, `tools/test_traffic_scenes.py`, #566): a few roads, walks, cars and
+walkers built in code and driven on the real `Traffic` without the world (a flat ground, no stops, no spawning; our
+tram only where the scene has a track), at the game's step, in milliseconds each. A rule's case is shown on a scene
+first, then on the lines: `S.play('name', args)` in a page that imports the module gives what a scene reports;
+`SCENES` holds them (a jam's scene with its fix switched off shows the jam).
 
 Mirror rendering cost (#79): `python -P -E tools/mirror_bench.py --line 17 --s 5064 --headed`.
 Keep its game window in front until it closes: the report records the graphics backend, focus,

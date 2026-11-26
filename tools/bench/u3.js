@@ -78,6 +78,9 @@ export async function run(seed = 1, opts = {}) {
         also.forEach((w, i) => w.after(alsoBefore[i]));
         for (const [c, b] of lit) {
           if (!c.conn && c.lane === b.lane && b.front > -0.5 && c.toEnd - b.lane.light.back - 3.2 <= -0.5) c._atLine = { lane: b.lane, a: traffic.lightAspect(b.lane.light), go: c.lightGo === b.lane };
+          // (a lane whose line is at its start: the car crossed it coming onto the lane, judged by the aspect then; one that
+          // stood on it, past its line, for the next lane's red was counted on its own red when it went on, #566)
+          else if (c._atLine?.lane !== b.lane && b.age === 0 && b.front <= -0.5) c._atLine = { lane: b.lane, a: b.a, go: b.go };
         }
         for (const [c, b0] of lit) {
           if (!c.conn || c.lane !== b0.lane) continue;
@@ -146,7 +149,9 @@ export async function run(seed = 1, opts = {}) {
           if (d > 0 && d < 100 && tr.v > 0.5) crossed.add(xc.car.id);
           if (xc.onTrack && d > 0 && tr.v > 2 && d < (tr.v * tr.v) / 2 + 10 && !cut.has(xc.car.id)) {
             cut.add(xc.car.id);
-            R.cuts.push({ s: Math.round(tr.s), d: Math.round(d), v: +(tr.v * 3.6).toFixed(0), bold: !!xc.car.bold });
+            R.cuts.push({ s: Math.round(tr.s), d: Math.round(d), v: +(tr.v * 3.6).toFixed(0), bold: !!xc.car.bold,
+              // (#560: seconds since a circle of cars let it go, if within a minute)
+              letGo: game.clock - (xc.car.letGoAt ?? -Infinity) < 60 ? Math.round(game.clock - xc.car.letGoAt) : null });
           }
         }
       }
@@ -160,7 +165,11 @@ export async function run(seed = 1, opts = {}) {
   });
   const bump = [...(R.bumper || new Map()).values()].sort((a, b) => a - b);
   const q = (p) => (bump.length ? +bump[Math.min(bump.length - 1, Math.floor(p * bump.length))].toFixed(1) : null);
-  return { seed, watch: R.watch || [], stuck: R.stuck ?? null, carsIntoJunctions: { green: R.carGreen || 0, amber: R.carAmber || 0, red: R.carRed || 0 }, carRedWhy: R.carRedWhy || [], stuckScene: R.stuckScene || null, bumperToTrackCentre: { n: bump.length, min: q(0), median: q(0.5), max: q(0.999) },
+  return { seed, watch: R.watch || [], stuck: R.stuck ?? null,
+    // (#560: the heads of chains standing a minute or more, by kind; the circles let go by class; those through a tram
+    // broken; cars given up)
+    waits: { chainHeads: traffic.longChainCount || {}, circlesLetGo: traffic.circlesLetGo || {}, cyclesBroken: traffic.cyclesBroken || 0, givenUp: traffic.givenUp || 0 },
+    carsIntoJunctions: { green: R.carGreen || 0, amber: R.carAmber || 0, red: R.carRed || 0 }, carRedWhy: R.carRedWhy || [], stuckScene: R.stuckScene || null, bumperToTrackCentre: { n: bump.length, min: q(0), median: q(0.5), max: q(0.999) },
     // #602: yielding cars' nearest body corner to each track (stood within FOUL of it: on it); the fouls by track and tram
     stance: (() => { const out = {}; for (const k of ['ours', 'back']) { const v = [...(R.stance || new Map())].filter(([key]) => key.startsWith(k)).map(([, d]) => d).sort((a, b) => a - b); out[k] = { n: v.length, min: v[0] ?? null, median: v[Math.floor(v.length / 2)] ?? null, within: v.filter((d) => d < FOUL).length }; } return out; })(),
     fouls: { ours: [...(R.foul || new Map()).values()].filter((f) => f.track === 'ours').length, back: [...(R.foul || new Map()).values()].filter((f) => f.track === 'back').length,

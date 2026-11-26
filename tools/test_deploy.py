@@ -381,6 +381,83 @@ class DeployTest(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(os.path.join(dest, "alpha"))), ["fb-20261111-120000-00000002.json"])
         self.assertEqual(pulled, [os.path.join(self.tmp, "u")])  # (no review verdicts on the public target)
 
+    def on_server(self):
+        """{name: sha256} of the files on the fake host, the manifest and .part files left out."""
+        out = {}
+        for d, _, fs in os.walk(self.server):
+            for f in fs:
+                rel = os.path.relpath(os.path.join(d, f), self.server).replace(os.sep, "/")
+                if rel != deploy.MANIFEST and not rel.endswith(".part"):
+                    out[rel] = deploy.digest(os.path.join(d, f))
+        return out
+
+    def test_a_dropped_connection_is_opened_again_and_the_step_tried_again(self):
+        # #861: the alpha's host closed the connection twice after ~130 files (EOFError); the deploy stopped there
+        many = SOME + ["src/" + f for f in sorted(os.listdir(os.path.join(deploy.ROOT, "src"))) if f.endswith(".js")][:8]
+
+        class Drops(FakeFtp):
+            def __init__(s, root):
+                super().__init__(root)
+                s.stors, s.renames, s.connects = 0, 0, 0
+
+            def storbinary(s, cmd, fh):
+                s.stors += 1
+                if s.stors == 4:
+                    raise EOFError()
+                return super().storbinary(cmd, fh)
+
+            def rename(s, a, b):
+                s.renames += 1
+                if s.renames == 7:  # (after the old file was deleted: the .part goes up again)
+                    raise ftplib.error_temp("421 timeout")
+                return super().rename(a, b)
+
+            def close(s):
+                pass
+
+        ftp = Drops(self.server)
+
+        def connect(cfg, pw):
+            ftp.connects += 1
+            return ftp
+
+        with mock.patch.object(deploy, "files", lambda: iter(many)), mock.patch.object(deploy, "PAUSE", 0):
+            deploy.main(["--dirty"], connect=connect)
+        self.assertEqual(ftp.connects, 3, "opened, then again after each drop")
+        man = json.load(open(os.path.join(self.server, deploy.MANIFEST)))
+        self.assertEqual(self.on_server(), man, "every file up, as the manifest says")
+        stors = [r for op, r in ftp.log if op == "STOR" and r != deploy.MANIFEST + ".part"]
+        self.assertEqual(len(stors), len(set(stors)) + 1, "only the file whose rename dropped went up twice")
+
+    def test_a_deploy_that_stops_is_resumed(self):
+        many = SOME + ["src/" + f for f in sorted(os.listdir(os.path.join(deploy.ROOT, "src"))) if f.endswith(".js")][:8]
+
+        class Dead(FakeFtp):
+            stors = 0
+
+            def storbinary(s, cmd, fh):
+                Dead.stors += 1
+                if Dead.stors > 8:  # (the host gone for good)
+                    raise EOFError()
+                return super().storbinary(cmd, fh)
+
+            def close(s):
+                pass
+
+        with mock.patch.object(deploy, "files", lambda: iter(many)), mock.patch.object(deploy, "PAUSE", 0), \
+                mock.patch.object(deploy, "MANIFEST_EVERY", 3), self.assertRaises(SystemExit) as e:
+            deploy.main(["--dirty"], connect=lambda cfg, pw: Dead(self.server))
+        self.assertIn("run the deploy again", str(e.exception))
+        man = json.load(open(os.path.join(self.server, deploy.MANIFEST)))
+        self.assertEqual(len(man), 6, "the record of the first 6 files, written after them")
+        have = self.on_server()
+        self.assertTrue(all(have.get(r) == h for r, h in man.items()), "the record says what is on the host")
+        # the next run sends only the rest
+        with mock.patch.object(deploy, "files", lambda: iter(many)):
+            up, _ = self.run_deploy()
+        self.assertFalse({r + ".part" for r in man} & set(up), "nothing recorded as up goes up again")
+        self.assertEqual(self.on_server(), json.load(open(os.path.join(self.server, deploy.MANIFEST))))
+
     def test_merge_newer_wins(self):
         out = reviews.merge({"meta": {"a": 1}, "items": {"k": {"v": 1, "t": 5}}},
                             {"meta": {"b": 2}, "items": {"k": {"v": 2, "t": 4}, "j": {"v": 3, "t": 1}, 7: "bad"}})
