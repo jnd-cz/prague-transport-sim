@@ -3,6 +3,8 @@
 
     python -P -E tools/ground_place.py krejcarek-ramp           # a place of data/truth.json groundPlaces
     python -P -E tools/ground_place.py --all | --list
+    python -P -E tools/ground_place.py --locality                # the fixed set with one ring and two (#865)
+    python -P -E tools/ground_place.py --rule walls,kerbs        # the places of rules (tools/ground_rules.py)
     python -P -E tools/ground_place.py --line 37 --at 3915,316 [--reach 60]
     (--ring N: tiles built round the place's own, default 1; --rings: also built with one ring more and the two
     compared; --mesh DIR: a city mesh folder other than the current inputs')
@@ -522,29 +524,78 @@ def main(argv=None):
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--jobs", type=int, default=JOBS, help="several places: how many build at once, each in its own "
                     "process (#843); 1: one after another in this one")
+    ap.add_argument("--locality", action="store_true", help="the fixed locality set (tools/ground_rules.py) with one "
+                    "ring and with two: exit 1 unless each is 0 triangles and 0 heights differing (#865)")
+    ap.add_argument("--rule", help="the places of these rules (tools/ground_rules.py RULES), comma-separated (#865)")
     a = ap.parse_args(argv)
+    import ground_rules as gr
     known = places()
     if a.list:
+        of = {}
+        for r, v in gr.RULES.items():
+            for p in v["places"]:
+                of.setdefault(p, []).append(r)
         for k, v in known.items():
-            print(f"{k}: line {v['line']} ({v['at'][0]}, {v['at'][1]}), reach {v.get('reach') or REACH} m, #{v.get('issue')}: {v.get('what', '')}")
+            print(f"{k}: line {v['line']} ({v['at'][0]}, {v['at'][1]}), reach {v.get('reach') or REACH} m, #{v.get('issue')} "
+                  f"[{', '.join(of.get(k, [])) or 'in no rule'}{', locality' if k in gr.LOCALITY else ''}]: {v.get('what', '')}")
+        print("rules:", "; ".join(f"{r} ({len(v['places'])}): {v['what']}" for r, v in gr.RULES.items()))
         return 0
-    todo = {}
+    todo, names = {}, list(a.names)
     if a.at:
         x, y = (float(v) for v in a.at.split(","))
         todo[f"line{a.line}_{x:.0f}_{y:.0f}"] = {"line": a.line, "at": [x, y], "reach": a.reach, "issue": None}
-    for k in (known if a.all else a.names):
+    if a.rule:
+        rules = [r.strip() for r in a.rule.split(",") if r.strip()]
+        if bad := [r for r in rules if r not in gr.RULES]:
+            raise SystemExit(f"ground_place: no rule {', '.join(bad)} (the rules: {', '.join(gr.RULES)})")
+        names += gr.places_of(rules)
+    if a.locality:
+        a.rings = True
+        for k, v in gr.LOCALITY.items():
+            if isinstance(v, dict):
+                todo[k] = {"line": v["line"], "at": v["at"], "reach": a.reach, "issue": 812}
+            else:
+                names.append(k)
+    for k in (known if a.all else dict.fromkeys(names)):
         if k not in known:
             raise SystemExit(f"ground_place: no place {k} in data/truth.json groundPlaces (--list)")
         todo[k] = dict(known[k], **({"reach": a.reach} if a.reach else {}))
     if not todo:
-        ap.error("a place's name, --all, --list, or --line with --at")
+        ap.error("a place's name, --all, --list, --rule, --locality, or --line with --at")
     import snapshot
     snapshot.require_current_data(ROOT)  # (#835)
+    t0 = time.time()
     if a.written or (len(todo) == 1 and not a.rings):
         for k, v in todo.items():
             run(k, v, a.ring, a.mesh, a.threads, build=not a.written, over=a.overlay)
         return 0
-    return many(todo, a)
+    rc = many(todo, a)
+    if a.locality:
+        return judge(list(gr.LOCALITY), since=t0) or rc
+    return rc
+
+
+def judge(names, since=0.0, root=ROOT, log=print):
+    """The locality set's verdict from the places' reports of this run (written since `since`): 0 when each is the same
+    with one ring more (no vertex and no triangle in one build only), else 1."""
+    bad = []
+    for k in names:
+        try:
+            p = os.path.join(root, "reports", "places", k, "place.json")
+            with open(p, encoding="utf-8") as f:
+                r = json.load(f).get("rings") if os.path.getmtime(p) >= since else None
+        except (OSError, ValueError):
+            r = None
+        if r is None:
+            bad.append(f"{k}: no report with one ring more from this run")
+            continue
+        n = [r["vertices"]["only built"], r["vertices"]["only written"], r["triangles"]["only built"], r["triangles"]["only written"]]
+        if any(n):
+            p = r["points at another height"]
+            bad.append(f"{k}: {n[2]} / {n[3]} triangles and {n[0]} / {n[1]} vertices in one build only, "
+                       f"{p['points']} points at another height (max {p['max cm']} cm)")
+    log(f"locality set: {len(names) - len(bad)} of {len(names)} the same with one ring more" + "".join(f"\n    {b}" for b in bad))
+    return 1 if bad else 0
 
 
 if __name__ == "__main__":
