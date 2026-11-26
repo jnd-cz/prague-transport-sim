@@ -1410,8 +1410,10 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   alighting first at each door. About one boarder in five wishes to stand though seats are free (`STAND_SHARE`, from the
   passengers' own seeded stream: the rules' and the traffic's draws are as they were); a seat freed by a door whose exchange is
   over goes to the nearest standing passenger who wants to sit, at 0.8 m/s round the others, also while driving. Doors closed
-  during the exchange: who is on the steps finishes the way, the rest of the queue stays (`leftBehind`, as before), those not
-  yet on the steps out get off at the next stop (`cantAlight`, as before). The exchange took 3.3 people a second a car before
+  during the exchange: who is on the steps finishes the way, the rest of the queue waits at the doors and gets on when they open
+  again (since #869; before, it was dropped from the stop and never got on), 15 points off each, once a person (`leftBehind`,
+  `pax.outside`), and goes home if the tram leaves (`_finishStop`); those not yet on the steps out get off at the next stop
+  (`cantAlight`, as before). The exchange took 3.3 people a second a car before
   (a 15 out / 20 in two-car exchange in about 5 s); now its time is the queues': on line 22 (seed 1, 38 stops) 2.6–15.8 s, mean
   10.3 s (line 17: 10.0 s, at most 14.9 s), with the doors' 2 s to open and 3 s to close about 15 s a stop. Their cost on line
   17's drive (seed 1, 102 748 steps): 1.1 s in all, 0.011 ms a step, 0.1 ms at the 99th percentile, 5.3 ms at most (one step).

@@ -867,12 +867,14 @@ export class Game {
       this.doorTimer = DOOR_CLOSE_TIME;
       this.audio.emit('door.buzzer');
       this.audio.emit('door.close');
-      // (those not yet on the entry steps stay behind; those on them finish the climb, #249)
+      // (those on the entry steps finish the climb; those at the doors not yet on them wait there and get on when the doors open
+      // again, the lab's door predicate; they go home if the tram leaves, _finishStop. Closing on them costs 15 each, once a person;
+      // #249, the user, 2026-11-26: "If player closes door and then opens again at the same stop, do people come inside again?")
       const st = this.stops[this.nextStop];
       if (st && st.arrived && st.waiting > 0 && this._atStop(st)) {
-        const n = this.pax.abandon(st.i);
-        if (n) this.penalty('leftBehind', n * 15, t('msg.closedOn', { n }));
-        st.waiting -= n;
+        const shut = this.pax.outside(st.i).filter((a) => !a.shutOn);
+        for (const a of shut) a.shutOn = true;
+        if (shut.length) this.penalty('leftBehind', shut.length * 15, t('msg.closedOn', { n: shut.length }));
       }
     }
   }
@@ -1180,7 +1182,18 @@ export class Game {
     st.done = true;
     // (#249: whoever still waits for this tram stays on the platform; the counts and places checked once a stop)
     const needed = !st.request || st.waiting > 0 || st.alightFrac > 0;
-    if (st.alightSet) st.waiting -= this.pax.abandon(st.i);
+    if (st.alightSet) {
+      // (one who walked or ran in and was still at the doors: back on the platform, where their door was, the same figure)
+      const back = [];
+      st.waiting -= this.pax.abandon(st.i, back);
+      for (const r of back) {
+        r.state = 'left';
+        this.runners.push(r);
+        this.came.aboard--; this.came.left++;
+        st.came[0]--; st.came[1]++;
+        if (r.waitedFor) { this.came.waited--; st.waited--; }
+      }
+    }
     const bad = this.pax.check();
     if (bad.length) { this.paxProblems.push({ stop: st.name, bad }); console.warn(`passengers at ${st.name}: ${bad.join('; ')}`); }
     if (!st.served) {

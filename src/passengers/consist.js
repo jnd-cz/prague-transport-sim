@@ -141,13 +141,17 @@ export function createConsist(layout, { cars, crush, rand }) {
       for (const car of set) moving += car.c.ready(readied.cars[car.k].ids, { speed: READY_SPEED, gap: READY_GAP });
       return moving;
     },
-    // the boarders of a stop not yet on the steps go home (the doors closed on them, or the set is full); the number
-    abandon(tag) {
+    // the boarders of a stop not yet on the steps go home (the tram leaves the stop without them); the number
+    // (out: an array for who those gone were, src/game.js: one who walked or ran in goes back to the platform)
+    abandon(tag, out = null) {
       let n = 0;
-      for (let i = platform.length - 1; i >= 0; i--) if (platform[i].tag === tag) { platform.splice(i, 1); n++; }
-      for (const car of set) for (const a of car.c.abandon((a) => a.tag === tag)) { n++; if (a.counted) car.flight--; }
+      for (let i = platform.length - 1; i >= 0; i--) if (platform[i].tag === tag) { if (platform[i].who) out?.push(platform[i].who); platform.splice(i, 1); n++; }
+      for (const car of set) for (const a of car.c.abandon((a) => a.tag === tag)) { n++; if (a.counted) car.flight--; if (a.who) out?.push(a.who); }
       return n;
     },
+    // the boarders of a stop at the doors and not yet on the steps, left where they are (the doors closed on them: they wait at
+    // them and get on when they open again, #249); the passengers
+    outside(tag) { return set.flatMap((car) => car.c.outside((a) => a.tag === tag)); },
     // boarders waiting on the platform with no room in any car and nobody left to alight
     get full() { return platform.length > 0 && set.every((c) => room(c) <= 0 && outgoing(c) === 0); },
     // those of a stop still on the platform stay there (the set is full); the number

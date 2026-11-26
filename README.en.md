@@ -54,8 +54,9 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   24 seats and 81 standing places; above these 105 it only counts the passengers (up to 160). About one boarder in
   five stands even with seats free; seats that come free go to standing passengers who want to sit, also while the
   tram drives.
-  Whoever is on the steps when you close the doors gets through; the others stay at the stop, and anyone who could
-  not get off gets off at the next one.
+  Whoever is on the steps when you close the doors gets through; the others wait at the doors and get on when you open
+  them again (closing on them costs 15 points each); if you leave, they stay at the stop. Anyone who could not get off
+  gets off at the next one.
   With the detailed tram model (the default) you see them: sitting and standing through the windows, getting off and
   on by the steps, those waiting walking from the platform to the doors, and in the right mirror who is still
   boarding. Those above the 105 a car only counts are seen on the steps and outside only.

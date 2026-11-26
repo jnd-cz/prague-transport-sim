@@ -16,8 +16,9 @@ same with the figures and with ?boxpeople (nothing drawn feeds back into the run
 starts with nobody aboard and nobody to alight there, and nobody waits for other lines at a stop of our line only (#249).
 At the next stop, the departure 12 s off, one walking in from the platform's front end and one from its back end who runs (a walk
 would not make it) are each one figure from the platform into the car (the same key, look and shirt in every drawn step, none
-missing, no jump); then the departure time come, one running 25 m from their door is waited for and gets on (the points for
-waiting), one 45 m off is not waited for, left without a penalty (#249)."""
+missing, no jump); the doors closed on four at them and opened again, they wait at the doors and get on, 15 points off each
+once; then the departure time come, one running 25 m from their door is waited for and gets on (the points for waiting), one
+45 m off is not waited for, left without a penalty (#249)."""
 import argparse
 import faulthandler
 import functools
@@ -192,6 +193,20 @@ SCENE = """async () => {
     }
     out.who.push({ ...start[i], ran: r.ran, seen: first >= 0, gaps, looks: [...looks], jump: +jump.toFixed(3), boxThenPax: box && pax, aboard: aboard[i] !== null });
   });
+  // the doors closed on four at them, opened and at once closed again, then opened: they wait at the doors, cost 15 each once,
+  // and all get on (the user, 2026-11-26: "If player closes door and then opens again at the same stop, do people come inside
+  // again?"); the tram held by the input of a standing step, the autopilot not asked meanwhile
+  g.pax.board(4, st.i); st.waiting += 4;
+  step();
+  const hold = { ...ap.input }, pen0 = g.penalties.leftBehind || 0, out0 = g.pax.outside(st.i).length, w0 = st.waiting;
+  const still = (secs) => { for (let t = 0; t < secs; t += dt) { g.update(dt, hold); traffic.update(dt); } };
+  g.toggleDoors(); still(6);
+  const closed = { outside: g.pax.outside(st.i).length, waiting: st.waiting, penalty: (g.penalties.leftBehind || 0) - pen0, doors: g.doorState };
+  g.toggleDoors(); still(0.4); g.toggleDoors(); still(4);
+  const again = (g.penalties.leftBehind || 0) - pen0;
+  g.toggleDoors();
+  for (let t = 0; t < 40 && st.waiting > 0; t += dt) still(dt);
+  out.shut = { out0, w0, closed, again, after: st.waiting, aboard: g.pax.aboard };
   // the departure time a second off: one 25 m from their door, one 45 m
   g._spawnWalker(st, 'back'); g._spawnWalker(st, 'back');
   const [near, far] = g.runners.slice(-2);
@@ -319,6 +334,15 @@ def main():
                         # (the departure 12 s off: from the front end a walk; from the back end, 30-40 m, a run)
                         want[f"{name}: {'ran' if w['ran'] else 'walked'} from the {'back' if i else 'front'} end"] = w["ran"] == (i == 1)
                         fails += [f"scene: {k}" for k, ok in want.items() if not ok]
+                    sh = sc["shut"]
+                    want = {
+                        f"the doors closed on {sh['out0']} at them: they wait there ({sh['closed']})":
+                            sh["out0"] > 0 and sh["closed"]["outside"] == sh["out0"] and sh["closed"]["waiting"] == sh["w0"] and sh["closed"]["doors"] == "closed",
+                        f"15 points each, once a person ({sh['closed']['penalty']}, after closing again {sh['again']})":
+                            sh["closed"]["penalty"] == 15 * sh["out0"] == sh["again"],
+                        f"opened again, all of them got on (still waiting {sh['after']})": sh["after"] == 0,
+                    }
+                    fails += [f"scene: {k}" for k, ok in want.items() if not ok]
                     dep = sc["dep"]
                     want = {
                         f"the departure time come, the doors wait for the one running 25 m off ({dep['closingAfter']} s)":

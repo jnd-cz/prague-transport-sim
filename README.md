@@ -52,7 +52,8 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
   vystupuje, vstane už při příjezdu k zastávce a postaví se ke dveřím, takže vyjde hned, jak se otevřou. Ve voze
   je 24 sedadel a 81 míst k stání; kdo nastoupí nad těchto 105, toho vůz jen počítá (až do 160). Asi pětina
   nastupujících zůstane stát, i když je volno; uvolněná sedadla zaberou stojící, kteří chtějí sedět, i za jízdy. Kdo už je na schodech,
-  když zavřete dveře, projde; ostatní zůstanou na zastávce, a kdo nestihl vystoupit, vystoupí na další.
+  když zavřete dveře, projde; ostatní počkají u dveří a nastoupí, když je znovu otevřete (zavřít jim dveře před nosem
+  stojí 15 bodů za každého); když odjedete, zůstanou na zastávce. Kdo nestihl vystoupit, vystoupí na další.
   S podrobným modelem tramvaje (výchozím) jsou cestující vidět: okny sedí a stojí ve voze, po schodech vystupují a
   nastupují, čekající jdou z nástupiště ke dveřím a v pravém zrcátku uvidíte, kdo ještě nastupuje. Ty nad 105 vůz jen
   počítá a vidět jsou jen na schodech a venku.
