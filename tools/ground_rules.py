@@ -26,7 +26,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The tools a place's build runs (ground_mesh.build and what it imports at build time): a change to one is a ground
 # rule's, tried on places (tools/tiers.py).
 TOOLS = ("tools/ground_mesh.py", "tools/ground_partition.py", "tools/bed_surface.py", "tools/wall_lines.py",
-         "tools/covers.py", "tools/ties.py")
+         "tools/covers.py", "tools/ties.py", "tools/ipr_dtm.py", "tools/ipr_pits.py")
 
 # (name: a place of groundPlaces, or {line, at} for one that is not; the kind of defect it showed, #812)
 LOCALITY = {
@@ -118,6 +118,12 @@ RULES = {
                  "ground_mesh.PIT*", "ground_partition.PLOT_*"],
         "places": ["garden-beds", "yard-at-a-sidewalk", "garden-edgings", "bed-in-a-sidewalk", "lattice-cell",
                    "verge-by-a-car-park-no-wall", "vystaviste-flush-parking", "wall-end-in-a-path", "stairs-beside-a-building"],
+    },
+    "lidar-pits": {
+        "what": "IPR's pits under the survey's streets, filled from their rim in every reader of the raster (#867)",
+        "code": ["ipr_pits.*", "ipr_dtm.IprDtm", "ipr_dtm.FILLS"],
+        "places": ["taboritska-road-pit", "platnerska-road-pit", "belohorska-sidewalk-pit", "stairs-beside-a-building",
+                   "yard-at-a-sidewalk"],
     },
 }
 

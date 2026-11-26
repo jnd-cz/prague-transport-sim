@@ -44,6 +44,7 @@ from sources import TERRAIN_FLOOR  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIR = os.path.join(ROOT, "raw", "ipr-dtm")
 TIF = os.path.join(DIR, "DTM", "dtm_1m.tif")
+FILLS = os.path.join(ROOT, "data", "ipr.fills.json")  # (tools/ipr_pits.py writes it)
 ITEM = "97d2c9c11aa9478cb21b469b8a4f820e"
 URLS = {"DTM.zip": f"https://www.arcgis.com/sharing/rest/content/items/{ITEM}/data",
         "item.json": f"https://www.arcgis.com/sharing/rest/content/items/{ITEM}?f=json",
@@ -97,9 +98,11 @@ def ground(a):
 
 
 class IprDtm:
-    """Heights at S-JTSK points: bilinear between the four nearest cells, NaN where one is no-data."""
+    """Heights at S-JTSK points: bilinear between the four nearest cells, NaN where one is no-data. The cells of IPR's
+    pits under the survey's streets read as filled from their rim (tools/ipr_pits.py: data/ipr.fills.json, #867);
+    fills=None reads the raster as it is (the steps the fills are built from, and those before them in the build)."""
 
-    def __init__(self, path=TIF):
+    def __init__(self, path=TIF, fills=FILLS):
         if not os.path.exists(path):
             raise SystemExit(f"no {path}: python -I tools/snapshot.py fetch (it unzips raw/ipr-dtm/DTM.zip)")
         self.f = open(path, "rb")
@@ -136,6 +139,16 @@ class IprDtm:
         self.offs, self.cnts = val(324, None), val(325, None)
         self.ntx = -(-self.w // self.tw)
         self.tiles = {}
+        from ipr_pits import load
+        self._fills = load(fills)(self.tw, self.th)
+
+    def fill(self, tx, ty, a):
+        """A decoded tile (decode) with the pits' cells filled (tools/ipr_pits.py), in place."""
+        f = getattr(self, "_fills", None)
+        if f and (tx, ty) in f:
+            r, c, z = f[(tx, ty)]
+            a[r, c] = z
+        return a
 
     def decode(self, tx, ty):
         """One tile's cells as the file holds them (th x tw, float32), not kept."""
@@ -150,7 +163,7 @@ class IprDtm:
     def tile(self, tx, ty):
         k = (tx, ty)
         if k not in self.tiles:
-            self.tiles[k] = ground(self.decode(tx, ty))
+            self.tiles[k] = self.fill(tx, ty, ground(self.decode(tx, ty)))
         return self.tiles[k]
 
     def cells(self, i, j):

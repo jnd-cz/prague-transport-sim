@@ -467,7 +467,8 @@ CHAIN = {  # name: (what it reads, what it writes, a file of its own)
     "osm_validate": ([L], "data/line9.validate.json", True), "geoportal": (["raw/in.txt"], "data/line9.geo.json", True),
     "dtm": (["raw/in.txt"], "data/line9.dtm.json", True), "zps_source": (["data/line9.dtm.json"], "data/line9.zps.json", True),
     "placement": (["data/line9.dtm.json"], L, False), "track_styles": (["data/line9.dtm.json"], L, False),
-    "line_heights": (["data/line9.dtm.json"], L, False), "line_structures": ([], L, False), "cross_level": ([], L, False),
+    "ipr_pits": (["data/line9.dtm.json"], "data/ipr.fills.json", True),
+    "line_heights": (["data/line9.dtm.json", "data/ipr.fills.json"], L, False), "line_structures": ([], L, False), "cross_level": ([], L, False),
     "street_profile": ([L, "data/line9.dtm.json"], "data/line9.streets.json", True),
     "ground_mesh": ([L, "data/line9.dtm.json", "data/line9.streets.json"], "data/line9.ground.json", True),
     "network": ([L, "data/line9.ground.json", "data/line9.dtm.json", "data/line9.geo.json"], "data/line9.network.json", True)}
@@ -519,7 +520,7 @@ class ChainTest(unittest.TestCase):
                                                             "line9.network.json", "line9.ground.json"})
         built = self.files()
         again = self.chain()
-        self.assertEqual([r.rsplit(", ", 1)[1] for r in again], ["all 12 steps skipped", "all 4 steps skipped", "all 3 steps skipped"])
+        self.assertEqual([r.rsplit(", ", 1)[1] for r in again], ["all 12 steps skipped", "all 5 steps skipped", "all 3 steps skipped"])
         self.assertEqual(self.files(), built)  # (each step's output put back, build_id's stamped files last)
         self.assertEqual(build_id.check("9", self.root), (want, {}))
 
@@ -531,7 +532,7 @@ class ChainTest(unittest.TestCase):
         self.assertIn("city mesh k1 → k2", open(os.path.join(self.root, "reports", "rebuild", "ground.summary.log"), encoding="utf-8").read())
         self.write("tools/street_profile.py", FAKE.format(name="street_profile", reads=[L], writes="data/line9.streets.json", fresh=True))
         r = self.chain()
-        self.assertTrue(r[1].endswith("ran street_profile; 3 skipped"), r)
+        self.assertTrue(r[1].endswith("ran street_profile; 4 skipped"), r)
         self.assertTrue(r[2].endswith("ran ground_mesh, network, build_id"), r)  # (a new ground, a new network on it)
         self.assertEqual(build_id.check("9", self.root)[1], {})
 

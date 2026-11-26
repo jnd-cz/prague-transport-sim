@@ -379,6 +379,21 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   163.1-169.8 m at Troja (50.1139 N, 14.4290 E, 334 m from the track), a pit in the 2009-2013 lidar (Trojský most
   and the Blanka tunnel were built there 2010-2014), where IPR's 2023 lidar reads 180.1-187.0 m: the floor fills
   them from their neighbours at line 17's next `build_line.py`.
+- **IPR's 2023 lidar has pits in the streets** (#867): a few metres across, vertical sides, flat floors 1-14 m down,
+  in the survey's level-0 roads and sidewalks, where DMR 5G (2009-2013) has level street: open excavations or shafts
+  at the flight, most likely. The scan of 2026-11-26 (the five lines' tiles, data of 2026-11-23): 30 road and sidewalk
+  pits the ground showed 0.5 m or more deep (Táboritská 3.7 m, Platnéřská 3.1 m); of the roads' and sidewalks' pits
+  2 m or more deep, 30 of 34 are absent from DMR 5G, while the 'paved' areas (yards, forecourts) hold real sunken
+  parts too (22 in both lidars). `tools/ipr_pits.py` fills those under the streets from their rim (its docstring has
+  the rule; paved ones and those 13-16 m long only where DMR 5G is level, the user's answer 1; those off the survey
+  stay, answer 2) into `data/ipr.fills.json`, which every `IprDtm` reads (`fill`; `city_terrain.read_ipr` too): 272
+  pits, 4,161 cells on the five lines' survey of 2026-11-23. `dtm.py` and `open_track.py` run before the fills in the
+  build and read the raster as it is (`IprDtm(fills=None)`). `tools/bench/street_pits.py` counts what is left. Of the
+  scan's 30 and the two at a kerb (Bělohorská 13.9 m, Škrétova 5 x 13 m), 26 fill and 6 stay: five mostly, or deep
+  only, off the survey ((-5192, -1347) 12 x 9, (-592, -248) 48 % in the sidewalk, (1202, -8833), (-793, -8952),
+  (4886, -3115)), one where the survey's own outline lies 1.2 m under the rim, near the pit's floor ((2005, -2299)). Many
+  more street pits stay with their reason in the file's `kept`: a rim on no plane (kerbs, terraces: 547), the survey's
+  level apart (185), no rim of their class (114).
 - **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; the coarse
   10 m grid of a line, and the city mesh's fallback inside the city where IPR has no data.
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): every district a line's 80 m corridor touches
