@@ -11,7 +11,8 @@
 // the stop crowd's places (src/gameView.js crowdSpots), which then stays empty; a runner, or one who walked in while the tram
 // stood (src/game.js runners, the boarder's `who`), is the same figure on: their key, look and place go on into the queue (the
 // user, 2026-11-26: "Can we keep the single model and transition him smoothly from running to queueing for door and getting
-// inside, with the same stats?"). One who alighted steps off the edge and walks along the platform to its nearer end, and goes.
+// inside, with the same stats?"). One who alighted walks from where the core lets them go to a lane along the platform and on
+// to its nearer end, and goes.
 import * as THREE from 'three';
 
 const EASE = 1.3; // m/s: from the crowd's place, or where a runner stopped, to the queue (only drawn: the core has them queued already)
@@ -167,8 +168,8 @@ export class PassengerView {
     return g;
   }
 
-  // an alighter's step to t (_ghost): off the edge to their lane, along it, turned towards the way they go at TURN_V; false once
-  // past the platform's end
+  // an alighter's step to t (_ghost): to their lane, along it, turned towards the way they go at TURN_V; false once past the
+  // platform's end
   _walkOff(g, t) {
     const dt = Math.max(0, t - g.t), a = g.along;
     g.t = t;
@@ -180,7 +181,8 @@ export class PassengerView {
     if (t - g.t0 > OFF_MAX || (a.dir > 0 ? a.s >= a.end : a.s <= a.end)) return false;
     if (dt === 0) return true;
     const game = this.game, route = game.route, step = OFF_V * dt;
-    const side = Math.min(Math.max(0, a.lat - a.lane), step * 0.8), ds = a.dir * Math.sqrt(step * step - side * side);
+    // (to their lane from either side: the core lets them go up to about 6 m off the track, where they cleared the door)
+    const side = Math.max(-step * 0.8, Math.min(step * 0.8, a.lat - a.lane)), ds = a.dir * Math.sqrt(step * step - side * side);
     const h = route.heading(a.s, 3);
     a.lat -= side; a.s += ds; g.walked += step;
     const o = route.offset(a.s, a.lat);

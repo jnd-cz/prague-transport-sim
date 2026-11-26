@@ -940,7 +940,7 @@ export class Game {
   // one coming to the stop (_comeTo): in from the platform's back or front end, at a walk, to the door nearest that end, along the
   // platform's edge (the stop crowd stands further from it). With the doors open they join its queue and board as runners do; the
   // driver does not wait for them (the user, 2026-11-26: "Driver should not wait for walkers past the departure time"): left when
-  // the tram goes, without a penalty. (from: 'back' or 'front' for the tests, tools/test_people.py; drawn the same)
+  // the tram goes, without a penalty, they walk on to where their door was and wait there. (from: 'back' or 'front' for the tests, tools/test_people.py; drawn the same)
   _spawnWalker(st, from = null) {
     const r = this.comeRand, tr = this.tram, [lo, hi] = this.platformEnds(st), u = r();
     const s = (from ? from === 'back' : u < 0.5) ? lo - 1 : hi + 1;
@@ -969,11 +969,13 @@ export class Game {
         r.s = Math.min(r.target, r.s + r.v * dt);
         r.lat += (-1.9 - r.lat) * Math.min(1, dt * 0.8); // towards the platform edge by the door
         if (r.s >= r.target) r.state = 'door';
-      } else if (r.state === 'walk') { // (to their door, which stays with the tram while it is at the stop)
-        if (this._atStop(r.st)) r.target = this.doorS(r.car, r.door);
+      } else if (r.walk && (r.state === 'walk' || r.state === 'left')) {
+        // (to their door, which stays with the tram while it is at the stop; one the tram left walks on to where it was and waits
+        // there for the next, as those on the platform do)
+        if (r.state === 'walk' && this._atStop(r.st)) r.target = this.doorS(r.car, r.door);
         const d = r.target - r.s, step = r.v * dt;
         r.s += Math.sign(d) * Math.min(Math.abs(d), step);
-        if (Math.abs(d) <= step) r.state = 'door';
+        if (Math.abs(d) <= step && r.state === 'walk') r.state = 'door';
       }
       if (r.state !== 'left') {
         const open = this.doorState === 'open' || this.doorState === 'opening';

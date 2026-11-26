@@ -1468,11 +1468,12 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   end (`platformEnds`: the OSM platform, else the crowd's 26 m behind the stop point to 2 m past it) to the door nearest that
   end, along the edge (1.9-2.3 m right of the track; the crowd stands 2.4-4 m off it). At an open door they join its queue as a
   runner does; the autopilot waits for those at the doors, not for those walking (`runnersFor` counts runners only), and one
-  the tram leaves stays without a penalty. A runner or a walker keeps their look (`look`, the figure's person number; `model`,
+  the tram leaves walks on to where their door was and waits there, without a penalty. A runner or a walker keeps their look (`look`, the figure's person number; `model`,
   the box figure's shirt) into the passenger core: the core's boarder carries `who`, queued at once (`board`), and its figure
   (`src/passengerView.js`) has their key, number and shirt and walks on from where they stood. Before, the boarder was a new
-  person at the queue (a number from the car and its index, a shirt by it). Those who alight step off the edge to a lane 2.3 m
-  off the track and walk to the platform's nearer end and 1.5 m past it, and go (drawn only; before, 3 s on the way they faced).
+  person at the queue (a number from the car and its index, a shirt by it). Those who alight walk from where the core lets them
+  go (clear of the door, up to about 6 m off the track) to a lane 2.3-2.6 m off it and along it to the platform's nearer end and
+  1.5 m past it, and go (drawn only; before, 3 s on the way they faced).
 - **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
   is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
   model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body
