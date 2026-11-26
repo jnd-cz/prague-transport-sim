@@ -82,7 +82,7 @@ export class Game {
     this.deadmanTimer = 0;
     this.action = null; // { label, t, done }
     this.runners = []; // late passengers running for the tram (C14), and those walking in while it stands at a stop (#249)
-    this.came = { aboard: 0, left: 0 }; // (of those walking in: boarded, left behind; tools/bench/stops.js)
+    this.came = { aboard: 0, left: 0 }; // (of those walking in: boarded, left behind; per stop st.came; tools/bench/stops.js)
     this.holdTimer = 0;
 
     this.profile = route.ground.profile;
@@ -984,10 +984,10 @@ export class Game {
           r.st.waiting++;
           this.pax.board(1, r.st.i, { car: r.walk ? r.car : tr.cars - 1, door: r.walk ? r.door : 'Rear', who: r });
           r.state = 'aboard';
-          if (r.walk) this.came.aboard++;
+          if (r.walk) { this.came.aboard++; (r.st.came ||= [0, 0])[0]++; }
         } else if (tr.s > r.st.zone[1] + 2 || (tr.v > 0.5 && this.doorState === 'closed')) { // (the tram leaves)
           r.state = 'left';
-          if (r.walk) this.came.left++;
+          if (r.walk) { this.came.left++; (r.st.came ||= [0, 0])[1]++; }
           else this.penalty('leftBehind', 15, t('msg.runnerLeft'));
         }
       }

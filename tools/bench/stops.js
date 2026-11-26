@@ -174,7 +174,7 @@ export function stopsWatch(game) {
         depOnTime: ((D) => (D.length ? +(D.filter((x) => x.dev >= 0 && x.dev < (x.first ? 60 : 180)).length / D.length).toFixed(2) : null))(
           game.stops.filter((x, i) => i < game.stops.length - 1 && x.departClock != null && x.sched != null).map((x) => ({ dev: x.departClock - x.sched, first: x === game.stops[game.opts.startStop] }))),
         stretches: R.stretches.map((q, i) => ({ to: q.to, drive: q.drive, brake: q.brake, secs: Math.round((R.stretches[i + 1]?.t0 ?? game.clock) - (q.tMove ?? q.t0)), quick: q.quick == null ? null : Math.round(q.quick), hand: q.hand == null ? null : Math.round(q.hand), sched: q.sched == null ? null : Math.round(q.sched), tt: q.tt == null ? null : Math.round(q.tt),
-          arr: q.st.arriveClock == null ? null : Math.round(q.st.arriveClock - q.st.sched), dep: q.st.departClock == null ? null : Math.round(q.st.departClock - q.st.sched), held:Object.fromEntries(Object.entries(q.held).map(([k, v]) => [k, Math.round(v)])) })) };
+          arr: q.st.arriveClock == null ? null : Math.round(q.st.arriveClock - q.st.sched), dep: q.st.departClock == null ? null : Math.round(q.st.departClock - q.st.sched), came: q.st.came ?? null, held:Object.fromEntries(Object.entries(q.held).map(([k, v]) => [k, Math.round(v)])) })) };
     },
   };
 }
