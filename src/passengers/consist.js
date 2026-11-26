@@ -20,7 +20,12 @@ import { createCabinNavigator } from './cabin-navigation.js';
 export const STAND_SHARE = 0.2; // (the user: "some people boarding can stand even with free seats"; revisited with journeys, #40)
 export const RESEAT_SPEED = 0.8; // m/s: a slow walk to a seat inside
 // (#249 step 4) the stop this near (m), those alighting there get up and go to their door's doorway places, one a door every
-// READY_GAP s at READY_SPEED (a walk in a moving tram, as RESEAT_SPEED): src/game.js
+// READY_GAP s at READY_SPEED (a walk in a moving tram, as RESEAT_SPEED): src/game.js. The distance as the user asked it measured
+// (2026-11-26: "how far from stop they need to start moving when tram is approaching at 50 km/h and breaking at the highest
+// step"): getting ready takes at most about 10 s (two cars, 38 % alighting, the most the game draws: 8.2-9.9 s at 100 aboard,
+// less below and above, where the doorways are full); the set braking on step 5 from 50 km/h covers 69-84 m in its last 10 s
+// and 97-112 m in its last 12 s (empty to full). 120 m: those 12 s at the hardest braking; with the autopilot (lines 17 and 22,
+// 69 stops) the tram stood 15.9 s after at the soonest, everyone at the doors after 8.1 s at most.
 export const READY_DIST = 120;
 export const READY_SPEED = 0.8;
 export const READY_GAP = 0.8;

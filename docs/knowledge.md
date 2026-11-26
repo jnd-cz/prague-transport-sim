@@ -1344,7 +1344,14 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   arrival would choose them (`consist.ready`; the same ones alight there) and go to free doorway places of the doors they will
   leave by, one a door every 0.8 s at 0.8 m/s, round the others; from a seat they stand up first. A doorway place is its
   door's, so they go out through it and first; boarders at that door wait for them. Those with no free doorway place or no way
-  stay where they are; one still on the way when the tram stops alights from where they get to. Line 17 (seed 1): a door's last
+  stay where they are; one still on the way when the tram stops alights from where they get to. The 120 m, measured as the user
+  asked (the same day: "how far from stop they need to start moving when tram is approaching at 50 km/h and breaking at the
+  highest step"): getting ready takes up to about 10 s (two cars, 38 % alighting, the most `alightFrac` draws, seeds 1–5: 4.3–5.8 s
+  at 30 aboard, 8.0–8.3 s at 60, 8.2–9.9 s at 100, 8.1–9.3 s at 140; at 180 and more the doorway places are taken by those
+  standing, and fewer or none go); the set braking on step 5 from 50 km/h stands after 9.0–11.1 s and 70–84 m (full to empty),
+  and covers 69–84 m in its last 10 s, 97–112 m in its last 12 s. With the autopilot on lines 17 and 22 (seed 1, 69 stops) the
+  tram stood 15.9 s after the start at the soonest (median 20.5 s), the last one at the door after 8.1 s at most (median 5.7 s),
+  nobody still on the way. Line 17 (seed 1): a door's last
   alighter out at 3.3 s on average (median 2.5 s: the 2.2 s down the steps), its first boarder up at 3.6 s; the boardings
   begun with alighters at the car's other doors 60 of 134 (those doors' alighters still on the steps). In `tools/test_consist.py`
   (50 aboard, 15 off, 20 on): out 2.3 s to 6.9 s after the doors open against 3.5 s to 8.3 s from their places, the first
