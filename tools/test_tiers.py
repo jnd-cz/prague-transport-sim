@@ -32,6 +32,8 @@ class Rows(unittest.TestCase):
         self.assertEqual(k("AGENTS.md", "src/traffic.js"), ["simulation"])  # (docs beside code: the code's checks)
         self.assertEqual(k("tools/build_line.py"), ["world"])
         self.assertEqual(k("tools/ground_mesh.py"), ["ground rule"])  # (a ground rule: no line rebuilt, #757)
+        for t in ("tools/covers.py", "tools/wall_lines.py", "tools/ties.py", "tools/bed_surface.py"):
+            self.assertEqual(k(t), ["ground rule"], t)  # (what a place's build runs, though a rebuild runs it too, #865)
         queue = ("tools/heavy.py", "tools/stepcache.py", "tools/board.py")  # (the queue, the cache, the label: no output)
         self.assertEqual(list(tiers.kinds(queue)), ["tool"])
         self.assertEqual(k("tools/line_heights.py"), ["track heights"])
@@ -51,6 +53,18 @@ class Rows(unittest.TestCase):
         self.assertIn("python -I tools/test_all.py -k test_tiers", c)
         self.assertEqual(c.count("-k test_tiers"), 1)
         self.assertEqual(tiers.commands(tiers.kinds(["AGENTS.md"], BUILD)), [])
+
+    def test_a_ground_change_runs_the_locality_set_and_its_rules_places_not_all(self):
+        found = tiers.kinds(["tools/ground_mesh.py"], BUILD)
+        c = "\n".join(tiers.commands(found, ground=["ground_mesh.wall_face", "ground_mesh.lowered_kerbs"]))
+        self.assertIn("ground_place.py --locality", c)
+        self.assertIn("ground_place.py --rule walls,kerbs", c)
+        self.assertNotIn("--all", c.replace("test_all", ""))
+        self.assertNotIn("in no rule", c)
+        c = "\n".join(tiers.commands(found, ground=["ground_mesh.build"]))
+        self.assertIn("--locality", c)
+        self.assertNotIn("--rule", c)
+        self.assertIn("# in no rule (ground_mesh.build)", c)
 
     def test_the_lines_come_from_the_manifest(self):
         self.assertEqual(tiers.lines(os.path.join(ROOT, "no such checkout")), ["9", "17", "22", "23", "37"])

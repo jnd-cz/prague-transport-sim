@@ -22,6 +22,8 @@ TOOLS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(TOOLS)
 sys.path.insert(0, TOOLS)
 
+import ground_rules  # noqa: E402 (which places a ground change is tried on, #865)
+
 SEEDED = "u3,redruns,stops,traffic,lint,giveway"  # (stops rides on the u3 drive, #708; giveway is static, #602)
 STATIC = "lint,surfaces,canted,crossing,spacing,heights"
 DRAWN = "lint,surfaces,crossing,canted"
@@ -35,9 +37,11 @@ KINDS = [
                 "src/trackHeightProfile.js", "reviews.html", "reports/review/*", "tools/test_review.py",
                 "src/overview.js", "overview.html", "tools/test_overview_page.py"),  # (the overview counts like reviews.html, #826)
      "tools/test_review.py and tools/test_overview_page.py (phone and desktop sizes)", "headless"),
-    ("ground rule", ("tools/ground_mesh.py", "tools/ground_partition.py", "tools/bed_surface.py"),
-     "the tool's test; tools/ground_place.py on the rule's places and --all, before → after (a new case becomes a "
-     "place in data/truth.json groundPlaces); no line rebuilt", "the lines' rebuild and checks: once for the batch"),
+    ("ground rule", ground_rules.TOOLS,  # (what a place's build runs, #865)
+     "the tool's test; tools/ground_place.py --locality (the fixed set with one ring and two) and --rule on the "
+     "changed rules' places (tools/ground_rules.py), before → after (a new case becomes a place in data/truth.json "
+     "groundPlaces and of its rule); no line rebuilt",
+     "--all --rings, the lines' rebuild and their checks: once for the batch (#757)"),
     ("world", ("data/MANIFEST.json", "data/truth.json", "snapshots/*"),  # (and the tools a rebuild runs: world())
      f"the tool's test; the lines rebuilt; --checks {STATIC} on them; tools/datadiff.py or tools/track_moves.py per "
      "line; a smoke drive per line (--checks u3 --seeds 1)", "redruns, traffic, seeds 2-5"),
@@ -134,15 +138,16 @@ def tests_of(paths, root=ROOT):
     return out
 
 
-def commands(found, base="origin/main", root=ROOT):
-    """The commands for the kinds found, in the order to run them."""
+def commands(found, base="origin/main", root=ROOT, ground=None):
+    """The commands for the kinds found, in the order to run them. ground: what the ground tools changed
+    ([module.name]; None: read from the diff against base)."""
     every, out = ",".join(lines(root)), []
     tests = tests_of([p for ps in found.values() for p in ps], root)
     out += [f"python -I tools/test_all.py -k {t[:-3]}" for t in tests]  # (-k: one name a run)
     if "review" in found:
         out.append("python -P -E tools/test_review.py")
     if "ground rule" in found:
-        out.append("python -P -E tools/ground_place.py <the rule's places>  # then --all, before → after")
+        out += ground_commands(found["ground rule"], base, root, ground)
     if "world" in found:
         ls = ",".join(rebuilt_lines(base, root)) or every
         if not rebuilt_lines(base, root):
@@ -164,6 +169,21 @@ def commands(found, base="origin/main", root=ROOT):
         out.append("python -P -E tools/shot.py ...  # main vs branch; python -P -E tools/frametime.py")
     if "tool" in found or "world" in found or "ground rule" in found:
         out.append("python -I tools/test_all.py  # the whole suite, before the PR is ready")
+    return out
+
+
+def ground_commands(paths, base, root=ROOT, names=None):
+    """A ground change's places (#865): the locality set, the changed rules' places, and what changed in no rule."""
+    names = ground_rules.diff(paths, base, root) if names is None else names
+    out = ["python -P -E tools/ground_place.py --locality  # the fixed set, one ring and two: 0 differing (#865)"]
+    rules, none = ground_rules.rules_of(names or [])
+    if rules:
+        out.append(f"python -P -E tools/ground_place.py --rule {','.join(rules)}  # "
+                   f"{len(ground_rules.places_of(rules))} places, before → after")
+    if none or names is None:
+        what = ", ".join(none[:8]) + (f" and {len(none) - 8} more" if len(none) > 8 else "") if none else "the diff unread"
+        out.append(f"# in no rule ({what}): their places by hand (ground_place.py --list), or the code into a rule "
+                   "of tools/ground_rules.py")
     return out
 
 

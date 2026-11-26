@@ -83,7 +83,8 @@ things are done, and why a rule exists, is in the files it points to:
   publishes (`snapshot.py data-publish`, then commit `data/MANIFEST.json`). Others test on a local rebuild and
   wait. `main`'s manifest always names data that is in the store (`snapshot.py verify`).
 - **Ground changes are proven on places, rebuilt in batches** (the user, 2026-11-19, #757): a ground rule's PR
-  carries the tool, its test and its places' numbers; the holder of `rebuild` rebuilds every line once a batch.
+  carries the tool, its test and the numbers of the locality set and its rules' places (`tiers.py` names them; the
+  user, 2026-11-26, #865); `--all --rings` and every line's rebuild are the batch's, by the holder of `rebuild`.
 - **Sources** come only from the pinned snapshot in `raw/` (`snapshot.py fetch`), OSM only from its local extract,
   never the public Overpass API. A new source goes into a snapshot with its URL, licence and date, and into
   `tools/sources.py`. A provider that refuses scripted requests is waited out, never fooled.
