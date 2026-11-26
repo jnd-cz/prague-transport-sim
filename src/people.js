@@ -6,10 +6,19 @@
 // pedestrians' and the driver's box figures) and writes nothing back, so a seeded run counts the same
 // with or without it. The box figures stay in the scene on a camera layer nothing draws: their
 // `visible` is the game's (an obstacle pedestrian appears by it) and they come back with ?boxpeople.
+// An animated figure is one primitive, one draw call (its shirt, trousers and the rest were three before), and only
+// people in view are animated (the slots went by distance alone, to people behind the camera too): in the camera's view,
+// or in the right mirror's near the tram (people boarding, running for the doors; the user, 2026-11-24: "The main use
+// of mirrors in player's vehicle is to check is people finished boarding").
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { bindPose, middleBody, withStyle, styleOf, STYLES, SKIN_COLOR, HAT_COLOR } from './figures.js';
 
-export const PEOPLE_FILES = ['assets/people/person-near.glb', 'assets/people/person-far.glb'];
+// (#249 step 3: our set's passengers too, src/passengerView.js: on the car they are its node's children, the animated ones
+// with the lab's clips (Sit, TramStepUp, TramStepDown), the sitting down blended, the leg poses on the entry steps; the
+// distant ones in two batches a car, standing and seated, person-seated-far.glb)
+export const PEOPLE_FILES = ['assets/people/person-near.glb', 'assets/people/person-far.glb', 'assets/people/person-seated-far.glb'];
+const CAR_FAR = 140; // a car's distant passengers at most, of each posture (105 places, those walking in and out)
 
 // at most 64 animated figures, in within 80 m, out beyond 88 m; an animated one keeps its place against
 // a newcomer up to 5 m closer (the handoff's values, which the user tried on line 17); of them the full
@@ -17,6 +26,13 @@ export const PEOPLE_FILES = ['assets/people/person-near.glb', 'assets/people/per
 // change visibly at 1080 px and the game's 62 deg: the face and the head's shading. At 40 m it is 48 pixels
 // of a 42 px tall figure; #251.)
 const NEAR_MAX = 64, NEAR_IN = 80, NEAR_OUT = 88, KEEP = 5, FULL_IN = 40, FULL_OUT = 46;
+// in view: the camera's frustum against a sphere round the figure (its bounds, BODY_R), VIEW_IN m larger to come in and
+// VIEW_OUT m to stay (as src/cars.js: the change happens off the screen's edge)
+const BODY_R = 1.45, VIEW_IN = 3, VIEW_OUT = 4;
+// in the mirror's view (src/mirror.js: 30 degrees, a picture about 300 px tall, 30 times a second) within MIRROR_IN m of
+// its camera, kept to MIRROR_OUT: a figure at 50 m is about 20 px tall there, as one at 80 m on a 1080 px screen. Those
+// seen only there are the middle figure (the full one's face is a pixel or two in it)
+const MIRROR_IN = 50, MIRROR_OUT = 55;
 // one Walk cycle covers 16/15 m, one Run cycle 2.15 m (the lab's catalog.json); faster than RUN: running
 const STRIDE = { Walk: 16 / 15, Run: 2.15 }, RUN = 2.4, STILL = 0.25;
 const FAR_MAX = 320;
@@ -52,21 +68,53 @@ function maskOf(geo, c) {
   return new THREE.BufferAttribute(m, 1);
 }
 
+// a figure's three parts as one primitive: the shirt and the trousers marked to take the person's colours (the detail
+// part's hair region is marked already, maskOf)
+function oneBody(shirt, trousers, detail) {
+  const mark = (g, s, t) => {
+    g = g.clone();
+    const n = g.attributes.position.count;
+    g.setAttribute('shirtMask', new THREE.BufferAttribute(new Float32Array(n).fill(s), 1));
+    g.setAttribute('trousersMask', new THREE.BufferAttribute(new Float32Array(n).fill(t), 1));
+    if (!g.attributes.hairMask) g.setAttribute('hairMask', new THREE.BufferAttribute(new Float32Array(n), 1));
+    return g;
+  };
+  return mergeGeometries([mark(shirt, 1, 0), mark(trousers, 0, 1), mark(detail, 0, 0)]);
+}
+
+// a figure's material: the vertex colours times the shirt's and the trousers' colours where their masks are, the hair
+// colour on the hair region; the clothes' roughness 0.65 and the rest's 0.85, as the three materials had
+function oneMaterial() {
+  const u = { shirt: { value: new THREE.Color() }, trousers: { value: new THREE.Color() }, hair: { value: new THREE.Color() } };
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.85 });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.shirtColor = u.shirt; sh.uniforms.trousersColor = u.trousers; sh.uniforms.hairColor = u.hair;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float shirtMask;\nattribute float trousersMask;\nattribute float hairMask;\nuniform vec3 shirtColor;\nuniform vec3 trousersColor;\nuniform vec3 hairColor;\nvarying float vCloth;')
+      .replace('#include <color_vertex>', '#include <color_vertex>\n  vColor.xyz *= mix(vec3(1.0), shirtColor, shirtMask) * mix(vec3(1.0), trousersColor, trousersMask);\n  vColor.xyz = mix(vColor.xyz, hairColor, hairMask);\n  vCloth = shirtMask + trousersMask;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vCloth;')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.65, vCloth);');
+  };
+  m.customProgramCacheKey = () => 'people-one';
+  return { m, u };
+}
+
 // responses: the loader's bodies of PEOPLE_FILES, in that order
 export async function loadPeople(responses) {
   const [{ GLTFLoader }, { clone }] = await Promise.all([
     import('three/addons/loaders/GLTFLoader.js'), import('three/addons/utils/SkeletonUtils.js')]);
   const loader = new GLTFLoader();
-  const [near, far] = await Promise.all(responses.map(async (r, i) => {
+  const [near, far, seated] = await Promise.all(responses.map(async (r, i) => {
     if (!r?.ok) throw new Error(`${PEOPLE_FILES[i]} missing`);
     return loader.parseAsync(await r.arrayBuffer(), '');
   }));
-  return { near, far, clone };
+  return { near, far, seated, clone };
 }
 
 // the far figure as one instanced mesh: the shirt, trousers and hair regions of its baked vertex colours
 // take each instance's colours (the instance colour and two more per-instance colours)
-function farBatch(gltf) {
+function farBatch(gltf, max = FAR_MAX) {
   let src = null;
   gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o; });
@@ -75,7 +123,7 @@ function farBatch(gltf) {
   geo.setAttribute('trousersMask', maskOf(geo, FAR_TROUSERS));
   geo.setAttribute('hairMask', maskOf(geo, BAKED_HAIR));
   for (const k of ['instanceTrousers', 'instanceHair']) {
-    const a = new THREE.InstancedBufferAttribute(new Float32Array(FAR_MAX * 3), 3);
+    const a = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3);
     a.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute(k, a);
   }
@@ -86,7 +134,7 @@ function farBatch(gltf) {
       .replace('#include <color_vertex>', '#include <color_vertex>\n#ifdef USE_INSTANCING_COLOR\n  vColor.xyz = mix(color.xyz, instanceColor.xyz, shirtMask);\n  vColor.xyz = mix(vColor.xyz, instanceTrousers, trousersMask);\n  vColor.xyz = mix(vColor.xyz, instanceHair, hairMask);\n#endif');
   };
   mat.customProgramCacheKey = () => 'people-far';
-  const mesh = new THREE.InstancedMesh(geo, mat, FAR_MAX);
+  const mesh = new THREE.InstancedMesh(geo, mat, max);
   mesh.name = 'people-far';
   mesh.setColorAt(0, FAR_SHIRT); // (creates the instance colours, which the shader needs from the start)
   mesh.count = 0;
@@ -114,6 +162,9 @@ export class People {
       middle: { shirt: mid.shirt, trousers: mid.trousers, citizen_detail: styled(mid.citizen_detail, 6) },
     };
     for (const l of Object.values(this.levels)) for (const g of Object.values(l.citizen_detail)) g.setAttribute('hairMask', maskOf(g, BAKED_HAIR));
+    // each level and style as one primitive, which the figures share
+    this.bodies = Object.fromEntries(Object.entries(this.levels).map(([k, l]) =>
+      [k, Object.fromEntries(STYLES.map((st) => [st, oneBody(l.shirt, l.trousers, l.citizen_detail[st])]))]));
     this.clips = Object.fromEntries(assets.near.animations.map((c) => [c.name, c]));
     this.near = new Map(); // key -> figure
     this.pool = [];
@@ -122,6 +173,8 @@ export class People {
     this.mats = []; // reused matrices and colours, one per record
     this.colors = [];
     this.cam = new THREE.Vector3();
+    this._f = new THREE.Frustum(); this._pv = new THREE.Matrix4(); this._sp = new THREE.Sphere();
+    this._mf = new THREE.Frustum(); this.mcam = new THREE.Vector3();
     this.sweep = 0;
     this.stats = { near: 0, far: 0, people: 0, figures: 0 };
   }
@@ -129,31 +182,27 @@ export class People {
   _figure() {
     const f = this.pool.pop();
     if (f) { f.root.visible = true; return f; }
-    const root = this.assets.clone(this.assets.near.scene), mats = {}, meshes = {};
+    const root = this.assets.clone(this.assets.near.scene), parts = [];
     root.matrixAutoUpdate = false;
-    root.traverse((o) => {
-      if (!o.isMesh) return;
-      const name = o.material.name;
-      meshes[name] = o;
-      if (name === 'shirt' || name === 'trousers') o.material = mats[name] = o.material.clone();
-      if (name === 'citizen_detail') { // (skin, eyes, shoes and hair in vertex colours: the hair is replaced)
-        const m = o.material = o.material.clone(), hair = mats.hair = { value: new THREE.Color() };
-        m.onBeforeCompile = (sh) => {
-          sh.uniforms.hairColor = hair;
-          sh.vertexShader = sh.vertexShader
-            .replace('#include <common>', '#include <common>\nattribute float hairMask;\nuniform vec3 hairColor;')
-            .replace('#include <color_vertex>', '#include <color_vertex>\n  vColor.xyz = mix(vColor.xyz, hairColor, hairMask);');
-        };
-        m.customProgramCacheKey = () => 'people-hair';
-      }
-      // (a skinned mesh's own bounds would be computed from its pose: one sphere round the body)
-      if (o.isSkinnedMesh) o.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.9, 0), 1.45);
-    });
+    // (the three parts have one skeleton, the same joints in the same order: the first part's mesh draws the one body,
+    // the other two go; skin, eyes, shoes and hair in vertex colours, the hair's replaced)
+    root.traverse((o) => { if (o.isSkinnedMesh) parts.push(o); });
+    const body = parts[0];
+    for (const o of parts.slice(1)) o.parent.remove(o);
+    const { m, u } = oneMaterial();
+    body.material = m;
+    // (a skinned mesh's own bounds would be computed from its pose: one sphere round the body)
+    body.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.9, 0), BODY_R);
     const mixer = new THREE.AnimationMixer(root);
     const actions = Object.fromEntries(Object.entries(this.clips).map(([k, c]) => [k, mixer.clipAction(c)]));
     this.group.add(root);
     this.stats.figures++;
-    return { root, mats, meshes, mixer, actions, motion: null, level: 'full', style: 'short' };
+    // (the legs' bones for a passenger on the entry steps, with their rest poses: the lab's two-bone leg, its thigh 0.43 m and
+    // shin 0.41 m)
+    const bone = (name) => root.getObjectByName(name);
+    const legs = ['L', 'R'].map((s) => [bone(`UpperLeg_${s}`), bone(`LowerLeg_${s}`), bone(`Foot_${s}`)]), hips = bone('Hips');
+    const rest = [hips, ...legs.flat()].filter(Boolean).map((b) => [b, b.position.clone(), b.quaternion.clone()]);
+    return { root, body, u, mixer, actions, motion: null, level: null, style: null, playing: [], hips, legs, rest, ik: false };
   }
 
   _matrix(n) { return this.mats[n] || (this.mats[n] = new THREE.Matrix4()); }
@@ -189,8 +238,9 @@ export class People {
   }
 
   // after the game's and the traffic's step, before drawing; the traffic and the game as drawn (src/trafficView.js,
-  // src/gameView.js)
-  sync(camera, trafficView, gameView) {
+  // src/gameView.js); mirror: the right mirror's camera, posed for this frame, while the mirror is shown (else null);
+  // passengers: our set's, src/passengerView.js sync's { recs, cars }
+  sync(camera, trafficView, gameView, mirror = null, passengers = null) {
     this.recs.length = 0;
     if (trafficView) this._crowd(trafficView.crowd, trafficView.traffic.slots || [], 'w');
     const game = gameView?.game;
@@ -221,61 +271,162 @@ export class People {
       rescale(r.m, r.w, r.h);
     }
     for (const [k, s] of this.track) if (s.seen !== sweep) this.track.delete(k);
-    // the nearest ones (a near one keeps its place): animated figures; the rest: the far batch
+    // (our set's passengers: their pose is the passenger core's, src/passengerView.js; those on a car hidden with it)
+    if (passengers) for (const r of passengers.recs) this.recs.push(r);
+    // the nearest ones in view (a near one keeps its place): animated figures; the rest: the far batch. In the camera's
+    // view, or else in the mirror's (by their distance to its camera)
     const c = camera.getWorldPosition(this.cam);
-    for (const r of this.recs) { r.raw = Math.hypot(r.x - c.x, r.y - c.y, r.z - c.z); r.d = r.raw - (this.near.has(r.key) ? KEEP : 0); }
-    const near = this.recs.filter((r) => r.d < (this.near.has(r.key) ? NEAR_OUT - KEEP : NEAR_IN)).sort((a, b) => a.d - b.d).slice(0, NEAR_MAX);
+    camera.updateMatrixWorld();
+    this._f.setFromProjectionMatrix(this._pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const mc = mirror && mirror.getWorldPosition(this.mcam);
+    if (mirror) { mirror.updateMatrixWorld(); this._mf.setFromProjectionMatrix(this._pv.multiplyMatrices(mirror.projectionMatrix, mirror.matrixWorldInverse)); }
+    for (const r of this.recs) {
+      const was = this.near.has(r.key);
+      r.raw = Math.hypot(r.x - c.x, r.y - c.y, r.z - c.z); r.d = r.raw - (was ? KEEP : 0);
+      this._sp.center.set(r.x, r.y + 0.9, r.z);
+      this._sp.radius = BODY_R + (was ? VIEW_OUT : VIEW_IN);
+      r.view = r.shown !== false && r.d < (was ? NEAR_OUT - KEEP : NEAR_IN) && this._f.intersectsSphere(this._sp);
+      r.mirror = false;
+      if (!r.view && mc) {
+        const dm = Math.hypot(r.x - mc.x, r.y - mc.y, r.z - mc.z);
+        if (dm < (was ? MIRROR_OUT : MIRROR_IN) && this._mf.intersectsSphere(this._sp)) { r.view = r.mirror = true; r.d = dm - (was ? KEEP : 0); }
+      }
+    }
+    const near = this.recs.filter((r) => r.view).sort((a, b) => a.d - b.d).slice(0, NEAR_MAX);
     const keep = new Set(near.map((r) => r.key));
-    for (const [k, f] of this.near) if (!keep.has(k)) { f.root.visible = false; this.pool.push(f); this.near.delete(k); }
-    let full = 0;
+    for (const [k, f] of this.near) {
+      if (keep.has(k)) continue;
+      f.root.visible = false;
+      if (f.root.parent !== this.group) this.group.add(f.root); // (off a car: its model may go)
+      this.pool.push(f); this.near.delete(k);
+    }
+    let full = 0, mirrored = 0;
     for (const r of near) {
       let f = this.near.get(r.key);
-      const level = r.raw < (f?.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'middle';
+      const level = !r.mirror && r.raw < (f?.level === 'full' ? FULL_OUT : FULL_IN) ? 'full' : 'middle';
       if (!f) { f = this._figure(); this.near.set(r.key, f); }
       this._pose(f, r, t, level);
       if (level === 'full') full++;
+      if (r.mirror) mirrored++;
     }
     let n = 0;
-    const pants = this.far.geometry.attributes.instanceTrousers, hair = this.far.geometry.attributes.instanceHair;
+    // (our set's distant passengers on a car: its own batches, standing and seated, in its frame)
+    const carFar = (passengers?.cars || []).map((node) => this._carFar(node));
+    let onCars = 0;
     for (const r of this.recs) {
-      if (keep.has(r.key) || n >= FAR_MAX) continue;
-      this.far.setMatrixAt(n, r.m.multiply(TURN));
-      this.far.setColorAt(n, r.shirt);
-      const tr = TROUSERS[r.n % TROUSERS.length], h = hairFor(r.n, styleOf(r.n), true);
-      pants.setXYZ(n, tr.r, tr.g, tr.b);
-      hair.setXYZ(n, h.r, h.g, h.b);
-      n++;
+      if (keep.has(r.key)) continue;
+      if (r.pax?.car >= 0 && r.parent) {
+        const b = carFar[r.pax.car]?.[r.pax.seated ? 'seated' : 'standing'];
+        if (b && b.count < CAR_FAR) { this._farAt(b, b.count++, r.local, r); onCars++; }
+        continue;
+      }
+      if (n >= FAR_MAX) continue;
+      this._farAt(this.far, n++, r.m.multiply(TURN), r);
     }
     this.far.count = n;
-    this.far.instanceMatrix.needsUpdate = true;
-    this.far.instanceColor.needsUpdate = true;
-    pants.needsUpdate = hair.needsUpdate = true;
-    Object.assign(this.stats, { near: near.length, full, middle: near.length - full, far: n, people: this.recs.length });
+    for (const b of [this.far, ...carFar.flatMap((x) => [x.standing, x.seated])]) {
+      b.instanceMatrix.needsUpdate = true;
+      b.instanceColor.needsUpdate = true;
+      b.geometry.attributes.instanceTrousers.needsUpdate = b.geometry.attributes.instanceHair.needsUpdate = true;
+    }
+    Object.assign(this.stats, { near: near.length, full, middle: near.length - full, mirror: mirrored, far: n, onCars, people: this.recs.length });
+  }
+
+  // one distant figure of a batch: its matrix, its shirt, trousers and hair
+  _farAt(b, i, m, r) {
+    b.setMatrixAt(i, m);
+    b.setColorAt(i, r.shirt);
+    const tr = TROUSERS[r.n % TROUSERS.length], h = hairFor(r.n, styleOf(r.n), true);
+    b.geometry.attributes.instanceTrousers.setXYZ(i, tr.r, tr.g, tr.b);
+    b.geometry.attributes.instanceHair.setXYZ(i, h.r, h.g, h.b);
+  }
+
+  // a car's batches of distant passengers (its node's children, emptied each frame): standing and seated
+  _carFar(node) {
+    let b = node.userData.paxFar;
+    if (!b) {
+      b = node.userData.paxFar = { standing: farBatch(this.assets.far, CAR_FAR), seated: farBatch(this.assets.seated, CAR_FAR) };
+      b.standing.name = 'passengers-far'; b.seated.name = 'passengers-far-seated';
+      node.add(b.standing, b.seated);
+    }
+    b.standing.count = b.seated.count = 0;
+    return b;
+  }
+
+  // the animated figures on a set's cars back to the people's group, before the set's model goes (src/main.js)
+  detach(model) {
+    for (const f of [...this.near.values(), ...this.pool]) {
+      let on = false;
+      for (let o = f.root.parent; o; o = o.parent) if (o === model) { on = true; break; }
+      if (on) this.group.add(f.root);
+    }
   }
 
   _pose(f, r, t, level) {
     const style = styleOf(r.n);
-    if (f.level !== level || f.style !== style) { // (the figures share the levels' geometries)
-      const g = this.levels[level];
-      f.meshes.shirt.geometry = g.shirt;
-      f.meshes.trousers.geometry = g.trousers;
-      f.meshes.citizen_detail.geometry = g.citizen_detail[style];
+    if (f.level !== level || f.style !== style) { // (the figures share the levels' bodies)
+      f.body.geometry = this.bodies[level][style];
       f.level = level; f.style = style;
     }
-    f.root.matrix.multiplyMatrices(r.m, TURN);
+    // (a passenger on a car: its node's child in its frame; everyone else in the world)
+    const parent = r.parent || this.group;
+    if (f.root.parent !== parent) parent.add(f.root);
+    if (r.parent) f.root.matrix.copy(r.local);
+    else f.root.matrix.multiplyMatrices(r.m, TURN);
     f.root.matrixWorldNeedsUpdate = true;
-    const motion = r.s.speed > RUN ? 'Run' : r.s.speed > STILL ? 'Walk' : 'Idle';
-    if (f.motion !== motion) {
-      if (f.motion) f.actions[f.motion].stop();
-      f.actions[motion].play();
-      f.motion = motion;
+    if (f.ik) { for (const [b, p, q] of f.rest) { b.position.copy(p); b.quaternion.copy(q); } f.ik = false; }
+    if (r.pax) this._posePassenger(f, r.pax);
+    else {
+      const motion = r.s.speed > RUN ? 'Run' : r.s.speed > STILL ? 'Walk' : 'Idle';
+      this._play(f, [motion], [1]);
+      // (a stride is the clip's foot travel along the figure's forward axis, scaled with the person's build)
+      const a = f.actions[motion], phase = STRIDE[motion] ? r.s.dist / (STRIDE[motion] * r.w) : t * 0.5 + r.n * 0.137;
+      a.time = (phase - Math.floor(phase)) * a.getClip().duration;
+      f.mixer.update(0);
     }
-    // (a stride is the clip's foot travel along the figure's forward axis, scaled with the person's build)
-    const a = f.actions[motion], phase = STRIDE[motion] ? r.s.dist / (STRIDE[motion] * r.w) : t * 0.5 + r.n * 0.137;
-    a.time = (phase - Math.floor(phase)) * a.getClip().duration;
+    f.u.shirt.value.copy(r.shirt);
+    f.u.trousers.value.copy(TROUSERS[r.n % TROUSERS.length]);
+    f.u.hair.value.copy(hairFor(r.n, style, false));
+  }
+
+  // the clips playing, with their weights (the others stopped)
+  _play(f, names, weights) {
+    const key = names.join('+');
+    if (f.motion !== key) {
+      for (const a of f.playing) if (!names.includes(a)) f.actions[a].stop();
+      for (const a of names) f.actions[a].play();
+      f.playing = names; f.motion = key;
+    }
+    names.forEach((a, i) => f.actions[a].setEffectiveWeight(weights[i]));
+  }
+
+  // a passenger's pose from the passenger core (src/passengers/boarding-state.js, exit-flow.js), as the lab drew it: the
+  // clip at its phase (a clip is 1 s), sitting down and getting up blended, and on the entry steps the legs' two-bone pose
+  // (the hips' height and each foot's target, forward and up in the figure's frame)
+  _posePassenger(f, p) {
+    const has = (m) => !!f.actions[m];
+    if (p.blend && has(p.blend.from) && has(p.blend.to)) {
+      const w = Math.min(1, Math.max(0, p.blend.weight));
+      this._play(f, [p.blend.from, p.blend.to], [1 - w, w]);
+      for (const m of [p.blend.from, p.blend.to]) f.actions[m].time = 0;
+    } else {
+      const motion = has(p.motion) ? p.motion : 'Idle';
+      this._play(f, [motion], [1]);
+      const a = f.actions[motion];
+      a.time = (p.phase - Math.floor(p.phase)) * a.getClip().duration;
+    }
     f.mixer.update(0);
-    if (f.mats.shirt) f.mats.shirt.color.copy(r.shirt);
-    if (f.mats.trousers) f.mats.trousers.color.copy(TROUSERS[r.n % TROUSERS.length]);
-    if (f.mats.hair) f.mats.hair.value.copy(hairFor(r.n, style, false));
+    const L = p.legPose;
+    if (!L || !f.hips || !Number.isFinite(L.hipsHeight) || L.feet?.length !== 2) return;
+    f.hips.position.y = L.hipsHeight;
+    L.feet.forEach(({ x, y }, i) => {
+      const [up, low, foot] = f.legs[i];
+      if (!up || !low || !foot) return;
+      const dy = y - (L.hipsHeight - 0.015), A = 0.43, B = 0.41;
+      const k = -Math.acos(Math.min(0.9999, Math.max(-0.9999, (x * x + dy * dy - A * A - B * B) / (2 * A * B))));
+      const u = Math.atan2(x, -dy) - Math.atan2(B * Math.sin(k), A + B * Math.cos(k));
+      up.rotation.set(0, 0, u); low.rotation.set(0, 0, k); foot.rotation.set(0, 0, -u - k);
+    });
+    f.ik = true;
   }
 }

@@ -19,6 +19,8 @@ const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
 const PHASE_HOLD = 10;        // s: the most a junction holds its phase for each tram committed to it (_runController)
 
 import { rng } from './random.js';
+import { createConsist } from './passengers/consist.js';
+import { carTypeOf } from './carTypes.js';
 import { Feeding } from './electric.js';
 import { platformsOf, stopOf } from './platformRules.js';
 
@@ -126,7 +128,11 @@ export class Game {
     for (const w of this.switches) {
       if (w.contact < tram.panto && w.s > tram.s - 1) { w.passedContact = true; w.pos = w.required; this._showSwitch(w); }
     }
-    tram.passengers = Math.min(tram.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock)));
+    // the passengers (#249): the passenger lab's core for each car on the T3's cabin (src/passengers/consist.js), drawing from a
+    // stream of their own (a passenger's draws leave the rules' and the traffic's as they were); the count is theirs
+    this.pax = createConsist(opts.cabin, { cars: tram.cars, crush: T3.crushCapacity, rand: rng((opts.seed ?? 12345) ^ 0x2490) });
+    this.paxProblems = []; // (what pax.check() found at the stops: none, or a count or a place gone wrong)
+    tram.passengers = this.pax.load(Math.min(tram.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock))));
     this.nextStop = opts.startStop;
     st.arrived = true;
     st.arriveClock = this.clock;
@@ -700,7 +706,10 @@ export class Game {
       if (this.switches.some((w) => Math.abs(w.s - s) < 30) || this.signals.some((g) => Math.abs(g.cross - s) < 40)) continue;
       const type = this.rand() < 0.5 ? 'parked' : 'pedestrian';
       // (its look, one of eight, drawn here as when its model was made here; turn: its heading against the track's)
-      this.obstacles.push({ type, model: Math.floor(this.rand() * 8), s, lat: type === 'parked' ? -1.5 : -6, turn: 0, state: 'idle', timer: 0, rung: false, speed: 1.3 });
+      const ob = { type, model: Math.floor(this.rand() * 8), s, lat: type === 'parked' ? -1.5 : -6, turn: 0, state: 'idle', timer: 0, rung: false, speed: 1.3 };
+      // a parked car's type (#250): its half length and width, numbered past the traffic's ids and the signal scenes'
+      if (type === 'parked') { ob.carType = carTypeOf(0x50000000 + i); ob.half = ob.carType.length / 2; ob.halfW = ob.carType.width / 2; }
+      this.obstacles.push(ob);
     }
     // jaywalkers at some unsignalised pedestrian crossings, none on the road under a bridge (the build's answer:
     // tools/network.py over_bridge. Asked here, the ground under the span was past the window at Start, #823)
@@ -824,10 +833,12 @@ export class Game {
       this.doorTimer = DOOR_CLOSE_TIME;
       this.audio.emit('door.buzzer');
       this.audio.emit('door.close');
+      // (those not yet on the entry steps stay behind; those on them finish the climb, #249)
       const st = this.stops[this.nextStop];
       if (st && st.arrived && st.waiting > 0 && this._atStop(st)) {
-        this.penalty('leftBehind', st.waiting * 15, t('msg.closedOn', { n: st.waiting }));
-        st.waiting = 0;
+        const n = this.pax.abandon(st.i);
+        if (n) this.penalty('leftBehind', n * 15, t('msg.closedOn', { n }));
+        st.waiting -= n;
       }
     }
   }
@@ -888,7 +899,8 @@ export class Game {
       }
       if (r.state !== 'left') {
         const open = this.doorState === 'open' || this.doorState === 'opening';
-        if (r.state === 'door' && open && this._atStop(r.st) && tr.v < 0.05) { r.st.waiting++; r.state = 'aboard'; }
+        // (at the rear car's rear door they join its queue, #249)
+        if (r.state === 'door' && open && this._atStop(r.st) && tr.v < 0.05) { r.st.waiting++; this.pax.board(1, r.st.i, { car: tr.cars - 1, door: 'Rear' }); r.state = 'aboard'; }
         else if (tr.s > r.st.zone[1] + 2 || (tr.v > 0.5 && this.doorState === 'closed')) { // (the tram leaves)
           r.state = 'left';
           this.penalty('leftBehind', 15, t('msg.runnerLeft'));
@@ -996,8 +1008,17 @@ export class Game {
   _updateStops(dt) {
     const tram = this.tram;
     const st = this.stops[this.nextStop];
+    const at = !!st && this._atStop(st) && Math.abs(tram.v) < 0.05;
+    // the passengers (#249): through the doors only while they are open with the tram standing at the stop (one on the steps
+    // finishes the way); inside, the freed seats taken also while it drives. A crossing is the head of the entry steps in, their
+    // foot out: the counts change there, and the autopilot waits for the last one
+    for (const x of this.pax.update(dt, at && this.doorState === 'open')) {
+      this.score += 1;
+      if (x.dir === 'in') this.stops[x.tag].waiting--;
+      else if (st?.alight > 0) st.alight--;
+    }
+    tram.passengers = this.pax.aboard;
     if (!st) return;
-    const at = this._atStop(st) && Math.abs(tram.v) < 0.05;
 
     if (at && !st.arrived) {
       st.arrived = true;
@@ -1007,26 +1028,22 @@ export class Game {
       else if (err > 4) this.penalty('precision', 20, t('msg.overshot', { d: Math.round(err) }));
       if (st.runners > 0) this._spawnRunners(st);
     }
+    // on arrival the share of those aboard to alight here, the nearest to the doors (the user's rule, #249), with any who could
+    // not get off at the stop before; the waiting queue at the doors
     if (st.arrived && !st.alightSet) {
       st.alightSet = true;
-      st.alight = Math.round(tram.passengers * st.alightFrac);
+      const carry = this.pax.toAlight;
+      st.alight = carry + this.pax.alight(Math.round((this.pax.aboard - carry) * st.alightFrac));
+      this.pax.board(st.waiting, st.i);
+      st.boarders = st.waiting; // (how many waited when the tram came: the stop crowd's places, src/gameView.js)
     }
-    // passenger exchange through open doors
+    // the exchange through the open doors is the passengers' own (src/passengers/consist.js); with the set full and everybody
+    // off, those left wait for the next tram
     if (at && this.doorState === 'open') {
       st.served = true;
-      // three doors per car; a packed car boards slowly
-      const crowd = tram.passengers > tram.capacity ? 0.45 : tram.passengers > tram.capacity * 0.75 ? 0.75 : 1;
-      st.flow = (st.flow || 0) + 3 * tram.cars * 1.1 * crowd * dt;
-      while (st.flow >= 1) {
-        st.flow -= 1;
-        if (st.alight > 0) { st.alight--; tram.passengers--; this.score += 1; }
-        else if (st.waiting > 0 && tram.passengers < tram.crushCapacity) { st.waiting--; tram.passengers++; this.score += 1; }
-        else break;
-      }
-      if (st.alight === 0 && st.waiting > 0 && tram.passengers >= tram.crushCapacity) {
-        this.msg(t('msg.full', { n: st.waiting }), 'warn', 5);
-        st.leftFull = st.waiting;
-        st.waiting = 0;
+      if (st.alight === 0 && st.waiting > 0 && this.pax.full) {
+        const n = this.pax.leaveFull(st.i);
+        if (n) { this.msg(t('msg.full', { n }), 'warn', 5); st.leftFull = (st.leftFull || 0) + n; st.waiting -= n; }
       }
     }
     // last passengers of the old line are out: the route boxes and the HUD show the new line
@@ -1051,8 +1068,12 @@ export class Game {
 
   _finishStop(st) {
     st.done = true;
+    // (#249: whoever still waits for this tram stays on the platform; the counts and places checked once a stop)
+    const needed = !st.request || st.waiting > 0 || st.alightFrac > 0;
+    if (st.alightSet) st.waiting -= this.pax.abandon(st.i);
+    const bad = this.pax.check();
+    if (bad.length) { this.paxProblems.push({ stop: st.name, bad }); console.warn(`passengers at ${st.name}: ${bad.join('; ')}`); }
     if (!st.served) {
-      const needed = !st.request || st.waiting > 0 || st.alightFrac > 0;
       if (!needed) {
         this.log.push({ name: st.name, skipped: true });
         return;
@@ -1262,8 +1283,12 @@ export class Game {
         sig.spawn = 3 + this.rand() * 4;
         const dir = X.oneway || (this.rand() < 0.5 ? 1 : -1);
         const start = dir > 0 ? 0 : X.length;
-        // (its look from the signal's own counter, not the run's stream; drawn by src/gameView.js on the street's right side)
-        if (!sig.cars.some((c) => c.dir === dir && Math.abs(c.s - start) < 9)) sig.cars.push({ s: start, dir, model: sig.seed++, v: 0 });
+        // (its look and its type, #250, from the signal's own counter, not the run's stream, the type numbered past the
+        // traffic's ids; drawn by src/gameView.js on the street's right side)
+        if (!sig.cars.some((c) => c.dir === dir && Math.abs(c.s - start) < 9)) {
+          const type = carTypeOf(0x40000000 + sig.seed);
+          sig.cars.push({ s: start, dir, model: sig.seed++, v: 0, type, half: type.length / 2 });
+        }
       }
     }
     for (const car of sig.cars) {
@@ -1276,14 +1301,15 @@ export class Game {
       const waiting = toX > 3.5 && toX < 12 && (red || tramComing);
       // queue behind the car in front
       let gap = Infinity;
-      for (const o of sig.cars) if (o !== car && o.dir === car.dir && (o.s - car.s) * car.dir > 0) gap = Math.min(gap, (o.s - car.s) * car.dir - 4.4);
+      for (const o of sig.cars) if (o !== car && o.dir === car.dir && (o.s - car.s) * car.dir > 0) gap = Math.min(gap, (o.s - car.s) * car.dir - o.half - car.half);
       const vt = waiting ? 0 : Math.min(9, Math.max(0, (gap - 3) * 0.9));
       car.v = vt > car.v ? Math.min(vt, car.v + dt * 2.5) : Math.max(vt, car.v - dt * 6);
       car.s += car.dir * car.v * dt;
       // a hit: the car inside the tram's body on the crossing (its front plus the car's half width), not
-      // the 4 m ahead in which drivers see it coming (a car 4 m ahead counted, line 9 seed 7, #268)
+      // the 4 m ahead in which drivers see it coming (a car 4 m ahead counted, line 9 seed 7, #268); within its half
+      // length and 0.1 m of the crossing point (2.3 m for every car before #250)
       const inBody = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 1;
-      if (Math.abs(toX) < 2.3 && inBody && tram.v > 0.2 && !car.hit) {
+      if (Math.abs(toX) < car.half + 0.1 && inBody && tram.v > 0.2 && !car.hit) {
         car.hit = true;
         this._collision(t('obj.crossingCar'));
       }
@@ -1326,8 +1352,11 @@ export class Game {
           if (Math.abs(ob.lat) > 7) ob.state = 'gone';
         }
       }
-      // collision with tram body
-      if (ob.state !== 'gone' && Math.abs(ob.lat) < 1.55 && ob.s <= tram.s + 0.2 && ob.s >= tram.s - tram.length) {
+      // collision with tram body (a parked car: from its rear to its front, its middle within 0.65 m and its half width of
+      // the track centre, 1.55 m for the 1.8 m box car; a walker: where it is. Before #250 only a car's middle counted: the
+      // tram ran 2.2 m into it without a collision)
+      const hl = ob.half ?? 0, hw = ob.halfW !== undefined ? 0.65 + ob.halfW : 1.55;
+      if (ob.state !== 'gone' && Math.abs(ob.lat) < hw && ob.s - hl <= tram.s + 0.2 && ob.s + hl >= tram.s - tram.length) {
         if (tram.v > 0.15 || ob.type === 'pedestrian') {
           ob.state = 'gone';
           this._collision(t(ob.type === 'parked' ? 'obj.parkedCar' : 'obj.pedestrian'), ob.type === 'pedestrian' ? 500 : 300);

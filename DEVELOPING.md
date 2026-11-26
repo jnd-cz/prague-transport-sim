@@ -606,6 +606,14 @@ the pinned #291 and only proposes.
   says so.
 - A waiting job of 10 min or less goes before longer ones queued earlier (the suites, a one-line run), but not
   before one that has waited 2 h (`baseline_store.rank`, `SHORT`, `PASS_MAX`). It still waits for the jobs running.
+- Checkouts of different queue versions may order the waiting jobs differently, and then wait for each other: on
+  2026-11-25 three jobs did so for hours with nothing running (#854). From #854 on, a job that waits while none runs
+  for 2 min (`HeavyJob.STALL`) waits only for the jobs queued before it by time, the order every version keeps, and
+  says so once. Each ticket carries its queue version (`baseline_store.QUEUE`, #856); while a job of a version older
+  than #851 waits, the newer ones take their turns first come first served too, its own order, so the two cannot wait
+  for each other. The board marks a job whose queue code is older: "its queue code is older (merge main)". Merge main
+  into that checkout before its next job (the same night #812's jobs and an older checkout's short job stood still
+  that way at 06:24).
 - A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that
   names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
@@ -703,7 +711,7 @@ go into a "Findings" section of the PR.
 - A test that needs `data/` or `raw/` skips without them, saying what to fetch.
 
 **Dev switches:** `?line=N`, `?inspect`, `?review` (findings on the map), `?bot`, `?keepgeo`, `?notunnels`,
-`?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile
+`?boxpeople` (the box figures instead of the pedestrian models, #251), `?boxcars` (the box cars instead of the street vehicles' models, #250), `?profile=<name>` (a trial height profile
 from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N,
 replayed up to route s and handed over paused: a stuck scene as it was, #157).
 

@@ -12,12 +12,12 @@ import { TrafficView } from './trafficView.js';
 import { Autopilot } from './autopilot.js';
 import { rng } from './random.js';
 
-// world: what the page loaded for its line { scene, data, route, ground, audio }; o: the run's options:
+// world: what the page loaded for its line { scene, data, route, ground, audio, cabin (the T3's, for the passengers) }; o: the run's options:
 //   seed (the run's seeded stream, src/random.js), cars, controls ('arcade' / 'advanced'), autopilot (it drives),
 //   trip, startStop, weather, obstacles, assist, deadman, autoSwitch, toutAt (the outdoor temperature by the clock),
 //   vehicle, dealer (the fleet's, its own stream from the seed), facts (the user's facts the game reads: substations,
 //   speedFacts, signFacts), extra (Game options over these: the performance test's lead)
-export function createRun({ scene, data, route, ground, audio }, o) {
+export function createRun({ scene, data, route, ground, audio, cabin }, o) {
   const tram = new Tram(o.cars);
   tram.eq.mode = o.controls;
   // one seeded stream for the whole run (rules and traffic), apart from Math.random
@@ -36,6 +36,7 @@ export function createRun({ scene, data, route, ground, audio }, o) {
     vehicle: o.vehicle,
     dealer: o.dealer,
     seed: Math.floor(random() * 1e9),
+    cabin,
     ...o.facts,
     ...o.extra,
   });
