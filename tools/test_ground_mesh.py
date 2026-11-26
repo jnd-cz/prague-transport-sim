@@ -119,6 +119,18 @@ class File(unittest.TestCase):
         want = {tuple(sorted(map(tuple, V[F[i]].tolist()))): draw[i] for i in range(4)}
         self.assertEqual(got, want)
 
+    def test_a_border_vertex_decodes_to_its_grid_point_whichever_tile_comes_first(self):
+        # (the two tiles' copies of a border vertex were welded to the first tile's floats, #865)
+        V = mm([300000, 0, 200000], [306000, 0, 200100], [306000, -1000, 199900], [300000, -1000, 200000],
+               [312000, 0, 200300], [312000, -1000, 200200])
+        F = np.array([[0, 1, 2], [0, 2, 3], [1, 4, 5], [1, 5, 2]])
+        blob, layout = gm.encode_tiles(V, F, np.array([0, 1, 1, 0]))
+        W, _ = gm.decode(blob, layout)
+        back = dict(layout, tiles=layout["tiles"][::-1])
+        W2, _ = gm.decode(blob, back)
+        np.testing.assert_array_equal(np.unique(W, axis=0), np.unique(W2, axis=0))
+        np.testing.assert_array_equal(W * Q, np.round(W * Q))
+
     def test_draw_classes_round_trip_with_their_triangles(self):
         V = mm([0, 0, 200000], [1000, 0, 200100], [1000, -1000, 199900], [0, -1000, 200000], [500, -500, 201234])
         F = np.array([[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]])
@@ -1233,6 +1245,42 @@ class MeetRaised(unittest.TestCase):
         z1, _ = gm.meet_raised(sc2, x2, y2, zs2)
         np.testing.assert_array_equal(z1[:len(x)][np.argsort(o)], z0)
         np.testing.assert_allclose(z0[:99], zs[:99] + 0.2, atol=1e-9)  # (on the edge: each corner its point's step)
+
+    def test_the_fade_reads_an_edge_points_grid_point_whichever_copy_comes_first(self):
+        # (a point's copies a fraction of a mm apart in one mm: its distances were the first copy's, by the order the
+        # corners came in, #865)
+        sc, sa, x, y, zs = self.corners(0.2)
+        rep = np.r_[np.arange(11), np.arange(11), np.arange(11, len(x))]
+        sc, x, y, zs = sc[rep], x[rep].copy(), y[rep], zs[rep]
+        x[11:22] += 0.0003
+        z0, _ = gm.meet_raised(sc, x, y, zs)
+        o = np.r_[np.arange(11, 22), np.arange(11), np.arange(22, len(x))]  # (the copies first)
+        z1, _ = gm.meet_raised(sc[o], x[o], y[o], zs[o])
+        np.testing.assert_allclose(z1[np.argsort(o)], z0, rtol=0, atol=1e-12)
+        self.assertTrue(np.all(z0[33:44] < 100.2) and np.all(z0[33:44] > 100.0))  # (1 m in: part of the step)
+
+
+class Picks(unittest.TestCase):
+    def test_a_points_copies_are_its_grid_point_whatever_their_order(self):
+        x, y = np.array([5.0001, 5.0004, 7.0, 4.9998]), np.array([1.0, 1.0003, -2.0, 0.9999])
+        a, b = gm.mm_points(x, y), gm.mm_points(x[::-1], y[::-1])
+        np.testing.assert_array_equal(a[0], [5.0, 7.0])
+        np.testing.assert_array_equal(a[1], [1.0, -2.0])
+        self.assertEqual(a[2].tolist(), [0, 0, 1, 0])
+        np.testing.assert_array_equal(b[0], a[0])
+        self.assertEqual(b[2].tolist(), a[2][::-1].tolist())
+
+    def test_a_rail_point_and_its_copies_read_alike_in_any_order(self):
+        import bed_surface
+        beds = bed_surface.Beds(level_line([([[0, 0], [0, 100]], {})]))
+        x, y = np.array([0.7203, -0.72, 0.7199, 0.0]), np.array([50.0002, 30.0, 49.9999, 50.0])
+        got, low = gm.on_rails(x, y, beds, shapely.box(-3, 0, 3, 90))
+        o = np.array([2, 3, 0, 1])
+        got2, low2 = gm.on_rails(x[o], y[o], beds, shapely.box(-3, 0, 3, 90))
+        np.testing.assert_array_equal(got2[np.argsort(o)], got)
+        np.testing.assert_array_equal(low2[np.argsort(o)], low)
+        self.assertEqual(got[0], got[2])
+        self.assertEqual(np.isfinite(got).tolist(), [True, True, True, False])
 
 
 class Steps(unittest.TestCase):
