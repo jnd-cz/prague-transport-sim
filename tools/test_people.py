@@ -9,7 +9,10 @@ the box crowd is hidden. Each animated figure is one draw call, and only people 
 the camera turned away from the row, none; with the right mirror's camera looking along it, those within 50 m of
 the mirror, as the simplified figure, one draw call each in its picture. Part 2, in the game (needs data/lineN.json; skipped without): after a short autopilot drive the
 walkers and the stop crowd are drawn by figures, the box meshes are on the hidden layer, and ?boxpeople
-leaves the box figures."""
+leaves the box figures. Our set's passengers (#249 step 3, src/passengerView.js): every one the passenger core has
+drawn (the counted ones only on the steps and outside), those on a car as its node's children (the animated ones) or
+in its own batches (the distant ones, standing and seated); and the same seeded drive, drawn once a second, ends the
+same with the figures and with ?boxpeople (nothing drawn feeds back into the run)."""
 import argparse
 import faulthandler
 import functools
@@ -98,15 +101,39 @@ GAME = """async () => {
   window.headless = true;
   const { Autopilot } = await import('/src/autopilot.js');
   const g = window.game, traffic = window.traffic, view = window.run.trafficView, ap = new Autopilot(), dt = 1 / 30;
+  const gv = window.run.gameView, people = window.people;
+  // (drawn once a simulated second, as a page draws; with ?boxpeople nothing to draw)
+  const draw = () => { gv.sync(); gv.syncCrowd(); if (people) people.sync(window.camera, view, gv, null, window.paxView.sync(g, window.tramModel, gv)); };
   g.audio.setMuted?.(true);
-  for (let t = 0; t < 90; t += dt) { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt); view.sync(window.camera); }
-  const gv = window.run.gameView;
-  gv.sync(); gv.syncCrowd();
-  window.people.sync(window.camera, view, gv);
+  let k = 0;
+  for (let t = 0; t < 90; t += dt) { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt); view.sync(window.camera); if (++k % 30 === 0) draw(); }
+  // (the run's state: equal with and without the figures)
+  const state = { s: +g.tram.s.toFixed(4), clock: +g.clock.toFixed(3), score: +g.score.toFixed(3), passengers: g.tram.passengers,
+    stops: g.stops.map((st) => [st.waiting, st.alight, !!st.served]).join(';'),
+    actors: g.pax.cars.map((c) => [...c.c.actors.values()].map((a) => `${a.id}@${a.x.toFixed(3)},${a.z.toFixed(3)}`).join('|')).join('/') };
+  if (!people) return { state };
+  draw();
   const walkers = (traffic.slots || []).filter(Boolean).length;
   let skinned = 0;
-  window.people.group.traverse((o) => { if (o.isSkinnedMesh && o.parent?.visible !== false && o.parent?.parent?.visible !== false) skinned++; });
-  return { ...window.people.stats, walkers, skinned, stopCrowd: gv.crowd.count, hidden: [view.crowd.layers.mask, gv.crowd.layers.mask] };
+  people.group.traverse((o) => { if (o.isSkinnedMesh && o.parent?.visible !== false && o.parent?.parent?.visible !== false) skinned++; });
+  const stats = { ...people.stats };
+  // (then the tram shown and the camera 7 m beside the first car's middle door, looking at it: its passengers near)
+  const model = window.tramModel, node = model.userData.cars[0].userData.rig.full, cam = window.camera, V = cam.position.constructor;
+  model.visible = true; node.updateMatrixWorld(true);
+  cam.position.copy(new V(-0.8, 1.7, 7).applyMatrix4(node.matrixWorld)); cam.lookAt(new V(-0.8, 1.3, 0).applyMatrix4(node.matrixWorld));
+  const pax = window.paxView.sync(g, model, gv);
+  people.sync(cam, view, gv, null, pax);
+  // the passengers drawn: every one the core has (the counted ones on the steps and outside only), those on a car on it
+  const drawable = g.pax.cars.reduce((n, c) => n + [...c.c.actors.values()].filter((a) => !(a.counted && a.aboard && !a.legPose)).length, 0);
+  const cars = new Set(pax.cars), onCar = pax.recs.filter((r) => r.parent).length;
+  let nearOnCar = 0, carSkinned = 0;
+  for (const f of people.near.values()) if (cars.has(f.root.parent)) nearOnCar++;
+  for (const c of pax.cars) c.traverse((o) => { if (o.isSkinnedMesh) carSkinned++; });
+  const farOnCar = pax.cars.reduce((n, c) => n + (c.userData.paxFar ? c.userData.paxFar.standing.count + c.userData.paxFar.seated.count : 0), 0);
+  const seated = pax.recs.filter((r) => r.pax.seated).length;
+  const farSeated = pax.cars.reduce((n, c) => n + (c.userData.paxFar?.seated.count ?? 0), 0);
+  return { ...stats, walkers, skinned, stopCrowd: gv.crowd.count, hidden: [view.crowd.layers.mask, gv.crowd.layers.mask], state,
+    paxRecs: pax.recs.length, drawable, onCar, nearOnCar, farOnCar, carSkinned, seated, farSeated, paxCars: pax.cars.length, cars: g.pax.cars.length };
 }"""
 
 
@@ -174,17 +201,33 @@ def main():
             fails += [f"synthetic: {k}" for k, ok in want.items() if not ok]
             if data and not args.synthetic:
                 for mode in ("", "&boxpeople"):
-                    page.goto(f"{base}/?line={args.line}{mode}", timeout=300000)
+                    # (one seed for both, so the two drives are the same run)
+                    page.goto(f"{base}/?line={args.line}&seed=7{mode}", timeout=300000)
                     page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=300000)
+                    # (the page steps no game of its own: both drives are the test's steps only)
+                    page.evaluate("document.getElementById('optAuto').checked = false; window.headless = true")
                     if mode:
                         r["boxpeople"] = b = page.evaluate("({ people: window.people })")
                         if b["people"] is not None:
                             fails.append("?boxpeople: the figures loaded anyway")
+                        page.click("#btnStart")
+                        page.wait_for_function("window.game && window.traffic && window.camera", timeout=60000)
+                        box = page.evaluate(GAME)["state"]
+                        if box != r["game"]["state"]:
+                            diff = [k for k in box if box[k] != r["game"]["state"].get(k)]
+                            fails.append(f"game: the run differs with the figures and without them ({diff})")
                         continue
-                    page.evaluate("document.getElementById('optAuto').checked = false")
                     page.click("#btnStart")
                     page.wait_for_function("window.game && window.traffic && window.camera", timeout=60000)
                     r["game"] = gm = page.evaluate(GAME)
+                    want = {
+                        f"passengers: {gm['paxRecs']} drawn of {gm['drawable']}": gm["paxRecs"] >= gm["drawable"] > 0,
+                        f"passengers: our {gm['paxCars']} cars": gm["paxCars"] == gm["cars"] > 0,
+                        f"passengers on a car: {gm['nearOnCar']} animated + {gm['farOnCar']} distant of {gm['onCar']}":
+                            gm["nearOnCar"] > 0 and gm["nearOnCar"] + gm["farOnCar"] == gm["onCar"] and gm["carSkinned"] == gm["nearOnCar"],
+                        f"passengers seated: {gm['seated']}, of them distant on the seated figure {gm['farSeated']}": gm["seated"] > 0 and gm["farSeated"] <= gm["seated"],
+                    }
+                    fails += [f"game: {k}" for k, ok in want.items() if not ok]
                     if gm["people"] < gm["walkers"] or gm["walkers"] == 0:
                         fails.append(f"game: {gm['walkers']} walkers, {gm['people']} drawn as figures")
                     if gm["near"] == 0 or gm["near"] > 64:

@@ -19,6 +19,7 @@ const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
 const PHASE_HOLD = 10;        // s: the most a junction holds its phase for each tram committed to it (_runController)
 
 import { rng } from './random.js';
+import { createConsist } from './passengers/consist.js';
 import { carTypeOf } from './carTypes.js';
 import { Feeding } from './electric.js';
 import { platformsOf, stopOf } from './platformRules.js';
@@ -127,7 +128,11 @@ export class Game {
     for (const w of this.switches) {
       if (w.contact < tram.panto && w.s > tram.s - 1) { w.passedContact = true; w.pos = w.required; this._showSwitch(w); }
     }
-    tram.passengers = Math.min(tram.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock)));
+    // the passengers (#249): the passenger lab's core for each car on the T3's cabin (src/passengers/consist.js), drawing from a
+    // stream of their own (a passenger's draws leave the rules' and the traffic's as they were); the count is theirs
+    this.pax = createConsist(opts.cabin, { cars: tram.cars, crush: T3.crushCapacity, rand: rng((opts.seed ?? 12345) ^ 0x2490) });
+    this.paxProblems = []; // (what pax.check() found at the stops: none, or a count or a place gone wrong)
+    tram.passengers = this.pax.load(Math.min(tram.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock))));
     this.nextStop = opts.startStop;
     st.arrived = true;
     st.arriveClock = this.clock;
@@ -828,10 +833,12 @@ export class Game {
       this.doorTimer = DOOR_CLOSE_TIME;
       this.audio.emit('door.buzzer');
       this.audio.emit('door.close');
+      // (those not yet on the entry steps stay behind; those on them finish the climb, #249)
       const st = this.stops[this.nextStop];
       if (st && st.arrived && st.waiting > 0 && this._atStop(st)) {
-        this.penalty('leftBehind', st.waiting * 15, t('msg.closedOn', { n: st.waiting }));
-        st.waiting = 0;
+        const n = this.pax.abandon(st.i);
+        if (n) this.penalty('leftBehind', n * 15, t('msg.closedOn', { n }));
+        st.waiting -= n;
       }
     }
   }
@@ -892,7 +899,8 @@ export class Game {
       }
       if (r.state !== 'left') {
         const open = this.doorState === 'open' || this.doorState === 'opening';
-        if (r.state === 'door' && open && this._atStop(r.st) && tr.v < 0.05) { r.st.waiting++; r.state = 'aboard'; }
+        // (at the rear car's rear door they join its queue, #249)
+        if (r.state === 'door' && open && this._atStop(r.st) && tr.v < 0.05) { r.st.waiting++; this.pax.board(1, r.st.i, { car: tr.cars - 1, door: 'Rear' }); r.state = 'aboard'; }
         else if (tr.s > r.st.zone[1] + 2 || (tr.v > 0.5 && this.doorState === 'closed')) { // (the tram leaves)
           r.state = 'left';
           this.penalty('leftBehind', 15, t('msg.runnerLeft'));
@@ -1000,8 +1008,17 @@ export class Game {
   _updateStops(dt) {
     const tram = this.tram;
     const st = this.stops[this.nextStop];
+    const at = !!st && this._atStop(st) && Math.abs(tram.v) < 0.05;
+    // the passengers (#249): through the doors only while they are open with the tram standing at the stop (one on the steps
+    // finishes the way); inside, the freed seats taken also while it drives. A crossing is the head of the entry steps in, their
+    // foot out: the counts change there, and the autopilot waits for the last one
+    for (const x of this.pax.update(dt, at && this.doorState === 'open')) {
+      this.score += 1;
+      if (x.dir === 'in') this.stops[x.tag].waiting--;
+      else if (st?.alight > 0) st.alight--;
+    }
+    tram.passengers = this.pax.aboard;
     if (!st) return;
-    const at = this._atStop(st) && Math.abs(tram.v) < 0.05;
 
     if (at && !st.arrived) {
       st.arrived = true;
@@ -1011,26 +1028,22 @@ export class Game {
       else if (err > 4) this.penalty('precision', 20, t('msg.overshot', { d: Math.round(err) }));
       if (st.runners > 0) this._spawnRunners(st);
     }
+    // on arrival the share of those aboard to alight here, the nearest to the doors (the user's rule, #249), with any who could
+    // not get off at the stop before; the waiting queue at the doors
     if (st.arrived && !st.alightSet) {
       st.alightSet = true;
-      st.alight = Math.round(tram.passengers * st.alightFrac);
+      const carry = this.pax.toAlight;
+      st.alight = carry + this.pax.alight(Math.round((this.pax.aboard - carry) * st.alightFrac));
+      this.pax.board(st.waiting, st.i);
+      st.boarders = st.waiting; // (how many waited when the tram came: the stop crowd's places, src/gameView.js)
     }
-    // passenger exchange through open doors
+    // the exchange through the open doors is the passengers' own (src/passengers/consist.js); with the set full and everybody
+    // off, those left wait for the next tram
     if (at && this.doorState === 'open') {
       st.served = true;
-      // three doors per car; a packed car boards slowly
-      const crowd = tram.passengers > tram.capacity ? 0.45 : tram.passengers > tram.capacity * 0.75 ? 0.75 : 1;
-      st.flow = (st.flow || 0) + 3 * tram.cars * 1.1 * crowd * dt;
-      while (st.flow >= 1) {
-        st.flow -= 1;
-        if (st.alight > 0) { st.alight--; tram.passengers--; this.score += 1; }
-        else if (st.waiting > 0 && tram.passengers < tram.crushCapacity) { st.waiting--; tram.passengers++; this.score += 1; }
-        else break;
-      }
-      if (st.alight === 0 && st.waiting > 0 && tram.passengers >= tram.crushCapacity) {
-        this.msg(t('msg.full', { n: st.waiting }), 'warn', 5);
-        st.leftFull = st.waiting;
-        st.waiting = 0;
+      if (st.alight === 0 && st.waiting > 0 && this.pax.full) {
+        const n = this.pax.leaveFull(st.i);
+        if (n) { this.msg(t('msg.full', { n }), 'warn', 5); st.leftFull = (st.leftFull || 0) + n; st.waiting -= n; }
       }
     }
     // last passengers of the old line are out: the route boxes and the HUD show the new line
@@ -1055,8 +1068,12 @@ export class Game {
 
   _finishStop(st) {
     st.done = true;
+    // (#249: whoever still waits for this tram stays on the platform; the counts and places checked once a stop)
+    const needed = !st.request || st.waiting > 0 || st.alightFrac > 0;
+    if (st.alightSet) st.waiting -= this.pax.abandon(st.i);
+    const bad = this.pax.check();
+    if (bad.length) { this.paxProblems.push({ stop: st.name, bad }); console.warn(`passengers at ${st.name}: ${bad.join('; ')}`); }
     if (!st.served) {
-      const needed = !st.request || st.waiting > 0 || st.alightFrac > 0;
       if (!needed) {
         this.log.push({ name: st.name, skipped: true });
         return;

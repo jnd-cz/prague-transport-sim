@@ -178,6 +178,8 @@ def judge(check, r):
             bad.append(f"stuck at {round(r['stuck'])}")
         if r.get("flipsFree"):
             bad.append(f"{r['flipsFree']} brake-to-drive flips with nothing in front")
+        if r.get("paxProblems"):  # (#249: the passengers' counts or places gone wrong at a stop, src/passengers/consist.js check)
+            bad.append(f"passengers wrong at {r['paxProblems']} stops (first: {r.get('paxProblem')})")
         if r.get("over"):
             bad.append(f"{r['over']} stops overrun by more than 3 m")
         if r.get("short"):
@@ -188,7 +190,8 @@ def judge(check, r):
             bad.append(f"signal penalty {r['signalPenalty']}")
         more = (f"{r.get('stops')} stops, flips short/ahead/signal/car/contact {r.get('flipsShort')}/{r.get('flipsAhead')}/{r.get('flipsSignal')}/{r.get('flipsCar')}/{r.get('flipsContact')}, pulses {r.get('pulses')}, "
                 f"shoes at speed {r.get('shoesAtSpeed')}, decel {r.get('maxDecel')}, jerk {r.get('maxJerk')}, err p90 {r.get('errP90')} max {r.get('errMax')}, comfort {r.get('comfort')}, pedal/km {r.get('pedalChangesPerKm')}, "
-                f"late {r.get('late')}, dev mean {r.get('devMean')} s, over 3 min {r.get('lateStops')}, on time by D 1/2 {r.get('depOnTime')}, presses {r.get('presses')} ({r.get('pressesRolling')} rolling), brakes {r.get('brakeApplies')}, wire {r.get('lineKWh')} kWh/km of it waste {r.get('wasteKWh')}"
+                f"late {r.get('late')}, dev mean {r.get('devMean')} s, over 3 min {r.get('lateStops')}, on time by D 1/2 {r.get('depOnTime')}, "
+                f"exchange mean {r.get('exchangeMean')} s max {r.get('exchangeMax')}, presses {r.get('presses')} ({r.get('pressesRolling')} rolling), brakes {r.get('brakeApplies')}, wire {r.get('lineKWh')} kWh/km of it waste {r.get('wasteKWh')}"
                 + (f", slip {r.get('slipSecs')} s ({r.get('slips')}), slide {r.get('slideSecs')} s ({r.get('slides')}, {r.get('slidesAtStops')} at stops), emergencies {r.get('emergencies')}" if check in WEATHER else ""))
     elif check == "canted":
         c = (r.get("checks") or {}).get("cantedRailVisibility", {})
@@ -272,22 +275,22 @@ def load_places():
     return json.load(open(PLACES, encoding="utf-8")) if os.path.exists(PLACES) else {}
 # counts that are problems when they rise (the rest are context: yields, junction phases, holds)
 BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
-       "stops": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
-       "load10": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
-       "load90": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
+       "stops": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed", "paxProblems"},
+       "load10": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed", "paxProblems"},
+       "load90": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed", "paxProblems"},
        # (overspeed too: down 55 ‰ on leaves the branch of #351 ran 35 km/h into a 20 in 23 of 25 runs, unflagged)
-       "autumn": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed"},
-       "rain": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed"},
-       "winter": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed"},
+       "autumn": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed", "paxProblems"},
+       "rain": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed", "paxProblems"},
+       "winter": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed", "paxProblems"},
        "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"}}
 # per seed: problems that must not appear on any seed (the rest are judged against the seed spread)
 HARD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
-        "stops": {"stuck", "flipsFree"},
-        "load10": {"stuck", "flipsFree"},
-        "load90": {"stuck", "flipsFree"},
-        "autumn": {"stuck", "hits", "signalPenalty"},
-        "rain": {"stuck", "hits", "signalPenalty"},
-        "winter": {"stuck", "hits", "signalPenalty"},
+        "stops": {"stuck", "flipsFree", "paxProblems"},
+        "load10": {"stuck", "flipsFree", "paxProblems"},
+        "load90": {"stuck", "flipsFree", "paxProblems"},
+        "autumn": {"stuck", "hits", "signalPenalty", "paxProblems"},
+        "rain": {"stuck", "hits", "signalPenalty", "paxProblems"},
+        "winter": {"stuck", "hits", "signalPenalty", "paxProblems"},
         "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"},
         "traffic": {"finished"}}
 SPREAD_SEEDS = "1-5"
@@ -312,7 +315,7 @@ def counts(check, r):
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     if check in STOPS_LIKE:
         keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "slips", "slides", "slidesAtStops", "sandSecs", "sandLeft", "emergencies") if check in WEATHER else ("simSeconds",) if check.startswith("load") else ()
-        return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "overspeed", "late", "devMean", "lateStops", "depOnTime", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm", "lineKWh", "wasteKWh", "brakeKWh")}
+        return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "overspeed", "late", "devMean", "lateStops", "depOnTime", "paxProblems", "exchangeMean", "exchangeMax", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm", "lineKWh", "wasteKWh", "brakeKWh")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}
     if check == "traffic":

@@ -2,6 +2,10 @@
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), tools/prepare-cabin-floor.mjs (sha256 4823b74541ccab48), run in a page
 // (tools/cabin.py) instead of Node: the layout, the T3 model and its hash given, the files returned (prepareFloor; the PNG left out);
 // more packings on request (opts.packings: the lab's adaptive one with other options, or tools/cabin/packing-search.js's). Otherwise as it was (#249 step 1).
+// #249 step 2: opts.cabFixtures false leaves out the fixtures that stand in the driver's cab (their box's centre in its exclusion): the
+// cab's control panel (Control_Panel_18, x 5.42-6.94 m) marked by its box the floor behind the cab's partition by the front door, which
+// is open floor (the user, 2026-11-25: "the black area behind driver's cabin. It should be also part of circulation area"). The lab's
+// own files keep them (the default).
 /** Offline plan-area estimate from the source mesh plus explicit passenger-space policy. */
 import {finishStandingLayouts} from './standing-priority.js';
 import {adaptivePacking} from './adaptive-packing.js';
@@ -20,7 +24,7 @@ function triangles(o){const a=o.geometry.attributes.position,idx=o.geometry.inde
 const floors=meshes.filter(o=>['Ground','Ground__Wave'].includes(o.material.name)).flatMap(triangles),wall=source.scene.getObjectByName('Interior_Walls_4'),wallPoints=[];
 for(const p of triangles(wall))for(let j=0;j<3;j++){const a=p[j],b=p[(j+1)%3];if((a.y<=1.4&&b.y>1.4)||(b.y<=1.4&&a.y>1.4)){const t=(1.4-a.y)/(b.y-a.y);wallPoints.push([a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t]);}}
 function hull(points){const p=[...new Map(points.map(p=>[p.map(v=>v.toFixed(5)).join(','),p])).values()].sort((a,b)=>a[0]-b[0]||a[1]-b[1]),cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]),half=[];for(const v of p){while(half.length>1&&cross(half.at(-2),half.at(-1),v)<=0)half.pop();half.push(v);}const n=half.length;for(const v of p.slice(0,-1).reverse()){while(half.length>n&&cross(half.at(-2),half.at(-1),v)<=0)half.pop();half.push(v);}half.pop();return half;}
-const outline=hull(wallPoints),boxes=meshes.filter(o=>/^(Red|Blue)_Seat_\d+$/.test(o.name)||o.material.name==='Control_Panel'||/^Handles_7[2-7]$/.test(o.name)).map(o=>{const b=new T.Box3().setFromObject(o);return {mesh:o.name,xMin:b.min.x,xMax:b.max.x,zMin:b.min.z,zMax:b.max.z};});
+const outline=hull(wallPoints),boxes=meshes.filter(o=>/^(Red|Blue)_Seat_\d+$/.test(o.name)||o.material.name==='Control_Panel'||/^Handles_7[2-7]$/.test(o.name)).map(o=>{const b=new T.Box3().setFromObject(o);return {mesh:o.name,xMin:b.min.x,xMax:b.max.x,zMin:b.min.z,zMax:b.max.z};}).filter(b=>opts.cabFixtures!==false||!excludedFromPassengers(layout,(b.xMin+b.xMax)/2,(b.zMin+b.zMax)/2));
 const seatLegroom=layout.seats.map(s=>{const f=s.forward,r={x:-f.z,z:f.x};return {id:s.id,polygon:[[.18,-.26],[.56,-.26],[.56,.26],[.18,.26]].map(([a,b])=>[s.anchor.x+f.x*a+r.x*b,s.anchor.z+f.z*a+r.z*b])};});
 const byX=[...layout.doors].sort((a,b)=>a.x-b.x),regions=byX.map((d,i)=>({id:d.id,name:`${d.id} catchment`,xMin:i?(byX[i-1].x+d.x)/2:-7.2,xMax:i<2?(d.x+byX[i+1].x)/2:7.2}));
 const categoryNames=['outside','cab','fixtures','legroom','edge margin','circulation','standing pockets'],colors=['#eff4f1','#8c6174','#536573','#d9a968','#b4bfc1','#71adcf','#73bb94'];

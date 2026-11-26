@@ -25,6 +25,10 @@
   "tier": 2,
   "moves": ["bogies", "wheels", "couplers", "collector", "lamps", "doors", "trackBrakes"],
   "levels": 2,
+  "passengers": {
+    "cabin": "t3",
+    "accepted": "the user, 2026-11-25, #249: 24 seats and 81 standing places, 105 a car (PR #858), the floor behind the cab open (PR #859), drawn (PR #860)"
+  },
   "slots": { "body": ["Red_Hull"], "band": ["Beige", "Beige_wbackface"] },
   "fleet_source": "the user, 2026-11-10: \"Basic T3 6400-6992, T3SUCS 7001-7292, T3M 8005-8106\"; a type's share of AI trams follows its range's size (\"roughly related to their range sizes\"); the sets: the historic cars still kept, paired as the user gave them (2026-11-11, PR #462: \"pair them like: 6892+6921, 7269+7290, 8080+8074\")",
   "fleet": {

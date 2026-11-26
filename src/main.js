@@ -42,6 +42,7 @@ import { loadInstalled } from './packages.js';
 import { Mirror } from './mirror.js';
 import { CabFrame, EYE, lookLimits, leanFor } from './cabframe.js';
 import { People, PEOPLE_FILES, loadPeople } from './people.js';
+import { PassengerView } from './passengerView.js';
 import { Cars, CAR_FILES, loadCars } from './cars.js';
 
 const $ = (id) => document.getElementById(id);
@@ -68,6 +69,9 @@ if (figures) for (const f of PEOPLE_FILES) load.prefetch(f);
 // the street vehicles' models (#250); ?boxcars keeps the box cars
 const carModels = !params.has('boxcars');
 if (carModels) for (const f of CAR_FILES) load.prefetch(f);
+// the T3's cabin the passengers use, whichever model is drawn (#249: tools/cabin.py --game; src/passengers/consist.js)
+const CABIN = 'assets/passengers/t3-cabin.json';
+load.prefetch(CABIN);
 // (weights: the steps' usual milliseconds on line 17; the bar shares them with the downloads by time)
 load.plan([['terrain', 2000], ['profile', 500], ['world', WORLD_PARTS.reduce((a, p) => a + p[1], 0)], ['gpu', 1500], ['tram', 300]]);
 const lineFile = await load.get(`data/line${lineId}.json`);
@@ -76,6 +80,7 @@ const lineBuild = crc32(lineFile.bytes); // (the line's build ID: every file of 
 data.line = String(data.line);
 checkBuiltRoute(data); // (the track as the build draws it: its curves, the run past the termini, radius and cant: #477, #478)
 const built = { [`line${lineId}.json`]: data }; // every built file, for the credits and the provenance log
+const cabin = await (await load.get(CABIN)).json();
 // ?profile=<name>: a trial height profile over the line's own, to drive and compare (reports/review/profiles/, #358)
 if (params.has('profile')) {
   const name = params.get('profile'), res = await fetch(`reports/review/profiles/line${lineId}-${encodeURIComponent(name)}.json`);
@@ -391,6 +396,9 @@ if (figures) {
   catch (e) { console.warn('pedestrian figures not loaded: the box figures stay', e); }
 }
 window.people = people;
+// our set's passengers drawn by the figures (#249 step 3; src/passengerView.js), with them
+const paxView = people ? new PassengerView() : null;
+window.paxView = paxView;
 let cars = null;
 if (carModels) {
   try { cars = new Cars(scene, await loadCars(await Promise.all(CAR_FILES.map((f) => load.get(f))))); }
@@ -609,6 +617,7 @@ async function start(extra = {}, o = menuOpts()) {
   if (tramModel.userData.cars.length !== cars || tramModel.userData.vehicle !== pickVehicle(vehicle)?.id
     || String(tramModel.userData.fleet) !== String(ours.numbers) || tramModel.userData.livery !== (ours.livery ?? null)) {
     scene.remove(tramModel);
+    people?.detach(tramModel); // (the passengers' figures on its cars back to the people, #249)
     disposeModel(tramModel);
     tramModel = makeT3({ line: data.line, cars, vehicle, dest: lastStop, run: runNumber(0), dealt: ours });
     scene.add(tramModel);
@@ -616,11 +625,13 @@ async function start(extra = {}, o = menuOpts()) {
   if (run) { run.gameView.dispose(); run.trafficView.dispose(); }
   applyWeather(o.weather);
   sWas = null; carry = 0; between.clear(); // (the steps start afresh with the shift: fixedSteps, drawnS, src/between.js)
-  run = createRun({ scene, data, route, ground, audio }, {
+  run = createRun({ scene, data, route, ground, audio, cabin }, {
     ...o, seed, dealer, toutAt: outdoorTemperature(o.temp), extra,
     facts: { substations: truth.substations?.list, speedFacts: speedFacts(truth), signFacts: signFacts(truth) },
   });
   ({ game, traffic, tram } = run);
+  // (the stop crowd's places the boarders walked from stay empty, #249: src/passengerView.js)
+  if (paxView) run.gameView.usedSpots = (stop) => paxView.usedAt(stop);
   pilot = run.pilot;
   perfLog.reset({ line: data.line, model: tramModel.userData.vehicle, cars, weather: o.weather, controls: tram.eq.mode, autopilot: o.autopilot });
   // the line number shown on the tram, the top bar and in messages follows the run
@@ -1258,7 +1269,9 @@ function frame(now) {
     // (the right mirror's camera, posed for this frame while the mirror is shown: the people it shows near the tram are
     // animated too, and its cars are the near model, with their indicators and brake lamps: src/people.js, src/cars.js)
     const mirrorCam = game && mirrorShown() ? (poseMirror(mirror.camera), mirror.camera) : null;
-    if (people && game) people.sync(camera, run.trafficView, run.gameView, mirrorCam);
+    // (our set's passengers where its model shows them: its manifest's `passengers`, docs/vehicles.md)
+    if (people && game) people.sync(camera, run.trafficView, run.gameView, mirrorCam,
+      paxView.sync(game, tramModel, run.gameView, !!pickVehicle(tramModel.userData.vehicle)?.passengers));
     if (cars && game) cars.sync(camera, run.trafficView, run.gameView, mirrorCam);
     if (debugOverlay.on) debugOverlay.update(game, traffic); // (what holds each standing car, #560)
     // (window.headlessDraw false: what a draw does for the checks, the world matrices the lints read, without its
