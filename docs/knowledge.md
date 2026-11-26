@@ -1335,6 +1335,20 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   The departures' mean delay (seeds 1–5, against main at 573d129): line 9 45 → 71 s, 17 117 → 186 s, 22 92 → 187 s (on time by
   D 1/2 0.91 → 0.50), 37 41 → 82 s; line 23 inside main's spread (its exchanges 16.5 s on average). The user, 2026-11-25: keep the
   queues' time; the drive between the stops is its own matter (most of the delay is there on arrival).
+- **Ready at the doors** (#249 step 4; the user, 2026-11-26: "often when tram arrives people start boarding before other
+  passengers get out ... those getting off at the stop needs to be prepared often, to be ready to go once door opens"). Before,
+  those alighting stood up when the doors opened: on line 17 (seed 1) a door's last alighter was out 5.7 s after the doors
+  opened (median 5.7), and its boarders went up from 5.3 s; a door where nobody alighted boarded at once, so in 48 of 133
+  boardings the car's other doors still had alighters walking to them (a door's own boarders never began before its
+  alighters were out). Now, 120 m before a stop the tram drives towards (`READY_DIST`, moving), the alighters are chosen as
+  arrival would choose them (`consist.ready`; the same ones alight there) and go to free doorway places of the doors they will
+  leave by, one a door every 0.8 s at 0.8 m/s, round the others; from a seat they stand up first. A doorway place is its
+  door's, so they go out through it and first; boarders at that door wait for them. Those with no free doorway place or no way
+  stay where they are; one still on the way when the tram stops alights from where they get to. Line 17 (seed 1): a door's last
+  alighter out at 3.3 s on average (median 2.5 s: the 2.2 s down the steps), its first boarder up at 3.6 s; the boardings
+  begun with alighters at the car's other doors 60 of 134 (those doors' alighters still on the steps). In `tools/test_consist.py`
+  (50 aboard, 15 off, 20 on): out 2.3 s to 6.9 s after the doors open against 3.5 s to 8.3 s from their places, the first
+  boarder in at 6.7 s against 8.5 s.
 - **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
   is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
   model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body
