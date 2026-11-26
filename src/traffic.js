@@ -1255,11 +1255,13 @@ export class Traffic {
       // (one waiting for it keeps waiting until it is by: else, slowing for it, it would get there later, find it by first
       // and go on, and slow again)
       if (c.keepClear && c.kcFor === o) return o;
-      const tO = (hit.d - o.half) / vo, tOut = (hit.d + o.half) / vo;
+      const tO = (hit.d - o.half) / vo;
       const tC = Math.max(0, hit.dc - c.half) / vc, tCout = (hit.dc + c.half) / vc;
-      // (one is over it before the other comes, by 2 s: its speed now, and it slows for its turns; seed 31's came on at
-      // 8.8 m/s, slowed to 2.7 for the junction and was 1 s later than so foreseen)
-      if (tCout + 2 < tO || tOut + 2 < tC) continue;
+      // (c is over it before the other comes, by 2 s: their speeds now, and the other slows for its turns; seed 31's came on
+      // at 8.8 m/s, slowed to 2.7 for the junction and was 1 s later than so foreseen. Not the other way round: one foreseen
+      // by first was held at its own junction meanwhile, and the car went in and stood on the rails for it, line 9 s 24330,
+      // seed 2; waiting for one that is there first costs little, it would follow it anyway)
+      if (tCout + 2 < tO) continue;
       // (who goes: one that could not stop short of it any more; else the one from the right, as the circles (the user,
       // 2026-11-24); else the first there. Each decides the same of the other, so one waits: by the times alone, both
       // nearly alike and changing with each one's speed, the two cars took turns to wait, and both went, seed 31)
