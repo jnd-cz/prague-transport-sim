@@ -12,7 +12,8 @@ walkers and the stop crowd are drawn by figures, the box meshes are on the hidde
 leaves the box figures. Our set's passengers (#249 step 3, src/passengerView.js): every one the passenger core has
 drawn (the counted ones only on the steps and outside), those on a car as its node's children (the animated ones) or
 in its own batches (the distant ones, standing and seated); and the same seeded drive, drawn once a second, ends the
-same with the figures and with ?boxpeople (nothing drawn feeds back into the run)."""
+same with the figures and with ?boxpeople (nothing drawn feeds back into the run). The run, from the line's first stop,
+starts with nobody aboard and nobody to alight there, and nobody waits for other lines at a stop of our line only (#249)."""
 import argparse
 import faulthandler
 import functools
@@ -105,6 +106,10 @@ GAME = """async () => {
   // (drawn once a simulated second, as a page draws; with ?boxpeople nothing to draw)
   const draw = () => { gv.sync(); gv.syncCrowd(); if (people) people.sync(window.camera, view, gv, null, window.paxView.sync(g, window.tramModel, gv)); };
   g.audio.setMuted?.(true);
+  // (#249: the run from the line's first stop has nobody aboard and nobody to alight there; those waiting for other lines are
+  // only where other lines stop, by the platforms' lines)
+  const start = { first: g.opts.startStop === 0, aboard: g.pax.aboard, alightFrac: g.stops[g.nextStop].alightFrac,
+    lone: g.stops.filter((st, i) => g.data.stops[i].lines?.every((l) => g.segments.some((s) => s.line === l))).map((st) => st.ambient) };
   let k = 0;
   for (let t = 0; t < 90; t += dt) { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt); view.sync(window.camera); if (++k % 30 === 0) draw(); }
   // (the run's state: equal with and without the figures)
@@ -132,7 +137,7 @@ GAME = """async () => {
   const farOnCar = pax.cars.reduce((n, c) => n + (c.userData.paxFar ? c.userData.paxFar.standing.count + c.userData.paxFar.seated.count : 0), 0);
   const seated = pax.recs.filter((r) => r.pax.seated).length;
   const farSeated = pax.cars.reduce((n, c) => n + (c.userData.paxFar?.seated.count ?? 0), 0);
-  return { ...stats, walkers, skinned, stopCrowd: gv.crowd.count, hidden: [view.crowd.layers.mask, gv.crowd.layers.mask], state,
+  return { ...stats, walkers, skinned, stopCrowd: gv.crowd.count, hidden: [view.crowd.layers.mask, gv.crowd.layers.mask], state, start,
     paxRecs: pax.recs.length, drawable, onCar, nearOnCar, farOnCar, carSkinned, seated, farSeated, paxCars: pax.cars.length, cars: g.pax.cars.length };
 }"""
 
@@ -226,6 +231,10 @@ def main():
                         f"passengers on a car: {gm['nearOnCar']} animated + {gm['farOnCar']} distant of {gm['onCar']}":
                             gm["nearOnCar"] > 0 and gm["nearOnCar"] + gm["farOnCar"] == gm["onCar"] and gm["carSkinned"] == gm["nearOnCar"],
                         f"passengers seated: {gm['seated']}, of them distant on the seated figure {gm['farSeated']}": gm["seated"] > 0 and gm["farSeated"] <= gm["seated"],
+                        f"from the line's first stop: {gm['start']['aboard']} aboard at the start, alighting share {gm['start']['alightFrac']}":
+                            gm["start"]["first"] and gm["start"]["aboard"] == 0 and gm["start"]["alightFrac"] == 0,
+                        f"waiting for other lines at the {len(gm['start']['lone'])} stops of our line only: {gm['start']['lone']}":
+                            len(gm["start"]["lone"]) > 0 and not any(gm["start"]["lone"]),
                     }
                     fails += [f"game: {k}" for k, ok in want.items() if not ok]
                     if gm["people"] < gm["walkers"] or gm["walkers"] == 0:
