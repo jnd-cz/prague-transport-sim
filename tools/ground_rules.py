@@ -63,7 +63,7 @@ RULES = {
                    "wall-end-in-a-path", "sidewalk-under-a-road-wall", "sidewalk-on-a-quay-wall", "branik-platform-ramps",
                    "cerny-kun-platform-wall", "modranska-skola-ramp", "na-vapence-garage-ramp", "modrany-viaduct-ramps",
                    "garden-beds", "zizkov-wall-at-the-kerb", "motol-wall-at-the-kerb", "wall-above-a-lower-walkway",
-                   "hlavni-nadrazi-under-the-magistrala"],
+                   "hlavni-nadrazi-under-the-magistrala", "motol-bridge-parapets"],
     },
     "kerbs": {
         "what": "kerbs: raised edges, lowered kerbs, belts, parking bays (#606, #638, #800)",
@@ -100,13 +100,15 @@ RULES = {
                    "modranska-skola-ramp", "cerny-kun-platform-wall"],
     },
     "structures": {
-        "what": "what the ground meets at structures: decks, abutments, tunnels, covers over passages (#742, #763, #771, #783, #788)",
+        "what": "what the ground meets at structures: decks, abutments, tunnels, covers over passages (#742, #763, #771, #783, #788, #824)",
         "code": ["covers.*", "ground_mesh.span_decks", "ground_mesh.rock_tunnels", "ground_mesh.in_the_rock",
                  "ground_mesh.portal_masonry", "ground_mesh.off_the_hill", "ground_mesh.bed_ends", "ground_mesh.abutments",
-                 "ground_mesh.off_the_deck", "ground_mesh.fit_mouths", "ground_partition.route_decks", "ground_mesh.ABUT_*",
-                 "ground_mesh.TUNNEL_*", "ground_mesh.PORTAL_*", "ground_mesh.BRIDGE_NEAR", "ground_mesh.MOUTH_FIT"],
+                 "ground_mesh.off_the_deck", "ground_mesh.under_decks", "ground_mesh.DECK_EDGE", "ground_mesh.fit_mouths",
+                 "ground_partition.route_decks", "ground_mesh.ABUT_*", "ground_mesh.TUNNEL_*", "ground_mesh.PORTAL_*",
+                 "ground_mesh.BRIDGE_NEAR", "ground_mesh.MOUTH_FIT"],
         "places": ["hlavni-nadrazi-under-the-magistrala", "vysehrad-tunnel-mouths", "street-over-an-underpass",
-                   "krejcarek-abutment", "modrany-viaduct-ramps"],
+                   "krejcarek-abutment", "modrany-viaduct-ramps", "slanska-street-under-a-bridge",
+                   "narodni-divadlo-bridgehead", "motol-bridge-parapets"],
     },
     "plots": {
         "what": "plots, lawns, yards and beds in a sidewalk: their heights, terraces, pits and thin strips (#638, #663, #696, #738, #764)",

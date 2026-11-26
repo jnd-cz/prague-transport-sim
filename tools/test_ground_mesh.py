@@ -1001,6 +1001,18 @@ class UnderADeck(unittest.TestCase):
         self.assertEqual(z[:3].tolist(), [197.6, 204.7, 198.3])
         self.assertTrue(np.isnan(z[3]))
 
+    def test_a_deck_that_is_not_ours_is_any_survey_area_over_level_0_but_a_roof(self):
+        # (#824: Slánská's road bridge, line 9 (-8253, -1375), the survey's deck and road at level 1; a shelter's roof
+        # over a sidewalk is none, nor a level-0 area)
+        def sq(c, x0, l):
+            return {"c": c, "l": l, "r": [[x0, 0, 1.0], [x0 + 10, 0, 1.0], [x0 + 10, 10, 1.0], [x0, 10, 1.0]]}
+        D = {"areas": [sq("deck", 0, 1), sq("road", 20, 2), sq("roof", 40, 1), sq("road", 60, 0)]}
+        x, y = np.array([5.0, 25.0, 45.0, 65.0, 15.0, 11.0]), np.full(6, 5.0)
+        got = gm.under_decks(D, shapely.box(-10, -10, 80, 20), x, y)
+        # (and under its edge, DECK_EDGE: the Slánská deck's south-west corner, 0.5 m outside its outline)
+        self.assertEqual(got.tolist(), [True, True, False, False, False, True])
+        self.assertFalse(gm.under_decks(D, shapely.box(30, -10, 80, 20), x[2:], y[2:]).any())
+
     def test_the_trams_area_under_a_cover_lies_at_the_rails(self):
         # (#788: in a tunnel of the route, off the rock: a corner of the tram's area 4 m over the rails beside it at
         # the rails' level; one at the rails, and one outside the tunnel, left)

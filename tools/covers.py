@@ -37,6 +37,23 @@ passage. The cover holds over the slot and NEAR round it (the raster spreads the
 wider than the survey's passage: 90 % of its points within 1.2 m of it on line 17), and only where it is the higher
 of the two: a road tunnel deep under a hill (Letná, Strahov) has the hill's ground over it in both, and nothing
 changes there.
+
+A level-1 street over a passage (#824). Where the passage is at grade with its own street's ground (a road under a
+bridgehead), the survey has the street over it at level 1 and the passage's areas at level 0, their outlines the
+street's point for point: Národní divadlo's bridgehead, line 9 (-625, -585), road 24 and sidewalks 151-156 at 193.2 m
+over Divadelní's underpass (OSM's tunnel way, maxheight 4.4), its roads 18, 16 and 17 on the floor at 187.6-188 m.
+The ground fell into the floor, a pit 5 m deep in the street, and the page drew the level-1 areas as slabs over it.
+The user, 2026-11-23: "for now we draw the ground as in 783 with future update waiting in 449 to draw the actual low
+ground for all the underpasses and then put invented deck cover over them". So a level-1 area is a cover too, judged
+apart from level 0's (UPPER: judged together, a bridge's cut beside a level-0 cover ran on past LIMIT, and two of the
+lines' covers were lost), and the ground's corners under it lie on it (ground_mesh.build); the page draws no slab of
+the areas it holds (covered). A bridge is none: the survey's deck (`deck`) and the areas ON_DECK on one. Under
+Slánská's road bridge, line 9 (-8253, -1375), OSM has a footway in a tunnel, and a railway bridge over the tram's
+street on line 22 (5490, -3591) is a slot within LIMIT of its footways in a tunnel: as a cover it buried the track.
+The level-1 covers on the five lines: Národní divadlo (lines 9, 17, 22, 23), Wilsonova over the route's tram tunnel
+by Hlavní nádraží (line 9 (1095, -330)), the railway and the tram's bridge over U Kina and a pedestrian underpass
+(line 17 (-2560, -9068), (-2515, -9064), (-2478, -8572)), a platform over Simbirská and Turkmenská (line 22 (2812,
+-2572)) and two pedestrian underpasses (line 37 (9247, 996), (9265, 962)).
 """
 import json
 import os
@@ -63,11 +80,37 @@ SPAN = 1.0  # m (half of CUT)
 STEP = 0.5  # m: the lattice the cut is looked for on
 WINDOW = 2 * LIMIT  # m round a world tile: the cut's parts its points are judged by (#812)
 NOT_COVER = {"stairs", "wall", "roof", "water"}
+UPPER = (0, 1)  # the levels whose areas can be a cover, each judged on its own
+ON_DECK = 0.5  # of a level-1 area's own: on a survey deck of its level this much, it is the bridge's
+IN_COVER = 0.5  # of a level-1 area's own: in a cover of its level this much, the ground there is its street
+# m: a corner whose triangle lies under a cover takes the cover's plane this near it: the level-0 passage's outline is
+# the level-1 street's, point for point (Národní divadlo's sidewalk 138 and road 25), and a corner on it fell a
+# fraction of a mm outside the street's triangles and stayed on the floor, a notch 5 m deep at the cover's edge
+NEAR_EDGE = 0.05
 
 
 def _poly(a):
     p = shapely.Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
     return p if p.is_valid else p.buffer(0)
+
+
+def _over(A, lv):
+    """The areas at level lv that can cover a passage: not NOT_COVER; above level 0 neither a survey deck nor lying
+    ON_DECK on one of their level (a bridge, see the module's text)."""
+    out = [a for a in A if a.get("l", 0) == lv and len(a["r"]) >= 3 and a.get("c") not in NOT_COVER]
+    if lv < 1:
+        return out
+    decks = [_poly(a) for a in out if a.get("c") == "deck"]
+    tree = shapely.STRtree(decks) if decks else None
+    keep = []
+    for a in out:
+        if a.get("c") == "deck":
+            continue
+        p = _poly(a)
+        on = sum(p.intersection(decks[i]).area for i in tree.query(p, predicate="intersects").tolist()) if tree else 0.0
+        if on < ON_DECK * p.area:
+            keep.append(a)
+    return keep
 
 
 def _triangles(a):
@@ -143,11 +186,12 @@ class Covers:
             low = [p for p in low if p.intersects(b)]
         if not low:
             return
-        over = [a for a in A if a.get("l", 0) == 0 and len(a["r"]) >= 3 and a.get("c") not in NOT_COVER]
-        tree = shapely.STRtree([_poly(a) for a in over])
-        for g in shapely.get_parts(shapely.union_all([p.buffer(0.05) for p in low])):
+        over = {lv: _over(A, lv) for lv in UPPER}
+        tree = {lv: shapely.STRtree([_poly(a) for a in over[lv]]) for lv in UPPER}
+        parts = shapely.get_parts(shapely.union_all([p.buffer(0.05) for p in low])).tolist()
+        for lv, g in ((lv, g) for lv in UPPER for g in parts):
             near = g.buffer(LIMIT + 2 * STEP)
-            tris = [_triangles(over[i]) for i in sorted(tree.query(near, predicate="intersects").tolist())]
+            tris = [_triangles(over[lv][i]) for i in sorted(tree[lv].query(near, predicate="intersects").tolist())]
             tris = np.concatenate(tris) if tris else np.zeros((0, 3, 3))
             if not len(tris):
                 continue
@@ -196,30 +240,52 @@ class Covers:
             place["zone"] = spots.buffer(NEAR, quad_segs=4).intersection(g.buffer(REACH + TOUCH))
             shapely.prepare(place["zone"])
             place.update({"at": [[round(q.centroid.x, 1), round(q.centroid.y, 1)] for q in shapely.get_parts(place["zone"])],
-                          "cut m2": round(float(sel.sum()) * STEP * STEP, 1), "deepest m": round(float(d.reshape(X.shape)[sel].max()), 2)})
+                          "cut m2": round(float(sel.sum()) * STEP * STEP, 1), "deepest m": round(float(d.reshape(X.shape)[sel].max()), 2),
+                          "level": lv})
             self.places.append(place)
 
     @staticmethod
-    def _own(place, x, y):
+    def _own(place, x, y, near=0.0):
         out = np.full(len(x), np.nan)
-        pi, ti = place["tree"].query(shapely.points(x, y), predicate="intersects")
+        pts = shapely.points(x, y)
+        pi, ti = (place["tree"].query(pts, predicate="dwithin", distance=near) if near
+                  else place["tree"].query(pts, predicate="intersects"))
         if len(pi):
             np.fmax.at(out, pi, _plane(place["tris"][ti], x[pi], y[pi]))
         return out
 
-    def at(self, x, y):
-        """The cover's height at points; NaN off the covers."""
+    def at(self, x, y, level=None, near=0.0):
+        """The cover's height at points, of the covers of one level where one is given; NaN off the covers. near: a
+        point this close to a cover's triangle takes its plane (a corner on an outline the cover shares, NEAR_EDGE)."""
         x, y = np.asarray(x, float), np.asarray(y, float)
         out = np.full(x.shape, np.nan)
         fx, fy, fo = x.ravel(), y.ravel(), out.reshape(-1)
         for p in self.places:
+            if level is not None and p["level"] != level:
+                continue
             x0, y0, x1, y1 = p["zone"].bounds
-            k = np.flatnonzero((fx >= x0) & (fx <= x1) & (fy >= y0) & (fy <= y1))
+            k = np.flatnonzero((fx >= x0 - near) & (fx <= x1 + near) & (fy >= y0 - near) & (fy <= y1 + near))
             if not len(k):
                 continue
-            k = k[shapely.contains_xy(p["zone"], fx[k], fy[k])]
+            k = k[shapely.dwithin(p["zone"], shapely.points(fx[k], fy[k]), near) if near else shapely.contains_xy(p["zone"], fx[k], fy[k])]
             if len(k):
-                fo[k] = np.fmax(fo[k], self._own(p, fx[k], fy[k]))
+                fo[k] = np.fmax(fo[k], self._own(p, fx[k], fy[k], near))
+        return out
+
+    def covered(self, D, level=1):
+        """The indexes of survey D's areas at `level` that can cover (_over) and lie IN_COVER or more in a cover of that
+        level: the ground there is their street, and the page draws no slab of theirs (src/groundDraw.js buildDtm)."""
+        zones = [p["zone"] for p in self.places if p["level"] == level]
+        if not zones:
+            return []
+        z = shapely.union_all(zones)
+        ok = {id(a) for a in _over(D["areas"], level)}
+        out = []
+        for i, a in enumerate(D["areas"]):
+            if id(a) in ok:
+                g = _poly(a)
+                if g.intersects(z) and g.intersection(z).area >= IN_COVER * g.area:
+                    out.append(i)
         return out
 
     def over(self, lidar):

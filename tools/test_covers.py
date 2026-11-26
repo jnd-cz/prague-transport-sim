@@ -137,5 +137,45 @@ class Street(unittest.TestCase):
         np.testing.assert_allclose(c.sample(np.array([1030.0, 1030.0]), np.array([2005.0, 1997.0])), [200.0, 196.0], atol=1e-9)
 
 
+class UpperStreet(unittest.TestCase):
+    """A level-1 street over a level-0 passage (#824): Národní divadlo's bridgehead, line 9 (-625, -585), over
+    Divadelní's underpass (OSM's tunnel way, maxheight 4.4). The survey has the street at 193.2 m at level 1 and the
+    passage's road under it at level 0 on the floor, 188 m; the raster has the floor."""
+    WAY = shapely.LineString([(30, -5), (30, 15)])
+    AREAS = [rect("road", 0, 0, 24, 10, 193.2), rect("road", 36, 0, 60, 10, 193.2), rect("road", 24, 0, 36, 10, 188.0),
+             rect("road", 24, 0, 36, 10, 193.2, level=1)]
+
+    def test_the_street_over_the_passage_is_its_cover(self):
+        C = covers.Covers({"areas": self.AREAS}, slot(27, 33, floor=188.0, top=193.2), ways=[self.WAY])
+        self.assertEqual([p["level"] for p in C.places], [1])
+        x, y = np.array([30.0, 30.0]), np.array([5.0, 20.0])
+        np.testing.assert_allclose(C.at(x, y)[:1], 193.2, atol=1e-9)
+        self.assertTrue(np.isnan(C.at(x, y)[1]))
+        self.assertTrue(np.isnan(C.at(x, y, level=0)).all())  # (no cover of level 0: the passage's road is on the floor)
+        self.assertEqual(C.covered({"areas": self.AREAS}), [3])  # (the page draws no slab of its own there)
+        # (a corner on the outline the passage shares with the street, a fraction of a mm outside the street's
+        # triangles: its plane within NEAR_EDGE, Národní divadlo's sidewalk 138 under road 25)
+        x, y = np.array([30.0]), np.array([-1e-4])
+        self.assertTrue(np.isnan(C.at(x, y, level=1)).all())
+        np.testing.assert_allclose(C.at(x, y, level=1, near=covers.NEAR_EDGE), 193.2, atol=1e-9)
+
+    def test_a_bridge_the_survey_has_a_deck_under_is_no_cover(self):
+        # (Slánská's road bridge, line 9 (-8253, -1375): its roads at level 1 on the survey's deck 9317)
+        D = {"areas": self.AREAS + [rect("deck", 24, -0.5, 36, 10.5, 193.2, level=1)]}
+        C = covers.Covers(D, slot(27, 33, floor=188.0, top=193.2), ways=[self.WAY])
+        self.assertEqual(C.places, [])
+        self.assertEqual(C.covered(D), [])
+
+    def test_each_level_is_judged_on_its_own(self):
+        # (a level-1 bridge beside a level-0 street over a passage: judged together, the bridge's cut ran on past
+        # LIMIT and the street's cover was lost, line 17 (-226, 752) and line 22 (2746, -2584))
+        # (the street ends where the bridge begins, at x = 32; the raster is low from the passage on under the bridge)
+        D = {"areas": [rect("road", 0, 0, 32, 10, 200.0), rect("underpass", 28, -1, 32, 11, 196.0, level=-1),
+                       rect("road", 32, 0, 70, 10, 203.0, level=1)]}
+        C = covers.Covers(D, slot(27, 70, floor=196.0, top=200.0))
+        self.assertEqual([p["level"] for p in C.places], [0])
+        np.testing.assert_allclose(C.at(np.array([30.0]), np.array([5.0])), 200.0, atol=1e-9)
+
+
 if __name__ == "__main__":
     unittest.main()

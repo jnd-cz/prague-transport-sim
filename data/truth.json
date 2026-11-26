@@ -6770,6 +6770,94 @@
      "why": "the sidewalk level within 0.3 m along its kerb, the pits' cells at the sidewalk's own rim (the road's side of the kerb is not their level)"
     }
    ]
+  },
+  "motol-bridge-parapets": {
+   "line": "9",
+   "at": [
+    -6422.0,
+    -1326.0
+   ],
+   "reach": 40,
+   "issue": 824,
+   "what": "a road bridge by Motol (s 2802), the survey's deck 5881 and road 4804 at level 2 (284.8-286.7 m), over Plzeňská and the track at 278.4-278.8 m: the technical map's wall lines along its parapets, at level 2, made upright faces from the road up to the deck along both of its edges (x -6428 to -6434 and -6411 to -6416), 768 faces in a 40 x 70 m box, strips up to 85 m2 and 8 m tall, open only where the track bed is (batch C's written file, measured 2026-11-23). IPR's raster is the road on both sides of the parapets, 7 m under them",
+   "source": "the user's in-game note of 2026-11-22 on line 9 (the test host, 7a37b17; #824): \"bridge with blocked road near Motol\"",
+   "sections": [
+    {
+     "name": "along Plzeňská's road beside the track, under the deck and across both of its edges, y = -1318",
+     "from": [
+      -6450.0,
+      -1318.0
+     ],
+     "to": [
+      -6395.0,
+      -1318.0
+     ],
+     "expect": {
+      "largest step m": 0.3,
+      "off the lidar m": 1.0
+     },
+     "why": "the road runs on at grade under the bridge, IPR's raster 279.1-277.9 m along the line: no wall stands on it. Batch C's file had the parapets' faces standing from it up to the deck at both edges"
+    }
+   ]
+  },
+  "slanska-street-under-a-bridge": {
+   "line": "9",
+   "at": [
+    -8260.0,
+    -1410.0
+   ],
+   "reach": 50,
+   "issue": 824,
+   "what": "a road bridge by Slánská's stop (s 928), the survey's deck 9317 and roads 8530 and 8531 at level 1 (346.7-349.9 m), over the road beside the stop: the level-0 road 8529 (10,844 m2) and sidewalk 8671 have outlines that climb from 337.3 m to 349.6 m, the deck's height, and the street surface under the deck climbed into a faceted hump, wall and survey faces 2-6 m tall in a 50 x 55 m box (batch C's written file, measured 2026-11-23). off_the_deck (#761) put such corners on the lidar under our own spans only",
+   "source": "the user's in-game note of 2026-11-22 on line 9 (the test host, 7a37b17; #824): \"malformed road under bridge near Slánská stop\"",
+   "sections": [
+    {
+     "name": "along the road under the bridge, y = -1431",
+     "from": [
+      -8285.0,
+      -1431.0
+     ],
+     "to": [
+      -8240.0,
+      -1431.0
+     ],
+     "expect": {
+      "largest step m": 0.3,
+      "off the lidar m": 0.5
+     },
+     "why": "the road under the bridge lies on the ground, IPR's raster: road 8529's own outline points under the deck stand within 0.3 m of it (but two at its south edge, 3 m under it). Batch C's file climbed into the deck"
+    }
+   ]
+  },
+  "narodni-divadlo-bridgehead": {
+   "line": "9",
+   "at": [
+    -625.0,
+    -585.0
+   ],
+   "reach": 30,
+   "issue": 824,
+   "what": "Národní's bridgehead by the National Theatre (s 9578) over Divadelní's underpass (OSM's tunnel way, maxheight 4.4): the survey's street at level 1 (road 24, sidewalks 151-156, 193.2 m) over the passage's level-0 roads (18, 16, 17) on its floor at 187.6-188 m. The ground was the raster's floor there, along y = -580 a pit 5 m deep in the street between x -627 and -623, and the page drew the level-1 areas as slabs over it, their colour, shading and ragged outline unlike the ground's street round them (batch C's written file, measured 2026-11-23). The build: the street over the passage is the ground's (covers.py, a level-1 cover), no slab",
+   "said": "for now we draw the ground as in 783 with future update waiting in 449 to draw the actual low ground for all the underpasses and then put invented deck cover over them",
+   "source": "the user's in-game note of 2026-11-22 on line 9 (the test host, 7a37b17; #824): \"Národní divadlo underpass deck not welded well together with the street\"; the user's decision in the session of 2026-11-23 (#824's comment)",
+   "sections": [
+    {
+     "name": "along Národní over the underpass, y = -585",
+     "from": [
+      -645.0,
+      -585.0
+     ],
+     "to": [
+      -605.0,
+      -585.0
+     ],
+     "expect": {
+      "largest step m": 0.2,
+      "off the chord m": 0.3
+     },
+     "why": "one street over the passage, 193.1-193.3 m, a kerb at most (the user's decision: the street as the ground, #783's way). Batch C's file fell 5 m into the raster's floor between x -629 and -621"
+    }
+   ]
   }
  },
  "openTrackReview": {
