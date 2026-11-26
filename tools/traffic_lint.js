@@ -11,7 +11,7 @@
 // Used by tools/lint.js ({ traffic: true }); returns checks in the same shape.
 import { CAR_PITCH } from '../src/tram.js';
 
-const CAR = [4.3, 1.8], TRAM = [14.0, 2.5];
+const CAR = [4.3, 1.8], TRAM = [14.0, 2.5]; // (a car of no type: the box car; else its type's length and width, #250)
 const TOP = 12;
 // a walker walks 1.1-1.6 m/s: one that stays within 2 m of a place for 30 s without a reason is caught (#393's measure)
 const STILL_R = 2, STILL_T = 30;
@@ -51,7 +51,7 @@ function snapshot(g, tr, view) {
     const m = view.meshOf(c);
     if (c.alpha < 0.5 || !m) continue;
     const p = m.position, [hx, hy] = head(m.rotation.y);
-    out.veh.push({ id: `car${i}`, kind: 'car', x: p.x, y: -p.z, z: p.y, hx, hy, l: CAR[0] / 2, w: CAR[1] / 2, src: c.kind, alpha: c.alpha,
+    out.veh.push({ id: `car${i}`, kind: 'car', x: p.x, y: -p.z, z: p.y, hx, hy, l: (c.type?.length ?? CAR[0]) / 2, w: (c.type?.width ?? CAR[1]) / 2, src: c.kind, alpha: c.alpha,
       state: c.coast && !c.active ? 'coast' : c.conn ? 'junction' : 'lane', road: c.road, dir: c.dir });
   }
   for (const [list, kind] of [[tr.ahead, 'tram ahead'], [tr.oncoming, 'tram oncoming']]) {
@@ -200,7 +200,10 @@ export function trafficWatch(g, tr, { sample = 0.2, dt = 1 / 30, view = window.r
       // the walkers that had nowhere to go and left (src/traffic.js _leave, #366): how many, and the places most left at
       const leaves = [...(tr.walkLeaves || new Map())].sort((a, b) => b[1] - a[1]);
       return {
-        stats: { simSeconds: Math.round(T), samples, finished: stuck === null, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, junctionCircles: tr.junctionCircles || 0, recoveredCycles: g.trafficCycles || [], carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
+        stats: { simSeconds: Math.round(T), samples, finished: stuck === null, nextStop: g.nextStop, cyclesBroken: tr.cyclesBroken || 0, circlesLetGo: tr.circlesLetGo || {}, givenUp: tr.givenUp || 0, gaveUp: tr.gaveUp || [], recoveredCycles: g.trafficCycles || [], carsVisible: +(seenVeh / Math.max(1, samples)).toFixed(1), walkersVisible: +(seenWalk / Math.max(1, samples)).toFixed(1),
+          // (the waits-for graph, #560: the heads of chains standing a minute or more by kind, and the circles by class,
+          // with the last of each)
+          chainHeads: tr.longChainCount || {}, waitCircles: tr.waitCircleCount || {}, longChains: (tr.longChains || []).slice(-20), circlesSeen: (tr.waitCircles || []).slice(-20),
           walkersLeft: leaves.reduce((n, [, c]) => n + c, 0), walkLeaves: Object.fromEntries(leaves.slice(0, TOP)),
           // (a run that did not get through: what held the tram at the end, as u3 and redruns report it)
           ...(stuck === null ? {} : { stuck, stuckScene: scene }) },

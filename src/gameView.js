@@ -8,7 +8,7 @@
 // src/main.js). The rules read nothing of it.
 import * as THREE from 'three';
 import {
-  makeCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
+  makeCar, fitCar, makePerson, makeCrowd, makeTramSignal, makeSwitchIndicator, makeContactMarker,
   makeSpeedSign, makeContactSign, makeRadioSwitchSign, makeSpeedBoard, disposeModel,
   makeSpeedSwitchSignal, makeSwitchNumberPlate, makeCallSignal, makeEntrySignal,
 } from './models.js';
@@ -93,6 +93,7 @@ export class GameView {
     this.obstacles = new Map(); // obstacle -> its car or person
     for (const ob of g.obstacles) {
       const mesh = ob.type === 'parked' ? makeCar(ob.model) : makePerson(ob.model);
+      if (ob.carType) fitCar(mesh, ob.carType); // (its type's size, #250; src/cars.js draws its model there)
       this.objects.add(mesh);
       this.obstacles.set(ob, mesh);
     }
@@ -271,14 +272,19 @@ export class GameView {
       for (const car of sig.cars) {
         live.add(car);
         let mesh = this.crossCars.get(car);
-        if (!mesh) { mesh = makeCar(car.model); mesh.rotation.order = 'YXZ'; this.objects.add(mesh); this.crossCars.set(car, mesh); }
+        if (!mesh) {
+          mesh = makeCar(car.model);
+          if (car.type) fitCar(mesh, car.type); // (its type's size, #250)
+          mesh.rotation.order = 'YXZ'; this.objects.add(mesh); this.crossCars.set(car, mesh);
+        }
         const p = X.at(car.s), hx = p.hx * car.dir, hy = p.hy * car.dir;
         const lane = X.oneway ? 0 : Math.max(1.5, X.w / 4); // right-hand traffic
         const x = p.x + hy * lane, y = p.y - hx * lane;
-        const zf = ground.at(x + hx * 1.6, y + hy * 1.6), zb = ground.at(x - hx * 1.6, y - hy * 1.6);
+        // (pitched on its wheelbase: the ground under its axles)
+        const a = car.type ? car.type.wheelbase / 2 : 1.6, zf = ground.at(x + hx * a, y + hy * a), zb = ground.at(x - hx * a, y - hy * a);
         mesh.position.set(x, (zf + zb) / 2 + 0.1, -y);
         mesh.rotation.y = Math.atan2(hx, -hy);
-        mesh.rotation.x = -Math.atan2(zf - zb, 3.2);
+        mesh.rotation.x = -Math.atan2(zf - zb, 2 * a);
       }
     }
     for (const [car, mesh] of this.crossCars) if (!live.has(car)) { this.objects.remove(mesh); disposeModel(mesh); this.crossCars.delete(car); }
@@ -307,30 +313,70 @@ export class GameView {
   }
 
   // the people on the platforms of the stop ahead and the one just passed (each stop's own stream: they stand where
-  // they stood); once a drawn frame (src/main.js), as before #228: none in the checks' steps
+  // they stood); once a drawn frame (src/main.js), as before #228: none in the checks' steps. Only when the stops shown or
+  // their counts change: up to 120 matrices, each with a new Euler, were made every drawn frame before (#723)
+  // (#249: once the tram is at the stop its waiting people are the passengers' (src/passengers/consist.js); those who
+  // went to the doors left their places empty, src/passengerView.js `usedSpots`, and those still waiting stand on)
   syncCrowd() {
-    const g = this.game, st = g.stops[g.nextStop];
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+    const g = this.game, prev = g.stops[g.nextStop - 1], st = g.stops[g.nextStop];
+    const shown = (stop) => !!stop && Math.abs(stop.target - g.tram.s) <= 450;
+    const usedP = shown(prev) ? this.usedSpots?.(prev) : null, usedS = shown(st) ? this.usedSpots?.(st) : null;
+    const k0 = g.nextStop, k1 = shown(prev) ? prev.ambient : -1, k2 = shown(st) ? this._crowdCount(st) : -1, K = this._crowdKey;
+    if (K && K[0] === k0 && K[1] === k1 && K[2] === k2 && K[3] === (usedP?.size ?? 0) && K[4] === (usedS?.size ?? 0)) return;
+    this._crowdKey = [k0, k1, k2, usedP?.size ?? 0, usedS?.size ?? 0];
+    const m = (this._cm ||= new THREE.Matrix4()), none = (this._c0 ||= new THREE.Matrix4().makeScale(0, 0, 0));
     let n = 0;
-    for (const stop of [g.stops[g.nextStop - 1], st]) {
-      if (!stop || Math.abs(stop.target - g.tram.s) > 450) continue;
-      const r = rng(stop.i * 977);
-      const count = Math.min(stop === st ? st.waiting + st.ambient : stop.ambient, 55);
-      for (let k = 0; k < count && n < 120; k++) {
-        const along = stop.target - 2 - r() * 24, lat = -2.4 - r() * 1.6;
-        const o = g.route.offset(along, lat);
-        p.set(o.x, g.profile.height(along) + 0.18, -o.y);
-        sc.set(1, 0.85 + r() * 0.3, 1);
-        // facing the track (within ±40°), 3 in 10 towards where the tram comes from (±25°); one draw of r()
-        // as before, so everyone stands where they stood (#251)
-        const h = g.route.heading(along), v = r();
-        const yaw = v < 0.3 ? Math.atan2(-h.hx, h.hy) + (v / 0.3 - 0.5) * 0.9 : Math.atan2(-h.hy, -h.hx) + ((v - 0.3) / 0.7 - 0.5) * 1.4;
-        q.setFromEuler(new THREE.Euler(0, yaw, 0));
-        m.compose(p, q, sc);
-        this.crowd.setMatrixAt(n++, m);
-      }
+    for (const stop of [prev, st]) {
+      if (!shown(stop)) continue;
+      const used = stop === st ? usedS : usedP;
+      const count = Math.min(stop === st ? this._crowdCount(st) : stop.ambient, 55);
+      this._stand(stop, count, (k, p, q, sc) => {
+        if (n >= 120) return;
+        this.crowd.setMatrixAt(n++, used?.has(k) ? none : m.compose(p, q, sc));
+      });
     }
     this.crowd.count = n;
     this.crowd.instanceMatrix.needsUpdate = true;
+  }
+
+  // the people at a stop: before the tram comes, those waiting for it and those waiting for other lines; from its arrival as
+  // many places as there were then (st.boarders, src/game.js: the boarders' among them, empty once they go to the doors)
+  _crowdCount(st) { return st.alightSet ? (st.boarders ?? 0) + st.ambient : st.waiting + st.ambient; }
+
+  // each of a stop's first `count` people where they stand (its own stream: they stand where they stood): fn(k, position,
+  // the yaw's quaternion, the scale)
+  _stand(stop, count, fn) {
+    const g = this.game, q = (this._cq ||= new THREE.Quaternion()), sc = (this._cs ||= new THREE.Vector3());
+    const p = (this._cp ||= new THREE.Vector3()), up = (this._cu ||= new THREE.Vector3(0, 1, 0));
+    const r = rng(stop.i * 977);
+    for (let k = 0; k < count; k++) {
+      const along = stop.target - 2 - r() * 24, lat = -2.4 - r() * 1.6;
+      const o = g.route.offset(along, lat);
+      p.set(o.x, g.profile.height(along) + 0.18, -o.y);
+      sc.set(1, 0.85 + r() * 0.3, 1);
+      // facing the track (within ±40°), 3 in 10 towards where the tram comes from (±25°); one draw of r()
+      // as before, so everyone stands where they stood (#251)
+      const h = g.route.heading(along), v = r();
+      const yaw = v < 0.3 ? Math.atan2(-h.hx, h.hy) + (v / 0.3 - 0.5) * 0.9 : Math.atan2(-h.hy, -h.hx) + ((v - 0.3) / 0.7 - 0.5) * 1.4;
+      q.setFromAxisAngle(up, yaw); // (the same quaternion as an Euler of yaw alone)
+      fn(k, p, q, sc);
+    }
+  }
+
+  // the places of our stop's crowd (#249: a boarder walks from one to the doors, src/passengerView.js): [{ x, y, z, n,
+  // shirt }], n and the shirt as src/people.js gives that person (by the place; the crowd's colour of its instance)
+  crowdSpots(st) {
+    const count = Math.min(this._crowdCount(st), 55);
+    if (this._spots?.stop === st && this._spots.list.length === count) return this._spots.list;
+    const g = this.game, prev = g.stops[g.nextStop - 1];
+    const before = prev && st === g.stops[g.nextStop] && Math.abs(prev.target - g.tram.s) <= 450 ? Math.min(prev.ambient, 55) : 0;
+    const c = new THREE.Color(), list = [];
+    this._stand(st, count, (k, p) => {
+      const gx = Math.round(p.x * 10), gz = Math.round(p.z * 10);
+      if (before + k < 120) this.crowd.getColorAt(before + k, c);
+      list.push({ x: p.x, y: p.y, z: p.z, n: (Math.imul(gx, 73856093) ^ Math.imul(gz, 19349663)) >>> 0, shirt: c.clone() });
+    });
+    this._spots = { stop: st, list };
+    return list;
   }
 }

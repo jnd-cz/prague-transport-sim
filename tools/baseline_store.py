@@ -366,6 +366,111 @@ def _free_gb():
 
 ENDED = 86  # (the exit code of a job its own watch ended, #815)
 NOLIMIT = "TRAM_HEAVY_NOLIMIT"  # (=1: a job's watch warns but ends nothing; heavy.py --no-limit)
+DAY = "TRAM_HEAVY_DAY"  # (=1: a long job runs by day, on the user's word; heavy.py --day, #851)
+# (#851; the user, 2026-11-24: "I thought it will go faster and heavy testing will be left for night unattended runs")
+NIGHT = (23, 7)  # (the night's hours, from 23:00 to 07:00: AGENTS.md, the user, 2026-11-23)
+DAY_MAX = 1800.0  # (s: by day a job expected to run longer, or whose time is not known, waits for the night; the
+# full suite with the page tests, 24 min, runs by day)
+SHORT, PASS_MAX = 600.0, 7200.0  # (s: a waiting job this short goes before longer ones queued earlier, but not before
+# one that has waited PASS_MAX)
+
+
+def night(t=None):
+    """Whether `t` (epoch s, now when None) falls in the night's hours (NIGHT), or in a night the user started early
+    (early_night())."""
+    t = time.time() if t is None else t
+    h = time.localtime(t).tm_hour
+    return h >= NIGHT[0] or h < NIGHT[1] or early_night(t) is not None
+
+
+def _early_path():
+    return os.path.join(LOCKS, "night.json")
+
+
+def morning(t=None):
+    """The next NIGHT[1] o'clock after `t` (epoch s)."""
+    t = time.time() if t is None else t
+    lt = time.localtime(t)
+    m = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, NIGHT[1], 0, 0, 0, 0, -1))
+    if m <= t:
+        lt = time.localtime(t + 86400)
+        m = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, NIGHT[1], 0, 0, 0, 0, -1))
+    return m
+
+
+def early_night(t=None):
+    """The night the user started early (heavy.py --night, #851) as {"from", "until"} (epoch s) while `t` is in it,
+    else None."""
+    t = time.time() if t is None else t
+    try:
+        with open(_early_path(), encoding="utf-8") as f:
+            e = json.load(f)
+        return e if e["from"] <= t < e["until"] else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def start_night(now=None):
+    """The night from now until the morning, on the user's word (heavy.py --night): the jobs held for it take their
+    turns, as at NIGHT[0] o'clock. Returns its {"from", "until"}."""
+    now = time.time() if now is None else now
+    e = {"from": now, "until": morning(now)}
+    os.makedirs(LOCKS, exist_ok=True)
+    tmp = _early_path() + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(e, f)
+    os.replace(tmp, _early_path())
+    return e
+
+
+def end_night():
+    """The early night ended (heavy.py --night off); whether there was one."""
+    try:
+        os.remove(_early_path())
+        return True
+    except OSError:
+        return False
+
+
+def night_starts(t=None):
+    """When the night starts next (epoch s): `t` itself at night, else that day's NIGHT[0] o'clock."""
+    t = time.time() if t is None else t
+    if night(t):
+        return t
+    lt = time.localtime(t)
+    return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, NIGHT[0], 0, 0, 0, 0, -1))
+
+
+def job_expect(j, records=None):
+    """A ticket's expected seconds: its own, else the history's median of its kind (a single run enough), else None."""
+    return j.get("expect") or (expected(j.get("kind"), records, least=1) if j.get("kind") else None)
+
+
+QUEUE = 2  # (the version of the queue's rules a ticket was written by, #856: 0 first come first served, before #851;
+# 1 the short ones first and the night's hold, #851; 2 with #854's fallback and the versions read. Raise it with a rule
+# that orders the waiting jobs otherwise)
+
+
+def turn_key(jobs, now=None, records=None):
+    """The key the waiting jobs take their turns by (#856): their queue time while a waiting job of a queue older than
+    #851 (version 0) is among `jobs`, which orders by it alone; else rank()."""
+    if any(j["state"] == "waiting" and queue_version(j) == 0 for j in jobs):
+        return lambda j: (j.get("t") or 0, j["pid"])
+    return lambda j: rank(j, now, records)
+
+
+def queue_version(j):
+    """The queue rules' version that wrote ticket j (QUEUE): its own; without one, #851's (1) when it has "held", else 0."""
+    return j.get("queue", 1 if "held" in j else 0)
+
+
+def rank(j, now=None, records=None):
+    """A waiting job's place among the waiting ones (#851), as a sortable tuple: first the long ones that have waited
+    PASS_MAX, then the short ones (SHORT or less), then the rest; in each, first come first."""
+    now = time.time() if now is None else now
+    e = job_expect(j, records)
+    cls = 0 if now - (j.get("t") or now) >= PASS_MAX and not (e and e <= SHORT) else 1 if e and e <= SHORT else 2
+    return (cls, j.get("t") or 0, j["pid"])
 
 
 def history_path():
@@ -589,8 +694,10 @@ class HeavyJob:
     # running now are expected to: the alone ones could not start sooner. On 2026-11-23 three shared jobs of 3-6 min
     # waited an hour behind two test_all runs that themselves waited for a shared ground_place run, #829)
     BACKFILL = 1.5
+    DAY_MAX = DAY_MAX  # (a test's own)
+    STALL = 120.0  # (s with jobs waiting and none running before the waiting ones take first come first served, #854)
 
-    def __init__(self, what, wait=None, out=None, share=None, expect=None, kind=None, limits=None):
+    def __init__(self, what, wait=None, out=None, share=None, expect=None, kind=None, limits=None, day=None):
         self.path = os.path.join(LOCKS, f"{os.getpid()}.lock")
         self.what = what
         self.share = None if share is None else {"gb": float(share.get("gb", 0)), "cores": int(share.get("cores", 1))}
@@ -606,6 +713,9 @@ class HeavyJob:
         self.kind = kind or kind_of(sys.argv)
         self.expect_s = expect  # (s; None: from the history when the run starts)
         self.limits = os.environ.get(NOLIMIT) != "1" if limits is None else limits
+        self.day = os.environ.get(DAY) == "1" if day is None else day  # (may run long by day: the user's word, #851)
+        self.parked = ""  # (why it waits for the night, "" when it does not)
+        self.still, self.told_still = None, False  # (since when nothing ran while it waited; said once, #854)
         self.own = False  # (holds a turn of its own: watched, recorded)
         self.warn, self.gb, self.peak, self.cpu = "", None, 0.0, 0.0
         self.mark, self.over = None, 0  # (idle: (when, CPU) when the CPU last moved; memory: looks in a row over)
@@ -621,10 +731,14 @@ class HeavyJob:
                 self.state, self.since = state, time.time()
             tmp = f"{self.path}.{state}.tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"what": self.what, "root": ROOT, "pid": os.getpid(), "t": self.t, "state": state,
+                # (held for the night, its ticket says it was queued at the night's start: a checkout from before #851
+                # orders by it, and so does not wait for it; its own place comes back when it is let go)
+                json.dump({"what": self.what, "root": ROOT, "pid": os.getpid(),
+                           "t": night_starts() if self.parked else self.t, "state": state,
                            "since": self.since, "share": self.share, "kind": self.kind, "expect": self.expect_s,
                            "warn": self.warn, "gb": self.gb, "watch": bool(self.thread) and self.limits,
-                           "stops": bool(self.thread), "in": self.within}, f)
+                           "stops": bool(self.thread), "in": self.within, "held": bool(self.parked), "queue": QUEUE,
+                           "day": self.day}, f)
                 # (watch: it ends itself; stops: heavy.py --stop reaches it; in: the job whose turn it runs in, #844)
             for wait in (0.05, 0.2, 0.5, 1, 2, 0):  # (Windows refuses while a queue() in another process reads the
                 try:                                # ticket; measured 2026-11-06: a check run died at its turn, #282)
@@ -780,27 +894,57 @@ class HeavyJob:
         if self.state:
             self._write(self.state)
 
+    def night_hold(self, now=None, records=None):
+        """Why this job waits for the night, or "" (#851): by day (outside NIGHT) a job expected to run over DAY_MAX, or
+        whose time is not known, unless it has the user's word (day)."""
+        now = time.time() if now is None else now
+        if self.day or night(now):
+            return ""
+        e = self.expect_s or expected(self.kind, records, least=1)
+        if e is None:
+            return "its time is not known (heavy.py --expect, or --day on the user's word)"
+        if e > self.DAY_MAX:
+            return f"expected {e / 60:.0f} min, over {self.DAY_MAX / 60:.0f} by day (--day on the user's word)"
+        return ""
+
     def ahead(self):
         """The jobs this one waits for. Alone: every ticket before it, and any job running now. Shared: the alone jobs
         among those and the shared ones queued before it, but when it backfills (backfills()) the waiting alone ones and
         the shared ones queued behind the first of those;
         with none, the shared jobs running while its cores or its memory do not fit beside them (self.why says which)."""
-        me = (self.t, os.getpid())
+        now, records = time.time(), history()
         jobs = queued_turns()  # (a step in another job's turn is that job's, #844)
-        others = [j for j in jobs if not own_turn(j)]
+        others = [j for j in jobs if not own_turn(j) and not j.get("held")]  # (held for the night: ahead of none, #851)
+        # (with a job of a queue older than #851 waiting, first come first served: its own order, so neither waits for
+        # the other, #856; else by rank(), the short ones first, #851)
+        key = turn_key(others, now, records)
+        me = key({"t": self.t, "pid": os.getpid(), "expect": self.expect_s, "kind": self.kind})
         self.why = ""
+        # (nothing runs and this job still waits: from STALL s on it waits only for the jobs queued before it by their
+        # time, the order every version of the queue keeps. A checkout's queue of another version orders otherwise, and
+        # the two would wait for each other for good: on 2026-11-25 three jobs did so for hours, #854)
+        if any(j["state"] == "running" for j in others):
+            self.still = None
+        else:
+            self.still = self.still or now
+            if now - self.still >= self.STALL:
+                if not self.told_still:
+                    self.told_still = True
+                    print(f"heavy jobs: {self.what}: nothing has run for {self.STALL / 60:.0f} min with jobs waiting; first "
+                          f"come first served until one runs (#854)", file=self.out, flush=True)
+                return [j for j in others if (j["t"], j["pid"]) < (self.t, os.getpid())]
 
-        def first(j):
-            return (j["t"], j["pid"]) < me
+        def first(j):  # (a running job counts below; the waiting ones by key)
+            return j["state"] == "waiting" and key(j) < me
         if not self.share:
             return [j for j in others if first(j) or j["state"] == "running"]
         turn = [j for j in others if (first(j) or j["state"] == "running") and (not j.get("share") or j["state"] == "waiting")]
         beside = [j for j in others if j["state"] == "running"]
-        alone = [(j["t"], j["pid"]) for j in turn if not j.get("share") and j["state"] == "waiting"]
+        alone = [key(j) for j in turn if not j.get("share") and j["state"] == "waiting"]
         if alone and backfills(self.expect_s or expected(self.kind, least=1), beside, self.BACKFILL):
             # (the waiting alone jobs, and the shared ones queued behind the first of them: none of those starts
             # before the jobs running now end, and this one ends sooner)
-            turn = [j for j in turn if j["state"] == "running" or (j.get("share") and (j["t"], j["pid"]) < min(alone))]
+            turn = [j for j in turn if j["state"] == "running" or (j.get("share") and key(j) < min(alone))]
         if turn or not beside:
             return turn
         room = self.room(jobs)
@@ -835,8 +979,21 @@ class HeavyJob:
             self.wait, self.own, self.within = False, False, theirs[0]["pid"]
         self._write("waiting" if self.wait else "running")
         told, last, marks, looked = None, 0.0, {}, 0.0
-        while self.wait and (ahead := self.ahead()):
+        while self.wait:
             now = time.time()
+            if parked := self.night_hold(now):
+                if parked != self.parked:
+                    print(f"heavy jobs: {self.what} waits for the night ({NIGHT[0]}:00): {parked}", file=self.out, flush=True)
+                    self.parked = parked
+                    self._write("waiting")
+                time.sleep(self.POLL)
+                continue
+            if self.parked:
+                self.parked = ""
+                self._write("waiting")
+                told = None
+            if not (ahead := self.ahead()):
+                break
             ids = [(j["pid"], j["state"]) for j in ahead] + [self.why[:5]]  # (said again when they change, or every TELL s)
             if ids != told or now - last > self.TELL:
                 print(f"heavy jobs: {self.what} waits for {self.why + ' beside ' if self.why else ''}"
@@ -1023,6 +1180,8 @@ def describe(j, now=None):
             + (f", expected {j['expect'] / 60:.0f}" if j.get("expect") and j["state"] == "running" else "")
             + (f" (shared: {s['gb']:.0f} GB, {s['cores']} core{'s' * (s['cores'] != 1)})" if s else "")
             + (f", its step{'s' * (len(steps) > 1)} {', '.join(steps)} running" if steps else "")
+            + (", held for the night" if j.get("held") else "")
+            + (", its queue code is older (merge main)" if queue_version(j) < QUEUE else "")
             + (f": {j['warn']}" if j.get("warn") else ""))
 
 
@@ -1095,11 +1254,11 @@ def schedule(jobs, now=None, records=None, free=None, cores=None, keep=None, par
     after = bf = now
     alone = False
     backfill = bool(run) and all(est(j)[0] for j in run) and max(iv[1] for iv in ivals)
-    for j in jobs:
-        if j["state"] == "running":
-            continue
+    # (the waiting ones as HeavyJob.ahead() takes them: by rank(), the ones held for the night last and from its start)
+    key = turn_key([j for j in jobs if not j.get("held")], now, records)  # (as HeavyJob.ahead() takes them, #856)
+    for j in sorted((j for j in jobs if j["state"] != "running"), key=lambda j: (bool(j.get("held")), key(j))):
         e, src = est(j)
-        frm = after
+        frm = max(after, night_starts(now)) if j.get("held") else after
         if j.get("share") and alone and e and backfill and bf + HeavyJob.BACKFILL * e <= backfill:
             frm = bf  # (ends before the jobs running now: the ones ahead behind an alone job could not start sooner)
         start = next((t for t in sorted({frm} | {iv[1] for iv in ivals if frm < iv[1] < inf}) if fits(j, t)), inf)

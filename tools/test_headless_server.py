@@ -83,6 +83,24 @@ class Ownership(unittest.TestCase):
         with self.assertRaises(OSError):
             read(url)
 
+    def test_a_ready_file_refused_while_replaced_is_read_again(self):
+        """#851: Windows may refuse to open ready.json for a moment while serve.py replaces it."""
+        root = self.checkout('refused once','served')
+        real, refused = open, []
+
+        def flaky(path, *a, **kw):
+            if str(path).endswith('ready.json') and not refused:
+                refused.append(path)
+                raise PermissionError(13, 'in use')
+            return real(path, *a, **kw)
+        with patch('builtins.open', flaky):
+            child, url = self.start(root)
+        try:
+            self.assertEqual(len(refused), 1)
+            self.assertEqual(read(url)[0], b'served')
+        finally:
+            headless.stop_server(child)
+
     def test_two_automatic_ports_have_distinct_launch_identities(self):
         root = self.checkout('target','index')
         a, first = self.start(root)

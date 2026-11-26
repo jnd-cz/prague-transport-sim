@@ -40,8 +40,19 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   more than 4 m costs 20 points, even though the stop is served. Stopping further back in the allowed place costs
   nothing.
 - Passengers: an on-board counter (normal capacity 110, crush 160 per car). Demand follows the time of day:
-  morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a packed car boards
-  slowly and a full one leaves people for the next tram.
+  morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a full car leaves people
+  for the next tram.
+- Getting on and off takes as long as the passengers need to pass the doors: each door has two streams, those
+  standing or sitting nearest the doors get off first, then those waiting board and go to sit or stand. Those getting
+  off stand up as the tram comes into the stop and wait at the doors, so they are out as soon as the doors open. A car has
+  24 seats and 81 standing places; above these 105 it only counts the passengers (up to 160). About one boarder in
+  five stands even with seats free; seats that come free go to standing passengers who want to sit, also while the
+  tram drives.
+  Whoever is on the steps when you close the doors gets through; the others stay at the stop, and anyone who could
+  not get off gets off at the next one.
+  With the detailed tram model (the default) you see them: sitting and standing through the windows, getting off and
+  on by the steps, those waiting walking from the platform to the doors, and in the right mirror who is still
+  boarding. Those above the 105 a car only counts are seen on the steps and outside only.
 - Line changes: a trip can change its number along the line's route and at a terminus (line 9 continues as 10 at Nákladové
   nádraží Žižkov): everybody gets out, the route boxes and the HUD switch, the tram departs as 10.
 

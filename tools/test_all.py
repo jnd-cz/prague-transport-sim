@@ -113,7 +113,9 @@ def main():
     if not a.pattern:  # (the whole suite, ~6 min: a heavy job; -k picks a few tests, #536)
         sys.path.insert(0, TOOLS)
         import heavy
-        heavy.turn("test_all" + (" --browser" if a.browser else ""))
+        # (its time stated, not taken from the history: a machine without one, CI, held it for the night as a job of
+        # unknown time, #851; 24 min with the page tests on 2026-11-24)
+        heavy.turn("test_all" + (" --browser" if a.browser else ""), expect=1440 if a.browser else 360)
     failed, skipped, t0 = [], [], time.time()
     for t, kind, _ext in rows:
         if kind == "browser" and not a.browser:

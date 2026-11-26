@@ -52,6 +52,9 @@ class Handler(BaseHTTPRequestHandler):
         if path in ('/tools/bench/redruns.js', '/tools/bench/stuck.js', '/tools/bench/shift.js'):
             body = (Path(__file__).parent / 'bench' / path.rsplit('/', 1)[1]).read_bytes()
             mime = 'text/javascript'
+        elif path == '/src/waits.js':  # (stuck.js names each chain's head with it, #560)
+            body = (Path(__file__).parent.parent / 'src' / 'waits.js').read_bytes()
+            mime = 'text/javascript'
         elif path == '/src/autopilot.js':
             body = b'export class Autopilot { constructor() { this.input = {}; } step() {} }'
             mime = 'text/javascript'
@@ -104,6 +107,23 @@ class TimeoutTests(unittest.TestCase):
         start = time.monotonic()
         self.assertEqual(self.run_bench('loading', timeout=0.5), {'error': 'timeout'})
         self.assertLess(time.monotonic() - start, 3)
+
+    def test_a_page_error_ends_the_run_after_its_grace(self):
+        """#851: an error in a step stops the game; the run ends PAGE_ERROR_GRACE after it, not at the timeout."""
+        js = "setTimeout(() => { throw new Error('in a step'); }, 50); return await new Promise(() => {});"
+        with patch.dict(headless.CALLS, redruns=js), patch.object(headless, 'PAGE_ERROR_GRACE', 0.5):
+            start = time.monotonic()
+            result = self.run_bench(timeout=30)
+            self.assertLess(time.monotonic() - start, 10)
+        self.assertEqual(result['error'], 'page error, the run stopped 0.5 s after it: Error: in a step')
+
+    def test_a_run_that_finishes_after_a_page_error_keeps_its_result(self):
+        js = "setTimeout(() => { throw new Error('once'); }, 0); await new Promise((r) => setTimeout(r, 200)); return {stuck: null};"
+        with patch.dict(headless.CALLS, redruns=js):
+            result = self.run_bench(timeout=30)
+        self.assertNotIn('error', result, result)
+        self.assertIsNone(result['stuck'])
+        self.assertEqual(len(result['pageErrors']), 1)
 
     def test_rejection_is_a_result(self):
         with patch.dict(headless.CALLS, redruns="await Promise.resolve(); throw new Error('bench failed');"):

@@ -26,7 +26,7 @@ MARKER = "SECRET-PROMPT-TEXT-8c1f"
 def job(pid, state, since=None, share=None, expect=None, kind="x.py", gb=None, t=None):
     return {"what": f"job{pid}", "root": f"/w/transport-game-{pid}", "pid": pid, "t": NOW - 1000 + pid if t is None else t,
             "state": state, "since": since if since is not None else NOW - 1000 + pid, "share": share, "kind": kind,
-            "expect": expect, "gb": gb}
+            "expect": expect, "gb": gb, "queue": baseline_store.QUEUE}
 
 
 def times(jobs, **kw):
@@ -67,7 +67,8 @@ class Schedule(unittest.TestCase):
         got = times([job(1, "running", since=NOW - 600, share=s, expect=4200), job(2, "waiting", expect=1380),
                      job(3, "waiting", expect=360), job(4, "waiting", share=s, expect=180),
                      job(5, "waiting", share=s, expect=360), job(6, "waiting", share=s, expect=3000)])
-        self.assertEqual(got, {1: (-600, 3600, False), 2: (3600, 4980, False), 3: (4980, 5340, False),
+        # (3, alone and short, goes before 2, alone and longer: the short ones first, #851)
+        self.assertEqual(got, {1: (-600, 3600, False), 2: (3960, 5340, False), 3: (3600, 3960, False),
                                4: (0, 180, False), 5: (0, 360, False), 6: (5340, 8340, False)})
 
     def test_a_short_shared_job_passes_one_of_no_known_time_behind_an_alone_one(self):
@@ -84,7 +85,8 @@ class Schedule(unittest.TestCase):
     def test_late_ends_now_and_unknown_leaves_the_rest_unknown(self):
         got = times([job(1, "running", since=NOW - 600, expect=60), job(2, "waiting", kind="new.py"),
                      job(3, "waiting", expect=60)])
-        self.assertEqual(got, {1: (-600, 0, True), 2: (0, None, False), 3: (None, None, False)})
+        # (3, short, goes before 2, whose time is not known: #851; after 2 nothing would be known)
+        self.assertEqual(got, {1: (-600, 0, True), 2: (60, None, False), 3: (0, 60, False)})
 
     def test_board_says_the_finish(self):
         j = baseline_store.schedule([job(1, "running", since=NOW - 60, expect=600), job(2, "waiting", expect=300)], NOW, [])

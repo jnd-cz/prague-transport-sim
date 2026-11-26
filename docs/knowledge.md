@@ -310,6 +310,11 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   set the junction's moved tracks 0.15-0.24 m over their neighbours. A track within 7 m of a stretch taken goes with
   it where its own record lies over 0.1 m off the lidar the same way: left behind, three short tracks of that junction
   had their rails 11-15 cm under their neighbours' beds (ground batch D, 2026-11-23).
+  Between 0.10 and 0.20 m under the lidar (staged 2026-11-23, 3,797 samples with DI, paved and unknown) DI sides
+  with the lidar at 89 %, and the street beside the track does not sharpen it (level with the track's lidar 241 of
+  272 paved, falling away across it 1,743 of 1,927): no rule there. Where the survey lies within 5 cm of the record,
+  DI sides with the lidar at 668 of 686 paved samples: the survey there is the same old street level, not a second
+  witness, and the rule takes that case (`SURVEY_WITH`).
 - **Two junctions lie on the ground under 500 m** (#358, 2026-11-08): Královka's loop arms and Malovanka, where the
   user's photos show the paving following the slope. Held at 500 m, Malovanka's curves lay up to 40 cm off the 1 m lidar
   and its junction still needed 355 m (meeting points metres apart). The archive put Královka's arms 15-78 cm above the
@@ -675,6 +680,28 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   level-1 areas) fit there while IPR inside them is the bridges: on the lidar they raised the place's steep faces
   from 379 to 640 m². Paved yards under a cover are judged as before (34 on the five lines lie on the lidar with
   over a third under a level-1 area, 0.8 ha).
+- **A parking area is the road's to a kerb** (#800, measured 2026-11-23 on ground batch D). The street surface covered
+  the road and tram areas only, so beside a parking area the sidewalk's kerb had no plane: its walkway lay on the fill
+  to IPR, which rounds the kerb away, and the bay on its outline, 6-8 cm over IPR at line 9 (-8655, -1214), met it
+  level. 138 of batch D's flat kerb samples drawn from an outline lay between a sidewalk and a parking area, and 72
+  more spread into a ramp. The road's fill now takes the parking areas as it takes a junction's middle
+  (`street_profile.parking_area`; a car park over a third under a cover keeps its sheet), and the sidewalk stands a
+  kerb over a bay as over a road, unless IPR reads the two flush. IPR's step from 1 m out to 1 m in, its median over
+  ±1 m along the edge, is under 0.03 m at 26 % of the 25.6 km of sidewalk kerb beside parking on the five lines and
+  at 10 % beside a road or tram area (medians +0.092 and +0.114 m). The excess beside parking is 16-17 points at
+  every threshold from 0.03 to 0.07 m, so the flush bays read under 0.03 (`PARK_FLUSH`). Read less the ground's slope
+  1.5-2.5 m either side, the step tells them apart worse (26 % of the road's kerbs under 0.03): the road's camber and
+  the sidewalk's crossfall enter it. Built so on the five lines, the parking cells lie within 1.1-1.2 cm of IPR at the
+  median, p90 4-5.5 cm (batch D's ground at the same cells: 4-5.5 cm, p90 15-19 cm). Where a walkway is wide enough
+  to read past the kerb's smear (1.5 m in to 1 m short of its far side: 41 % of the kerb beside parking), IPR's mean
+  over it less the kerb's plane there has a median of -0.013 m beside a bay the step calls a kerb and -0.005 beside a
+  road (p10 -0.083 and -0.088, p90 +0.079 and +0.074): the plane fits as well beside a bay as beside a road. Beside a
+  bay the step calls flush it is -0.156 (95 % under -0.07). The step misses a flush bay on the low side of a sloping
+  walk: at line 17 (1171, 1913) the walk falls 2 % to the bay, the step reads 3-4 cm, and the walk stands 8-9 cm over
+  IPR across its width (the fit reads -0.08). Such bays are about 2 % of the kerb beside parking (the fit under -0.07
+  at 17 % beside bays the step calls kerbs, 15 % beside roads); calling every walkway under -0.07 flush would take
+  15 % of the real kerbs with them. A walkway beside a bay can now be a wall's top (`wall_tops`): by the car park sunk
+  6 m at line 37 (5568, -221) it keeps its level to the edge, where the fill to IPR had sunk it 3 m down the wall.
 - **A wall the survey has only as a strip** (#770, measured 2026-11-20). The tram's cutting north of Ohrada (line 37
   (3400, 1)) runs between two upright concrete walls of 4.7 and 5.8 m with a ledge at each foot (the user's photos
   from the footbridge, 2026-11-20). The survey has no `Zeď` line, no wall area and Geoportál no wall there: only a
@@ -966,6 +993,52 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
     sidewalks steeper than they are.
   - **Today's survey surface at Hartigova falls away from the kerb** (median −2.2 %): `kerbs.py`'s +0.10 m may land on
     a line that is already the kerb's top there.
+  - **A kerb drawn in short edges** (#800, measured 2026-11-23). Round a corner or along a bend the survey draws a
+    kerb in edges of 0.2-1.5 m. Until #800 an edge 3 m or longer was a kerb and a shorter one none, its walkway on
+    the fill following IPR, whose raster rounds the kerb away: 182 of the 202 sidewalk|road samples with a flat kerb
+    on ground batch D lay on such an edge. A run of consecutive kerb edges 0.5 m or longer is now sampled every
+    0.25 m, its normals read over 0.5 m either way along it (`street_profile.kerb_edges`). An edge under 3 m is no
+    wall's top (`WALL_EDGE_MIN`): read as one, a 2 m edge at the road's level by Palackého náměstí (line 9 (-708.4,
+    -1186.4)) held its sidewalk 1.9 m under the road, the quay 1.5 m behind. Against batch D's street surfaces on the
+    five lines: within 0.75 m of a kerb the walkway lies +0.046 m over IPR (median), 1.5-3 m in -0.002 m; of the
+    sidewalk cells that moved 0.3 m or more, 2,023 came nearer IPR and 1,172 went from it (1 m or more: 470 and 196).
+    Those that went from it lie where a sidewalk spans two levels and a few seeds (a kerb's plane, a wall's hold)
+    set it. The wall test reads across each point's own edge, not along the run's normal: at Výtoň (line 17
+    (-763.3, -2212.2)), a wedge at the foot of a wall whose hold is its top, 192.38 m, the corner's normal turned 30°
+    read IPR into the wall's smear, and the wedge, 188.7 m at the kerb, filled at 192.4 m.
+  - **A kerb at the road's level under a rise is a wall's foot** (#800, the user, 2026-11-23). On about 520 m of
+    kerb on the five lines the survey has the edge at the road's level plus a kerb and IPR rises 0.8-4 m within
+    1.5 m behind it; `wall_tops` holds the walkway there at IPR's level 1.5 m in, a wall at the kerb. Asked at three
+    such places, the user found a wall between the road (or a ramp) and a raised sidewalk at each: "a straight up
+    wall between road and sidewalk" (Motol, line 9 (-6418.8, -1518.4)); "not vertical but still steep wall down from
+    street level to the ramp going down to the river" (under Vyšehrad, line 17 (-764.1, -2356.4)); "a wall next to
+    sidewalk" (Žižkov, line 9 (2217.7, -671.0)). A rule taking such an edge's own height as the walkway's was tried
+    and dropped; the three are places in `data/truth.json`.
+  - **A wall at a kerb edge is one IPR sees** (#800, the user, 2026-11-23). By a car park on line 22 (3449, -2602)
+    the verge's edge is surveyed at 211.38 m, 0.41 m off IPR 1.5 m in, and the test held it 0.66 m under the car
+    park. IPR has the verge at the car park's level at the edge, falling 0.2 m a metre towards the road, and the user
+    sees "grass and bushes on what would otherwise be sidewalk" and a car park "lying on a lower level overall".
+    A wall's edge now needs IPR 1 m in to stand off the road's surface beyond by `WALL_SEEN` (0.5) of the step, the
+    median within 1 m along the edge. The three walls above bear 0.59-1.01 at every point, the verge 0.15-0.44; DMR
+    5G (2009-2013) bears half of the step within 2 m at all the three walls' points and at 3-8 % of the verge's. The
+    walls' edges of 3 m or more went from 832 / 958 / 539 / 280 / 372 m to 708 / 837 / 381 / 190 / 305 m (lines 9 /
+    17 / 22 / 23 / 37). By IPR's profile those cut are a walkway at the road's level with a drop 1-3 m behind it
+    (line 37 (9065, 1055); lines 22/23 (-885, 1105)), or a slope rising from a plain kerb (Bělohorská, line 22
+    (-4170, 145): IPR and DMR 5G +0.07 m at the kerb, the survey's edge +0.48 m). IPR 1 m out is no witness of the
+    road: under a deck it reads the ground. Read as one, it took the walls of short edges under Modřanská's deck,
+    line 17 (-2495, -8295), and their kerbs' planes lifted the walkway 3.5 m, 194.75 m to 198.23 m.
+    The user on four of the cut places (2026-11-24, #834): Bělohorská "is plain street with sidewalk kerb"; at lines
+    22/23 (-885, 1105) "there is a wall and on lower level there's a park with footpaths" (the survey's sidewalk is
+    1.6 m wide, a survey wall area 1.6-2.7 m in, a footpath 2.5 m lower from 5.7 m); line 37 (9065, 1055) could not be
+    seen; and at line 17 (-360, 30) "street has a wall and lower sidewalk next to the building". There the survey's
+    sidewalk runs 3.8 m to the building with no line at the step, IPR drops 1.8 m between 0.5 and 1.5 m in, and IPR
+    1 m in bears 0.28-0.82 of it along its 82 m. The places the user found no wall at the kerb all take the walkway's
+    level from the edge's own height; the four walls take it from IPR 1.5 m in. So where the level is IPR's, IPR 1 m in
+    needs only `WALL_SEEN_RUN` (0.25) of the step, and IPR 0.5 m in must not lie STEP_CUT past the road the other way
+    (at 0.35 the wall's weakest metres were kerbs, and the walkway rose between them to 0.3 m under the road): by
+    Bělohorská, line 22 (-4157, 149), IPR has a pit some 11 m deep at the kerb, and the road's surface sinks 5 m into
+    it (on main too: on #732). The survey has no wall line (`Zeď`, `Hranice_zdi`, `Terénní_hrana`) within 3 m behind
+    the kerb at any of these places, the four walls included.
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
@@ -1235,12 +1308,68 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   takes them only for a walker, a car or an obstacle in the way, or where the grip is under 0.25 or the wheels slide. A stop, a
   signal, a junction or a tram ahead on dry rail gets step 5 at most.
 - **The load** (#351, `tools/headless.py --checks load10,load90`: the stops run with the passengers held at 10 % and 90 % of the
-  capacity): a full car's plan brakes gentler and longer, as step 5 gives less over the mass, and boarding slows over 75 %. A full car
+  capacity): a full car's plan brakes gentler and longer, as step 5 gives less over the mass (since #249 the hold moves the mass only:
+  the exchanges at the stops are the passengers' own, with their own count; before it boarding slowed over 75 %). A full car
   pulls away on step 4 where step 3 cannot make 1.0 m/s² (on step 3 it made 0.8). At 90 % against 10 %, lines 9, 17, 22, 23 and 37
   (seed 1, line 23 seed 2): +79, +320, +302, +206 and +142 s to the terminus (main +4, +263, +240, +46, +50 s); the departures' mean
   delay 99, 308, 251, 214 and 91 s at 90 %. The full car ends within 30 s of main's on four lines, the empty one 3–63 s ahead of
   main's. Line 23's full car came down Chotkova 16 s behind main's and waited a whole cycle (108 s) at the signal main's passed. A
   run's length also moves 35–223 s from seed to seed, as the traffic reshuffles.
+- **The passengers at a stop** (#249 step 2, `src/passengers/consist.js`): each car runs the passenger lab's boarding controller
+  (`src/passengers/boarding-state.js`) on the T3's cabin (`assets/passengers/t3-cabin.json` from `tools/cabin.py --game`: 24 seats
+  and 81 standing places, 105 shown a car, the user's choice of 2026-11-25; the floor behind the cab's partition by the front door
+  is open floor, the user the same day: the lab took the cab's control panel by its box for a fixture there, and the front door
+  keeps both its streams both ways), and the game's counts are theirs. A passenger is
+  aboard from the head of the entry steps in to their foot out; the counts, the score and `st.waiting` / `st.alight` change
+  there, and the autopilot closes the doors once the last one is across. How many alight is drawn as before (`alightFrac`);
+  who alights is the nearest to a door by walking (the user's rule), the counted ones (above the 105, up to the crush load of
+  160) first, from the doorways. The waiting queue at the doors of the car with the most room, two streams a door, those
+  alighting first at each door. About one boarder in five wishes to stand though seats are free (`STAND_SHARE`, from the
+  passengers' own seeded stream: the rules' and the traffic's draws are as they were); a seat freed by a door whose exchange is
+  over goes to the nearest standing passenger who wants to sit, at 0.8 m/s round the others, also while driving. Doors closed
+  during the exchange: who is on the steps finishes the way, the rest of the queue stays (`leftBehind`, as before), those not
+  yet on the steps out get off at the next stop (`cantAlight`, as before). The exchange took 3.3 people a second a car before
+  (a 15 out / 20 in two-car exchange in about 5 s); now its time is the queues': on line 22 (seed 1, 38 stops) 2.6–15.8 s, mean
+  10.3 s (line 17: 10.0 s, at most 14.9 s), with the doors' 2 s to open and 3 s to close about 15 s a stop. Their cost on line
+  17's drive (seed 1, 102 748 steps): 1.1 s in all, 0.011 ms a step, 0.1 ms at the 99th percentile, 5.3 ms at most (one step).
+  The departures' mean delay (seeds 1–5, against main at 573d129): line 9 45 → 71 s, 17 117 → 186 s, 22 92 → 187 s (on time by
+  D 1/2 0.91 → 0.50), 37 41 → 82 s; line 23 inside main's spread (its exchanges 16.5 s on average). The user, 2026-11-25: keep the
+  queues' time; the drive between the stops is its own matter (most of the delay is there on arrival).
+- **Ready at the doors** (#249 step 4; the user, 2026-11-26: "often when tram arrives people start boarding before other
+  passengers get out ... those getting off at the stop needs to be prepared often, to be ready to go once door opens"). Before,
+  those alighting stood up when the doors opened: on line 17 (seed 1) a door's last alighter was out 5.7 s after the doors
+  opened (median 5.7), and its boarders went up from 5.3 s; a door where nobody alighted boarded at once, so in 48 of 133
+  boardings the car's other doors still had alighters walking to them (a door's own boarders never began before its
+  alighters were out). Now, 120 m before a stop the tram drives towards (`READY_DIST`, moving), the alighters are chosen as
+  arrival would choose them (`consist.ready`; the same ones alight there) and go to free doorway places of the doors they will
+  leave by, one a door every 0.8 s at 0.8 m/s, round the others; from a seat they stand up first. A doorway place is its
+  door's, so they go out through it and first; boarders at that door wait for them. Those with no free doorway place or no way
+  stay where they are; one still on the way when the tram stops alights from where they get to. The 120 m, measured as the user
+  asked (the same day: "how far from stop they need to start moving when tram is approaching at 50 km/h and breaking at the
+  highest step"): getting ready takes up to about 10 s (two cars, 38 % alighting, the most `alightFrac` draws, seeds 1–5: 4.3–5.8 s
+  at 30 aboard, 8.0–8.3 s at 60, 8.2–9.9 s at 100, 8.1–9.3 s at 140; at 180 and more the doorway places are taken by those
+  standing, and fewer or none go); the set braking on step 5 from 50 km/h stands after 9.0–11.1 s and 70–84 m (full to empty),
+  and covers 69–84 m in its last 10 s, 97–112 m in its last 12 s. With the autopilot on lines 17 and 22 (seed 1, 69 stops) the
+  tram stood 15.9 s after the start at the soonest (median 20.5 s), the last one at the door after 8.1 s at most (median 5.7 s),
+  nobody still on the way. Line 17 (seed 1): a door's last
+  alighter out at 3.3 s on average (median 2.5 s: the 2.2 s down the steps), its first boarder up at 3.6 s; the boardings
+  begun with alighters at the car's other doors 60 of 134 (those doors' alighters still on the steps). In `tools/test_consist.py`
+  (50 aboard, 15 off, 20 on): out 2.3 s to 6.9 s after the doors open against 3.5 s to 8.3 s from their places, the first
+  boarder in at 6.7 s against 8.5 s. Every line, seeds 1–5, against main (f8d8453): the exchange mean 10–11 s → 8.4–9.4 s
+  (line 23, one car, 16.4 → 15.9 s), lateness inside main's spread: part of the time is spent at the next signal, whose tram
+  call comes 140 m before it (`_runController`), so at a stop before a junction it comes on arrival and the cross street's
+  8 s and change-over can outlast a shorter exchange (held at signals: line 9 seed 1 178 → 233 s, seed 2 126 → 180 s, line 17
+  seed 4 31 → 72 s; so more brake applies and pedal changes). Ready turned off, the branch repeats main's run exactly.
+- **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
+  is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
+  model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body
+  and are hidden with it in the cab view and drawn with it in the mirror; on the platform they are in the world on the car's frame
+  without its lean. The lab's clips at the core's phase (Sit, TramStepUp, TramStepDown, sitting down blended from Idle) and on the
+  steps its two-bone legs (thigh 0.43 m, shin 0.41 m). The distant ones on a car in its own batches, standing and seated
+  (`person-seated-far.glb`). A boarder walks to the queue at 1.3 m/s from the nearest place of the stop crowd, which then stays
+  empty (the core has them queued at once: drawn only); an alighter walks on 3 s after the core lets them go. The cabin's
+  platform is the game's, 0.18 m over the rail (`tools/cabin.py --game`). A run counts the same with and without the figures
+  (`tools/test_people.py`).
 - **Where the traction's energy goes** (#351, `--checks stops`: lineKWh, wasteKWh, brakeKWh; `tools/test_drives.py` in Wh): the
   starting resistors take 36 % of what the wire gives on a level test drive and 78 % holding 15 km/h in a slow street, almost all
   of it pulling away. Coasting 1 m/s under the limit before pressing again on step 3 (the drivers' "few presses, hard") cut the
@@ -1465,12 +1594,19 @@ Review these when realism matters; most move into the build in M2.
   late (line 17 seed 5, line 22 s 4211; #394). A longer hold was turned down (the user, 2026-11-10: "that would slow up the cycle and cause potential jams").
 - **AI tram gridlocks** (#168): line 37 seed 4 at Balabenka closes an oncoming tram → car 307 →
   car 295 → car 297 → that tram cycle before ours arrives. The #154 recovery covered only a car
-  immediately ahead of our tram. `Traffic._clearAiTramCycles` follows each vehicle's `waitFor`
-  (the controlling stop reason) and fades one car after the same closed cycle stands for 30 s.
-  Signal waits, boarding and moving vehicles end the chain. This is recovery for cars that cannot
+  immediately ahead of our tram. Since #560 both are one rule on the waits-for graph (`src/waits.js`):
+  `Traffic._tramCircles` finds the circles through a tram, ours or an AI one, and fades the car the tram
+  waits for after the same circle has stood 30 s, every agent of it standing. Boarding, a signal wait
+  (no `waitFor`) and moving vehicles open the circle. This is recovery for cars that cannot
   reverse out in the present model. `window.game.trafficCycles` records the removed car, cycle and
   reasons; the traffic check retains those events. `tools/bench/stuck.js` names both AI directions
-  and the nearby junction cars, including their `why`, `seen` and actual wait chains.
+  and the nearby junction cars, including their `why`, `seen`, actual wait chains and chain heads.
+- **Circles of cars** (#560): one graph per step over what each car sees, the car it followed and what held it.
+  Of each circle of cars only (up to 12), one goes at once (`Traffic._letGo`): of those a rule holds, the one with
+  none of the circle coming from its right (the user, 2026-11-24, on PR #850: "the traffic rule that car on the
+  right should go first"), else the one that has stood longest. It replaced three walks in which the lowest id went
+  (#607 and the lines it cites). A car standing 200 s, no red light holding it, more than 100 m from the focus is
+  taken off (`givenUp` in the traffic check), the last net after openOMSI.
 
 ## Checks and what they measure
 

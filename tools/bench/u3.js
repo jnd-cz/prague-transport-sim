@@ -8,15 +8,15 @@
 // bells = the autopilot's bell; hits = collisions with crossing cars.
 import { stuckWatch, stuckScene } from './stuck.js';
 
-const CAR_FRONT = 2.2; // a car's front bumper ahead of its position (its middle), as traffic.js CAR_HALF
-// #602: a car's body (src/models.js: 1.8 x 4.3 m) against both tracks. FOUL: a tram's half width (1.25 m) with its swing in a
-// tight curve's overhang (about 0.45 m) and 0.3 m; a body corner nearer a track's centre fouls the tram passing there
-const CAR_HW = 0.9, CAR_HL = 2.15, FOUL = 2.0;
+// #602: a car's body (its type's half length and half width over the tyres, src/carTypes.js) against both tracks. FOUL: a
+// tram's half width (1.25 m) with its swing in a tight curve's overhang (about 0.45 m) and 0.3 m; a body corner nearer a
+// track's centre fouls the tram passing there
+const FOUL = 2.0;
 // the car's corners' least distance to a route's centre line, and the route position there: { d, s } or null
-function bodyTo(route, p) {
+function bodyTo(route, p, c) {
   let best = null;
-  const nx = -p.hy, ny = p.hx;
-  for (const [a, b] of [[CAR_HL, CAR_HW], [CAR_HL, -CAR_HW], [-CAR_HL, CAR_HW], [-CAR_HL, -CAR_HW]]) {
+  const nx = -p.hy, ny = p.hx, hl = c.half, hw = c.halfW;
+  for (const [a, b] of [[hl, hw], [hl, -hw], [-hl, hw], [-hl, -hw]]) {
     const n = route.nearest(p.x + p.hx * a + nx * b, p.y + p.hy * a + ny * b);
     if (n && (!best || n.d < best.d)) best = { d: n.d, s: n.s };
   }
@@ -55,7 +55,7 @@ export async function run(seed = 1, opts = {}) {
   game._collision = (what, pts) => {
     // (the scene: the crossing cars at the tram's front)
     const tr = game.tram;
-    const cars = (game.carsCrossing || []).filter((x) => Math.abs(x.s - tr.s) < 6).map((x) => ({ d: +(x.s - tr.s).toFixed(1), onTrack: x.onTrack, v: +(x.car.vNow ?? 0).toFixed(1), front: x.car.xing && +(x.car.xing.dC - 2.2).toFixed(1), bold: !!x.car.bold, light: x.car.lane?.light ? traffic.lightAspect(x.car.lane.light) : null, conn: !!x.car.conn, lightGo: !!x.car.lightGo }));
+    const cars = (game.carsCrossing || []).filter((x) => Math.abs(x.s - tr.s) < 6).map((x) => ({ d: +(x.s - tr.s).toFixed(1), onTrack: x.onTrack, v: +(x.car.vNow ?? 0).toFixed(1), front: x.car.xing && +(x.car.xing.dC - x.car.half).toFixed(1), bold: !!x.car.bold, light: x.car.lane?.light ? traffic.lightAspect(x.car.lane.light) : null, conn: !!x.car.conn, lightGo: !!x.car.lightGo }));
     R.hits.push({ what, s: Math.round(tr.s), v: +(tr.v * 3.6).toFixed(0), notch: tr.notch, cars, trail: (R.ctrail || []).slice(-10).join(' | ') });
     coll(what, pts);
   };
@@ -78,6 +78,9 @@ export async function run(seed = 1, opts = {}) {
         also.forEach((w, i) => w.after(alsoBefore[i]));
         for (const [c, b] of lit) {
           if (!c.conn && c.lane === b.lane && b.front > -0.5 && c.toEnd - b.lane.light.back - 3.2 <= -0.5) c._atLine = { lane: b.lane, a: traffic.lightAspect(b.lane.light), go: c.lightGo === b.lane };
+          // (a lane whose line is at its start: the car crossed it coming onto the lane, judged by the aspect then; one that
+          // stood on it, past its line, for the next lane's red was counted on its own red when it went on, #566)
+          else if (c._atLine?.lane !== b.lane && b.age === 0 && b.front <= -0.5) c._atLine = { lane: b.lane, a: b.a, go: b.go };
         }
         for (const [c, b0] of lit) {
           if (!c.conn || c.lane !== b0.lane) continue;
@@ -94,13 +97,13 @@ export async function run(seed = 1, opts = {}) {
             if (!c.active) continue;
             const p = c.path.at(c.s);
             if (Math.hypot(p.x - W.x, p.y - W.y) > 40) continue;
-            (R.watch ||= []).push(`${(game.clock % 1000).toFixed(1)} tram${Math.round(opts.watch - tr.s)} #${c.id} ${c.conn ? 'conn' : 'lane' + c.lane.id} toEnd${(c.toEnd ?? 0).toFixed(1)} next${c.next ? c.next.id : '-'} v${(c.vNow ?? 0).toFixed(1)} xing${c.xing ? `${Math.round(c.xing.sx)}@${(c.xing.dC - 2.2).toFixed(1)}` : '-'}${c.yielding ? ' Y' : ''} why${c.why ?? '-'}${c.jBlock != null ? ' jb' + c.jBlock : ''} lead${c.lead?.id ?? '-'}`);
+            (R.watch ||= []).push(`${(game.clock % 1000).toFixed(1)} tram${Math.round(opts.watch - tr.s)} #${c.id} ${c.conn ? 'conn' : 'lane' + c.lane.id} toEnd${(c.toEnd ?? 0).toFixed(1)} next${c.next ? c.next.id : '-'} v${(c.vNow ?? 0).toFixed(1)} xing${c.xing ? `${Math.round(c.xing.sx)}@${(c.xing.dC - c.half).toFixed(1)}` : '-'}${c.yielding ? ' Y' : ''} why${c.why ?? '-'}${c.jBlock != null ? ' jb' + c.jBlock : ''} lead${c.lead?.id ?? '-'}`);
           }
         }
         // (a trail of crossing cars ahead of the tram, every 0.5 s: for the collision scene)
         if (R.steps % 15 === 0) {
           const cc = traffic.cars.filter((c) => c.active && c.xing && c.xing.sx > tr.s - 2 && c.xing.sx - tr.s < 40)
-            .map((c) => `#${c.id} x${Math.round(c.xing.sx - tr.s)}m front${(c.xing.dC - 2.2).toFixed(1)} v${(c.vNow ?? 0).toFixed(1)}${c.yielding ? ' YIELD' : ''}${c.bold ? ' bold' : ''}${c.conn ? ' conn' : ''}`);
+            .map((c) => `#${c.id} x${Math.round(c.xing.sx - tr.s)}m front${(c.xing.dC - c.half).toFixed(1)} v${(c.vNow ?? 0).toFixed(1)}${c.yielding ? ' YIELD' : ''}${c.bold ? ' bold' : ''}${c.conn ? ' conn' : ''}`);
           (R.ctrail ||= []).push(`${Math.round(game.clock)} tram ${(tr.v * 3.6).toFixed(0)}km/h n${tr.notch} [${cc.join(', ')}]`);
           if (R.ctrail.length > 30) R.ctrail.shift();
         }
@@ -119,7 +122,7 @@ export async function run(seed = 1, opts = {}) {
             const p = c.path.at(c.s);
             for (const [route, trams, k] of tracks) {
               if (!route) continue;
-              const b = bodyTo(route, p);
+              const b = bodyTo(route, p, c);
               if (!b || b.d > 8) continue;
               const h = route.at(b.s);
               if (Math.abs(p.hx * h.hx + p.hy * h.hy) > 0.7) continue;
@@ -133,10 +136,10 @@ export async function run(seed = 1, opts = {}) {
         }
         for (const c of traffic.cars) if (c.active && c.yielding && c.xing && Math.abs(c.xing.sx - tr.s) < 150) {
           yielded.add(c.id);
-          // where a yielding car stands: its front bumper's distance from the track centre line
+          // where a yielding car stands: its front bumper's (half its length ahead of its middle) distance from the track centre line
           if ((c.vNow ?? 1) < 0.05 && !(R.bumper ||= new Map()).has(c.id)) {
             const seq = traffic._seq(c); let fp = null;
-            for (const [path, off] of seq) { const s = CAR_FRONT - off; if (s <= path.length) { fp = path.at(s); break; } }
+            for (const [path, off] of seq) { const s = c.half - off; if (s <= path.length) { fp = path.at(s); break; } }
             const n = fp && game.route.nearest(fp.x, fp.y);
             if (n) R.bumper.set(c.id, n.d);
           }
@@ -146,7 +149,9 @@ export async function run(seed = 1, opts = {}) {
           if (d > 0 && d < 100 && tr.v > 0.5) crossed.add(xc.car.id);
           if (xc.onTrack && d > 0 && tr.v > 2 && d < (tr.v * tr.v) / 2 + 10 && !cut.has(xc.car.id)) {
             cut.add(xc.car.id);
-            R.cuts.push({ s: Math.round(tr.s), d: Math.round(d), v: +(tr.v * 3.6).toFixed(0), bold: !!xc.car.bold });
+            R.cuts.push({ s: Math.round(tr.s), d: Math.round(d), v: +(tr.v * 3.6).toFixed(0), bold: !!xc.car.bold,
+              // (#560: seconds since a circle of cars let it go, if within a minute)
+              letGo: game.clock - (xc.car.letGoAt ?? -Infinity) < 60 ? Math.round(game.clock - xc.car.letGoAt) : null });
           }
         }
       }
@@ -160,7 +165,11 @@ export async function run(seed = 1, opts = {}) {
   });
   const bump = [...(R.bumper || new Map()).values()].sort((a, b) => a - b);
   const q = (p) => (bump.length ? +bump[Math.min(bump.length - 1, Math.floor(p * bump.length))].toFixed(1) : null);
-  return { seed, watch: R.watch || [], stuck: R.stuck ?? null, carsIntoJunctions: { green: R.carGreen || 0, amber: R.carAmber || 0, red: R.carRed || 0 }, carRedWhy: R.carRedWhy || [], stuckScene: R.stuckScene || null, bumperToTrackCentre: { n: bump.length, min: q(0), median: q(0.5), max: q(0.999) },
+  return { seed, watch: R.watch || [], stuck: R.stuck ?? null,
+    // (#560: the heads of chains standing a minute or more, by kind; the circles let go by class; those through a tram
+    // broken; cars given up)
+    waits: { chainHeads: traffic.longChainCount || {}, circlesLetGo: traffic.circlesLetGo || {}, cyclesBroken: traffic.cyclesBroken || 0, givenUp: traffic.givenUp || 0 },
+    carsIntoJunctions: { green: R.carGreen || 0, amber: R.carAmber || 0, red: R.carRed || 0 }, carRedWhy: R.carRedWhy || [], stuckScene: R.stuckScene || null, bumperToTrackCentre: { n: bump.length, min: q(0), median: q(0.5), max: q(0.999) },
     // #602: yielding cars' nearest body corner to each track (stood within FOUL of it: on it); the fouls by track and tram
     stance: (() => { const out = {}; for (const k of ['ours', 'back']) { const v = [...(R.stance || new Map())].filter(([key]) => key.startsWith(k)).map(([, d]) => d).sort((a, b) => a - b); out[k] = { n: v.length, min: v[0] ?? null, median: v[Math.floor(v.length / 2)] ?? null, within: v.filter((d) => d < FOUL).length }; } return out; })(),
     fouls: { ours: [...(R.foul || new Map()).values()].filter((f) => f.track === 'ours').length, back: [...(R.foul || new Map()).values()].filter((f) => f.track === 'back').length,

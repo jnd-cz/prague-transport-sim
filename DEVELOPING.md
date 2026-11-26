@@ -191,6 +191,7 @@ CC BY-NC 4.0: fine for a non-commercial public test, with its attribution shown 
 To a web host over FTPS (#131): `python -P -E tools/deploy.py` uploads the same files from a clean commit
 whose data matches the manifest:
 - only the changed files go up (the server keeps `.deploy-manifest.json`), and removed ones are deleted;
+- a connection the host drops (the alpha's did after ~130 files, #861) is opened again and the step tried again, up to 4 times; the manifest goes up every 20 files too, so a deploy that stops is resumed by the next run, not started over;
 - the data heavy packs (`.json`, `.bin`, `.glb`, `.gltf` in `data/` and `assets/`) go up only compressed, as `<name>.brotli` at quality 11 (#275), and the `.htaccess` hands that file to every request for `<name>`. The rest stays plain, for the host to compress on the fly. The site was 114.6 MB plain and is 31.5 MB this way. Browsers accept brotli only over HTTPS, so the host must redirect HTTP (Plesk: Permanent SEO-safe 301 redirect from HTTP to HTTPS). Without it Chromium refuses the files (`ERR_CONTENT_DECODING_FAILED`), a browser that hands the page the raw bytes shows the bar at 5 % with every file ticked, and the loading screen says to open the page over https (#371);
 - it adds `version.json`, shown in the menu's credits, and that `.htaccess`;
 - `--dry-run` lists the changes, `--reports` adds `reports/headless/*.json` for review mode, and a rollback is a deploy from the older commit.
@@ -372,6 +373,12 @@ the same counts every time (a second run in the same page differs slightly).
 
 Reports go to `reports/lineN.json` (not in git). Regression checks use `tools/headless.py --compare`
 (above), whose baseline follows main.
+
+**Traffic scenes** (`tools/bench/scenes.js`, `tools/test_traffic_scenes.py`, #566): a few roads, walks, cars and
+walkers built in code and driven on the real `Traffic` without the world (a flat ground, no stops, no spawning; our
+tram only where the scene has a track), at the game's step, in milliseconds each. A rule's case is shown on a scene
+first, then on the lines: `S.play('name', args)` in a page that imports the module gives what a scene reports;
+`SCENES` holds them (a jam's scene with its fix switched off shows the jam).
 
 Mirror rendering cost (#79): `python -P -E tools/mirror_bench.py --line 17 --s 5064 --headed`.
 Keep its game window in front until it closes: the report records the graphics backend, focus,
@@ -570,7 +577,8 @@ check before a PR, `/housekeeping` is the weekly pass (also every Monday at 06:3
 architecture review at a world checkpoint ([docs/housekeeping.md](docs/housekeeping.md)). Housekeeping posts on
 the pinned #291 and only proposes.
 
-**Heavy jobs** (`baseline_store.HeavyJob`, first come first served; #280, #536, #728):
+**Heavy jobs** (`baseline_store.HeavyJob`, first come first served, the short ones first, the long ones at night;
+#280, #536, #728, #851):
 - Every job that keeps several cores or GBs busy for over a minute waits for the machine's other heavy jobs and
   holds its turn, so that it does not spoil another's measurement (the user, 2026-11-12, #516). These take their
   turn themselves: `headless.py`, `rebuild.py`, `frametime.py`, `city_terrain.py`, `ground_mesh.py`;
@@ -593,6 +601,26 @@ the pinned #291 and only proposes.
   not known it keeps its turn; one that runs over delays a job alone but never runs beside it. A ticket from a
   checkout older than #728 is a job alone, and such a checkout's jobs wait for every job as before. A tool becomes shared when its peak is measured
   and written at its `HeavyJob(...)`.
+- By day (07:00-23:00) a job expected over 30 min, or whose time is not known, waits for the night (#851; the user,
+  2026-11-24: "I thought it will go faster and heavy testing will be left for night unattended runs"; on that day
+  three 6-min test suites waited 27-97 min behind a 95-min job of #800, and #800's chains of 56-182 min ran by day).
+  Its time is its `--expect`, its tool's plan (`headless.py`, `ground_place.py`), or the median of its kind's last
+  runs (`heavy.py --history`); a chain named for the first time has none, so state it. While it waits it stands
+  ahead of no other job, and the board shows it "held for the night". On the user's word it runs by day:
+  `heavy.py --day`, or `TRAM_HEAVY_DAY=1` for a tool that takes its own turn; say so in the PR. A job already
+  running at 07:00 runs on. With the machine left free by day the user may start the night early: `heavy.py --night`
+  (until 07:00; `--night off` ends it) lets the held jobs take their turns, after the jobs running now, and the board
+  says so.
+- A waiting job of 10 min or less goes before longer ones queued earlier (the suites, a one-line run), but not
+  before one that has waited 2 h (`baseline_store.rank`, `SHORT`, `PASS_MAX`). It still waits for the jobs running.
+- Checkouts of different queue versions may order the waiting jobs differently, and then wait for each other: on
+  2026-11-25 three jobs did so for hours with nothing running (#854). From #854 on, a job that waits while none runs
+  for 2 min (`HeavyJob.STALL`) waits only for the jobs queued before it by time, the order every version keeps, and
+  says so once. Each ticket carries its queue version (`baseline_store.QUEUE`, #856); while a job of a version older
+  than #851 waits, the newer ones take their turns first come first served too, its own order, so the two cannot wait
+  for each other. The board marks a job whose queue code is older: "its queue code is older (merge main)". Merge main
+  into that checkout before its next job (the same night #812's jobs and an older checkout's short job stood still
+  that way at 06:24).
 - A job that has waited 10 min behind a running one whose processes used under 2 s of CPU ends with an error that
   names it (#585 lost a night behind a job waiting for its own child): look at that job, end it, start again.
 - What `tools/heavy.py` starts runs in its turn without waiting again, even a tool that queues itself or a process
@@ -690,7 +718,7 @@ go into a "Findings" section of the PR.
 - A test that needs `data/` or `raw/` skips without them, saying what to fetch.
 
 **Dev switches:** `?line=N`, `?inspect`, `?review` (findings on the map), `?bot`, `?keepgeo`, `?notunnels`,
-`?boxpeople` (the box figures instead of the pedestrian models, #251), `?profile=<name>` (a trial height profile
+`?boxpeople` (the box figures instead of the pedestrian models, #251), `?boxcars` (the box cars instead of the street vehicles' models, #250), `?profile=<name>` (a trial height profile
 from `reports/review/profiles/`, to drive and compare, #358), `?seed=N&at=S` (the traffic check's run of seed N,
 replayed up to route s and handed over paused: a stuck scene as it was, #157).
 

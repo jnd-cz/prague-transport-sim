@@ -312,6 +312,19 @@ def check(v, vid, types, assets_md, src):
             for m in [ms] if isinstance(ms, str) else ms:
                 need(m in have, f"slot {s}: its model has no material {m}")
     need(isinstance(v.get("colours", []), list), "colours is not a list of slot names")
+    # the passengers shown (#249; the user, 2026-11-25: "I would offer passenger simulation to vehicles which have functional
+    # door and interior"): working doors and a saloon, and a cabin measured from this very model, accepted by the user
+    pax = v.get("passengers")
+    if pax is not None:
+        cabin = os.path.join(ROOT, "assets", "passengers", f"{pax.get('cabin')}-cabin.json")
+        need(os.path.isfile(cabin), f"passengers: no cabin assets/passengers/{pax.get('cabin')}-cabin.json")
+        need(isinstance(pax.get("accepted"), str) and pax["accepted"].strip(), "passengers: not accepted (who, when, where)")
+        need("doors" in moves, "passengers: its doors do not move")
+        rig = json.load(open(os.path.join(ASSETS, vid, v["rig"]), encoding="utf-8")) if v.get("rig") and os.path.isfile(os.path.join(ASSETS, vid, v["rig"])) else {}
+        need(bool(rig.get("saloon")), "passengers: its rig names no saloon (an interior)")
+        if os.path.isfile(cabin) and os.path.isfile(model):
+            sha = hashlib.sha256(open(model, "rb").read()).hexdigest()
+            need(json.load(open(cabin, encoding="utf-8")).get("assetSha256") == sha, "passengers: the cabin was not measured from this model")
     if v.get("sounds"):
         bad += [f"sounds: {b}" for b in sound_problems({**v["sounds"], "files": files}, {vid: v}, os.path.join(ASSETS, vid), own=True)]
     # the manifest is the one place for its files and its credit (#455)

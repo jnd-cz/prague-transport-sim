@@ -55,16 +55,17 @@ KINDS = [
                  "src/panel.js", "src/panel.css", "src/help.js", "src/i18n.js", "src/touch.js", "src/gamepad.js",
                  "src/localFiles.js", "src/packagesMenu.js", "src/report.js", "src/debugOverlay.js", "src/inspect.js",
                  "src/provenance.js", "src/buildId.js", "src/main.js", "index.html", "app.webmanifest", "assets/*",
-                 "src/trafficView.js", "tools/frametime.py", "tools/shot.py"),
+                 "src/trafficView.js", "src/cars.js", "src/carTypes.js", "src/passengerView.js", "tools/frametime.py", "tools/shot.py"),
      "screenshots main vs branch (tools/shot.py), tools/frametime.py; for a load cut, the world after load compared "
      "with main's", "seeded checks"),
     ("loading", ("src/groundFile.js", "src/groundWorker.js", "src/world.js", "src/loading.js", "src/localFiles.js"),
      "a smoke drive per line as a player loads it beside the checks' world (--checks u3 --seeds 1 --player): the same "
      "counts, or each move with its heights from the 10 m grid (#710)", ""),
-    ("simulation", ("src/traffic.js", "src/autopilot.js", "src/tram.js", "src/tr37.js", "src/electric.js",
+    ("simulation", ("src/traffic.js", "src/waits.js", "src/autopilot.js", "src/tram.js", "src/tr37.js", "src/electric.js",
                     "src/game.js", "src/people.js", "src/streetbot.js", "src/route.js", "src/speedRules.js",
                     "src/consist.js", "src/articulated.js", "src/random.js", "src/geo.js", "src/main.js", "src/run.js",
-                    "tools/traffic_lint.js", "tools/autopilot.js", "tools/bench/*", "src/trafficView.js", "src/platformRules.js"),
+                    "tools/traffic_lint.js", "tools/autopilot.js", "tools/bench/*", "src/trafficView.js", "src/platformRules.js",
+                    "src/carTypes.js", "src/passengers", "src/passengers/*", "src/passengerView.js"),
      f"--checks {SEEDED} on every line, seeds 1-5, --compare; the tram or the autopilot: also test_traction, "
      "test_electric, test_drives", "the geometry checks"),
     ("tool", ("tools/*",), "the changed tools' tests (tools/test_<tool>.py); the whole suite before the PR is ready", ""),

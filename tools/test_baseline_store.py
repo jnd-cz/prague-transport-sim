@@ -157,6 +157,173 @@ JOB = ("import os, sys, time; sys.path.insert(0, sys.argv[1]); import baseline_s
 MACHINE = "b.HeavyJob.FREE = staticmethod(lambda: 40.0); b.HeavyJob.CORES = 8; b.HeavyJob.KEEP = 2.0; "
 
 
+class DayAndNight(unittest.TestCase):
+    """#851: by day a long job, or one of unknown time, waits for the night and stands ahead of none meanwhile; a short
+    one goes before longer ones queued earlier, but not before one that has waited PASS_MAX."""
+    def setUp(self):  # (a lock folder of the test's own: no early night of this machine's, heavy.py --night)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        locks = mock.patch.object(baseline_store, "LOCKS", self.tmp.name)
+        locks.start()
+        self.addCleanup(locks.stop)
+
+    def at(self, h, m=0):
+        lt = time.localtime()
+        return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, h, m, 0, 0, 0, -1))
+
+    def job(self, **kw):
+        with mock.patch.dict(os.environ):
+            os.environ.pop(baseline_store.DAY, None)
+            return baseline_store.HeavyJob("j", wait=False, kind="a kind never run", **kw)
+
+    def ticket(self, what, pid, t, **kw):
+        return {"what": what, "root": "C:/x/transport-game-1", "pid": pid, "t": t, "state": "waiting", "since": t,
+                "share": None, "queue": baseline_store.QUEUE, **kw}
+
+    def test_the_night_hours(self):
+        self.assertEqual([baseline_store.night(self.at(h)) for h in (6, 7, 12, 22, 23, 2)],
+                         [True, False, False, False, True, True])
+        self.assertEqual(baseline_store.night_starts(self.at(14)), self.at(23))
+        self.assertEqual(baseline_store.night_starts(self.at(23, 30)), self.at(23, 30))
+
+    def test_by_day_a_long_job_or_one_of_unknown_time_waits_for_the_night(self):
+        noon, late = self.at(12), self.at(23, 30)
+        self.assertIn("expected 40 min, over 30 by day", self.job(expect=2400).night_hold(noon, []))
+        self.assertIn("its time is not known", self.job().night_hold(noon, []))
+        self.assertEqual(self.job(expect=1500).night_hold(noon, []), "")  # (the suite with the page tests: 24 min)
+        self.assertEqual(self.job(expect=2400).night_hold(late, []), "")
+        self.assertEqual(self.job(expect=2400, day=True).night_hold(noon, []), "")
+        with mock.patch.dict(os.environ, {baseline_store.DAY: "1"}):
+            self.assertTrue(baseline_store.HeavyJob("j", wait=False).day)  # (TRAM_HEAVY_DAY=1: the user's word)
+
+    def test_the_short_ones_first_but_not_before_one_waiting_two_hours(self):
+        now = self.at(12)
+        long = self.ticket("long", 1, now - 600, expect=3600)
+        short = self.ticket("short", 2, now - 60, expect=300)
+        unknown = self.ticket("unknown", 3, now - 900)
+        rank = lambda j: baseline_store.rank(j, now, [])  # noqa: E731
+        self.assertLess(rank(short), rank(long))
+        self.assertLess(rank(short), rank(unknown))
+        self.assertLess(rank(unknown), rank(long))  # (first come first among the longer ones)
+        self.assertLess(rank(dict(long, t=now - 7300)), rank(short))
+
+    def test_a_held_job_stands_ahead_of_none_and_the_board_shows_it(self):
+        now = time.time()
+        held = self.ticket("long", 1, now - 600, expect=3600, held=True)
+        me = self.job(expect=60)
+        me.t = now
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [held]), \
+                mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual(me.ahead(), [])
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [dict(held, held=False, expect=60)]), \
+                mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual([j["what"] for j in me.ahead()], ["long"])  # (not held, as short and first: ahead)
+        self.assertTrue(baseline_store.describe(held, now).endswith(", held for the night"))
+        noon = self.at(12)
+        got = baseline_store.schedule([dict(held, t=noon - 600, since=noon - 600), self.ticket("b", 2, noon - 60, expect=300)],
+                                      noon, records=[])
+        self.assertEqual({j["what"]: j["start"] for j in got}, {"long": self.at(23), "b": noon})
+
+    def test_a_held_jobs_ticket_is_queued_at_the_night_so_an_older_checkout_passes_it(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            j = self.job(expect=2400)
+            j.t, j.parked = time.time(), "expected 40 min"
+            j._write("waiting")
+            got, = baseline_store.queue()
+            j.parked = ""
+            j._write("waiting")
+            back, = baseline_store.queue()
+            os.remove(j.path)
+        self.assertTrue(got["held"])
+        self.assertAlmostEqual(got["t"], baseline_store.night_starts(), delta=5)  # (at night "now": read twice, #854)
+        self.assertEqual((back["held"], back["t"]), (False, j.t))
+
+    def test_the_night_started_early_on_the_users_word(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            noon = self.at(12)
+            self.assertFalse(baseline_store.night(noon))
+            e = baseline_store.start_night(noon)
+            lt = time.localtime(noon + 86400)
+            self.assertEqual(e["until"], time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 7, 0, 0, 0, 0, -1)))
+            self.assertTrue(baseline_store.night(noon + 60))
+            self.assertEqual(baseline_store.night_starts(noon + 60), noon + 60)
+            self.assertEqual(self.job(expect=2400).night_hold(noon + 60, []), "")
+            self.assertFalse(baseline_store.night(noon - 60))  # (not before it was started)
+            self.assertTrue(baseline_store.end_night())
+            self.assertFalse(baseline_store.night(noon + 60))
+            self.assertFalse(baseline_store.end_night())
+        self.assertEqual(baseline_store.morning(self.at(3)), self.at(7))
+
+    def test_versions_that_order_otherwise_wait_for_each_other_only_until_the_queue_stands_still(self):
+        """#854, as on 2026-11-25: this version puts a long job that has waited 2 h before a short one; a checkout of an
+        older version (a ticket without "held") waits for the short one, queued first. With nothing running, after
+        STALL s the short one takes its turn by queue time."""
+        now = time.time()
+        old = {"what": "#548", "root": "C:/x/transport-game-548", "pid": 2, "t": now - 4 * 3600, "state": "waiting",
+               "since": now - 4 * 3600, "share": {"gb": 22.0, "cores": 12}, "expect": 7200, "held": False}
+        me, out = self.job(expect=360), io.StringIO()
+        me.t, me.out = now - 6 * 3600, out
+        old["t"] = now - 3 * 3600  # (queued after me, waited past PASS_MAX: before me by rank)
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [old]),                 mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual([j["what"] for j in me.ahead()], ["#548"])  # (the stall starts)
+            with mock.patch.object(baseline_store.HeavyJob, "STALL", 0.0):
+                self.assertEqual(me.ahead(), [])  # (first come first served: mine is the older ticket)
+        self.assertIn("first come first served until one runs (#854)", out.getvalue())
+        running = dict(old, state="running", pid=3, t=now - 60)
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [running, old]),                 mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual([j["what"] for j in me.ahead()], ["#548", "#548"])  # (something runs: the rule as before)
+            self.assertIsNone(me.still)
+
+    def test_the_queue_version_of_a_ticket(self):
+        v = baseline_store.queue_version
+        self.assertEqual([v({}), v({"held": False}), v({"held": False, "queue": 2}), v({"queue": 7})], [0, 1, 2, 7])
+        self.assertEqual(self.ticket("x", 1, 0)["queue"], baseline_store.QUEUE)
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d):
+            j = self.job(expect=60)
+            j.t = time.time()
+            j._write("waiting")
+            got, = baseline_store.queue()
+            os.remove(j.path)
+        self.assertEqual(got["queue"], baseline_store.QUEUE)
+        self.assertNotIn("merge main", baseline_store.describe(got))
+        self.assertTrue(baseline_store.describe({**got, "queue": 1}).endswith(", its queue code is older (merge main)"))
+
+    def test_with_a_first_come_ticket_waiting_first_come_first_served_at_once(self):
+        """#856, as on 2026-11-25 06:24: #812's jobs (#851's code) put #250's short job first; #250's checkout (first come
+        first served, no "queue" nor "held" on its ticket) waits for #812's, queued before it. Now #812's take their
+        turn by queue time too, at once."""
+        now = time.time()
+        old = {"what": "#250 perf M", "root": "C:/x/transport-game-250-main", "pid": 2, "t": now - 1300,
+               "state": "waiting", "since": now - 1300, "share": None, "expect": 360}
+        me = self.job(expect=1500, share={"gb": 5, "cores": 4})
+        me.t = now - 2600
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [old]), \
+                mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual(me.ahead(), [])
+            later = self.job(expect=60)
+            later.t = now
+            self.assertEqual([j["what"] for j in later.ahead()], ["#250 perf M"])  # (short, but queued after it)
+        new = dict(old, queue=baseline_store.QUEUE)  # (the same ticket of this version: short ones first)
+        with mock.patch.object(baseline_store, "queued_turns", lambda: [new]), \
+                mock.patch.object(baseline_store, "history", lambda: []):
+            self.assertEqual([j["what"] for j in me.ahead()], ["#250 perf M"])
+        got = baseline_store.schedule([dict(old, pid=2), {**old, "what": "#812", "pid": 3, "t": now - 2600,
+                                                          "since": now - 2600, "expect": 1500, "queue": 2}], now, records=[])
+        self.assertLess(next(j["start"] for j in got if j["what"] == "#812"),
+                        next(j["start"] for j in got if j["what"] == "#250 perf M"))
+
+    def test_a_held_job_starts_when_the_night_comes(self):
+        out, nights = io.StringIO(), iter([False, False, True])
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(baseline_store, "LOCKS", d), \
+                mock.patch.object(baseline_store, "night", lambda t=None: next(nights, True)), \
+                mock.patch.multiple(baseline_store.HeavyJob, POLL=0.01, WATCH=False), mock.patch.dict(os.environ):
+            for k in (baseline_store.DAY, baseline_store.HELD, "TRAM_HEAVY_NOWAIT"):
+                os.environ.pop(k, None)
+            with baseline_store.HeavyJob("long", out=out, expect=2400) as j:
+                self.assertEqual((j.parked, j.state), ("", "running"))
+        self.assertIn("long waits for the night (23:00): expected 40 min", out.getvalue())
+
+
 class Queue(unittest.TestCase):
     """Heavy jobs take turns, first come first served (#280), in a lock folder of the test's own."""
     def setUp(self):
@@ -170,6 +337,11 @@ class Queue(unittest.TestCase):
         self.env = {**os.environ, "TMP": self.tmp.name, "TEMP": self.tmp.name, "TMPDIR": self.tmp.name}
         self.env.pop(baseline_store.HELD, None)
         self.env.pop("TRAM_HEAVY_NOWAIT", None)
+        # (the order of the turns, not the hour: a job of unknown time is not held for the night here, #851)
+        self.env[baseline_store.DAY] = "1"
+        day = mock.patch.dict(os.environ, {baseline_store.DAY: "1"})
+        day.start()
+        self.addCleanup(day.stop)
         self.kids = []
 
     def job(self, name, setup=""):
@@ -277,7 +449,8 @@ class Queue(unittest.TestCase):
         self.assertEqual(a.stdout.readline().strip(), "in")
         x, release_x = self.job("timing")
         self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting")])
-        c, release_c = self.job("c", MACHINE + "share = {'gb': 4, 'cores': 2}; expect = 60")
+        # (900 s: longer than SHORT, which would go before the timing as the short ones do, #851)
+        c, release_c = self.job("c", MACHINE + "share = {'gb': 4, 'cores': 2}; expect = 900")
         self.wait_for(lambda: self.states() == [("a", "running"), ("timing", "waiting"), ("c", "waiting")])
         time.sleep(0.5)
         self.assertEqual(self.states()[-1], ("c", "waiting"))
@@ -522,9 +695,10 @@ class Queue(unittest.TestCase):
             f.write("headless C:/x/transport-game-268\n")
         j, = baseline_store.queue()
         self.assertEqual((j["what"], j["state"], j["root"]), ("headless", "running", "C:/x/transport-game-268"))
-        self.assertEqual(baseline_store.describe(j, j["since"] + 600), "headless in transport-game-268, running 10 min")
+        old = ", its queue code is older (merge main)"  # (#856)
+        self.assertEqual(baseline_store.describe(j, j["since"] + 600), "headless in transport-game-268, running 10 min" + old)
         # (a ticket written just after the board read the clock)
-        self.assertEqual(baseline_store.describe(j, j["since"] - 1), "headless in transport-game-268, running 0 min")
+        self.assertEqual(baseline_store.describe(j, j["since"] - 1), "headless in transport-game-268, running 0 min" + old)
 
     def test_a_job_that_watches_itself_is_given_twice_the_idle_time(self):
         other = subprocess.Popen([sys.executable, "-I", "-c", "import time; time.sleep(60)"])
@@ -612,7 +786,7 @@ class Rules(unittest.TestCase):
 
     def test_the_board_sees_the_expected_time_the_warning_and_the_ends(self):
         j = {"what": "trace heights", "root": "C:/x/transport-game-812", "state": "running", "since": 0, "expect": 300,
-             "share": {"gb": 6, "cores": 4}, "warn": "LATE ×20; 17 of 6 GB"}
+             "share": {"gb": 6, "cores": 4}, "warn": "LATE ×20; 17 of 6 GB", "queue": baseline_store.QUEUE}
         self.assertEqual(baseline_store.describe(j, 6000), "trace heights in transport-game-812, running 100 min, "
                                                           "expected 5 (shared: 6 GB, 4 cores): LATE ×20; 17 of 6 GB")
         rs = [{"t": 0, "wall": 100, "ended": "idle: …"}, {"t": 0, "wall": 5000, "ended": None},

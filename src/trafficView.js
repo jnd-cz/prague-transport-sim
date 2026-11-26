@@ -4,7 +4,7 @@
 // height and an AI tram's cars for the rules are their own (c.pose, t.boxes), and a step that is not drawn moves the
 // traffic as a drawn one does. src/between.js draws the movers (movers()) between the last two steps.
 import * as THREE from 'three';
-import { makeCar, makeCrowd, makeT3, placeConsist, poseT3, setNextStop, makeTrafficLights, makePedLights, disposeModel, setOpacity } from './models.js';
+import { makeCar, fitCar, makeCrowd, makeT3, placeConsist, poseT3, setNextStop, makeTrafficLights, makePedLights, disposeModel, setOpacity } from './models.js';
 import { setRiggedLevel, FULL_IN, FULL_OUT } from './rigged.js';
 import { indicating } from './indicators.js';
 import { MAX_WALKERS } from './traffic.js';
@@ -71,6 +71,7 @@ export class TrafficView {
   _car(c) {
     let m = this.cars.get(c);
     if (!m) { m = makeCar(c.model); this.group.add(m); this.cars.set(c, m); }
+    if (m.userData.type !== c.type) { m.userData.type = c.type; fitCar(m, c.type); } // (a slot's car is of a new type each time)
     this._alpha(m, c.alpha);
     const p = c.pose;
     if (c.alpha <= 0 || !p) return;

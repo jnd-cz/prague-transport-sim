@@ -178,6 +178,8 @@ def judge(check, r):
             bad.append(f"stuck at {round(r['stuck'])}")
         if r.get("flipsFree"):
             bad.append(f"{r['flipsFree']} brake-to-drive flips with nothing in front")
+        if r.get("paxProblems"):  # (#249: the passengers' counts or places gone wrong at a stop, src/passengers/consist.js check)
+            bad.append(f"passengers wrong at {r['paxProblems']} stops (first: {r.get('paxProblem')})")
         if r.get("over"):
             bad.append(f"{r['over']} stops overrun by more than 3 m")
         if r.get("short"):
@@ -188,7 +190,8 @@ def judge(check, r):
             bad.append(f"signal penalty {r['signalPenalty']}")
         more = (f"{r.get('stops')} stops, flips short/ahead/signal/car/contact {r.get('flipsShort')}/{r.get('flipsAhead')}/{r.get('flipsSignal')}/{r.get('flipsCar')}/{r.get('flipsContact')}, pulses {r.get('pulses')}, "
                 f"shoes at speed {r.get('shoesAtSpeed')}, decel {r.get('maxDecel')}, jerk {r.get('maxJerk')}, err p90 {r.get('errP90')} max {r.get('errMax')}, comfort {r.get('comfort')}, pedal/km {r.get('pedalChangesPerKm')}, "
-                f"late {r.get('late')}, dev mean {r.get('devMean')} s, over 3 min {r.get('lateStops')}, on time by D 1/2 {r.get('depOnTime')}, presses {r.get('presses')} ({r.get('pressesRolling')} rolling), brakes {r.get('brakeApplies')}, wire {r.get('lineKWh')} kWh/km of it waste {r.get('wasteKWh')}"
+                f"late {r.get('late')}, dev mean {r.get('devMean')} s, over 3 min {r.get('lateStops')}, on time by D 1/2 {r.get('depOnTime')}, "
+                f"exchange mean {r.get('exchangeMean')} s max {r.get('exchangeMax')}, presses {r.get('presses')} ({r.get('pressesRolling')} rolling), brakes {r.get('brakeApplies')}, wire {r.get('lineKWh')} kWh/km of it waste {r.get('wasteKWh')}"
                 + (f", slip {r.get('slipSecs')} s ({r.get('slips')}), slide {r.get('slideSecs')} s ({r.get('slides')}, {r.get('slidesAtStops')} at stops), emergencies {r.get('emergencies')}" if check in WEATHER else ""))
     elif check == "canted":
         c = (r.get("checks") or {}).get("cantedRailVisibility", {})
@@ -251,6 +254,13 @@ def judge(check, r):
         if not st.get("finished"):
             bad.append(f"did not finish (stop {st.get('nextStop')}, {st.get('simSeconds')} s): a jam")
         more = ", ".join(f"{k} {v.get('count') if isinstance(v, dict) else v}" for k, v in (r.get("checks") or {}).items())
+        # (the waits-for graph, #560: heads of chains standing a minute or more by kind, circles by class; measured)
+        heads, rings, let = st.get("chainHeads") or {}, st.get("waitCircles") or {}, st.get("circlesLetGo") or {}
+        if heads or rings or let or st.get("givenUp") or st.get("cyclesBroken"):
+            more += (f"; chain heads {', '.join(f'{k} {v}' for k, v in sorted(heads.items())) or 0}"
+                     f"; circles {', '.join(f'{k} {v}' for k, v in sorted(rings.items())) or 0}"
+                     f"; let go {', '.join(f'{k} {v}' for k, v in sorted(let.items())) or 0}"
+                     f"; through a tram broken {st.get('cyclesBroken', 0)}; given up {st.get('givenUp', 0)}")
     else:  # lint
         more = ", ".join(f"{k} {v.get('count')}" for k, v in (r.get("checks") or {}).items()
                          if isinstance(v, dict) and "count" in v)
@@ -265,22 +275,22 @@ def load_places():
     return json.load(open(PLACES, encoding="utf-8")) if os.path.exists(PLACES) else {}
 # counts that are problems when they rise (the rest are context: yields, junction phases, holds)
 BAD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
-       "stops": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
-       "load10": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
-       "load90": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed"},
+       "stops": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed", "paxProblems"},
+       "load10": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed", "paxProblems"},
+       "load90": {"stuck", "flipsFree", "short", "over", "late", "lateStops", "overspeed", "paxProblems"},
        # (overspeed too: down 55 ‰ on leaves the branch of #351 ran 35 km/h into a 20 in 23 of 25 runs, unflagged)
-       "autumn": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed"},
-       "rain": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed"},
-       "winter": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed"},
+       "autumn": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed", "paxProblems"},
+       "rain": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed", "paxProblems"},
+       "winter": {"stuck", "hits", "signalPenalty", "flipsFree", "short", "over", "late", "lateStops", "slideSecs", "emergencies", "overspeed", "paxProblems"},
        "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"}}
 # per seed: problems that must not appear on any seed (the rest are judged against the seed spread)
 HARD = {"u3": {"stuck", "hits", "red", "signalPenalty"},
-        "stops": {"stuck", "flipsFree"},
-        "load10": {"stuck", "flipsFree"},
-        "load90": {"stuck", "flipsFree"},
-        "autumn": {"stuck", "hits", "signalPenalty"},
-        "rain": {"stuck", "hits", "signalPenalty"},
-        "winter": {"stuck", "hits", "signalPenalty"},
+        "stops": {"stuck", "flipsFree", "paxProblems"},
+        "load10": {"stuck", "flipsFree", "paxProblems"},
+        "load90": {"stuck", "flipsFree", "paxProblems"},
+        "autumn": {"stuck", "hits", "signalPenalty", "paxProblems"},
+        "rain": {"stuck", "hits", "signalPenalty", "paxProblems"},
+        "winter": {"stuck", "hits", "signalPenalty", "paxProblems"},
         "redruns": {"stuck", "redRuns", "aheadRedRuns", "ourSignalPenalty"},
         "traffic": {"finished"}}
 SPREAD_SEEDS = "1-5"
@@ -294,21 +304,35 @@ def counts(check, r):
         return {"error": 1}
     if check == "u3":
         j = r.get("carsIntoJunctions") or {}
+        w = r.get("waits") or {}  # (#560: chain heads by kind, circles let go by class, through a tram broken, given up)
         return {"stuck": None if r.get("stuck") is None else round(r["stuck"]), "hits": r.get("hits") or 0,
                 "red": j.get("red", 0), "signalPenalty": r.get("signalPenalty") or 0, "yielded": r.get("yielded"),
-                "closeCuts": r.get("closeCuts"), "green": j.get("green"), "amber": j.get("amber")}
+                "closeCuts": r.get("closeCuts"), "green": j.get("green"), "amber": j.get("amber"),
+                **{"heads " + k: (w.get("chainHeads") or {}).get(k, 0) for k in ("car", "light", "tram", "our tram", "walker")},
+                **{"let go " + k: (w.get("circlesLetGo") or {}).get(k, 0) for k in ("rules", "followers", "tangled")},
+                "cyclesBroken": w.get("cyclesBroken", 0), "givenUp": w.get("givenUp", 0)}
     if check == "redruns":
         return {k: r.get(k) for k in ("stuck", "redRuns", "avoidable", "aheadRedRuns", "ourSignalPenalty", "warnPasses", "holds")}
     if check in STOPS_LIKE:
         keep = ("hits", "signalPenalty", "slipSecs", "slideSecs", "slips", "slides", "slidesAtStops", "sandSecs", "sandLeft", "emergencies") if check in WEATHER else ("simSeconds",) if check.startswith("load") else ()
-        return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "overspeed", "late", "devMean", "lateStops", "depOnTime", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm", "lineKWh", "wasteKWh", "brakeKWh")}
+        return {k: r.get(k) for k in keep + ("stuck", "flipsFree", "flipsShort", "flipsAhead", "flipsSignal", "flipsCar", "flipsContact", "restarts", "pulses", "shoesAtSpeed", "short", "over", "maxDecel", "maxJerk", "errP90", "comfort", "overspeed", "late", "devMean", "lateStops", "depOnTime", "paxProblems", "exchangeMean", "exchangeMax", "presses", "pressesPerKm", "pressesPerStop", "pressesRolling", "brakeApplies", "coastStretches", "coastM", "driveM", "brakeM", "pedalChangesPerKm", "lineKWh", "wasteKWh", "brakeKWh")}
     out = {k: v.get("count") if isinstance(v, dict) else v for k, v in (r.get("checks") or {}).items()
            if not isinstance(v, dict) or "count" in v}
     if check == "traffic":
         out["finished"] = int(bool((r.get("stats") or {}).get("finished")))
         out["cyclesBroken"] = (r.get("stats") or {}).get("cyclesBroken", 0)  # (#154: a car on the track left a deadlock)
-        out["junctionCircles"] = (r.get("stats") or {}).get("junctionCircles", 0)  # (#607: a car let through a junction whose holds ran in a circle)
+        # (#560: of a circle of cars, one let go, by class: every car held by a rule, none, both; cars taken off after 200 s
+        # standing out of sight, the last net)
+        for cls in ("rules", "followers", "tangled"):
+            out["let go " + cls] = ((r.get("stats") or {}).get("circlesLetGo") or {}).get(cls, 0)
+        out["givenUp"] = (r.get("stats") or {}).get("givenUp", 0)
         out["walkersLeft"] = (r.get("stats") or {}).get("walkersLeft", 0)  # (#366: walkers with nowhere to go that left)
+        # (#560: the heads of chains standing a minute or more, by kind; the circles of waits, by class)
+        st = r.get("stats") or {}
+        for kind in ("car", "light", "tram", "our tram", "walker"):
+            out["heads " + kind] = (st.get("chainHeads") or {}).get(kind, 0)
+        for cls in ("rules", "followers", "tangled"):
+            out["circles " + cls] = (st.get("waitCircles") or {}).get(cls, 0)
     return out
 
 
@@ -503,6 +527,14 @@ def seeds_of(spec):
     return out
 
 
+PAGE_ERROR_GRACE = 30.0  # (s a run may still finish after an error its page did not catch, #851)
+
+
+class PageError(Exception):
+    """A run's page threw and the run did not finish within PAGE_ERROR_GRACE (#851: a ReferenceError in a step held
+    the queue for 30 min, three seeds each waiting out the timeout)."""
+
+
 def stop_server(p):
     """Reap only the child we started, including failed or interrupted startup."""
     if p.poll() is None:
@@ -526,8 +558,12 @@ def serve(port, startup_timeout=10):
         try:
             while time.monotonic() < deadline:
                 if os.path.exists(ready):
-                    with open(ready, encoding='utf-8') as f:
-                        info = json.load(f)
+                    try:
+                        with open(ready, encoding='utf-8') as f:
+                            info = json.load(f)
+                    except (PermissionError, ValueError):  # (Windows refuses it while serve.py replaces it, #851)
+                        time.sleep(0.05)
+                        continue
                     if info.get('error'):
                         raise SystemExit(f"tools/serve.py: {info['error']}; choose another --port or --port 0")
                     if p.poll() is not None:
@@ -748,13 +784,23 @@ def run_one(page, errors, check, seed, timeout, load=0):
         # evaluate has no timeout: launch without returning the bench's promise, then wait outside it.
         page.evaluate(f"""() => {{
             window._job = {{ done: false }};
+            // (an error the page does not catch: the run ends PAGE_ERROR_GRACE s after it unless it finishes, #851)
+            if (!window._jobErrors) {{
+                window._jobErrors = true;
+                const note = (e) => {{ if (!window._job.err) {{ window._job.err = performance.now(); window._job.errText = String(e); }} }};
+                addEventListener('error', (e) => note(e.error || e.message));
+                addEventListener('unhandledrejection', (e) => note(e.reason));
+            }}
             const lk = window.groundTiles?.lookup;
             if (lk) lk.missed = {{ reads: 0, tiles: new Set(), at: [] }};  // (this run's, #710)
             (async () => {{ {js} }})().then(
                 result => {{ window._job.result = result; window._job.done = true; }},
                 error => {{ window._job.result = {{ error: String(error) }}; window._job.done = true; }});
         }}""")
-        page.wait_for_function("() => window._job.done", timeout=remaining(timeout * 1000), polling=100)
+        page.wait_for_function(f"() => window._job.done || (window._job.err && performance.now() - window._job.err > "
+                               f"{PAGE_ERROR_GRACE * 1000:.0f})", timeout=remaining(timeout * 1000), polling=100)
+        if not page.evaluate("() => window._job.done"):
+            raise PageError(page.evaluate("() => window._job.errText"))
         r = page.evaluate("() => window._job.result")
         r = json.loads(json.dumps(r, default=str)) if r is not None else {}
         if isinstance(r, dict):
@@ -768,11 +814,22 @@ def run_one(page, errors, check, seed, timeout, load=0):
                 r["farGround"] = far
     except PlaywrightTimeoutError:
         r = {"error": "timeout"}
+    except PageError as e:
+        r = {"error": f"page error, the run stopped {PAGE_ERROR_GRACE:g} s after it: {e}"}
     except Exception as e:  # noqa: BLE001 (a failed run is a result)
         r = {"error": f"{type(e).__name__}: {e}"}
     if errors:
         r["pageErrors"] = errors[:20]
     return r, round(time.monotonic() - t0) + load
+
+
+def run_time(runs, pages, t, batch, player=False):
+    """(batches, their seconds, the run's expected seconds) of `runs` on `pages` pages from the timings `t`."""
+    batches = plan(runs, pages, t, batch)
+    dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
+    if player:  # (a player's page takes as long as the checks' one: 402 s against 406 s on the five lines, #710)
+        dur += dur
+    return batches, dur, finish(dur, pages)
 
 
 def player_rows(kept, streamed):
@@ -980,6 +1037,11 @@ def main():
     # (waits its turn among the heavy jobs, and the nightly baseline for it: #280. A count run: it runs beside other
     # counts and builds, a page being PAGE_GB of memory and PAGE_CORES cores, #728)
     heavy = HeavyJob("headless", share={"gb": PAGE_GB * (a.jobs or 1), "cores": PAGE_CORES * (a.jobs or 1)})
+    # (its expected time before its turn: by day a run over 20 min waits for the night, #851; on the pages it would
+    # open now, sized again once its turn comes)
+    pj = a.jobs or workers(PAGE_GB, most=PAGES)
+    heavy.expect(run_time(list(jobs) if a.separate else merge_drives(jobs), pj,
+                          load_timings() if TIMINGS else {"runs": {}, "loads": {}}, a.batch and max(1, a.batch), a.player)[2])
     try:
         heavy.__enter__()
         t0 = time.time()  # (the run's time, not the wait's)
@@ -993,13 +1055,10 @@ def main():
         # (u3, redruns and stops of a line and seed: one drive; then batches of one line's runs, each in one page)
         runs = list(jobs) if a.separate else merge_drives(jobs)
         t = load_timings() if TIMINGS else {"runs": {}, "loads": {}}
-        batches = plan(runs, a.jobs, t, a.batch and max(1, a.batch))
+        batches, dur, secs = run_time(runs, a.jobs, t, a.batch and max(1, a.batch), a.player)
         pages = min(a.jobs, len(batches))  # (what the queue keeps for this run: the pages it opens, #728)
         heavy.claim(gb=PAGE_GB * pages, cores=PAGE_CORES * pages)
-        dur = [load_of(b[0][0], t) + sum(estimate(j, t) for j in b) for b in batches]
-        if a.player:  # (a player's page takes as long as the checks' one: 402 s against 406 s on the five lines, #710)
-            dur += dur
-        heavy.expect(finish(dur, a.jobs))  # (its watch's time, #815)
+        heavy.expect(secs)  # (its watch's time, #815)
         print(f"{len(runs)} runs in {len(batches)} batches on {min(a.jobs, len(batches))} pages, longest first; "
               f"expected {finish(dur, a.jobs):.0f} s from {len(t['runs'])} timed runs", flush=True)
         i = 0
