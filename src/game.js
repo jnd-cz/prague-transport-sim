@@ -132,7 +132,13 @@ export class Game {
     // stream of their own (a passenger's draws leave the rules' and the traffic's as they were); the count is theirs
     this.pax = createConsist(opts.cabin, { cars: tram.cars, crush: T3.crushCapacity, rand: rng((opts.seed ?? 12345) ^ 0x2490) });
     this.paxProblems = []; // (what pax.check() found at the stops: none, or a count or a place gone wrong)
-    tram.passengers = this.pax.load(Math.min(tram.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock))));
+    // a run from a line's first stop (a terminus, or the stop where the run takes its next line) starts empty and nobody alights
+    // there (the user, 2026-11-26, #249: "The first stop off any line should always start with empty car and people are only
+    // going inside"); from a stop on the way, with those aboard already (drawn either way: the stream after it stays)
+    const first = this.segments.some((g) => g.from === opts.startStop);
+    const load = Math.min(tram.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock)));
+    tram.passengers = this.pax.load(first ? 0 : load);
+    if (first) st.alightFrac = 0;
     this.nextStop = opts.startStop;
     st.arrived = true;
     st.arriveClock = this.clock;
@@ -143,6 +149,9 @@ export class Game {
     const r = this.rand;
     const n = this.data.stops.length;
     this._buildPlatforms();
+    // the run's own lines at a stop (both at the one where it changes its line)
+    const segs = this.segments;
+    const oursAt = (i) => new Set(segs.filter((g, k) => g.from <= i && (segs[k + 1]?.from ?? Infinity) >= i).map((g) => g.line));
     this.stops = this.data.stops.map((s, i) => {
       const central = i > n * 0.25 && i < n * 0.7 ? 1 : 0;
       const request = !!s.request;
@@ -161,7 +170,13 @@ export class Game {
       };
       if (request && r() < 0.5) stop.alightFrac = 0;
       this._stopZone(stop);
-      stop.ambient = request ? Math.floor(r() * 2) : 2 + Math.floor(r() * (5 + central * 6)); // waiting for other lines
+      // those waiting for other lines (drawn only: src/gameView.js), who stay when we leave: only where other lines stop (the
+      // platform's day tram lines, tools/build_line.py; the user, 2026-11-26, #249: "some of them left waiting even if the stop
+      // is served only by single line, our tram"), more with more lines and at busier times. Without the lines, two others.
+      // (one draw either way: the stream after it stays)
+      const others = s.lines ? s.lines.filter((l) => !oursAt(i).has(l)).length : 2, u = r();
+      stop.ambient = others === 0 ? 0 : request ? Math.floor(u * 2) : Math.floor(u * others * (3 + central * 3) * demand);
+      stop.otherLines = others;
       if (i === n - 1) { stop.waiting = 0; stop.alightFrac = 1; stop.runners = 0; }
       // end of one line of the run: everybody leaves, the tram continues as the next line
       const change = this.segments.find((g) => g.from === i && g.from > 0);

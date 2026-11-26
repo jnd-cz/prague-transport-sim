@@ -1360,6 +1360,17 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   call comes 140 m before it (`_runController`), so at a stop before a junction it comes on arrival and the cross street's
   8 s and change-over can outlast a shorter exchange (held at signals: line 9 seed 1 178 → 233 s, seed 2 126 → 180 s, line 17
   seed 4 31 → 72 s; so more brake applies and pedal changes). Ready turned off, the branch repeats main's run exactly.
+- **The first stop and those waiting for other lines** (#249; the user, 2026-11-26: "The first stop off any line should
+  always start with empty car and people are only going inside", and "some of them left waiting even if the stop is served
+  only by single line, our tram"). A run from a line's first stop (a terminus, or the stop where the run takes its next
+  line) starts empty and nobody alights there; from a stop on the way it starts with 10-35 aboard by the time of day, as
+  before. Those waiting for other lines (`ambient`, drawn only, they stay when we leave) stand only where other lines stop:
+  the draw times the other lines (the platform's `lines` less the run's own) times 3 (6 in the centre) times the demand;
+  none at a stop of our line only (line 9 with its 10: 6 of 60 stops, 17: 6 of 37, 22: 4 of 39, 23: 4 of 18, 37: 0 of 20),
+  the mean at demand 1 5.4 → 5.2, 4.8 → 3.0, 5.7 → 5.8, 5.8 → 8.5, 5.0 → 2.9. The platforms' `lines` come from the
+  timetable's `route_stops.txt` (`tools/build_line.py`), which lists each line's pattern in the feed's two weeks (2026-10-21
+  to 11-03) with that time's diversions: lines 22 and 23 skip Pražský hrad and Královský letohrádek there (23 also Pohořelec,
+  via Hládkov), line 17 runs by Myslíkova, so those stops list only the line file's own line (our line is always added).
 - **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
   is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
   model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body

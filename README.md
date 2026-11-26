@@ -40,7 +40,8 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
   o více než 4 m stojí 20 bodů, i když zastávku obsloužíte. Zastavení dál vzadu v povoleném místě se netrestá.
 - Cestující: počítadlo ve voze (běžná obsaditelnost 110, nejvýše 160 na vůz). Poptávka se řídí denní dobou:
   ranní (7–9:30) a odpolední (15:30–17:30) špička přivádí davy, v noci je klid; při plném vozu zůstanou cestující
-  čekat na další spoj.
+  čekat na další spoj. Na první zastávce linky je vůz prázdný a cestující jen nastupují. Kdo čeká na jiné linky,
+  stojí jen na zastávkách, kde nějaké jiné linky jezdí.
 - Nástup a výstup trvají tak dlouho, jak cestujícím trvá projít dveřmi: každé dveře mají dva proudy, nejdřív
   vystoupí ti, kdo stojí nebo sedí nejblíž dveřím, pak nastoupí čekající a jdou si sednout nebo stoupnout. Kdo
   vystupuje, vstane už při příjezdu k zastávce a postaví se ke dveřím, takže vyjde hned, jak se otevřou. Ve voze
