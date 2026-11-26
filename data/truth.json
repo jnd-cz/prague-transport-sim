@@ -11,7 +11,7 @@
   "notes": "reference",
   "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, height_answers.py (the answers line_heights.py applies)",
   "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), height_answers.py (min-radius-passenger, the date of vertical-radius-min), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
-  "streetGeometry": "tools/street_profile.py (the radii by OSM class, the raised belt, the steepest crossfall, the sidewalks' crossfall, the raised corridors the user confirmed)",
+  "streetGeometry": "tools/street_profile.py (the radii by OSM class, the raised belt, the steepest crossfall, the sidewalks' crossfall, the raised corridors the user confirmed); tools/bench/surfaces.js (the raised belt: its kerb counted apart from the seams)",
   "kerbFacts": "tools/dtm.py, tools/kerbs.py",
   "trackStyleKinds": "src/heights.js",
   "trackStyles": "tools/track_styles.py (the sections the page reads, src/heights.js), tools/track_decks.py",

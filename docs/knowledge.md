@@ -1042,6 +1042,11 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
 - **The user on Hartigova (line 37):** "hartigova has central tram corridor which is on topside of kerb. Roads
   crossing it come up to the track level." (#512, 2026-11-14.) The raised belt keeps its kerb along the
   street; a crossing street ramps up to the bed.
+  - **The surfaces check counts that kerb apart** (`bedKerbs`, #770, 2026-11-26): until then it was a seam, and
+    batch C's kerbs (#606) put `seams10` over W3's on four lines (road beside tram 994 -> 1,454 samples over the five
+    lines, every other pair falling). The band and its calibration against IPR are in `tools/bench/surfaces.js`.
+    What stays a seam there: a step over 0.25 m (204 samples on batch D, the lidar having half of it) and a road
+    standing over the tram's surface (157).
 - **A street's crown ends where a side street leaves it downhill** (#780, measured 2026-11-20). A street's surface
   is its centreline's profile and a crossfall either side, the crossfall smoothed along the street. Its road area
   runs on into a side street's mouth, and there the smooth is not the ground: on Nad Ohradou (line 37 (3877, -10))
