@@ -16,7 +16,9 @@ reads only what those two wrote, and only the first group writes data/lineN.json
     the source lines for review mode)
 then placement (the signals and the platforms placed, and the stop types from the survey's areas: after dtm, #701),
 then track_styles (the user's marks, the grassed-track list and the survey's grass track with their holes, and the
-rails' height over the bed, #479, #503, #480: it reads the survey's areas and writes data/lineN.json), then line_heights
+rails' height over the bed, #479, #503, #480: it reads the survey's areas and writes data/lineN.json), then ipr_pits once
+(IPR's pits under the survey's streets filled from their rim, data/ipr.fills.json from every line's survey: the steps
+after it read the raster so, #867; dtm and track_styles before it read it as it is), then line_heights
 once for all the lines rebuilt (the top of rail, #197: the network's profile reads every line's survey sidecar and the
 lines' lift, so it runs after them all), then line_structures per line (the spans, decks and underpasses: they read the
 built top of rail, #480) and cross_level (the cross level of paved track where the road tilts across it: it reads the
@@ -117,7 +119,7 @@ def steps(line):
 
 def names():
     """Every step's name (for --from)."""
-    out = {"build_line", "geoportal", "dtm", "zps_source", "line_heights", "line_structures", "cross_level", "street_profile"}
+    out = {"build_line", "geoportal", "dtm", "zps_source", "ipr_pits", "line_heights", "line_structures", "cross_level", "street_profile"}
     return out | {st[0][:-3] for st in writers("17") + after("17") + ground_steps("17")}
 
 
@@ -225,11 +227,16 @@ def ran_text(ran, n):
 
 
 def heights(lines):
-    """The top of rail of the lines rebuilt (tools/line_heights.py), after all their steps."""
+    """IPR's pits under the survey's streets (tools/ipr_pits.py: one file for the city from every line's survey, read by
+    every step after it, #867), then the top of rail of the lines rebuilt (tools/line_heights.py), after all their steps."""
     t = time.time()
+    log = os.path.join(ROOT, "reports", "rebuild", "ipr_pits.log")
+    times = [run_step("city", ["ipr_pits.py"], log, phase="heights")]
+    if times[0][2] not in (0, "skip"):
+        return f"IPR's pits of {', '.join(lines)}: FAILED, see reports/rebuild/ipr_pits.log"
     log = os.path.join(ROOT, "reports", "rebuild", "heights.log")
-    times = [run_step("heights", ["line_heights.py", *lines], log, phase="heights")]
-    if times[0][2] != "skip" and times[0][2]:
+    times.append(run_step("heights", ["line_heights.py", *lines], log, phase="heights"))
+    if times[-1][2] not in (0, "skip"):
         return f"heights of {', '.join(lines)}: FAILED, see reports/rebuild/heights.log"
     # (the spans, decks and underpasses read the built top of rail: tools/line_structures.py, #480)
     for line in lines:

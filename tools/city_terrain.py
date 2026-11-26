@@ -77,7 +77,7 @@ NB = 30000  # error histogram: 1 mm bins up to 30 m
 CHUNK = 2_000_000  # cells a worker rasterises at once
 GROUND_BLOCK = 64  # cells: the blocks that say where any ground is
 SMALL = 30_000_000  # cells: a --box this small (30 km²) runs without a turn among the heavy jobs
-CODE = ("city_terrain.py", "dmr5g.py", "ipr_dtm.py")
+CODE = ("city_terrain.py", "dmr5g.py", "ipr_dtm.py", "ipr_pits.py")
 
 
 def tol(d, t=TOL, d0=D0, tmax=TOL_MAX):
@@ -633,7 +633,7 @@ def read_ipr(ipr, win, Z, lev):
     counts = np.zeros(4, np.int64)
     for ty in range(j0 // ipr.th, (j1 - 1) // ipr.th + 1):
         for tx in range(i0 // ipr.tw, (i1 - 1) // ipr.tw + 1):
-            a = ipr.decode(tx, ty)
+            a = ipr.fill(tx, ty, ipr.decode(tx, ty))  # (the pits under the streets filled, #867)
             r0, c0 = ty * ipr.th, tx * ipr.tw
             rs, re, cs, ce = max(j0, r0), min(j1, r0 + ipr.th, ipr.h), max(i0, c0), min(i1, c0 + ipr.tw, ipr.w)
             z, lv = classify(a[rs - r0:re - r0, cs - c0:ce - c0])
@@ -954,10 +954,11 @@ def sha256(path, h=None):
 
 
 def key(raster, tiles, grids, tracks, osm, floor=TERRAIN_FLOOR, tolerance=(TOL, D0, TOL_MAX, LAT, CAP), code="",
-        box=None):
+        box=None, fills=None):
     """The cache key: the raster's hash, the DMR 5G tiles' and 10 m grids' hashes ({name: sha256}), the track network
-    (segments, hashed at 1 mm), the OSM extract's id, the floor, the tolerance's and the mesh's parameters, the code."""
-    parts = {"raster": raster, "tiles": tiles, "grids": grids, "osm": osm, "floor": float(floor),
+    (segments, hashed at 1 mm), the OSM extract's id, the floor, the tolerance's and the mesh's parameters, the code;
+    the pits' fills (data/ipr.fills.json, #867) where there are any (None keeps the key of a build without them)."""
+    parts = {"raster": raster, **({"fills": fills} if fills else {}), "tiles": tiles, "grids": grids, "osm": osm, "floor": float(floor),
              "tolerance": [float(v) for v in tolerance],
              "mesh": [BASE_BLOCK, BASE_SIGMA, BLOCK, RAMP, RAMP_R], "code": code, "box": list(box) if box else None,
              "tracks": hashlib.sha256(np.round(np.asarray(tracks, np.float64) * 1000).astype(np.int64).tobytes()).hexdigest()}
@@ -1018,7 +1019,7 @@ def inputs(box=None):
     import dmr5g
     import di_network
     import osm_local
-    from ipr_dtm import TIF
+    from ipr_dtm import FILLS, TIF
     net = di_network.load_network()
     segs = segments(net)
     print(f"DI's network: {len(net.edges)} edges, {sum(e['line'].length for e in net.edges.values()) / 1000:.0f} km of track", flush=True)
@@ -1028,7 +1029,7 @@ def inputs(box=None):
     def tile_hashes():
         return {f: sha256(os.path.join(dmr5g.DIR, f)) for f in sorted(os.listdir(dmr5g.DIR)) if f.endswith(".tif")}
     grids_h = {os.path.relpath(p, ROOT).replace(os.sep, "/"): sha256(p) for p in grid_paths}
-    parts = dict(raster=sha256(TIF), tiles=tile_hashes(), grids=grids_h, tracks=segs, osm=osm_local.base_id(), code=code,
+    parts = dict(raster=sha256(TIF), fills=sha256(FILLS) if os.path.exists(FILLS) else None, tiles=tile_hashes(), grids=grids_h, tracks=segs, osm=osm_local.base_id(), code=code,
                  box=box)
     return parts, net, grid_paths, tile_hashes
 

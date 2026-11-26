@@ -6757,6 +6757,181 @@
      "why": "the user's second picture, the dotted lines in the grass strip right of the track: \"visible only from shallow angle [...] Is there a step too?\". The lawn's border corner (-2889.000, 144.046) is welded to the tram area's 298.916 m, its lattice corner (-2889.000, 144.000) kept the lidar's 298.986: a sliver 7 cm tall there, 6.6 cm on this section, running out along y = 144. Faded, the lattice corner comes down with the border"
     }
    ]
+  },
+  "taboritska-road-pit": {
+   "line": "9",
+   "at": [
+    2520.7,
+    -898.4
+   ],
+   "reach": 25,
+   "issue": 867,
+   "what": "a pit in IPR's 2023 lidar in Táboritská's road near Olšanská: 5 x 4 cells, vertical sides, a flat floor 4.0 m under the road round it (241.16 m, the survey's outline 240.87 m); DMR 5G (2009-2013) has level road there. The published ground of 2026-11-23 stood 3.7 m low in it",
+   "source": "a player's note (fb-20261125-222653-ebe6a362, alpha-5, \"deep pit in a road\"), the scan of 2026-11-26 (#867)",
+   "sections": [
+    {
+     "name": "across the pit along the road",
+     "from": [
+      2510.7,
+      -898.4
+     ],
+     "to": [
+      2530.7,
+      -898.4
+     ],
+     "expect": {
+      "off the chord m": 0.3,
+      "largest step m": 0.3
+     },
+     "why": "the road level within 0.3 m from 10 m west of the pit to 10 m east (IPR round it 241.0-241.3 m): the pit's cells take the rim's plane (tools/ipr_pits.py)"
+    }
+   ]
+  },
+  "platnerska-road-pit": {
+   "line": "9",
+   "at": [
+    -474.3,
+    65.6
+   ],
+   "reach": 25,
+   "issue": 867,
+   "what": "a round crater in IPR's 2023 lidar in Platnéřská's road: 6 x 5 cells, 6.9 m deep at its deepest; DMR 5G (2009-2013) has level road there. The published ground of 2026-11-23 stood 3.1 m low in it",
+   "source": "the scan of 2026-11-26 (#867), its picture of the place",
+   "sections": [
+    {
+     "name": "across the crater along the road",
+     "from": [
+      -484.3,
+      65.6
+     ],
+     "to": [
+      -466.3,
+      65.6
+     ],
+     "expect": {
+      "off the chord m": 0.3,
+      "largest step m": 0.3
+     },
+     "why": "the road level within 0.3 m from 10 m west of the crater to the sidewalk's edge east of it (IPR round it within 0.2 m)"
+    }
+   ]
+  },
+  "belohorska-sidewalk-pit": {
+   "line": "22",
+   "at": [
+    -4156.3,
+    148.6
+   ],
+   "reach": 25,
+   "issue": 867,
+   "what": "two pits in IPR's 2023 lidar in Bělohorská's sidewalk at its kerb, 2 x 2 cells each, 13.9 m and 13.0 m deep, 4 m apart; the road beside them lies 0.1-0.2 m under the sidewalk. The published ground of 2026-11-23 stood 2.7 m low",
+   "source": "the scan of 2026-11-26 (#867; on #732's list since 2026-11-24)",
+   "sections": [
+    {
+     "name": "along the sidewalk over both pits",
+     "from": [
+      -4166.3,
+      148.6
+     ],
+     "to": [
+      -4154.3,
+      148.6
+     ],
+     "expect": {
+      "off the chord m": 0.3,
+      "largest step m": 0.3
+     },
+     "why": "the sidewalk level within 0.3 m along its kerb, the pits' cells at the sidewalk's own rim (the road's side of the kerb is not their level)"
+    }
+   ]
+  },
+  "motol-bridge-parapets": {
+   "line": "9",
+   "at": [
+    -6422.0,
+    -1326.0
+   ],
+   "reach": 40,
+   "issue": 824,
+   "what": "a road bridge by Motol (s 2802), the survey's deck 5881 and road 4804 at level 2 (284.8-286.7 m), over Plzeňská and the track at 278.4-278.8 m: the technical map's wall lines along its parapets, at level 2, made upright faces from the road up to the deck along both of its edges (x -6428 to -6434 and -6411 to -6416), 768 faces in a 40 x 70 m box, strips up to 85 m2 and 8 m tall, open only where the track bed is (batch C's written file, measured 2026-11-23). IPR's raster is the road on both sides of the parapets, 7 m under them",
+   "source": "the user's in-game note of 2026-11-22 on line 9 (the test host, 7a37b17; #824): \"bridge with blocked road near Motol\"",
+   "sections": [
+    {
+     "name": "along Plzeňská's road beside the track, under the deck and across both of its edges, y = -1318",
+     "from": [
+      -6450.0,
+      -1318.0
+     ],
+     "to": [
+      -6395.0,
+      -1318.0
+     ],
+     "expect": {
+      "largest step m": 0.3,
+      "off the lidar m": 1.0
+     },
+     "why": "the road runs on at grade under the bridge, IPR's raster 279.1-277.9 m along the line: no wall stands on it. Batch C's file had the parapets' faces standing from it up to the deck at both edges"
+    }
+   ]
+  },
+  "slanska-street-under-a-bridge": {
+   "line": "9",
+   "at": [
+    -8260.0,
+    -1410.0
+   ],
+   "reach": 50,
+   "issue": 824,
+   "what": "a road bridge by Slánská's stop (s 928), the survey's deck 9317 and roads 8530 and 8531 at level 1 (346.7-349.9 m), over the road beside the stop: the level-0 road 8529 (10,844 m2) and sidewalk 8671 have outlines that climb from 337.3 m to 349.6 m, the deck's height, and the street surface under the deck climbed into a faceted hump, wall and survey faces 2-6 m tall in a 50 x 55 m box (batch C's written file, measured 2026-11-23). off_the_deck (#761) put such corners on the lidar under our own spans only",
+   "source": "the user's in-game note of 2026-11-22 on line 9 (the test host, 7a37b17; #824): \"malformed road under bridge near Slánská stop\"",
+   "sections": [
+    {
+     "name": "along the road under the bridge, y = -1431",
+     "from": [
+      -8285.0,
+      -1431.0
+     ],
+     "to": [
+      -8240.0,
+      -1431.0
+     ],
+     "expect": {
+      "largest step m": 0.3,
+      "off the lidar m": 0.5
+     },
+     "why": "the road under the bridge lies on the ground, IPR's raster: road 8529's own outline points under the deck stand within 0.3 m of it (but two at its south edge, 3 m under it). Batch C's file climbed into the deck"
+    }
+   ]
+  },
+  "narodni-divadlo-bridgehead": {
+   "line": "9",
+   "at": [
+    -625.0,
+    -585.0
+   ],
+   "reach": 30,
+   "issue": 824,
+   "what": "Národní's bridgehead by the National Theatre (s 9578) over Divadelní's underpass (OSM's tunnel way, maxheight 4.4): the survey's street at level 1 (road 24, sidewalks 151-156, 193.2 m) over the passage's level-0 roads (18, 16, 17) on its floor at 187.6-188 m. The ground was the raster's floor there, along y = -580 a pit 5 m deep in the street between x -627 and -623, and the page drew the level-1 areas as slabs over it, their colour, shading and ragged outline unlike the ground's street round them (batch C's written file, measured 2026-11-23). The build: the street over the passage is the ground's (covers.py, a level-1 cover), no slab",
+   "said": "for now we draw the ground as in 783 with future update waiting in 449 to draw the actual low ground for all the underpasses and then put invented deck cover over them",
+   "source": "the user's in-game note of 2026-11-22 on line 9 (the test host, 7a37b17; #824): \"Národní divadlo underpass deck not welded well together with the street\"; the user's decision in the session of 2026-11-23 (#824's comment)",
+   "sections": [
+    {
+     "name": "along Národní over the underpass, y = -585",
+     "from": [
+      -645.0,
+      -585.0
+     ],
+     "to": [
+      -605.0,
+      -585.0
+     ],
+     "expect": {
+      "largest step m": 0.2,
+      "off the chord m": 0.3
+     },
+     "why": "one street over the passage, 193.1-193.3 m, a kerb at most (the user's decision: the street as the ground, #783's way). Batch C's file fell 5 m into the raster's floor between x -629 and -621"
+    }
+   ]
   }
  },
  "openTrackReview": {

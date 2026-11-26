@@ -1066,14 +1066,37 @@ WALL_JOIN = 0.5  # m: a stretch's end this near another stretch is no free end: 
 
 
 def off_the_deck(z, zl):
-    """(Heights z of street corners under a span with those BED_OVER or more over the lidar zl set to it, which ones).
+    """(Heights z of street corners under a deck with those BED_OVER or more over the lidar zl set to it, which ones).
     The street surface follows the tracks onto a deck, so a level-0 street under the deck read the deck's level: the
     road under the Modřany viaduct, line 17 (-2428, -9241), area 7120: 205.3 m where the lidar has 197.6 m, a slab in
-    the viaduct 1.04 m over the deck's underside (#761)."""
+    the viaduct 1.04 m over the deck's underside (#761). The deck is a span of ours or any of the survey's areas of
+    level 1 and above but a roof (#824)."""
     z, zl = np.asarray(z, float), np.asarray(zl, float)
     with np.errstate(invalid="ignore"):
         low = z - zl >= BED_OVER
     return np.where(low, zl, z), low
+
+
+DECK_EDGE = 1.5  # m round a deck that is not ours: still under its edge (under_decks; a wall's hold, wall_lines.HOLD)
+
+
+def under_decks(D, box, x, y):
+    """Which points (x, y) in a box (shapely) lie under one of survey D's areas of level 1 and above but a roof, or
+    within DECK_EDGE of one: the deck of a bridge, ours or not (off_the_deck). A level-0 street's outline climbs into
+    such a deck as it does into ours: Slánská's road under the road bridge, line 9 (-8260, -1375), area 8529, from
+    337.3 to 349.6 m, a hump of faces 2-6 m tall (#824). The street surface reads the deck's level up to its edge,
+    where the parapet's wall line held the ground at its low side until a parapet over open ground made no stretch
+    (wall_lines.over_open_ground): at the Slánská deck's south-west corner, (-8276.9, -1440.7), the street stood 3.8 m
+    over the raster 0.5 m outside the deck."""
+    up = [shapely.Polygon([q[:2] for q in a["r"]]) for a in D["areas"]
+          if a.get("l", 0) >= 1 and a.get("c") != "roof" and len(a.get("r") or []) >= 3]
+    up = [g if g.is_valid else shapely.make_valid(g) for g in up]
+    up = shapely.union_all([g for g in up if g.intersects(box.buffer(DECK_EDGE))]) if up else None
+    if up is None or up.is_empty:
+        return np.zeros(np.shape(x), bool)
+    up = up.buffer(DECK_EDGE)
+    shapely.prepare(up)
+    return shapely.contains_xy(up, x, y)
 
 
 def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
@@ -2497,6 +2520,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     two_levels = {a: climbs(D["areas"][a]) for a in np.unique(sa[on_span]).tolist()}
     under_span = on_span & np.array([two_levels.get(a, False) for a in sa.tolist()], bool)
     on_span &= ~under_span
+    # (and a level-0 street under a deck that is not ours, under_decks, #824)
+    under_deck = np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span & under_decks(D, box, cx[m], cy[m])
     # (a terrace keeps its own outline's surface, and so does a footpath that touches one, #663)
     lidar_ = lidar_w
     raised = terraces(D, np.unique(sa).tolist(), lidar_)
@@ -2534,8 +2559,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (such an area's part under the deck lies on the lidar, not on the deck's level the street surface has there:
     # off_the_deck, #761)
     n_under = 0
-    if under_span.any():
-        k = np.flatnonzero(under_span & np.isfinite(zs))
+    if (under_span | under_deck).any():
+        k = np.flatnonzero((under_span | under_deck) & np.isfinite(zs))
         zs[k], low = off_the_deck(zs[k], lidar_(cx[m][k], cy[m][k]))
         n_under = int(low.sum())
     # (a lawn, a yard, a railway yard on the lidar ground (`g`, tools/zps_inside.py) has surveyed heights on its outline
@@ -2620,6 +2645,16 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     in_rock, rail_z = portal_masonry(L, rock, in_rock, rail_z, cx[m], cy[m], zs, sa, lambda a: wall_like(D["areas"][a]))
     zs, on_hill = off_the_hill(zs, np.where(in_rock, rail_z, np.nan))
     lifted &= ~on_hill  # (no face stands there: it welds with the ground beside it)
+    # (a level-0 area under a level-1 street's cover over a passage (covers.py, #824) is the passage: its corners lie on
+    # the cover, as the ground does there. Národní divadlo's bridgehead, line 9 (-625, -585), stood 5 m down in the
+    # passage's floor, its level-1 street a slab over the pit. The passage under the cover waits for #449. Whether a
+    # corner is under it is its triangle's: the passage's outline is the street's, and its corners lie on the cover's edge)
+    c3 = fc[m // 3].mean(1)
+    up = np.where(np.isfinite(cover.at(c3[:, 0], c3[:, 1], level=1)),
+                  cover.at(cx[m], cy[m], level=1, near=covers.NEAR_EDGE), np.nan)
+    n_up = int(np.isfinite(up).sum())
+    zs = np.where(np.isfinite(up), up, zs)
+    lifted &= ~np.isfinite(up)
     # (and in any tunnel of the route the tram's own area lies at the rails' level: under a cover the raster has the
     # cover, and the street surface the tram's area takes read it. By Hlavní nádraží, line 9 s 11840-11860, the upper
     # street crosses the track on a cover: the tram's area stood at 201-204.4 m over rails at 197.4 m, the ground
@@ -2709,7 +2744,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a deck on the lidar, {n_up:,} under a street's cover over a passage on it, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         zc[nan] = lidar_w(cx[nan], cy[nan])
 
@@ -2847,7 +2882,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     rep["draw classes"] = {c: {k or "-": int(v) for k, v in d.items()} for c, d in rep["draw classes"].items()}
     rep["survey classes"] = {c: {k or "-": int(v) for k, v in zip(*np.unique(area[fcls_id == i].astype(str), return_counts=True))}
                              for c, i in CLASS_IDS.items() if (area[fcls_id == i] != "").any()}
-    out = {"V": V, "F": F, "cls": fcls_id, "draw": draw, "area": area, "box": box, "L": L, "rep": rep}
+    out = {"V": V, "F": F, "cls": fcls_id, "draw": draw, "area": area, "box": box, "L": L, "rep": rep,
+           "covered": cover.covered(D)}  # (the level-1 areas the ground holds as a cover: no slab of their own, #824)
     if within is not None:
         out["corners"] = {"x": cx, "y": cy, "z": zf, "label": label}
     return out
@@ -3581,6 +3617,9 @@ def write(ln, built, rep):
     if bad:
         raise SystemExit(f"line {ln}: the ground file does not decode to the built mesh: {bad}")
     t_trip = time.time() - t0
+    # (the survey's level-1 areas (lineN.dtm.json) the ground holds as a street over a passage: src/groundDraw.js
+    # buildDtm draws no slab of theirs, #824)
+    layout["covered"] = [int(i) for i in built.get("covered") or []]
     layout["provenance"] = sources.stamp("ground_mesh.py", {
         "ground": sources.single("terrain", "ipr-dtm", int(len(built["F"])), "triangles: the city mesh (IPR), the survey, "
                                  "the beds, the building plots, welded")})

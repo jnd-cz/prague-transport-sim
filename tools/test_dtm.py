@@ -34,6 +34,9 @@ ROAD_LINES = "Hranice_dopravní_stavby_nebo_plochy#010000000503_Test"
 
 class FlatIpr:
     """IPR's 1 m terrain as a level ground at 200 m (the real one is a 2 GB raster)."""
+    def __init__(self, fills=None):  # (dtm.py reads it without the pits' fills, #867)
+        pass
+
     def sample(self, E, N):
         return np.full(np.shape(E), 200.0)
 

@@ -129,6 +129,24 @@ class Stretches(unittest.TestCase):
         for s in st:
             self.assertTrue(np.allclose(s["zl"], 203.0) and np.allclose(s["zr"], 200.0), (s["zl"], s["zr"]))
 
+    def test_a_parapet_over_open_ground_is_no_stretch_and_a_walled_ramps_side_is(self):
+        """Motol, line 9 (-6430, -1326), #824: a road bridge's parapet at level 2, the lines of its two faces 0.3 m apart
+        at 285.9 m, over Plzeňská at 278.5 m on both sides (IPR's raster has no bridge in it). The strip between the
+        faces read the line's own height, and the step to the road made a stretch along the deck's edge. The side of
+        the Modřany viaduct's walled ramp (#757 modrany-viaduct-ramps), at level 1 too, has the ramp's top beside it."""
+        def road(x, y):
+            return np.full(np.shape(x), 278.5)
+        faces = [np.array([[0.0, 0.0, 285.9], [0.0, 30.0, 285.9]]), np.array([[0.3, 0.0, 285.9], [0.3, 30.0, 285.9]])]
+        self.assertTrue(wl.of_lines(faces, road))  # (a wall at level 0: its stretches)
+        self.assertEqual(wl.of_lines(faces, road, raised={0, 1}), [])
+
+        def ramp(x, y):  # (the ramp's top west of the wall, the street 5 m down east of it)
+            return np.where(np.asarray(x, float) < 0, 204.0, 199.0)
+        side = [np.array([[0.0, 0.0, 204.0], [0.0, 30.0, 204.0]])]
+        st = wl.of_lines(side, ramp, raised={0})
+        self.assertEqual(len(st), 1)
+        self.assertTrue(np.allclose(st[0]["zl"], 204.0) and np.allclose(st[0]["zr"], 199.0))
+
     def test_a_line_meeting_walls_at_its_ends_reads_them_from_the_points_beside(self):
         # (an abutment's line between its wing walls, #763: at its ends the high side's readings run along a wing wall,
         # through the raster's smear of it)
