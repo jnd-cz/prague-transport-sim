@@ -149,7 +149,7 @@ class Plots(unittest.TestCase):
         self.assertEqual([q["z"] for q in p], [200.0, 200.0])
 
 
-class Grid(unittest.TestCase):
+class OnGrid(unittest.TestCase):
     def test_a_vertex_half_a_mm_off_the_grid_goes_one_way_whatever_its_float_noise(self):
         # (hlavni-nadrazi-under-the-magistrala's plot: x 1051.2025 plus or minus the overlays' noise went to 1051.203 in
         # one box and to 1051.202 in the other, #812)
