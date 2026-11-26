@@ -73,6 +73,7 @@ After trying the merged build (same day, with a photo of 6921's cab):
   request: at a request stop somebody gets off at, from a point 20 m to 60 % of the way from the last stop until the
   doors open (src/panel.js `requested`; it was lit within 400 m of such a stop). "The arrows for left and right should
   be green leds I think, can be a bit shorter": green, a third shorter. "The first red brzda I would label 'Brzda I'."
+  (2026-11-26, #249: "BRZDA I should be BRZDY I, like we have BRZDY II".)
   "the led symbol parts of |O| can be alongside each other": the brake lamps' bars stand beside the ring.
 - **The knobs:** "the heater rotary switches (and other rotary ones) should be aligned to the position labels, not turn
   to another angle". The heaters' labels stand round their knobs where the pointer stops (0–3 and 0 – ½ – 1 from

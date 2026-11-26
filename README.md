@@ -188,7 +188,7 @@ tmavé sklo je hra.
   rychloměru nejvyšší dovolenou rychlost.
 - **Kontrolky** jako na voze: směrovky (zelené), V (VÝSTUP, zelená: cestující zmáčkl znamení řidiči, aby
   vystoupil v příští zastávce na znamení; svítí do otevření dveří), DVEŘE (zelená, když jsou **všechny zavřené**),
-  BRZDA I, BRZDY II a VLAK (červené při zabrzděných čelisťových brzdách, VLAK u druhého vozu), ZRYCHLOVAČ
+  BRZDY I, BRZDY II a VLAK (červené při zabrzděných čelisťových brzdách, VLAK u druhého vozu), ZRYCHLOVAČ
   (oranžová, dokud jsou zařazeny odpory), TOPENÍ ZRCÁTKA.
 - **Ovladače** jdou stisknout myší nebo prstem a pošlou klávesu hry (s asistencí je na nich napsaná). Ty, které
   hra zatím neumí (mycí stroj, stěrače, osvětlení, havarijní pojezd a další), jsou nakreslené a nic nedělají.

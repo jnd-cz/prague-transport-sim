@@ -115,8 +115,9 @@ const KEYS = { bezp: ['Space', ' ', true], nevyst: ['D', 'd'], dvere1: ['U', 'u'
   vyptop: ['C', 'c', true], pisek: ['A', 'a', true] };
 // the lamp strip, left to right (6921's "ED – OPRAVNY" plate): [lamp, cs, en, the LED's shape]. V is the stop request,
 // labelled as some cars have it, the first brake lamp too (the user, 2026-11-17: "the V led sign is for Výstup, some
-// trams have this labeled and we can have it too", "The first red brzda I would label 'Brzda I'")
-const STRIP = [['L', 'Směr vlevo', 'Left', 'arrowL'], ['V', 'Výstup', 'Exit', 'V'], ['D', 'Dveře', 'Doors', 'doors'], ['B1', 'Brzda I', 'Brake I', 'brake'],
+// trams have this labeled and we can have it too", "The first red brzda I would label 'Brzda I'"; 2026-11-26: "BRZDA I should be
+// BRZDY I, like we have BRZDY II")
+const STRIP = [['L', 'Směr vlevo', 'Left', 'arrowL'], ['V', 'Výstup', 'Exit', 'V'], ['D', 'Dveře', 'Doors', 'doors'], ['B1', 'Brzdy I', 'Brakes I', 'brake'],
   ['B2', 'Brzdy II', 'Brakes II', 'brake'], ['BV', 'Vlak', 'Train', 'brake'], ['Z', 'Zrychlovač', 'Accelerator', 'dice5'],
   ['T', 'Topení zrcátka', 'Mirror heat', 'T'], ['R', 'Směr vpravo', 'Right', 'arrowR']];
 // the helper lamps (the game's): [key, colour]
