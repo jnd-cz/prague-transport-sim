@@ -10,6 +10,7 @@
 //   RESEAT_SPEED round the others, also while the tram drives;
 // - above the places shown, up to the car's declared capacity (the crush load), passengers are counted only: they climb the steps
 //   like the others and join the count at their head, and leave first, from the doorways, through the doors in turn.
+// - (2026-11-26) those alighting at a stop get ready as the tram comes near it: to their doors' doorway places (ready).
 // A passenger is aboard from the head of the entry steps in to their foot out (a.aboard): the counts change there, which is where
 // the game's crossings are (update's list) and what the autopilot waits for.
 import { createBoardingController } from './boarding-state.js';
@@ -18,6 +19,16 @@ import { createCabinNavigator } from './cabin-navigation.js';
 
 export const STAND_SHARE = 0.2; // (the user: "some people boarding can stand even with free seats"; revisited with journeys, #40)
 export const RESEAT_SPEED = 0.8; // m/s: a slow walk to a seat inside
+// (#249 step 4) the stop this near (m), those alighting there get up and go to their door's doorway places, one a door every
+// READY_GAP s at READY_SPEED (a walk in a moving tram, as RESEAT_SPEED): src/game.js. The distance as the user asked it measured
+// (2026-11-26: "how far from stop they need to start moving when tram is approaching at 50 km/h and breaking at the highest
+// step"): getting ready takes at most about 10 s (two cars, 38 % alighting, the most the game draws: 8.2-9.9 s at 100 aboard,
+// less below and above, where the doorways are full); the set braking on step 5 from 50 km/h covers 69-84 m in its last 10 s
+// and 97-112 m in its last 12 s (empty to full). 120 m: those 12 s at the hardest braking; with the autopilot (lines 17 and 22,
+// 69 stops) the tram stood 15.9 s after at the soonest, everyone at the doors after 8.1 s at most.
+export const READY_DIST = 120;
+export const READY_SPEED = 0.8;
+export const READY_GAP = 0.8;
 const RESEAT_EVERY = 1; // s between the looks for free seats
 const RESEAT_TRIES = 3; // ways looked for a look and a car (cabin-navigation.js: about a millisecond each)
 
@@ -32,7 +43,8 @@ export function createConsist(layout, { cars, crush, rand }) {
   // (aboard: on the floor, the counted ones with them; incoming: boarders not yet up the steps; outgoing: aboard and to alight)
   const aboard = (car) => { let n = car.counted; for (const a of actorsOf(car)) if (a.aboard) n++; return n; };
   const incoming = (car) => { let n = 0; for (const a of actorsOf(car)) if (!a.aboard && !a.exiting) n++; return n; };
-  const outgoing = (car) => { let n = 0; for (const a of actorsOf(car)) if (a.aboard && (a.exiting || a.stage === 'exit queue')) n++; return n; };
+  const outgoing = (car) => { let n = 0; for (const a of actorsOf(car)) if (a.aboard && (a.exiting || a.stage === 'exit queue' || a.alightOnArrive)) n++; return n; };
+  let readied = null; // (#249 step 4: who alights at the stop ahead, chosen when it came near: { n, cars: [{ ids, counted }] })
   const room = (car) => crush - aboard(car) - incoming(car) + outgoing(car);
   // (the ways round the others to a freed seat, one grid for the cars: its ids are the cars' own)
   const navigator = layout.navigation ? createCabinNavigator(layout) : null;
@@ -51,6 +63,20 @@ export function createConsist(layout, { cars, crush, rand }) {
     set.push(car);
   }
   const stands = () => rand() < STAND_SHARE;
+
+  // n of those aboard and not yet leaving: the nearest to a door in the whole set by walking, the counted ones first (in the
+  // doorways), one car after another. Per car: { ids, counted }
+  function choose(n) {
+    const pick = [];
+    for (const car of set) {
+      for (let i = 0; i < car.counted; i++) pick.push({ car, d: -1, i });
+      for (const a of actorsOf(car)) if ((a.stage === 'seated' || a.stage === 'standing') && !a.counted) pick.push({ car, d: car.c.doorDistance(a), i: a.index, id: a.id });
+    }
+    pick.sort((x, y) => x.d - y.d || x.i - y.i || x.car.k - y.car.k);
+    const out = set.map(() => ({ ids: new Set(), counted: 0 }));
+    for (const p of pick.slice(0, n)) { if (p.d < 0) out[p.car.k].counted++; else out[p.car.k].ids.add(p.id); }
+    return out;
+  }
 
   // the boarders not yet given a car go to the one with the most room (the fewest coming, then the front first); a runner to the
   // rear car's rear door (src/game.js _spawnRunners)
@@ -88,20 +114,27 @@ export function createConsist(layout, { cars, crush, rand }) {
     board(n, tag, { car = null, door = null } = {}) { for (let i = 0; i < n; i++) platform.push({ tag, car, door, stands: stands() }); },
     // n of those aboard and not yet leaving alight: the nearest to a door in the whole set by walking, the counted ones first
     // (in the doorways), one car after another; the number scheduled
+    // (the ones chosen when the stop came near, if it was this many: ready)
     alight(n) {
-      const pick = [];
-      for (const car of set) {
-        for (let i = 0; i < car.counted; i++) pick.push({ car, d: -1, i });
-        for (const a of actorsOf(car)) if ((a.stage === 'seated' || a.stage === 'standing') && !a.counted) pick.push({ car, d: car.c.doorDistance(a), i: a.index });
-      }
-      pick.sort((x, y) => x.d - y.d || x.i - y.i || x.car.k - y.car.k);
+      const chosen = readied?.n === n ? readied.cars : choose(n);
+      readied = null;
       let total = 0;
       for (const car of set) {
-        const mine = pick.slice(0, n).filter((p) => p.car === car), counted = mine.filter((p) => p.d < 0).length;
+        const { ids, counted } = chosen[car.k];
         car.counted -= counted;
-        total += car.c.alight(mine.length - counted, { nearest: true, counted });
+        total += car.c.alight(ids.size, { nearest: true, counted, ids });
       }
       return total;
+    },
+    // (#249 step 4, the user, 2026-11-26: "those getting off at the stop needs to be prepared often, to be ready to go once door
+    // opens") the stop ahead near: the n who will alight there chosen now, as alight would choose them, and those of them who can
+    // go to a free doorway place of their door (boarding-state.js ready); alight(n) at the stop takes the same ones. The number
+    // setting off
+    ready(n) {
+      readied = { n, cars: choose(n) };
+      let moving = 0;
+      for (const car of set) moving += car.c.ready(readied.cars[car.k].ids, { speed: READY_SPEED, gap: READY_GAP });
+      return moving;
     },
     // the boarders of a stop not yet on the steps go home (the doors closed on them, or the set is full); the number
     abandon(tag) {
@@ -142,7 +175,7 @@ export function createConsist(layout, { cars, crush, rand }) {
             if (p.status === 'free') continue;
             const a = actors.get(p.passengerId);
             if (!a) bad.push(`car ${car.k + 1}: ${p.id} held by ${p.passengerId}, who is not there`);
-            else if (a[key] !== p.id && a.reseatFrom !== p.id) bad.push(`car ${car.k + 1}: ${p.id} held by ${a.id}, whose place is ${a[key]}`);
+            else if (a[key] !== p.id && a.reseatFrom !== p.id && a.readyPlace !== p.id) bad.push(`car ${car.k + 1}: ${p.id} held by ${a.id}, whose place is ${a[key]}`);
           }
         }
         for (const a of actors.values()) {

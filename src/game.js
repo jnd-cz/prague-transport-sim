@@ -19,7 +19,7 @@ const STOP_TOL_BEHIND = 20, STOP_TOL_AHEAD = 12;
 const PHASE_HOLD = 10;        // s: the most a junction holds its phase for each tram committed to it (_runController)
 
 import { rng } from './random.js';
-import { createConsist } from './passengers/consist.js';
+import { createConsist, READY_DIST } from './passengers/consist.js';
 import { carTypeOf } from './carTypes.js';
 import { Feeding } from './electric.js';
 import { platformsOf, stopOf } from './platformRules.js';
@@ -1020,6 +1020,12 @@ export class Game {
     tram.passengers = this.pax.aboard;
     if (!st) return;
 
+    // (#249 step 4: the stop near, those to alight there get up and go to their doors' doorway places, so that they are out first
+    // when the doors open; arrival takes the same ones: src/passengers/consist.js ready)
+    if (!st.readySet && !st.arrived && st.alightFrac > 0 && st.target - tram.s < READY_DIST && tram.v > 0.5) {
+      st.readySet = true;
+      this.pax.ready(Math.round((this.pax.aboard - this.pax.toAlight) * st.alightFrac));
+    }
     if (at && !st.arrived) {
       st.arrived = true;
       st.arriveClock = this.clock;

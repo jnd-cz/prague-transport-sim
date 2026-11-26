@@ -13,7 +13,11 @@ passengers (src/passengers/consist.js) on two cars, by the user's rules (2026-11
   rest stay on the platform; the counted ones alight first;
 - the front door beside the cab takes both its streams, in and out, two people on its steps at once;
 - the doors closed during the exchange: who is on the steps finishes the way, the queue stays behind, those still to
-  alight get off when the doors open again; the counts right throughout.
+  alight get off when the doors open again; the counts right throughout;
+- (step 4, the user, 2026-11-26: "those getting off at the stop needs to be prepared often, to be ready to go once door
+  opens") the stop near, those to alight there go to their doors' doorway places while the tram drives, nobody else moving;
+  the same ones alight, sooner after the doors open than from their places, the boarders after them; one whose stop comes
+  while they are on the way alights from where they get to.
 And tools/cabin.py's game_cabin keeps one packing and what the passenger modules read.
 """
 import faulthandler
@@ -129,6 +133,46 @@ PAGE = """async () => {
     }
     out.front = { lanes, most };
   }
+  // (#249 step 4) ready at the doors: the stop near, those to alight there go to their doors' doorway places with the doors closed
+  // (12 s of driving), then alight when the doors open; against the same set alighting from where they sat. And one whose stop
+  // comes 0.5 s after: those on the way alight from where they get to
+  {
+    const first = (r, d) => Math.min(...r.times.filter((s) => s.startsWith(d)).map((s) => +s.slice(d.length)));
+    const last = (r, d) => Math.max(...r.times.filter((s) => s.startsWith(d)).map((s) => +s.slice(d.length)));
+    // (as the game: alight, then the stop's boarders on the platform, when the tram stands at the stop)
+    const p = set(50, 4), q = set(50, 4), late = set(50, 4);
+    const before = new Map(occupied(p).map(({ a, car }) => [`${car.k}${a.id}`, { x: a.x, z: a.z, seat: a.seatId, place: a.standingId }]));
+    const moving = p.ready(15), chosen = new Set(), bad = [];
+    for (const car of p.cars) for (const a of car.c.actors.values()) if (a.toAlight) chosen.add(`${car.k}${a.id}`);
+    for (let t = 0; t < 12; t += H) { p.update(H, false); if (Math.round(t / H) % 15 === 0) bad.push(...p.check()); }
+    let atDoors = 0, stayed = 0, others = 0;
+    for (const { a, car } of occupied(p)) {
+      const k = `${car.k}${a.id}`, b = before.get(k);
+      if (chosen.has(k)) { if (a.doorBufferId && a.standingId) atDoors++; else if (a.x === b.x && a.z === b.z) stayed++; }
+      else if (a.x !== b.x || a.z !== b.z || a.seatId !== b.seat || a.standingId !== b.place) others++;
+    }
+    const n = p.alight(15), leaving = new Set();
+    p.board(20, 7);
+    for (const car of p.cars) for (const a of car.c.actors.values()) if (a.stage === 'exit queue') leaving.add(`${car.k}${a.id}`);
+    const r = run(p);
+    q.alight(15);
+    q.board(20, 7);
+    const qLeaving = new Set();
+    for (const car of q.cars) for (const a of car.c.actors.values()) if (a.stage === 'exit queue') qLeaving.add(`${car.k}${a.id}`);
+    const rq = run(q);
+    late.ready(15);
+    for (let t = 0; t < 0.5; t += H) late.update(H, false);
+    const nLate = late.alight(15);
+    late.board(20, 7);
+    const rl = run(late);
+    out.ready = {
+      moving, chosen: chosen.size, atDoors, stayed, others, bad, n, outs: r.outs, ins: r.ins, check: p.check(),
+      same: [...chosen].every((k) => leaving.has(k) && qLeaving.has(k)) && leaving.size === chosen.size && qLeaving.size === chosen.size,
+      firstOut: first(r, 'out'), lastOut: last(r, 'out'), firstIn: first(r, 'in'),
+      qFirstOut: first(rq, 'out'), qLastOut: last(rq, 'out'), qFirstIn: first(rq, 'in'),
+      late: { n: nLate, outs: rl.outs, ins: rl.ins, aboard: late.aboard, check: late.check() },
+    };
+  }
   // the doors closed during the exchange, then opened again
   {
     const p = set(60, 5);
@@ -207,7 +251,8 @@ def main():
     finally:
         server.shutdown()
         faulthandler.cancel_dump_traceback_later()
-    c, h, s, w, k, d, f = r["cabin"], r["half"], r["stand"], r["reseat"], r["crush"], r["closed"], r["front"]
+    c, h, s, w, k, d, f, y = r["cabin"], r["half"], r["stand"], r["reseat"], r["crush"], r["closed"], r["front"], r["ready"]
+    yl = y["late"]
     fl = f["lanes"]
     share = s["standers"] / s["boarders"]
     want = {
@@ -227,6 +272,15 @@ def main():
         f"the front door: both streams in and out ({ {k: v for k, v in sorted(fl.items()) if k.startswith('Front')} }), "
         f"on its steps at once {f['most']['in']} in, {f['most']['out']} out":
             all(fl.get(f"Front:{n} {d}", 0) > 0 for n in (0, 1) for d in ("in", "out")) and f["most"]["in"] >= 2 and f["most"]["out"] >= 2,
+        f"ready: the stop near, the {y['chosen']} to alight go to their doors' doorway places ({y['atDoors']} there, {y['stayed']} "
+        f"where they were), nobody else moves ({y['others']}), the counts and places right on the way ({y['bad'][:1]})":
+            y["chosen"] == 15 and y["atDoors"] + y["stayed"] == 15 and y["atDoors"] >= 12 and y["others"] == 0 and not y["bad"],
+        f"ready: the same {y['n']} alight as from their places, the counts right": y["same"] and y["n"] == 15 and y["outs"] == 15 and not y["check"],
+        f"ready: out first {y['firstOut'] / 1000} s and last {y['lastOut'] / 1000} s after the doors open (from their places "
+        f"{y['qFirstOut'] / 1000}, {y['qLastOut'] / 1000} s), the first boarder in at {y['firstIn'] / 1000} s ({y['qFirstIn'] / 1000} s)":
+            y["firstOut"] <= 2500 and y["firstOut"] < y["qFirstOut"] and y["lastOut"] < y["qLastOut"] and y["firstIn"] < y["qFirstIn"],
+        f"ready, the stop 0.5 s after: those on the way alight from where they get to ({yl['outs']} of {yl['n']} out, the counts right)":
+            yl["n"] == 15 and yl["outs"] == 15 and yl["ins"] == 20 and yl["aboard"] == 55 and not yl["check"],
         f"the doors closed: {d['steps0']} on the steps finish ({d['steps1']} left), {d['gone']} stay behind, nobody waits": d["steps0"] > 0 and d["steps1"] == 0 and d["waiting"] == 0 and not d["check"],
         f"the doors open again: the {d['toAlight']} left to alight get off ({d['toAlightAfter']} left), the counts right": d["toAlight"] > 0 and d["toAlightAfter"] == 0 and d["outsAfter"] == d["n"] and not d["check2"] and d["aboard"] == 60 - d["n"] + d["insAfter"],
         "tools/cabin.py game_cabin: one packing and what is read; off_floor finds a place over a fixture": game_cabin_keeps(),

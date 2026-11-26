@@ -43,7 +43,8 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a full car leaves people
   for the next tram.
 - Getting on and off takes as long as the passengers need to pass the doors: each door has two streams, those
-  standing or sitting nearest the doors get off first, then those waiting board and go to sit or stand. A car has
+  standing or sitting nearest the doors get off first, then those waiting board and go to sit or stand. Those getting
+  off stand up as the tram comes into the stop and wait at the doors, so they are out as soon as the doors open. A car has
   24 seats and 81 standing places; above these 105 it only counts the passengers (up to 160). About one boarder in
   five stands even with seats free; seats that come free go to standing passengers who want to sit, also while the
   tram drives.
