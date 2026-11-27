@@ -351,6 +351,30 @@ class Stairs(unittest.TestCase):
             np.testing.assert_allclose(s.at(0, x, np.full(5, y)), 300.4 - 0.05 * x, atol=1e-6)
         self.assertEqual(s.missed, 10)
 
+    def test_a_long_edge_follows_the_lidars_shape_between_its_surveyed_points(self):
+        # (#638, Mariánské hradby: a median 28 m long and 2.5 m across over a crest, surveyed at its four corners, 0.2 m
+        # under the lidar at both ends as at a kerb's foot. The lidar's crest stands 0.25 m over its own chord at the
+        # middle: the edge takes that, on the survey's heights at its ends)
+        crest = lambda x, y: 243.2 - 0.05 * np.asarray(x, float) + 0.25 * (1 - ((np.asarray(x, float) - 14) / 14) ** 2)  # noqa: E731
+        strip = {"c": "median", "l": 0, "r": [[0, 0, 243.0], [28, 0, 241.6], [28, 2.5, 241.6], [0, 2.5, 243.0]]}
+        x = np.array([0.0, 7.0, 14.0, 21.0, 28.0])
+        chord = 243.0 - 0.05 * x
+        s = gm.SurveySurface({"areas": [strip]}, [0])
+        np.testing.assert_allclose(s.at(0, x, np.full(5, 1.0)), chord, atol=1e-6)  # (without the lidar: the chord)
+        s = gm.SurveySurface({"areas": [strip]}, [0], lidar=crest)
+        self.assertEqual(s.bends, 2)  # (the two long edges; the ends, 2.5 m, stay)
+        got = s.at(0, x, np.full(5, 1.0))
+        np.testing.assert_allclose(got[[0, 4]], chord[[0, 4]], atol=1e-6)  # (the surveyed heights stay)
+        np.testing.assert_allclose(got[1:4] - chord[1:4], [0.1875, 0.25, 0.1875], atol=0.002)
+        # (a yard is not bent, #750 moves it whole; nor an edge the lidar steps along: it runs over a wall's foot;
+        # nor one the lidar leaves by 0.6 m: a bank, no vertical curve)
+        self.assertEqual(gm.SurveySurface({"areas": [{**strip, "c": "paved"}]}, [0], lidar=crest).bends, 0)
+        step = lambda x, y: np.where(np.asarray(x, float) > 13, 243.0, 242.6)  # noqa: E731
+        self.assertEqual(gm.SurveySurface({"areas": [strip]}, [0], lidar=step).bends, 0)
+        bank = lambda x, y: 243.0 + 0.6 * (1 - ((np.asarray(x, float) - 14) / 14) ** 2)  # noqa: E731
+        self.assertEqual(gm.bent(strip["r"], bank)[1], 0)
+        self.assertEqual(gm.bent(strip["r"], lambda x, y: np.full(len(x), np.nan))[1], 0)  # (no lidar there)
+
 
 class Walls(unittest.TestCase):
     def test_a_street_corner_on_a_wall_takes_its_height_there(self):
