@@ -55,7 +55,7 @@ KINDS = [
                  "src/vehicles.js", "src/t3simple.js", "src/t3photo.js", "src/cabframe.js", "src/mirror.js", "src/weather.js",
                  "src/landmarks.js", "src/ledPanels.js", "src/indicators.js", "src/boxes.js", "src/nearbatch.js",
                  "src/catenary.js", "src/speedSigns.js", "src/packages.js", "src/packageRules.json", "src/audio.js",
-                 "src/perf.js", "src/between.js", "src/groundFile.js", "src/groundWorker.js", "src/loading.js", "src/hud.js",
+                 "src/perf.js", "src/gfx.js", "src/between.js", "src/groundFile.js", "src/groundWorker.js", "src/loading.js", "src/hud.js",
                  "src/panel.js", "src/panel.css", "src/help.js", "src/i18n.js", "src/touch.js", "src/gamepad.js",
                  "src/localFiles.js", "src/packagesMenu.js", "src/report.js", "src/debugOverlay.js", "src/inspect.js",
                  "src/provenance.js", "src/buildId.js", "src/main.js", "index.html", "app.webmanifest", "assets/*",

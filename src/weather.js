@@ -7,6 +7,7 @@
 //           vertical faces bare
 //   autumn: the terrain's grass and woods and the tree crowns in autumn colours; leaf litter
 import * as THREE from 'three';
+import { GFX } from './gfx.js';
 
 export const WEATHER_UNIFORMS = {
   uWet: { value: 0 },
@@ -39,7 +40,7 @@ const NOISE = /* glsl */ `
 //   veg:   the terrain: per-vertex land class (attribute landCls: 0 ground, 1 grass, 2 wood, 3 water):
 //          only the bare ground gets wet, grass and woods turn in autumn, water takes no snow
 export function weatherize(material, { wet = 1, snow = 0, slush = false, veg = false } = {}) {
-  const key = `w${wet.toFixed(2)}s${snow}${slush ? 'l' : ''}${veg ? 'v' : ''}`;
+  const key = `w${wet.toFixed(2)}s${snow}${slush ? 'l' : ''}${veg ? 'v' : ''}${GFX.snowBranch ? 'b' : ''}`;
   material.customProgramCacheKey = () => key;
   material.userData.weather = { wet, snow, slush, veg };
   material.onBeforeCompile = (sh) => {
@@ -79,11 +80,14 @@ export function weatherize(material, { wet = 1, snow = 0, slush = false, veg = f
           if (vCls > 2.5) cover = 0.0;` : ''}
           diffuseColor.rgb *= mix(1.0, wetF, uWet);
           // snow: on faces pointing up, in patches (two octaves of noise), thinner on driven streets
-          float up = smoothstep(0.45, 0.8, vWNor.y);
-          float n = 0.6 * wNoise(vWPos.xz * 0.23) + 0.4 * wNoise(vWPos.xz * 1.9);
-          float c = uSnow * up * smoothstep(0.75 - cover, 0.95 - cover, n);
-          vec3 snowCol = ${slush ? 'mix(vec3(0.38, 0.39, 0.40), vec3(0.72, 0.74, 0.77), n)' : 'vec3(0.82, 0.85, 0.89)'};
-          diffuseColor.rgb = mix(diffuseColor.rgb, snowCol, c);
+          // (?gfx=snowif: the noise only while it snows; without it, for every fragment in every weather, #705)
+          ${GFX.snowBranch ? 'if (uSnow > 0.0) {' : '{'}
+            float up = smoothstep(0.45, 0.8, vWNor.y);
+            float n = 0.6 * wNoise(vWPos.xz * 0.23) + 0.4 * wNoise(vWPos.xz * 1.9);
+            float c = uSnow * up * smoothstep(0.75 - cover, 0.95 - cover, n);
+            vec3 snowCol = ${slush ? 'mix(vec3(0.38, 0.39, 0.40), vec3(0.72, 0.74, 0.77), n)' : 'vec3(0.82, 0.85, 0.89)'};
+            diffuseColor.rgb = mix(diffuseColor.rgb, snowCol, c);
+          }
         }`);
   };
   material.needsUpdate = true;

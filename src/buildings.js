@@ -6,6 +6,7 @@ import { rng } from './random.js';
 import { STREET_BELOW } from './heights.js';
 import { LANDMARK_TALL, LANDMARK_HIGH, LANDMARK_RISE, landmarkHaze, textureMean } from './landmarks.js';
 import { weatherize } from './weather.js';
+import { GFX } from './gfx.js';
 import { ChunkedGeometry, FootprintIndex, GROUND_SNOW, W, addFlatPolygon, pointInRing, signedArea } from './worldMesh.js';
 
 function facadeTexture() {
@@ -183,7 +184,7 @@ const CLASS_COLORS = {
 
 export function buildLod2(group, data, route, ground) {
   const geo = data.geo.buildings, arr = geo.arr, q = geo.q;
-  const side = THREE.DoubleSide;
+  const side = GFX.side; // (both faces, or ?gfx=front the front ones only, to measure what the back ones cost: #705)
   const CLASSES = {
     // (snow on whatever points up: roofs, ledges)
     old: { mat: weatherize(new THREE.MeshLambertMaterial({ map: facadeTexture(), vertexColors: true, side }), { snow: GROUND_SNOW }), w: 3.5, h: 3.2 },
@@ -202,7 +203,7 @@ export function buildLod2(group, data, route, ground) {
   };
   data.buildings.forEach((b, i) => { osm.entries[i].kind = b.k; });
   const counts = {};
-  const roofMat = weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { snow: GROUND_SNOW });
+  const roofMat = weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side }), { snow: GROUND_SNOW });
   let bIndex = 0, lifted = 0, total = 0;
   // the car roads on bridges: a bridge model is cut out over them too (half their width, 0.4-4.5 m over
   // their surface; parapet blocks 1.2-1.7 m over the deck stood in the lanes, the lint deckClip)

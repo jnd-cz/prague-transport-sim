@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { DTM_LIFT } from './terrain.js';
 import { STREET_BELOW } from './heights.js';
 import { weatherize, wetFactor } from './weather.js';
+import { GFX } from './gfx.js';
 import { ChunkedGeometry, FOOT_SNOW, GROUND_SNOW, STREET_SNOW, W } from './worldMesh.js';
 
 // The DTM areas as meshes: ground-level surfaces draped on their surveyed heights (sidewalks,
@@ -186,7 +187,8 @@ export function groundStyles(layout) {
 // the layers they replace; a tile's positions are from its corner (the mesh stands there: 32-bit positions within 500 m)
 // hole(x, y): a terrain triangle whose centre it holds is not drawn (tested in the meshes that reach a box of `near`)
 export function attachGround(group, tiles, hole = null, near = []) {
-  const mat = (opts) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), opts);
+  // (GFX.side: both faces, or ?gfx=front the front ones only, to measure what the back ones cost: #705)
+  const mat = (opts) => weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side: GFX.side }), opts);
   const mats = {
     terrain: mat({ wet: wetFactor('#8d8c80', '#77766c'), snow: GROUND_SNOW, veg: true }),
     street: mat({ wet: 0.8, snow: STREET_SNOW, slush: true }),
