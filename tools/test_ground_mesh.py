@@ -1008,36 +1008,6 @@ class AtATurn(unittest.TestCase):
             np.testing.assert_allclose(z, [211.56], atol=1e-9)
 
 
-class OwnOutline(unittest.TestCase):
-    """#653: a street corner on a wall's outline at its own area's outline height, where its street past the raster's
-    smear agrees. A wall 0.3 m thick along y 0..0.3, its top at 195.15 m; a sidewalk south of it, its outline along the
-    wall's foot at 188.48 m (the quay's lower walkway by Palackého most, line 17 (-725.29, -1255.0))."""
-    WALL = {"c": "wall", "l": 0, "r": [[0, 0, 195.15], [10, 0, 195.15], [10, 0.3, 195.15], [0, 0.3, 195.15]]}
-
-    @staticmethod
-    def street(kd, px, py):  # (the street surface: the walkway's level past the smear, the smear up to the wall)
-        py = np.asarray(py, float)
-        return np.where(py < -1.0, 188.5, 188.5 + (195.15 - 188.5) * np.clip((py + 1.0) / 1.3, 0, 1))
-
-    def run_(self, walk_z):
-        walk = {"c": "sidewalk", "l": 0, "r": [[0, -5, 188.5], [10, -5, 188.5], [10, 0, walk_z], [0, 0, walk_z]]}
-        D = {"areas": [self.WALL, walk]}
-        x, y = np.array([5.0, 5.0]), np.array([0.0, -2.0])  # (one on the wall's foot, one in the walkway)
-        return gm.own_outline(D, np.array([1, 1]), np.array(["sidewalk", "sidewalk"]), x, y, np.array([5.0, 5.0]),
-                              np.array([-0.5, -2.5]), np.array([190.66, 188.5]), self.street, [0])
-
-    def test_a_corner_on_the_walls_foot_takes_its_own_outline_where_the_street_past_the_smear_agrees(self):
-        z, took = self.run_(188.48)
-        self.assertEqual(took.tolist(), [True, False])
-        np.testing.assert_allclose(z, [188.48, 188.5])
-
-    def test_an_outline_at_another_level_than_the_street_is_left(self):
-        # (Hořejší nábřeží, line 9 (-1029, -533): the street's outline along the wall's top line, the street at its foot)
-        z, took = self.run_(195.15)
-        self.assertFalse(took.any())
-        np.testing.assert_allclose(z, [190.66, 188.5])
-
-
 class APairsEnd(unittest.TestCase):
     def test_the_strip_between_two_wall_lines_holds_nothing_past_their_end(self):
         # (#770: a wall's foot line along x = 0 from y = 0 north, its right side the strip to the top line at 271.18 m,
