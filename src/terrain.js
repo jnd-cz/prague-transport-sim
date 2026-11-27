@@ -251,6 +251,11 @@ export class Profile {
     if (!(Math.abs(o) > 0.5)) return a;
     return a + (this._liftBack(s) - a) * Math.max(0, Math.min(1, lateral / o));
   }
+  // the opposite track's offset across from ours at s (left > 0), 0 where the build gave none
+  backOffset(s) {
+    const o = this.backOff ? this.backOff[Math.max(0, Math.min(this.n - 1, Math.round(s / this.step)))] : 0;
+    return Math.abs(o) > 0.5 ? o : 0;
+  }
   // which track `lateral` m across from ours lies nearer: the other direction's (true) or ours (#584)
   onBack(s, lateral) {
     if (!this.backOff || !lateral) return false;

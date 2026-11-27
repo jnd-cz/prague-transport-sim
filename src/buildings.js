@@ -106,6 +106,8 @@ function glassTexture() {
 
 const FACADE_COLORS = ['#e8d9b5', '#d9c7a0', '#efe3c8', '#c9b79a', '#e3c9b0', '#d6d0c2', '#e6d2a8', '#cfc3ad',
   '#e0b9a0', '#b9c4c9', '#d8cfb8', '#f0e6d2'].map((c) => new THREE.Color(c));
+const MODEL_UNDER = 0.05; // m: a bridge model's top lies this far under the bed top inside the trams' sweep (#742) ...
+const MODEL_REACH = 0.5;  // m: ... its corners from there up to this far over the rail heads
 const ROOF_COLORS = ['#8c4a32', '#7a3f2c', '#5f5a55', '#6d6862', '#9a5638', '#4f4b47'].map((c) => new THREE.Color(c));
 
 // Fallback: OSM footprints extruded to their tagged height, sitting on the terrain.
@@ -231,6 +233,19 @@ export function buildLod2(group, data, route, ground) {
     }
     return null;
   };
+  // (x, y) in the space the trams sweep in plan, ours and the opposite track's (3 m beyond each, the profile's
+  // cross-section): the top of rail `zr` and the bed top `zb` there, else null (n: its nearest route point)
+  const sweep = (x, y, n = route.nearest(x, y)) => {
+    if (!n) return null;
+    const o = ground.profile.backOffset(n.s);
+    if (n.d > Math.abs(o) + 3.5) return null;
+    const q = route.at(n.s), l = q.hx * (y - q.y) - q.hy * (x - q.x); // (left > 0, as src/world.js lateralOf)
+    if (l < Math.min(0, o) - 3 || l > Math.max(0, o) + 3) return null;
+    // (each track's own rails and bed to the line midway between them: the cross-section's line from one track to
+    // the other left the model 0.22 m over our bed where the other track stands higher, line 22 s 18184)
+    const lb = ground.profile.onBack(n.s, l) ? o : 0, zr = ground.profile.heightAt(n.s, lb);
+    return { zr, zb: zr - ground.profile.lift(n.s, lb) };
+  };
   // landmarks (src/landmarks.js): in meshes of their own with a lighter haze, and their triangles copied for the pass
   // past the far plane; "high ground" over the line's typical ground, the median along its route
   const along = [];
@@ -321,15 +336,29 @@ export function buildLod2(group, data, route, ground) {
       const facade = pal ? new THREE.Color(pal[Math.floor(r() * pal.length)]) : FACADE_COLORS[Math.floor(r() * FACADE_COLORS.length)];
       const roofTile = ROOF_COLORS[Math.floor(r() * 3)], roofFlat = new THREE.Color('#77736d');
       for (let t = 0; t < n3; t += 3) {
-        const ax = xs[t], ay = ys[t], az = zs[t], bx = xs[t + 1], by = ys[t + 1], bz = zs[t + 1], cx = xs[t + 2], cy = ys[t + 2], cz = zs[t + 2];
-        // nothing of a bridge model inside the space our tram sweeps (±3 m, from just over the rail heads
-        // to 5.8 m above them): at the north end of Čechův most a slab 3.7 m above the deck cut through
-        // the tram, and the model's top 0-0.5 m over the real deck would cover the rails (src/heights.js)
+        const ax = xs[t], ay = ys[t], bx = xs[t + 1], by = ys[t + 1], cx = xs[t + 2], cy = ys[t + 2];
+        let az = zs[t], bz = zs[t + 1], cz = zs[t + 2];
+        // nothing of a bridge model inside the space the trams sweep (±3 m of our track and of the opposite one, from
+        // just over the rail heads to 5.8 m above them): at the north end of Čechův most a slab 3.7 m above the deck
+        // cut through the tram, and the model's top 0-0.5 m over the real deck would cover the rails (src/heights.js)
         if (isBridge) {
           const mx = (ax + bx + cx) / 3, my = (ay + by + cy) / 3, n = route.nearest(mx, my);
-          if (n && n.d < 3) {
-            const zr = ground.profile.height(n.s), mz = (az + bz + cz) / 3; // (top of rail)
-            if (mz > zr + 0.02 && mz < zr + 5.8) continue;
+          const sw = sweep(mx, my, n), mz0 = (az + bz + cz) / 3;
+          if (sw && mz0 > sw.zr + 0.02 && mz0 < sw.zr + 5.8) continue;
+          // (and under that space the model lies under the bed, not in the ballast up to the rail heads: its corners
+          // within the sweep come down to MODEL_UNDER under the bed top, the opposite track's bed under its rails
+          // (the profile's cross-section, #197: on main its rails ran on the model's top). Krejcárek, line 37: the track climbs
+          // 6.2 % onto the viaduct's north end, numeric DI of 2023 and the archive alike, where the coarse model's top
+          // falls 2 %: it stood 0.06-0.19 m over the bed top at s 3480-3488, and 0.04-0.06 m over it before the
+          // south abutment, s 3030-3038, #742. A triangle's corners lie within 1.5 m of its centre: the split above)
+          if (n && n.d < 14) {
+            const under = (x, y, z) => {
+              const w = sweep(x, y);
+              // (to MODEL_REACH over the rail heads only: a road bridge's underside 5.6 m over the track came down
+              // as spikes, line 22 s 18184)
+              return w && z > w.zb - MODEL_UNDER && z < w.zr + MODEL_REACH ? w.zb - MODEL_UNDER : z;
+            };
+            az = under(ax, ay, az); bz = under(bx, by, bz); cz = under(cx, cy, cz);
           }
           // (over a flat deck, flushDtm, the deck and its parapets are the survey's: the model's top showed between the
           // survey's areas as grey bars across the ballast, and its edge beam as teeth along the deck's edge, #549)
