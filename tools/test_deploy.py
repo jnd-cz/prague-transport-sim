@@ -81,7 +81,10 @@ class DeployTest(unittest.TestCase):
         os.mkdir(self.server)
         cfg = os.path.join(self.tmp, "deploy.local.json")
         json.dump({"host": "ftp.example", "user": "u", "dir": "/httpdocs"}, open(cfg, "w"))
+        # (the checkout's data as its manifest names it: a branch's unpublished rebuild stopped 9-11 of these, #891;
+        # test_data_that_differs_from_its_manifest_stops_a_deploy holds the refusal)
         self.patches = [mock.patch.object(deploy, "CONFIG", cfg), mock.patch.object(deploy, "files", lambda: iter(SOME)),
+                        mock.patch.object(deploy, "data_matches", lambda: True),
                         mock.patch.dict(os.environ, {"TRAM_DEPLOY_PASSWORD": "x"})]
         for p in self.patches:
             p.start()
@@ -164,6 +167,12 @@ class DeployTest(unittest.TestCase):
         self.assertEqual(gone, ["data/MANIFEST.json"])
         self.assertFalse(os.path.exists(os.path.join(self.server, "data", "MANIFEST.json")))
         self.assertTrue(os.path.exists(os.path.join(self.server, "data", "MANIFEST.json.brotli")))
+
+    def test_data_that_differs_from_its_manifest_stops_a_deploy(self):
+        with mock.patch.object(deploy, "data_matches", lambda: False), self.assertRaises(SystemExit) as e:
+            self.run_deploy()
+        self.assertIn("data/ differs from data/MANIFEST.json", str(e.exception))
+        self.assertEqual([e for e in self.ftp.log if e[0] != "RETR"], [], "nothing went up")
 
     def test_dry_run_writes_nothing(self):
         self.run_deploy("--dry-run")
@@ -462,6 +471,19 @@ class DeployTest(unittest.TestCase):
         out = reviews.merge({"meta": {"a": 1}, "items": {"k": {"v": 1, "t": 5}}},
                             {"meta": {"b": 2}, "items": {"k": {"v": 2, "t": 4}, "j": {"v": 3, "t": 1}, 7: "bad"}})
         self.assertEqual(out, {"meta": {"a": 1, "b": 2}, "items": {"k": {"v": 1, "t": 5}, "j": {"v": 3, "t": 1}}})
+
+
+class DataMatches(unittest.TestCase):
+    def test_data_matches_when_status_finds_no_difference(self):
+        import snapshot
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "data"))
+            self.assertFalse(deploy.data_matches(root), "no manifest")
+            open(os.path.join(root, "data", "MANIFEST.json"), "w").close()
+            # (10 differences: the printed "data: 10 differences" held "0 differences" and passed, #891)
+            for diff, want in (([], True), ([("changed", f"line{n}.json") for n in range(10)], False), ([("new", "a.bin")], False)):
+                with mock.patch.object(snapshot, "data_diff", lambda r, d=diff: d if r == root else None):
+                    self.assertIs(deploy.data_matches(root), want, diff)
 
 
 class SiteFiles(unittest.TestCase):

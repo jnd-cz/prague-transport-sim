@@ -121,11 +121,16 @@ def checks(allow_dirty, public=False):
         raise SystemExit("a public target is deployed only from a commit, never with --dirty")
     if not allow_dirty and git("status", "--porcelain", "--untracked-files=no"):
         raise SystemExit("uncommitted changes: commit them, or --dirty for a test deploy")
-    st = subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "snapshot.py"), "status"], cwd=ROOT,
-                        capture_output=True, text=True)
-    if "0 differences to data/MANIFEST.json" not in st.stdout:
+    if not data_matches():
         raise SystemExit("data/ differs from data/MANIFEST.json: python -I tools/snapshot.py data-fetch")
     return git("rev-parse", "HEAD")
+
+
+def data_matches(root=ROOT):
+    """Whether data/ holds what data/MANIFEST.json names: snapshot.py status's differences, none. (Read from its
+    printed line, "data: 10 differences" held "0 differences" and passed, #891.)"""
+    import snapshot  # (here, not at the top: it reconfigures stdout when imported)
+    return os.path.exists(os.path.join(root, "data", "MANIFEST.json")) and not snapshot.data_diff(root)
 
 
 def packed(rel):
