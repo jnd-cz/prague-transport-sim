@@ -28,16 +28,17 @@ MODULES = ("furniture-lod.js", "barrier-lod.js", "traction-assets.js")
 
 PACK = """async ({ traction, attribution }) => {
   const T = await import('three');
-  const { mergeGeometries, mergeVertices } = await import('three/addons/utils/BufferGeometryUtils.js');
+  const { mergeVertices } = await import('three/addons/utils/BufferGeometryUtils.js');
   const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
   const { makeBinDetailed, makeBinLod, makeRecyclingBinLod, makeCycleStandLod } = await import('/furniture-lod.js');
+  const { makeBin, makeCycleStand } = await import('/street_furniture_models.js');
   const { makeBollardLod, makeRailingLod } = await import('/barrier-lod.js');
   const { makeTractionPole, makeWallAnchor } = await import('/traction-assets.js');
   const levels = ['near', 'middle', 'far'];
   const bin = (level, small) => level === 'near' ? makeBinDetailed({ small })
     : makeBinLod({ level: level === 'middle' ? 'near' : 'mid', small });
-  const street = {
+  const labStreet = {
     'bin-large': level => bin(level, false),
     'bin-small-canopied': level => bin(level, true),
     'bin-recycling': makeRecyclingBinLod,
@@ -45,6 +46,13 @@ PACK = """async ({ traction, attribution }) => {
     'bollard': makeBollardLod,
     'railing-bars': level => makeRailingLod({ level }),
     'railing-glass': level => makeRailingLod({ level, fill: 'glass' })
+  };
+  const street = {
+    ...labStreet,
+    'bin-large': level => makeBin('bin-large', level),
+    'bin-small-canopied': level => makeBin('bin-small-canopied', level),
+    'bin-recycling': level => makeBin('bin-recycling', level),
+    'cycle-stand': makeCycleStand,
   };
   const poles = {
     'pole-octagonal': level => makeTractionPole({ level }),
@@ -59,39 +67,6 @@ PACK = """async ({ traction, attribution }) => {
     'anchor-rosette-vertical': level => makeWallAnchor({ level, style: 'rosette-vertical' }),
     'anchor-bracket': level => makeWallAnchor({ level, style: 'bracket' })
   };
-
-  function tuneBin(model, kind, level) {
-    const [metal, shell] = model.children;
-    if (level !== 'near') {
-      if (kind === 'bin-large') {
-        // Keep the shell silhouette and extend its bottom to the paving datum.
-        const p = shell.geometry.attributes.position;
-        for (let i = 0; i < p.count; i++) if (p.getY(i) < .046) p.setY(i, 0);
-        shell.geometry.computeBoundingBox();
-      }
-      return;
-    }
-    const small = kind === 'bin-small-canopied', sx = small ? 1 : 1.75;
-    const rim = new T.CylinderGeometry(.191, .191, .025, 32).scale(sx, 1, 1).translate(0, .79, 0);
-    const foot = new T.CylinderGeometry(.191, .191, small ? .025 : .0525, 32).scale(sx, 1, 1)
-      .translate(0, small ? .04 : .02625, 0);
-    const parts = [rim, foot];
-    if (small) {
-      parts.push(new T.CylinderGeometry(.027, .027, 1.08, 10).translate(.22, .46, 0));
-      parts.push(new T.SphereGeometry(.18, 16, 5, 0, 2 * Math.PI, 0, Math.PI / 2)
-        .scale(1, .22, 1).translate(0, .95, 0));
-      parts.push(new T.BoxGeometry(.14, .02, .14).translate(.22, -.09, 0));
-    } else {
-      for (const x of [-.27, .27]) {
-        parts.push(new T.CylinderGeometry(.022, .022, .17, 8, 1, true).translate(x, .875, 0));
-      }
-      parts.push(new T.BoxGeometry(.60, .04, .32).translate(0, .98, 0));
-      for (const x of [-.11, .11]) parts.push(new T.BoxGeometry(.008, .70, .008).translate(x, .41, .187));
-    }
-    metal.geometry.dispose();
-    metal.geometry = mergeGeometries(parts);
-    for (const part of parts) part.dispose();
-  }
 
   const renderer = new T.WebGLRenderer();
   renderer.setSize(96, 96);
@@ -124,8 +99,9 @@ PACK = """async ({ traction, attribution }) => {
   const rows = [];
   const scenes = Object.entries(traction ? poles : street).flatMap(([kind, make]) => levels.map(level => {
     const model = make(level);
-    const before = measure(model);
-    if (kind === 'bin-large' || kind === 'bin-small-canopied') tuneBin(model, kind, level);
+    const original = !traction && labStreet[kind] !== make ? labStreet[kind](level) : model;
+    const before = measure(original);
+    if (original !== model) original.traverse(mesh => mesh.geometry?.dispose());
     model.name = kind + '--' + level;
     const wall = kind.startsWith('anchor-');
     Object.assign(model.userData, { kind, level, placement: wall ? 'wall' : 'ground' });
@@ -190,6 +166,7 @@ def main():
             "three/addons/BufferGeometryUtils.js", "three/addons/utils/BufferGeometryUtils.js")
         for name in MODULES
     }
+    source["street_furniture_models.js"] = Path(__file__).with_name("street_furniture_models.js").read_text(encoding="utf-8")
     importmap = re.search(r'<script type="importmap">.*?</script>',
                           (ROOT / "index.html").read_text(encoding="utf-8"), re.S)[0]
     server_handler = functools.partial(Quiet, directory=args.lab)

@@ -2,6 +2,7 @@
 """Check the game pack's glTF scenes, geometry budgets and placement metadata."""
 
 from pathlib import Path
+from struct import calcsize, unpack_from
 import sys
 import unittest
 
@@ -11,15 +12,30 @@ from edit_t3h_glb import read  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 LEVELS = ("near", "middle", "far")
 TRIANGLES = {
-    "bin-large": (452, 196, 100),
-    "bin-small-canopied": (580, 296, 140),
-    "bin-recycling": (728, 392, 280),
-    "cycle-stand": (344, 104, 64),
+    "bin-large": (744, 596, 460),
+    "bin-small-canopied": (620, 500, 380),
+    "bin-recycling": (790, 636, 494),
+    "cycle-stand": (492, 240, 132),
     "bollard": (152, 56, 40),
     "railing-bars": (448, 128, 80),
     "railing-glass": (450, 130, 82),
 }
-PASSES = dict(zip(TRIANGLES, (2, 2, 3, 1, 1, 1, 2), strict=True))
+PASSES = dict(zip(TRIANGLES, (2, 2, 2, 1, 1, 1, 2), strict=True))
+BINS = {"bin-large": (1.015, 0), "bin-small-canopied": (1.186, .035), "bin-recycling": (1.020, 0)}
+
+
+def samples(glb, binary, idx, fmt):
+    a = glb["accessors"][idx]
+    view = glb["bufferViews"][a["bufferView"]]
+    start = view.get("byteOffset", 0) + a.get("byteOffset", 0)
+    stride = view.get("byteStride", calcsize(fmt))
+    return [unpack_from(fmt, binary, start + i * stride) for i in range(a["count"])]
+
+
+def covers(point, triangle):
+    sides = [(b[0] - a[0]) * (point[1] - a[2]) - (b[2] - a[2]) * (point[0] - a[0])
+             for a, b in zip(triangle, triangle[1:] + triangle[:1], strict=True)]
+    return min(sides) >= -1e-7 or max(sides) <= 1e-7
 
 
 class TestFurniturePack(unittest.TestCase):
@@ -61,8 +77,36 @@ class TestFurniturePack(unittest.TestCase):
                                 self.assertTrue(mesh["extras"]["singlePass"] and mat["doubleSided"])
                                 glass += 1
                     self.assertEqual((triangles, passes, glass), (count, PASSES[kind], int(kind == "railing-glass")))
-                    self.assertAlmostEqual(low, -.1 if kind == "bin-small-canopied" else 0, places=2)
+                    ground_limit = -.1 if kind == "bin-small-canopied" else 0
+                    if kind == "cycle-stand":
+                        ground_limit = -.098 if level == "near" else -.08
+                        self.assertAlmostEqual(high, .9115, places=3)
+                    self.assertAlmostEqual(low, ground_limit, places=2)
                     self.assertGreater(high, .85)
+                    if kind in BINS:
+                        steel = glb["nodes"][model["children"][0]]
+                        part, = glb["meshes"][steel["mesh"]]["primitives"]
+                        pos = samples(glb, binary, part["attributes"]["POSITION"], "<3f")
+                        self.check_bin(glb, binary, kind, high, pos, part)
+
+    def check_bin(self, glb, binary, kind, high, pos, part):
+        height, centre = BINS[kind]
+        self.assertAlmostEqual(high, height, places=3)
+        cover = [(x, y, z) for x, y, z in pos if y > high - .14]
+        front = max(y for _, y, z in cover if z > centre + .13)
+        back = max(y for _, y, z in cover if z < centre - .13)
+        self.assertGreater(front - back, .075)
+        edge = max(abs(x) for x, _, z in cover if abs(z - centre) > .13)
+        self.assertLess(edge, max(abs(x) for x, _, _ in cover) - .025)
+        if kind == "bin-recycling":
+            a = glb["accessors"][part["indices"]]
+            fmt = "<I" if a["componentType"] == 5125 else "<H"
+            indices = [i for i, in samples(glb, binary, part["indices"], fmt)]
+            faces = [[pos[i] for i in indices[j:j + 3]] for j in range(0, len(indices), 3)]
+            mouth = [face for face in faces if all(abs(p[1] - .809) < 1e-5 for p in face)]
+            for x in [-.318, 0, .318]:
+                self.assertFalse(any(covers((x, 0), face) for face in mouth), x)
+            self.assertTrue(any(covers((.159, 0), face) for face in mouth))
 
 
 if __name__ == "__main__":

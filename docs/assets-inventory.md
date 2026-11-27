@@ -171,17 +171,17 @@ wood material, and some parts lie below Y = 0.
 `assets/furniture/ipr-street.glb` contains 21 glTF scenes. Each has one selectable root named
 `<kind>--<level>`, with a level of `near`, `middle` or `far`. Load the file once and read every entry
 in `GLTFLoader`'s `scenes`. The root records its kind, level, standing datum (`groundY: 0`) and Y-up
-axis in glTF extras. Both railing styles are 2 m sections with length along X. The small bin is the
-canopied model and retains its buried anchor. Each freestanding object's origin belongs at the
+axis in glTF extras. Both railing styles are 2 m sections with length along X. The bins face local
++Z. The small bin and bicycle stand have below-grade anchors. Each freestanding object's origin belongs at the
 finished surface at the centre of its footprint. Apply heading around world Y so it stays upright on
 a slope. Check ground contact at the individual posts of longer objects.
 
 | Root kind | Triangles, near / middle / far | WebGL draws per instance |
 |---|---:|---:|
-| `bin-large` | 452 / 196 / 100 | 2 |
-| `bin-small-canopied` | 580 / 296 / 140 | 2 |
-| `bin-recycling` | 728 / 392 / 280 | 3 |
-| `cycle-stand` | 344 / 104 / 64 | 1 |
+| `bin-large` | 744 / 596 / 460 | 2 |
+| `bin-small-canopied` | 620 / 500 / 380 | 2 |
+| `bin-recycling` | 790 / 636 / 494 | 2 |
+| `cycle-stand` | 492 / 240 / 132 | 1 |
 | `bollard` | 152 / 56 / 40 | 1 |
 | `railing-bars` | 448 / 128 / 80 | 1 |
 | `railing-glass` | 450 / 130 / 82 | 2 |
@@ -189,9 +189,15 @@ a slope. Check ground contact at the individual posts of longer objects.
 The WebGL measurements come from the exported GLB, with shadows off. For a mesh with `extras.singlePass`,
 set its material's `forceSinglePass` to true after loading. The glass railing's single double-sided
 plane and opaque frame then draw in two calls instead of three. Keep the panes sortable as separate
-surfaces and instance the opaque meshes by kind and level in each visible tile. The 312,872-byte file
-contains its cladding and glass textures. The near bin geometry drops from 804 triangles each by
-simplifying the large bin's two uprights and the small bin's canopy tessellation.
+surfaces and instance the opaque meshes by kind and level in each visible tile. The 438,644-byte file
+contains its cladding and glass textures.
+
+The bins and bicycle stand were rebuilt in `tools/street_furniture_models.js` using the converted lab
+references `bin-large.glb`, `bin-small.glb`, `bin-recycling.glb` and `cycle-rack.glb`. The bins use
+the inclined covers from catalogue UK.2, UK.5 and UK.4, respectively. The recycling bin has three
+circular recesses. The US.4 stand keeps straight legs, a level crossbar and tangent bends at every
+detail level. [IPR 3D drawings](https://iprpraha.cz/stranka/3413/3d-vykresy-mobiliare) ·
+[IPR catalogue, pp. 24–26](https://iprpraha.cz/assets/files/files/edfe93bf29ab70484e25676953ead79c.pdf#page=24)
 
 Rebuild with `python -P -E tools/pack_street_furniture.py --lab <prague-street-assets-lab>`.
 `--audit` writes WebGL counts for the lab and round-tripped GLB, plus the full-detail source models.
