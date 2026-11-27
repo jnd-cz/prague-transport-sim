@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Models from IPR catalogue UK.2, UK.4, UK.5 and US.4 and the corresponding lab CAD references.
+// Models from IPR catalogue UK.2, UK.4, UK.5, US.4 and Z.1–Z.14.
 import * as T from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -166,13 +166,13 @@ function cheek(x, z, bottom, underside, steps) {
 }
 
 const BINS = {
-  'bin-large': { length: .675, depth: .375, rimY: .803, high: 1.015, base: .060 },
-  'bin-recycling': { length: 1.015, depth: .375, rimY: .809, high: 1.020, base: .060 },
-  'bin-small-canopied': { length: .375, depth: .375, rimY: 1.003, high: 1.186, base: .231 },
+  'bin-large': { catalogue: 'UK.2', length: .675, depth: .375, rimY: .803, high: 1.015, base: .060 },
+  'bin-recycling': { catalogue: 'UK.4', length: 1.015, depth: .375, rimY: .809, high: 1.020, base: .060 },
+  'bin-small-canopied': { catalogue: 'UK.5', length: .375, depth: .375, rimY: 1.003, high: 1.186, base: .231 },
 };
 
 export function makeBin(kind, level) {
-  const { length, depth, rimY, high, base } = BINS[kind];
+  const { catalogue, length, depth, rimY, high, base } = BINS[kind];
   const small = kind === 'bin-small-canopied', recycling = kind === 'bin-recycling';
   const { ends } = DETAIL[level], z = small ? .035 : 0;
   const outline = (inset = 0) => capsule(length - 2 * inset, depth - 2 * inset, ends, z);
@@ -210,6 +210,7 @@ export function makeBin(kind, level) {
     frame.push(new T.BoxGeometry(.018, .065, .006).translate(recycling ? -.154 : 0, .55, depth / 2 + .001));
   }
   const model = new T.Group();
+  model.userData.catalogue = catalogue;
   model.add(
     mesh(steel, [...tint(frame, coating), ...tint(inside, liner)]),
     mesh(expandedMetal(), [strip(outer, base + .014, rimY - .016)]),
@@ -230,10 +231,8 @@ function standPath(bend) {
   return path;
 }
 
-export function makeCycleStand(level) {
-  const { bend, section } = DETAIL[level];
+function sweep(path, half, depth, section) {
   const positions = [], normals = [], uv = [], indices = [];
-  const path = standPath(bend), half = .0195, depth = .0315;
   for (const [i, [x, y, nx, ny]] of path.entries()) {
     for (let j = 0; j < section; j++) {
       const angle = 2 * Math.PI * j / section, a = Math.cos(angle), b = Math.sin(angle);
@@ -246,12 +245,169 @@ export function makeCycleStand(level) {
       indices.push(u, v, u + section, v, v + section, u + section);
     }
   }
-  const frame = [geometry(positions, normals, uv, indices)];
+  return geometry(positions, normals, uv, indices);
+}
+
+export function makeCycleStand(level) {
+  const { bend, section } = DETAIL[level];
+  const frame = [sweep(standPath(bend), .0195, .0315, section)];
   if (level === 'near') for (const x of [-.2755, .2755]) {
     const plate = slab(capsule(.15, .065, 4), -.098, .018);
     frame.push(plate.rotateY(Math.PI / 2).translate(x, 0, 0));
   }
   const model = new T.Group();
   model.add(mesh(steel, tint(frame, coating)));
+  return model;
+}
+
+// The type 1 span is the outside frame width. The type 2 dimension is post-centre spacing.
+export const RAILINGS = {
+  'railing-bars-short': [1, 1, 'bars'],
+  'railing-glass-short': [2, 1, 'glass'],
+  'railing-glass-rounded-short': [3, 1, 'glass-rounded'],
+  'railing-three-bars-short': [4, 1, 'three-bars'],
+  'railing-bars': [5, 2, 'bars'],
+  'railing-glass': [6, 2, 'glass'],
+  'railing-glass-rounded': [7, 2, 'glass-rounded'],
+  'railing-three-bars': [8, 2, 'three-bars'],
+  'railing-tubular-three-bars-short': [9, 1, 'three-bars'],
+  'railing-tubular-bars-short': [10, 1, 'bars'],
+  'railing-tubular-glass-short': [11, 1, 'glass'],
+  'railing-tubular-three-bars': [12, 2, 'three-bars'],
+  'railing-tubular-bars': [13, 2, 'bars'],
+  'railing-tubular-glass': [14, 2, 'glass'],
+};
+
+const RAIL_DETAIL = {
+  near: { sides: 12, bend: 6 },
+  middle: { sides: 8, bend: 4 },
+  far: { sides: 4, bend: 3 },
+};
+const glassSurface = { side: T.DoubleSide, transparent: true, depthWrite: false, forceSinglePass: true };
+const clearPane = new T.MeshBasicMaterial({ ...glassSurface, name: 'clear railing glass', color: 0xb6cbcb, opacity: .22 });
+const printPanes = new Map();
+
+function printedPane(width, height, bottom) {
+  if (printPanes.has(width)) return printPanes.get(width);
+  const scale = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(172,195,193,.22)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const dot = (x, y, radius) => {
+    ctx.beginPath();
+    ctx.arc(x * scale, (bottom + height - y) * scale, radius * scale, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  ctx.fillStyle = 'rgba(72,78,78,.58)';
+  for (let row = 0, y = bottom + .03; y < bottom + height; row++, y += .042) {
+    for (let x = .036 + (row % 2) * .03125; x < width; x += .0625) dot(x, y, .006);
+  }
+  // Z.S.1 and Z.S.2 use a single row at 916 mm above the paving.
+  ctx.fillStyle = 'rgba(47,52,54,.88)';
+  const n = Math.floor(width / .125);
+  for (let i = 0; i < n; i++) dot(width / 2 + (i - (n - 1) / 2) * .125, .916, .025);
+  const map = new T.CanvasTexture(canvas);
+  map.colorSpace = T.SRGBColorSpace;
+  const material = new T.MeshBasicMaterial({ ...glassSurface, name: 'printed railing glass', map });
+  printPanes.set(width, material);
+  return material;
+}
+
+function glassPanel(width, height, bottom, rounded, material, bend) {
+  let g = new T.PlaneGeometry(width, height);
+  if (rounded) {
+    g.dispose();
+    const x = width / 2, y = height / 2, r = .010;
+    const shape = new T.Shape();
+    shape.moveTo(-x + r, -y);
+    shape.lineTo(x - r, -y);
+    shape.quadraticCurveTo(x, -y, x, -y + r);
+    shape.lineTo(x, y - r);
+    shape.quadraticCurveTo(x, y, x - r, y);
+    shape.lineTo(-x + r, y);
+    shape.quadraticCurveTo(-x, y, -x, y - r);
+    shape.lineTo(-x, -y + r);
+    shape.quadraticCurveTo(-x, -y, -x + r, -y);
+    g = new T.ShapeGeometry(shape, Math.max(1, Math.floor(bend / 2)));
+    const p = g.attributes.position, uv = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / width + .5, p.getY(i) / height + .5);
+  }
+  return new T.Mesh(g.translate(0, bottom + height / 2, 0), material);
+}
+
+function tubeX(radius, from, to, y, sides, cap = false) {
+  return new T.CylinderGeometry(radius, radius, to - from, sides, 1, !cap, Math.PI / 2)
+    .rotateZ(Math.PI / 2).translate((from + to) / 2, y, 0);
+}
+
+function straightRailing(span, fill, level, sides, bend) {
+  const glass = fill.startsWith('glass'), height = 1.1, bottom = -.15;
+  const post = span / 2 - .0165, topRail = height - .02415, lowRail = .2;
+  const paneBottom = .238, paneHeight = .803;
+  const frame = [tubeX(.02415, -post, post, topRail, sides), tubeX(.02415, -post, post, lowRail, sides)];
+  if (fill === 'three-bars') frame.push(tubeX(.02415, -post, post, (topRail + lowRail) / 2, sides));
+  for (const x of [-post, post]) {
+    const section = capsule(.05, .033, level === 'near' ? 4 : 2);
+    frame.push(slab(section, bottom, height - bottom).rotateY(Math.PI / 2).translate(x, 0, 0));
+    if (level === 'near') frame.push(new T.BoxGeometry(.110, .012, .154).translate(x, bottom + .006, 0));
+  }
+  if (glass && level !== 'far') {
+    for (const x of span === 1 ? [-.30, .30] : [-.80, 0, .80]) {
+      for (const y of [paneBottom - .006, paneBottom + paneHeight + .006]) {
+        frame.push(new T.BoxGeometry(.035, .025, .020).translate(x, y, 0));
+      }
+    }
+  }
+  const group = new T.Group();
+  group.add(mesh(steel, tint(frame, coating)));
+  if (glass) {
+    const w = span - .096;
+    group.add(glassPanel(w, paneHeight, paneBottom, fill === 'glass-rounded',
+      printedPane(w, paneHeight, paneBottom), bend));
+  }
+  return group;
+}
+
+function bentRailing(span, fill, level, sides, bend) {
+  const post = span / 2, base = -.2, long = span === 2;
+  const height = long ? 1.130 : 1.124, radius = long ? .030 : .025;
+  const top = height - radius, low = .2, stub = long ? .104 : .080, elbow = long ? .078 : .063;
+  const path = [[-post, base, -1, 0]];
+  for (let i = 0; i <= bend; i++) {
+    const a = Math.PI - i * Math.PI / (2 * bend), nx = Math.cos(a), ny = Math.sin(a);
+    path.push([-post + elbow * (1 + nx), top - elbow * (1 - ny), nx, ny]);
+  }
+  path.push([post + stub - .02, top, 0, 1]);
+  const frame = [
+    sweep(path, radius, .025, sides),
+    tubeX(radius, post + stub - .021, post + stub, top, sides, true),
+    tubeX(.021, -post, post + stub, low, sides, true),
+    new T.CylinderGeometry(.025, .025, top - base, sides, 1, false, Math.PI / 2)
+      .translate(post, (top + base) / 2, 0),
+  ];
+  if (fill === 'three-bars') frame.push(tubeX(.021, -post, post + stub, low + .45, sides, true));
+  if (level === 'near') for (const x of [-post, post]) {
+    const foot = long ? .105 : .075;
+    frame.push(new T.CylinderGeometry(foot, foot, .014, sides).translate(x, base + .007, 0));
+  }
+  const w = long ? 1.788 : .826, h = long ? .809 : .817, y = .232;
+  if (fill === 'glass') for (const railY of [(y + low + .021) / 2, (y + h + top - radius) / 2]) {
+    frame.push(new T.BoxGeometry(w, .016, .016).translate(0, railY, 0));
+  }
+  const group = new T.Group();
+  group.add(mesh(steel, tint(frame, coating)));
+  if (fill === 'glass') group.add(glassPanel(w, h, y, false, clearPane, bend));
+  return group;
+}
+
+export function makeRailing(kind, level) {
+  const [number, span, fill] = RAILINGS[kind];
+  const { sides, bend } = RAIL_DETAIL[level];
+  const model = number < 9 ? straightRailing(span, fill, level, sides, bend)
+    : bentRailing(span, fill, level, sides, bend);
+  Object.assign(model.userData, { catalogue: 'Z.' + number, span });
   return model;
 }

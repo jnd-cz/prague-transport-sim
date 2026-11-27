@@ -32,7 +32,7 @@ PACK = """async ({ traction, attribution }) => {
   const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
   const { makeBinDetailed, makeBinLod, makeRecyclingBinLod, makeCycleStandLod } = await import('/furniture-lod.js');
-  const { makeBin, makeCycleStand } = await import('/street_furniture_models.js');
+  const { makeBin, makeCycleStand, makeRailing, RAILINGS } = await import('/street_furniture_models.js');
   const { makeBollardLod, makeRailingLod } = await import('/barrier-lod.js');
   const { makeTractionPole, makeWallAnchor } = await import('/traction-assets.js');
   const levels = ['near', 'middle', 'far'];
@@ -48,11 +48,12 @@ PACK = """async ({ traction, attribution }) => {
     'railing-glass': level => makeRailingLod({ level, fill: 'glass' })
   };
   const street = {
-    ...labStreet,
     'bin-large': level => makeBin('bin-large', level),
     'bin-small-canopied': level => makeBin('bin-small-canopied', level),
     'bin-recycling': level => makeBin('bin-recycling', level),
     'cycle-stand': makeCycleStand,
+    'bollard': makeBollardLod,
+    ...Object.fromEntries(Object.keys(RAILINGS).map(kind => [kind, level => makeRailing(kind, level)])),
   };
   const poles = {
     'pole-octagonal': level => makeTractionPole({ level }),
@@ -99,9 +100,9 @@ PACK = """async ({ traction, attribution }) => {
   const rows = [];
   const scenes = Object.entries(traction ? poles : street).flatMap(([kind, make]) => levels.map(level => {
     const model = make(level);
-    const original = !traction && labStreet[kind] !== make ? labStreet[kind](level) : model;
-    const before = measure(original);
-    if (original !== model) original.traverse(mesh => mesh.geometry?.dispose());
+    const original = traction || labStreet[kind] === make ? model : labStreet[kind]?.(level);
+    const before = original ? measure(original) : null;
+    if (original && original !== model) original.traverse(mesh => mesh.geometry?.dispose());
     model.name = kind + '--' + level;
     const wall = kind.startsWith('anchor-');
     Object.assign(model.userData, { kind, level, placement: wall ? 'wall' : 'ground' });

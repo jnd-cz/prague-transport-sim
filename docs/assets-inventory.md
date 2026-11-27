@@ -168,10 +168,10 @@ wood material, and some parts lie below Y = 0.
 
 #### Game pack from the street furniture studies
 
-`assets/furniture/ipr-street.glb` contains 21 glTF scenes. Each has one selectable root named
+`assets/furniture/ipr-street.glb` contains 57 glTF scenes. Each has one selectable root named
 `<kind>--<level>`, with a level of `near`, `middle` or `far`. Load the file once and read every entry
 in `GLTFLoader`'s `scenes`. The root records its kind, level, standing datum (`groundY: 0`) and Y-up
-axis in glTF extras. Both railing styles are 2 m sections with length along X. The bins face local
+axis in glTF extras. Railings run along local X and record their catalogue number and nominal span. The bins face local
 +Z. The small bin and bicycle stand have below-grade anchors. Each freestanding object's origin belongs at the
 finished surface at the centre of its footprint. Apply heading around world Y so it stays upright on
 a slope. Check ground contact at the individual posts of longer objects.
@@ -183,21 +183,38 @@ a slope. Check ground contact at the individual posts of longer objects.
 | `bin-recycling` | 790 / 636 / 494 | 2 |
 | `cycle-stand` | 492 / 240 / 132 | 1 |
 | `bollard` | 152 / 56 / 40 | 1 |
-| `railing-bars` | 448 / 128 / 80 | 1 |
-| `railing-glass` | 450 / 130 / 82 | 2 |
+| Z.1–Z.8, straight frame | 144–230 / 72–154 / 56–64 | 1–2 |
+| Z.9–Z.14, bent tubular frame | 432–480 / 192–224 / 88–114 | 1–2 |
 
 The WebGL measurements come from the exported GLB, with shadows off. For a mesh with `extras.singlePass`,
 set its material's `forceSinglePass` to true after loading. The glass railing's single double-sided
 plane and opaque frame then draw in two calls instead of three. Keep the panes sortable as separate
-surfaces and instance the opaque meshes by kind and level in each visible tile. The 438,644-byte file
+surfaces and instance the opaque meshes by kind and level in each visible tile. The 874,128-byte file
 contains its cladding and glass textures.
 
-The bins and bicycle stand were rebuilt in `tools/street_furniture_models.js` using the converted lab
-references `bin-large.glb`, `bin-small.glb`, `bin-recycling.glb` and `cycle-rack.glb`. The bins use
-the inclined covers from catalogue UK.2, UK.5 and UK.4, respectively. The recycling bin has three
+The bins and bicycle stand were rebuilt in `tools/street_furniture_models.js`. The converted lab references
+provide the body and stand profiles. The canopy geometry follows the inclined catalogue drawings UK.2,
+UK.5 and UK.4. The recycling bin has three
 circular recesses. The US.4 stand keeps straight legs, a level crossbar and tangent bends at every
 detail level. [IPR 3D drawings](https://iprpraha.cz/stranka/3413/3d-vykresy-mobiliare) ·
 [IPR catalogue, pp. 24–26](https://iprpraha.cz/assets/files/files/edfe93bf29ab70484e25676953ead79c.pdf#page=24)
+
+For placement there are six visual configurations. Select the frame and infill from evidence at the site, then
+use the 1 m or 2 m module that fits. Rounded glass corners are a catalogue option within the straight glazed
+configuration. The two Z.S. entries specify the printed pattern used by the straight glazed variants.
+
+| Frame | Infill | 1 m | 2 m |
+|---|---|---|---|
+| Straight, silniční 1 | Two bars | Z.1 | Z.5 |
+| Straight, silniční 1 | Three bars | Z.4 | Z.8 |
+| Straight, silniční 1 | Glass, square or rounded corners | Z.2 / Z.3 | Z.6 / Z.7 |
+| Bent tubular, silniční 2 | Two bars | Z.10 | Z.13 |
+| Bent tubular, silniční 2 | Three bars | Z.9 | Z.12 |
+| Bent tubular, silniční 2 | Glass | Z.11 | Z.14 |
+
+The nominal span is outside frame width for type 1 and post-centre spacing for type 2. The base depths are
+150 mm and 200 mm below finished paving, respectively. Z.11 uses the 1.124 m height dimensioned in its
+drawing. Glass uses one double-sided surface per module. [IPR catalogue, pp. 13–20](https://iprpraha.cz/assets/files/files/edfe93bf29ab70484e25676953ead79c.pdf#page=13)
 
 Rebuild with `python -P -E tools/pack_street_furniture.py --lab <prague-street-assets-lab>`.
 `--audit` writes WebGL counts for the lab and round-tripped GLB, plus the full-detail source models.
