@@ -106,6 +106,19 @@ CHECK = """async () => {
       passagePost, seatClear };
   }));
 
+  const compact = levels.map(level => {
+    const model = makeIprShelter('P.12', level, name, { compactBench: true });
+    const seat = new THREE.Box3().setFromObject(model.getObjectByName('seats'));
+    scene.add(model);
+    renderer.render(scene, camera);
+    const { calls, triangles } = renderer.info.render;
+    scene.remove(model);
+    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).toArray();
+    return { calls, triangles, size, seatDepth: seat.max.z - seat.min.z, width: seat.max.x - seat.min.x,
+      seatSide: seat.getCenter(new THREE.Vector3()).x, seatHeight: seat.max.y,
+      seatInFront: seat.min.z > model.getObjectByName('rear-glass').position.z };
+  });
+
   const detail = new THREE.OrthographicCamera(-1.25, 1.25, .59, -.59, .1, 20);
   for (const [col, [variant, side, caption]] of [
     ['P.1', 1, 'P.1 · front'], ['P.1', -1, 'P.1 · street side'], ['P.11', 1, 'P.11 · outward face'],
@@ -150,7 +163,7 @@ CHECK = """async () => {
   const differentNames = pair[0].getObjectByName('stop-name').material.map !== pair[1].getObjectByName('stop-name').material.map;
   renderer.setRenderTarget(null);
   target.dispose();
-  return { results, pair: { separate, instanced, differentNames, sameTriangleCount } };
+  return { results, compact, pair: { separate, instanced, differentNames, sameTriangleCount } };
 }"""
 
 HTML = """<!doctype html><style>
@@ -218,6 +231,15 @@ def main():
             if standard_passage:
                 assert model["passagePost"] and model["seatClear"], model
         print(f"{variant}: {counts} triangles, {calls} draw calls with a stop label")
+    island = next(row for row in measured["results"] if row[0]["variant"] == "P.12")
+    for standard, compact in zip(island, measured["compact"], strict=True):
+        assert compact["size"] == standard["size"], compact
+        assert abs(compact["width"] - 1.6) < .001 and abs(compact["seatDepth"] - .26) < .005, compact
+        assert abs(compact["seatSide"] - .36) < .001 and .48 < compact["seatHeight"] < .5, compact
+        assert compact["seatInFront"], compact
+        assert compact["calls"] == standard["calls"] + 1, compact
+    print(f"P.12 with compact seat: {[v['triangles'] for v in measured['compact']]} triangles, "
+          f"{[v['calls'] for v in measured['compact']]} draw calls with a stop label")
     pair = measured["pair"]
     assert pair == {"separate": 18, "instanced": 15, "differentNames": True, "sameTriangleCount": True}, pair
     print("Two differently named near P.1 shelters: 18 to 15 draw calls with opaque instancing")

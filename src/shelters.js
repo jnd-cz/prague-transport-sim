@@ -108,7 +108,20 @@ function canopy(group, frame, length, wall, back, level) {
   }
 }
 
-function freestanding(group, frame, layout, back, level) {
+function addCompactBench(frame, seats, back, level) {
+  // The waterfront platform has a shallow seat on two brackets fixed to the lower rail (#252).
+  const centre = .36, depth = .26, slats = level === 'far' ? 1 : 3;
+  for (let i = 0; i < slats; i++) {
+    box(seats, 1.60, .032, depth / slats - (slats > 1 ? .003 : 0), centre, .477,
+      back + .063 + (i + .5) * depth / slats);
+  }
+  for (const x of [centre - .56, centre + .56]) {
+    frame.push(new THREE.BoxGeometry(.043, Math.hypot(.218, .185), .042)
+      .rotateX(Math.atan2(.185, .218)).translate(x, .343, back + .1325));
+  }
+}
+
+function freestanding(group, frame, layout, back, level, compactBench) {
   const { supports, bays, side, citylight, bench = true } = layout, near = level === 'near', far = level === 'far';
   const seats = [];
   for (const x of supports) {
@@ -139,6 +152,7 @@ function freestanding(group, frame, layout, back, level) {
       if (!far) box(frame, .046, .23, .045, x, .335, back + .038);
     }
   }
+  if (compactBench) addCompactBench(frame, seats, back, level);
   if (seats.length) group.add(batch(seats, wood));
   if (!side) return;
 
@@ -211,14 +225,15 @@ function fascia(group, frame, { supports, bays, passage }, back, stopName) {
 
 // Length is on X, front is +Z and placement height is Y = 0. The back wall plane
 // for P.11 is Z = -0.929. A newline in the stop label separates the name and its qualifier.
-export function makeIprShelter(variant, level = 'near', stopName = '') {
+// Enable compactBench for P.12 placements with a documented seat.
+export function makeIprShelter(variant, level = 'near', stopName = '', { compactBench = false } = {}) {
   if (!Object.hasOwn(LAYOUTS, variant)) throw new RangeError(`Unknown shelter variant: ${variant}`);
   if (!['near', 'middle', 'far'].includes(level)) throw new RangeError(`Unknown shelter detail: ${level}`);
   const layout = LAYOUTS[variant], wall = -(layout.depth ?? STANDARD_DEPTH) / 2, back = wall + .14;
   const group = new THREE.Group(), frame = [];
   group.name = variant;
   canopy(group, frame, layout.length, wall, back, level);
-  if (layout.bays) freestanding(group, frame, layout, back, level);
+  if (layout.bays) freestanding(group, frame, layout, back, level, variant === 'P.12' && compactBench);
   else wallMounts(frame, layout.supports, wall, level === 'near');
   fascia(group, frame, layout, back, stopName);
   group.add(batch(frame, metal));
