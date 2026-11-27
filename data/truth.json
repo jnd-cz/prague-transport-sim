@@ -6934,6 +6934,90 @@
      "why": "one street over the passage, 193.1-193.3 m, a kerb at most (the user's decision: the street as the ground, #783's way). Batch C's file fell 5 m into the raster's floor between x -629 and -621"
     }
    ]
+  },
+  "road-at-a-walls-foot": {
+   "line": "22",
+   "at": [
+    -2197.4,
+    767.0
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "a road (survey area 4) along the foot of a wall (area 693) on line 22 (50.0915, 14.38944): the road's corners on the wall's outline stood up to 2.33 m over the road 0.5 m in, 20 of them over 0.3 m, a lip up the wall (batch E's file). The road's own outline has the foot's height there, and its street surface 2 m in agrees (own_outline)",
+   "source": "the scan of 2026-11-27 on batch E's ground (tools/bench/street_at_walls.py), #653",
+   "sections": [
+    {
+     "name": "along the road 0.3 m off the wall, 8 m",
+     "from": [
+      -2198.13,
+      763.06
+     ],
+     "to": [
+      -2196.09,
+      770.79
+     ],
+     "expect": {
+      "largest step m": 0.3
+     },
+     "why": "the road runs on at its own level along the wall's foot; batch E's corners on the outline stood 0.8-2.3 m over it"
+    }
+   ]
+  },
+  "road-beside-stairs": {
+   "line": "17",
+   "at": [
+    -1665.6,
+    -9080.4
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "a road (survey area 7103) beside a flight of stairs (area 7778) on line 17 (50.00445, 14.41557): the road's corners on the stairs' outline stood up to 1.67 m under the road 0.5 m in, 13 of them over 0.3 m (batch E's file). The road's own outline has its level there, and its street surface 2 m in agrees (own_outline)",
+   "source": "the scan of 2026-11-27 on batch E's ground (tools/bench/street_at_walls.py), #653",
+   "sections": [
+    {
+     "name": "along the road 0.3 m off the stairs, 8 m",
+     "from": [
+      -1663.73,
+      -9076.85
+     ],
+     "to": [
+      -1667.98,
+      -9083.63
+     ],
+     "expect": {
+      "largest step m": 0.3
+     },
+     "why": "the road runs on at its own level beside the stairs; batch E's corners on their outline dipped up to 1.67 m"
+    }
+   ]
+  },
+  "stairs-well-beside-a-cover": {
+   "line": "37",
+   "at": [
+    9264.8,
+    957.8
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the rim of the stairs (area 4863) down to a pedestrian underpass beside the street over it on line 37 (50.10719, 14.54781), the street a level-1 cover since #824: the sidewalk's (area 4668) corners on the rim at s 20.4-21.2 m along the stairs' outline stood at 236.0 m, the raster's well, under the rim's 239.5-239.7 m: #824's deck edge (1.5 m round any level-1 area) put them on the lidar (batch E's file). The edge is a deck's alone now (under_decks)",
+   "source": "the scan of 2026-11-27 on batch E's ground (tools/bench/street_at_walls.py), #653",
+   "sections": [
+    {
+     "name": "along the sidewalk 0.3 m off the stairs' rim, 3.6 m",
+     "from": [
+      9265.38,
+      958.41
+     ],
+     "to": [
+      9262.17,
+      956.77
+     ],
+     "expect": {
+      "largest step m": 0.3
+     },
+     "why": "the sidewalk runs on at the rim's level; batch E's corners on the rim fell 3.4 m into the well"
+    }
+   ]
   }
  },
  "openTrackReview": {

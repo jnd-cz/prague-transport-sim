@@ -63,7 +63,7 @@ RULES = {
                    "wall-end-in-a-path", "sidewalk-under-a-road-wall", "sidewalk-on-a-quay-wall", "branik-platform-ramps",
                    "cerny-kun-platform-wall", "modranska-skola-ramp", "na-vapence-garage-ramp", "modrany-viaduct-ramps",
                    "garden-beds", "zizkov-wall-at-the-kerb", "motol-wall-at-the-kerb", "wall-above-a-lower-walkway",
-                   "hlavni-nadrazi-under-the-magistrala", "motol-bridge-parapets"],
+                   "hlavni-nadrazi-under-the-magistrala", "motol-bridge-parapets", "road-at-a-walls-foot", "road-beside-stairs"],
     },
     "kerbs": {
         "what": "kerbs: raised edges, lowered kerbs, belts, parking bays (#606, #638, #800)",
@@ -108,7 +108,7 @@ RULES = {
                  "ground_mesh.BRIDGE_NEAR", "ground_mesh.MOUTH_FIT"],
         "places": ["hlavni-nadrazi-under-the-magistrala", "vysehrad-tunnel-mouths", "street-over-an-underpass",
                    "krejcarek-abutment", "modrany-viaduct-ramps", "slanska-street-under-a-bridge",
-                   "narodni-divadlo-bridgehead", "motol-bridge-parapets"],
+                   "narodni-divadlo-bridgehead", "motol-bridge-parapets", "stairs-well-beside-a-cover"],
     },
     "plots": {
         "what": "plots, lawns, yards and beds in a sidewalk: their heights, terraces, pits and thin strips, a lawn at a raised edge (#638, #663, #696, #738, #764, #770)",
