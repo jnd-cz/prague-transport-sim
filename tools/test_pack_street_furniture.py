@@ -28,17 +28,17 @@ RAILINGS = {
     "railing-tubular-glass": (14, 2, (458, 194, 66)),
 }
 TRIANGLES = {
-    "bin-large": (744, 596, 460),
-    "bin-small-canopied": (620, 500, 380),
-    "bin-recycling": (790, 636, 494),
+    "bin-large": (678, 488, 362),
+    "bin-small-canopied": (632, 460, 336),
+    "bin-recycling": (724, 528, 396),
     "cycle-stand": (492, 240, 132),
     "bollard": (152, 56, 40),
     **{kind: counts for kind, (_, _, counts) in RAILINGS.items()},
 }
 BINS = {
-    "bin-large": ("UK.2", 1.015, 0),
-    "bin-small-canopied": ("UK.5", 1.186, .035),
-    "bin-recycling": ("UK.4", 1.020, 0),
+    "bin-large": ("UK.2", 1.015, 0, .803, .675),
+    "bin-small-canopied": ("UK.5", 1.186, .035, 1.003, .375),
+    "bin-recycling": ("UK.4", 1.020, 0, .809, 1.015),
 }
 
 
@@ -128,7 +128,7 @@ class TestFurniturePack(unittest.TestCase):
                         self.check_bin(glb, binary, kind, high, pos, part)
 
     def check_bin(self, glb, binary, kind, high, pos, part):
-        _, height, centre = BINS[kind]
+        _, height, centre, rim, length = BINS[kind]
         self.assertAlmostEqual(high, height, places=3)
         cover = [(x, y, z) for x, y, z in pos if y > high - .14]
         front = max(y for _, y, z in cover if z > centre + .13)
@@ -136,12 +136,31 @@ class TestFurniturePack(unittest.TestCase):
         self.assertGreater(front - back, .075)
         edge = max(abs(x) for x, _, z in cover if abs(z - centre) > .13)
         self.assertLess(edge, max(abs(x) for x, _, _ in cover) - .025)
+
+        self.assertTrue(glb["materials"][part["material"]]["doubleSided"])
+        a = glb["accessors"][part["indices"]]
+        fmt = "<I" if a["componentType"] == 5125 else "<H"
+        indices = [i for i, in samples(glb, binary, part["indices"], fmt)]
+        faces = [[pos[i] for i in indices[j:j + 3]] for j in range(0, len(indices), 3)]
+
+        def underside(z):
+            return height - .063 + (.104 / .375) * (z - centre)
+
+        neck = [face for face in faces if any(rim + .008 < y < underside(z) - .006 for _, y, z in face)]
+        self.assertEqual(len(neck), len({tuple(sorted(face)) for face in neck}))
+        points = {p for face in neck for p in face}
+        roof_join = {(round(x, 6), round(z, 6)) for x, y, z in points if abs(y - underside(z)) < 1e-5}
+        rim_join = {(round(x, 6), round(z, 6)) for x, y, z in points if abs(y - rim) < 1e-5}
+        self.assertEqual(roof_join, rim_join)
+        self.assertAlmostEqual(max(x for x, _ in roof_join), length / 2, places=3)
+        self.assertAlmostEqual(max(z for _, z in roof_join), centre, places=3)
+        throat = [(x, z) for x, y, z in points if y > rim + .032 and y < underside(z) - .032]
+        # The opening curves inward in both elevations between the two matching outlines.
+        self.assertLess(max(abs(x) for x, _ in throat), length / 2 - .023)
+        self.assertLess(max(z for _, z in throat), centre - .035)
+
         if kind == "bin-recycling":
-            a = glb["accessors"][part["indices"]]
-            fmt = "<I" if a["componentType"] == 5125 else "<H"
-            indices = [i for i, in samples(glb, binary, part["indices"], fmt)]
-            faces = [[pos[i] for i in indices[j:j + 3]] for j in range(0, len(indices), 3)]
-            mouth = [face for face in faces if all(abs(p[1] - .809) < 1e-5 for p in face)]
+            mouth = [face for face in faces if all(abs(p[1] - rim) < 1e-5 for p in face)]
             for x in [-.318, 0, .318]:
                 self.assertFalse(any(covers((x, 0), face) for face in mouth), x)
             self.assertTrue(any(covers((.159, 0), face) for face in mouth))

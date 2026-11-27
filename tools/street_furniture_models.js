@@ -4,6 +4,9 @@ import * as T from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const steel = new T.MeshStandardMaterial({ name: 'black-grey metal', vertexColors: true, metalness: .2, roughness: .75 });
+const binSteel = steel.clone();
+binSteel.name = 'black-grey bin metal';
+binSteel.side = T.DoubleSide;
 const coating = new T.Color(0x35383a), liner = new T.Color(0x222526);
 const DETAIL = {
   near: { ends: 10, bend: 9, section: 10 },
@@ -67,14 +70,13 @@ function slab(outline, bottom, height, slope = 0, centre = 0) {
   return indexed;
 }
 
-function strip(outline, low, high, inward = false, close = true) {
+function strip(outline, low, high, inward = false) {
   const positions = [], normals = [], uv = [], indices = [];
   let u = 0;
-  const count = outline.length + Number(close);
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i <= outline.length; i++) {
     const p = outline[i % outline.length], q = outline[i - 1];
     if (q) u += Math.hypot(p.x - q.x, p.z - q.z);
-    for (const y of [low, typeof high === 'function' ? high(p.z) : high]) {
+    for (const y of [low, high]) {
       positions.push(p.x, y, p.z);
       normals.push(inward ? -p.nx : p.nx, 0, inward ? -p.nz : p.nz);
       uv.push(u / .144, y / .144);
@@ -99,11 +101,32 @@ function recyclingInlets(outer, y, segments) {
   };
 }
 
-function roofBack(crown, rimY, underside, centre) {
-  const half = crown.length / 2;
-  const rear = crown.slice(half).concat(crown.slice(0, half)).filter(p => p.z <= centre + 1e-6);
-  // The rear skin wraps both corners. The front remains open for access.
-  return [strip(rear, rimY, underside, false, false), strip(rear, rimY, underside, true, false)];
+function binNeck(outline, bottom, underside, centre, bands) {
+  const half = outline.length / 2;
+  const rear = outline.slice(half).concat(outline.slice(0, half)).filter(p => p.z <= centre + 1e-6);
+  const positions = [], uv = [], indices = [], width = rear.length;
+  // One sheet flares to the rim and to the sloped cover perimeter. Its open ends curve
+  // back in side view to leave a rounded mouth.
+  for (let band = 0; band <= bands; band++) {
+    const t = band / bands, waist = Math.sin(Math.PI * t);
+    for (const [i, p] of rear.entries()) {
+      positions.push(
+        p.x - p.nx * .033 * waist,
+        T.MathUtils.lerp(bottom, underside(p.z), t),
+        p.z - (1 + p.nz) * .052 * waist,
+      );
+      uv.push(i / (width - 1), t);
+      if (!band || !i) continue;
+      const upper = band * width + i, lower = upper - width;
+      indices.push(lower - 1, upper - 1, lower, upper - 1, upper, lower);
+    }
+  }
+  const neck = new T.BufferGeometry();
+  neck.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+  neck.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+  neck.setIndex(indices);
+  neck.computeVertexNormals();
+  return neck;
 }
 
 function rim(outer, inner, height) {
@@ -149,22 +172,6 @@ function tint(parts, color) {
   return parts;
 }
 
-function cheek(x, z, bottom, underside, steps) {
-  // Side elevation of the cast canopy support. The opening is on the high side.
-  const t = new T.Shape();
-  t.moveTo(z - .055, bottom);
-  t.lineTo(z - .055, underside(z - .055));
-  t.lineTo(z + .048, underside(z + .048));
-  t.quadraticCurveTo(z - .042, bottom + .058, z + .012, bottom + .018);
-  t.quadraticCurveTo(z + .027, bottom + .006, z + .062, bottom);
-  t.closePath();
-  const g = new T.ExtrudeGeometry(t, { depth: .014, bevelEnabled: false, curveSegments: steps });
-  g.rotateY(-Math.PI / 2).translate(x + .007, 0, 0);
-  const indexed = mergeVertices(g);
-  g.dispose();
-  return indexed;
-}
-
 const BINS = {
   'bin-large': { catalogue: 'UK.2', length: .675, depth: .375, rimY: .803, high: 1.015, base: .060 },
   'bin-recycling': { catalogue: 'UK.4', length: 1.015, depth: .375, rimY: .809, high: 1.020, base: .060 },
@@ -183,19 +190,15 @@ export function makeBin(kind, level) {
     slab(outer, base, .016),
     slab(outer, coverTop - skin, skin, slope, z),
     strip(outer, rimY - .018, rimY),
-    ...roofBack(outline(.009), rimY - .007, underside, z),
+    binNeck(outer, rimY, underside, z, level === 'near' ? 7 : ends / 2),
   ];
   if (small) {
     const post = -.193;
     frame.push(new T.CylinderGeometry(.03175, .03175, 1.091, 2 * ends).translate(0, .4635, post));
     frame.push(new T.BoxGeometry(.15, .018, .135).translate(0, -.091, post));
-    frame.push(new T.BoxGeometry(.048, .69, .069).translate(0, .616, -.158));
-    frame.push(cheek(0, z - .119, rimY - .008, underside, ends));
+    frame.push(new T.BoxGeometry(.048, .69, .055).translate(0, .616, -.173));
   } else {
     frame.push(slab(outline(.023), 0, base));
-    for (const x of [-1, 1]) {
-      frame.push(cheek(x * (length / 2 - .095), -.064, rimY - .008, underside, ends));
-    }
   }
   const inside = [slab(inner, rimY - .118, .005)];
   if (recycling) {
@@ -212,7 +215,7 @@ export function makeBin(kind, level) {
   const model = new T.Group();
   model.userData.catalogue = catalogue;
   model.add(
-    mesh(steel, [...tint(frame, coating), ...tint(inside, liner)]),
+    mesh(binSteel, [...tint(frame, coating), ...tint(inside, liner)]),
     mesh(expandedMetal(), [strip(outer, base + .014, rimY - .016)]),
   );
   return model;

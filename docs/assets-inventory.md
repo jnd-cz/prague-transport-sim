@@ -178,9 +178,9 @@ a slope. Check ground contact at the individual posts of longer objects.
 
 | Root kind | Triangles, near / middle / far | WebGL draws per instance |
 |---|---:|---:|
-| `bin-large` | 744 / 596 / 460 | 2 |
-| `bin-small-canopied` | 620 / 500 / 380 | 2 |
-| `bin-recycling` | 790 / 636 / 494 | 2 |
+| `bin-large` | 678 / 488 / 362 | 2 |
+| `bin-small-canopied` | 632 / 460 / 336 | 2 |
+| `bin-recycling` | 724 / 528 / 396 | 2 |
 | `cycle-stand` | 492 / 240 / 132 | 1 |
 | `bollard` | 152 / 56 / 40 | 1 |
 | Z.1–Z.8, straight frame | 144–230 / 72–88 / 40–48 | 1–2 |
@@ -189,12 +189,13 @@ a slope. Check ground contact at the individual posts of longer objects.
 The WebGL measurements come from the exported GLB, with shadows off. For a mesh with `extras.singlePass`,
 set its material's `forceSinglePass` to true after loading. The glass railing's single double-sided
 plane and opaque frame then draw in two calls instead of three. Keep the panes sortable as separate
-surfaces and instance the opaque meshes by kind and level in each visible tile. The 830,876-byte file
+surfaces and instance the opaque meshes by kind and level in each visible tile. The 773,364-byte file
 contains its cladding and glass textures.
 
 The bins and bicycle stand were rebuilt in `tools/street_furniture_models.js`. The converted lab references
 provide the body and stand profiles. The canopy geometry follows the inclined catalogue drawings UK.2,
-UK.5 and UK.4. The recycling bin has three
+UK.5 and UK.4. A single curved neck flares to the rounded cover and rim, with the front open for access.
+The recycling bin has three
 circular recesses. The US.4 stand keeps straight legs, a level crossbar and tangent bends at every
 detail level. [IPR 3D drawings](https://iprpraha.cz/stranka/3413/3d-vykresy-mobiliare) ·
 [IPR catalogue, pp. 24–26](https://iprpraha.cz/assets/files/files/edfe93bf29ab70484e25676953ead79c.pdf#page=24)
