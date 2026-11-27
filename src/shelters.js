@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const HEIGHT = 2.455;
 const STANDARD_DEPTH = 1.858;
+const POST_BASE = -.18;  // The anchor plate is below the ±0.000 paving datum (IPR catalogue, pp. 10–11).
 const GLASS_BOTTOM = .23, GLASS_TOP = 2.245;
 const FASCIA_Y = 2.13, FASCIA_HEIGHT = .36, FASCIA_DEPTH = .15;
 const STANDARD_POSTS = [-1.83, 1.83], PASSAGE_POSTS = [-1.83, -.61, 1.83];
@@ -125,8 +126,8 @@ function freestanding(group, frame, layout, back, level, compactBench) {
   const { supports, bays, side, citylight, bench = true } = layout, near = level === 'near', far = level === 'far';
   const seats = [];
   for (const x of supports) {
-    box(frame, .105, 2.32, .135, x, 1.16, back);
-    if (near) box(frame, .216, .018, .212, x, .009, back);
+    box(frame, .105, 2.32 - POST_BASE, .135, x, (2.32 + POST_BASE) / 2, back);
+    if (near) box(frame, .216, .02, .212, x, POST_BASE - .01, back);
   }
   for (const [first, last] of bays) {
     const lo = supports[first] + .055, hi = supports[last] - .055;
@@ -223,7 +224,7 @@ function fascia(group, frame, { supports, bays, passage }, back, stopName) {
   }
 }
 
-// Length is on X, front is +Z and placement height is Y = 0. The back wall plane
+// Length is on X, front is +Z and Y = 0 is the finished paving at the shelter midpoint. The back wall plane
 // for P.11 is Z = -0.929. A newline in the stop label separates the name and its qualifier.
 // Enable compactBench for P.12 placements with a documented seat.
 export function makeIprShelter(variant, level = 'near', stopName = '', { compactBench = false } = {}) {

@@ -109,6 +109,9 @@ CHECK = """async () => {
   const compact = levels.map(level => {
     const model = makeIprShelter('P.12', level, name, { compactBench: true });
     const seat = new THREE.Box3().setFromObject(model.getObjectByName('seats'));
+    const frame = model.getObjectByName('frame');
+    const lowerRail = [-1.5, 0, 1.5].every(x => rearRay(x, .233).intersectObject(frame).length > 0);
+    const buriedPlate = [-1, 1].every(side => rearRay(side * 1.91, -.19).intersectObject(frame).length > 0);
     scene.add(model);
     renderer.render(scene, camera);
     const { calls, triangles } = renderer.info.render;
@@ -116,7 +119,7 @@ CHECK = """async () => {
     const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).toArray();
     return { calls, triangles, size, seatDepth: seat.max.z - seat.min.z, width: seat.max.x - seat.min.x,
       seatSide: seat.getCenter(new THREE.Vector3()).x, seatHeight: seat.max.y,
-      seatInFront: seat.min.z > model.getObjectByName('rear-glass').position.z };
+      seatInFront: seat.min.z > model.getObjectByName('rear-glass').position.z, lowerRail, buriedPlate };
   });
 
   const detail = new THREE.OrthographicCamera(-1.25, 1.25, .59, -.59, .1, 20);
@@ -219,7 +222,8 @@ def main():
             assert abs(w - (7.080 if extended else 4.040)) < .001, model
             assert abs(d - (1.438 if island else 1.858)) < .001, model
             assert abs(model["max"][1] - 2.455) < .001, model
-            assert (h < .72 and model["min"][1] >= 1.75) if wall else abs(model["min"][1]) < .001, model
+            footing = -.20 if model["level"] == "near" else -.18
+            assert (h < .72 and model["min"][1] >= 1.75) if wall else abs(model["min"][1] - footing) < .001, model
             assert model["types"].count("frame") == 1 and model["types"].count("canopy") == 1, model
             assert model["twoBays"] == extended and ("seats" in model["types"]) == (not (wall or island)), model
             assert ("citylight" in model["types"]) == citylight, model
@@ -237,6 +241,7 @@ def main():
         assert abs(compact["width"] - 1.6) < .001 and abs(compact["seatDepth"] - .26) < .005, compact
         assert abs(compact["seatSide"] - .36) < .001 and .48 < compact["seatHeight"] < .5, compact
         assert compact["seatInFront"], compact
+        assert compact["lowerRail"] and compact["buriedPlate"] == (standard["level"] == "near"), compact
         assert compact["calls"] == standard["calls"] + 1, compact
     print(f"P.12 with compact seat: {[v['triangles'] for v in measured['compact']]} triangles, "
           f"{[v['calls'] for v in measured['compact']]} draw calls with a stop label")
