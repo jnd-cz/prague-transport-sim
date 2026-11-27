@@ -389,7 +389,12 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   whose first build filled the garage ramp on Na Vápence, one of 20 road, sidewalk and parking pits in both lidars;
   those off the survey stay, answer 2) into `data/ipr.fills.json`, which every `IprDtm` reads (`fill`;
   `city_terrain.read_ipr` too): 252 pits, 3,779 cells on the five lines' survey of 2026-11-27. `dtm.py` and `open_track.py` run before the fills in the
-  build and read the raster as it is (`IprDtm(fills=None)`). `tools/bench/street_pits.py` counts what is left. Of the
+  build and read the raster as it is (`IprDtm(fills=None)`). `tools/bench/street_pits.py` counts what is left: in the raster as read (0), and as holes in the written ground, a
+  road's or a sidewalk's pit whose ground lies 0.5 m or more under its rim's plane and under the low side of the
+  ground round it (ground batch E, 2026-11-27: 66, none of them a pit the rule fills; off the street 37, stairs or
+  a wall 11, the survey's level apart 7, in both lidars 7, a rim on no plane 3, no rim 1). Against the rim's plane
+  alone it counted 404, three of them filled pits at a wall's or a slope's foot, where the plane lies between the
+  top and the foot and the ground, held to the foot by the survey's wall lines, has no hole. Of the
   scan's 30 and the two at a kerb (Bělohorská 13.9 m, Škrétova 5 x 13 m), 26 fill and 6 stay: five mostly, or deep
   only, off the survey ((-5192, -1347) 12 x 9, (-592, -248) 48 % in the sidewalk, (1202, -8833), (-793, -8952),
   (4886, -3115)), one where the survey's own outline lies 1.2 m under the rim, near the pit's floor ((2005, -2299)). Many
