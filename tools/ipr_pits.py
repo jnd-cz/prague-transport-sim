@@ -80,8 +80,9 @@ def pits(a, cls, survey_z=None, dmr=None):
     """The pits of window a (heights, NaN where no ground; rows north to south) and the rule's verdict on each.
     cls: uint8 class codes per cell (1 + STREET's index, NO, KEPT, OTHER). survey_z(j, i): the survey's outline height
     near cell (row j, column i), NaN where it has none (None: not checked). dmr(j, i): DMR 5G there (None: no DMR).
-    Returns [{"j", "i", "depth", "top" (the closing there), "street" (the share of its cells in street areas), "class", "rim", "rough", "survey", "dmr", "cells": (rows, cols, heights), "kept"}]:
-    "kept" is None for a pit to fill, else why it stays."""
+    Returns [{"j", "i", "depth", "top" (the closing there), "street" (the share of its cells in street areas), "class", "rim", "rough", "survey", "dmr", "cells": (rows, cols, heights), "kept", "round"}]:
+    "kept" is None for a pit to fill, else why it stays; "round" is a street pit's surroundings, (rows, cols) of the
+    cells RIM m outside it that are in no pit, whatever their class (tools/bench/street_pits.py reads the ground there)."""
     from scipy import ndimage
     ok = ~np.isnan(a)
     if not ok.any():
@@ -109,11 +110,13 @@ def pits(a, cls, survey_z=None, dmr=None):
         d = int(np.argmax(np.where(st, dd, -1.0))) if st.any() else int(np.argmax(dd))
         dj, di = int(jj[d]), int(ii[d])
         p = {"j": dj, "i": di, "depth": round(float(dd[d]), 2), "top": round(float(cl[dj, di]), 2), "class": None, "rim": None, "rough": None,
-             "survey": None, "dmr": None, "kept": None, "cells": None, "street": None}
+             "survey": None, "dmr": None, "kept": None, "cells": None, "street": None, "round": None}
         out.append(p)
         if st.any():
             c = int(np.bincount(pc[st]).argmax())  # (the street's class most of its street cells are in)
             p["class"] = STREET[c - 1]
+            p["round"] = np.nonzero(ndimage.binary_dilation(m, iterations=RIM[1]) & ~ndimage.binary_dilation(m, iterations=RIM[0])
+                                    & ok & (dep < SKIRT))
         if (pc == KEPT).mean() > SHARE:
             p["kept"] = "stairs or a wall"
             continue
@@ -271,6 +274,9 @@ def scan(ipr, survey, dmr=None, log=print):
             if p["cells"] is not None:
                 rr, cc, z = p["cells"]
                 p["cells"] = (cc + i0, rr + j0, z)
+            if p["round"] is not None:  # (city frame: the cells' centres)
+                rr, cc = p["round"]
+                p["round"] = (origin[0] + cc, origin[1] - rr)
             p["x"], p["y"] = round(float(x), 1), round(float(y), 1)
             found.append(p)
         if n_t % 50 == 0:
