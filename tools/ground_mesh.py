@@ -616,14 +616,70 @@ def beside(D, ids, raised, lidar):
     return out
 
 
+BEND = ("median", "island", "parking", "cycle")  # (survey classes whose long edges follow the lidar's shape: bent, #638)
+BEND_LONG = 10.0  # m: an outline edge between two surveyed points this long or longer is bent
+BEND_STEP = 2.5  # m between the points laid along it
+BEND_MOST = 0.5  # m: the lidar off its own chord along the edge; further is no vertical curve (a wall's foot, a bank)
+BEND_JUMP = 0.15  # m between two neighbouring points' offsets: more is a step the edge crosses, no curve
+BEND_LEAST = 0.08  # m: an edge whose curve leaves the chord by less stays straight (the lidar's noise at a kerb: 0.05 m)
+
+
+def bent(ring, lidar):
+    """A survey ring ([[x, y, z], ...]) with its long edges following the lidar's shape: (the ring, the edges bent).
+    The survey has an area's heights at its outline's points only, and a kerb along a street may run 10-60 m between
+    two of them. Triangulated, such an edge is a chord, while the street beside it (the generated surface, the beds)
+    follows the lidar over a crest or through a dip: Mariánské hradby, lines 22 and 23 (-1040, 920), the median between
+    the two tracks, area 509, its south edge 27.6 m from 243.92 to 242.35 m over the hill's crest: the chord 0.25 m
+    under the lidar's curve at 9 m, the median 0.17-0.22 m under the upper track's bed beside it for 28 m (13 sunk
+    kerb samples, ground batch E, #757).
+    An edge of BEND_LONG or more between two surveyed points gets a point every BEND_STEP at the chord's height plus a
+    curve: the lidar's offsets from its own chord (read at the edge's two ends and every BEND_STEP between), fitted by
+    t (1 - t) (a + b t) along the edge, a crest, a dip or one of each, nothing at the ends. The surveyed heights stay,
+    the lidar gives the shape between them, and what it reads at a kerb (its top and foot in one cell, 0.05 m of noise
+    along a kerb) cancels in the difference and in the fit. Not where the lidar leaves its chord by over BEND_MOST or
+    two neighbouring offsets differ by over BEND_JUMP (the edge runs along a wall's foot or crosses a step: no curve),
+    nor where the curve leaves the chord by under BEND_LEAST (half the five lines' long edges, by a median 0.05 m: the
+    noise)."""
+    out, n = [], 0
+    for p, q in zip(ring, list(ring[1:]) + list(ring[:1])):
+        out.append(p)
+        L = math.hypot(q[0] - p[0], q[1] - p[1])
+        if L < BEND_LONG or p[2] is None or q[2] is None:
+            continue
+        k = int(math.ceil(L / BEND_STEP))
+        t = np.arange(k + 1) / k
+        g = np.asarray(lidar(p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])), float)
+        if not np.isfinite(g).all():
+            continue
+        sag = g - (g[0] + t * (g[-1] - g[0]))
+        if np.abs(sag).max() > BEND_MOST or np.abs(np.diff(sag)).max() > BEND_JUMP:
+            continue
+        w = t * (1 - t)
+        B = np.column_stack([w, w * t])
+        sag = B @ np.linalg.lstsq(B, sag, rcond=None)[0]
+        if np.abs(sag).max() < BEND_LEAST:
+            continue
+        n += 1
+        out += [[p[0] + u * (q[0] - p[0]), p[1] + u * (q[1] - p[1]), p[2] + u * (q[2] - p[2]) + s]
+                for u, s in zip(t[1:-1].tolist(), sag[1:-1].tolist())]
+    return out, n
+
+
 class SurveySurface:
     """Each survey area's own surface: its outline's heights, triangulated (the page's DtmSurface); a stairs area that is
-    one flight, its plane (flight()); one that is not, on the stairs' own heights where `stairs` (StairsHeights) is given."""
+    one flight, its plane (flight()); one that is not, on the stairs' own heights where `stairs` (StairsHeights) is given.
+    lidar(x, y): the BEND classes' long edges follow its shape between their surveyed points (bent; `bends` counts them)."""
 
-    def __init__(self, D, areas, stairs=None):
-        self.tris, self.area, self.flights = [], [], {}
+    def __init__(self, D, areas, stairs=None, lidar=None):
+        self.tris, self.area, self.flights, self.bends = [], [], {}, 0
         for i in sorted(set(areas)):
             a = D["areas"][i]
+            if lidar is not None and a["c"] in BEND and a.get("l", 0) == 0:
+                r, nb = bent(a["r"], lidar)
+                hs = [bent(h, lidar) for h in a.get("h", [])]
+                if nb or any(m for _, m in hs):
+                    a = {**a, "r": r, "h": [h for h, _ in hs]}
+                    self.bends += nb + sum(m for _, m in hs)
             if a["c"] == "stairs":
                 f = flight(a)
                 if f is None and stairs is not None:
@@ -2465,8 +2521,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     prio = np.full(len(cx), 9.0)
     kind = np.full(len(cx), "", dtype=object)
     from track_styles import RANK
-    surface = SurveySurface(D, [pieces["survey"][owners[o][1]]["area"] for o in owner if owners[o][0] == "survey"], stairs)
-    log(f"  stairs: {stairs.areas} on their own heights ({stairs.points} outline points moved, StairsHeights)")
+    surface = SurveySurface(D, [pieces["survey"][owners[o][1]]["area"] for o in owner if owners[o][0] == "survey"], stairs, lidar_raw)
+    log(f"  stairs: {stairs.areas} on their own heights ({stairs.points} outline points moved, StairsHeights); "
+        f"{surface.bends} long outline edges follow the lidar's shape (bent)")
     # terrain: the parent triangle's plane
     m = corner_cls == "terrain"
     par = np.array([owners[o][1] for o in owner])[corner_face[m]]

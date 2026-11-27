@@ -691,6 +691,21 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   m², Krejcárek's abutment 88.5 -> 70.3, Letná 149.0 -> 125.0, Chotkova 498.2 -> 482.2). The price: the ground lies
   farther from the raster where the raster bumps (4.5 m of a 24 m section along that bank more than 0.5 m off, none
   before). Streets keep their fine cells.
+- **A long outline edge is a chord over a crest** (#638, measured 2026-11-27 on ground batch E). A median, an
+  island, a parking strip or a cycle path off the lidar keeps its own outline's surface (`SurveySurface`), and the
+  survey has its heights at the outline's points only: a kerb along a street runs 10-60 m between two of them (per
+  line 149-652 such parking edges, 13-179 median edges, 8-493 of cycle paths). Triangulated, the edge is a chord,
+  while the street and the beds beside it follow the lidar over a crest or through a dip. Mariánské hradby, lines
+  22 and 23 (-1040, 920): the median between the tracks, its south edge two points 27.6 m apart (243.92 and
+  242.35 m) over the hill's crest, lay 0.17-0.22 m under the upper track's bed for 28 m, 13 sunk kerb samples.
+  `ground_mesh.bent` lays a point every 2.5 m along an edge of 10 m or more: the chord's height plus the lidar's
+  offsets from its own chord, fitted by t (1 - t) (a + b t), so the surveyed heights stay and what the raster
+  reads at a kerb cancels. Half the long edges leave their chord by a median 0.05 m (the raster's noise at a
+  kerb): only a curve of 0.08 m or more is taken, on 30-112 edges a line (0.9-2.6 km; a median 0.10 m, at most
+  0.43 m), and none where the lidar leaves its chord by over 0.5 m or steps 0.15 m between two points (a wall's
+  foot, a bank). At the median the step from the track's bed is 0.20 -> 0.10 m; the rest is the survey's own
+  level at its points, 0.11-0.15 m under the lidar there, beside a track the lidar rule moved off its record
+  (#825): no rule yet. Paved yards are left out: #750 moves them whole to their raised neighbours.
 - **A paved yard whose sheet misses the ground** (#638, measured 2026-11-20). A paved yard has surveyed heights on
   its outline only, and inside it is a sheet between them unless that sheet misses IPR's raster by more than 0.5 m
   at the 95th percentile (`zps_inside.MISS`), when it lies on the lidar. Under that limit a yard can still be far
