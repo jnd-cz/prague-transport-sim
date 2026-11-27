@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """tools/frametime.py: the bench runs for a model and reports what it measured (headless, a few frames), also at the
-zoom key's narrower field (#382).
+zoom key's narrower field (#382), at a pixel ratio of its own and with the page's drawing switches (#705).
 
 Usage: python -P -E tools/test_frametime.py [--line 17]
 
@@ -14,7 +14,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from frametime import ROOT, measure  # noqa: E402
+from frametime import ROOT, fill, measure  # noqa: E402
 
 
 def main():
@@ -28,10 +28,26 @@ def main():
     # (the models by their registry names: "detailed" and "simple" are their names before #455, which the menu no longer
     # offers, and the bench waited for a model never picked)
     rows = measure(args.line, ["t3h", "t3simple"], frames=10, headless=True, warm=5)
-    zoomed = measure(args.line, ["t3simple"], frames=10, headless=True, warm=5, fovs=[22.75])[0]
+    # (the zoomed run at the bench's own pixel ratio too, #705)
+    zoomed = measure(args.line, ["t3simple"], frames=10, headless=True, warm=5, fovs=[22.75], ratios=[2])[0]
+    # (every drawing switch of src/gfx.js at once: the page draws at its cap of the pixel ratio, with no page error)
+    switched = measure(args.line, ["t3simple"], frames=10, headless=True, warm=5, params="gfx=nolog,snowif,front,noaa,pr0.5")[0]
     faulthandler.cancel_dump_traceback_later()
     fails = []
     hy, simple = rows
+    if simple["pixelRatio"] != 1 or simple["drawn"] != [1280, 720]:
+        fails.append(f"the page's own pixel ratio: {simple['pixelRatio']}, {simple['drawn']} drawn")
+    if zoomed["pixelRatio"] != 2 or zoomed["drawn"] != [2560, 1440] or zoomed["canvas"] != zoomed["drawn"]:
+        fails.append(f"--ratio 2: {zoomed['pixelRatio']}, {zoomed['drawn']} drawn, the canvas {zoomed['canvas']}")
+    if switched["pixelRatio"] != 0.5 or switched["drawn"] != [640, 360] or switched["frames"] != 10 or switched["errors"]:
+        fails.append(f"the switches with pr0.5: {switched['pixelRatio']}, {switched['drawn']} drawn, {switched['errors']}")
+    # the fill cost: between the lowest ratio and the highest, of the GPU's time; a run whose buffer was cut is left out
+    row = {"model": "m", "fov": 62, "frameMedian": 3}
+    cost = fill([{**row, "pixelRatio": 1, "drawn": [1000, 1000], "canvas": [1000, 1000], "gpuMs": 2},
+                 {**row, "pixelRatio": 2, "drawn": [2000, 2000], "canvas": [2000, 2000], "gpuMs": 5},
+                 {**row, "pixelRatio": 4, "drawn": [3000, 3000], "canvas": [4000, 4000], "gpuMs": 50}])
+    if cost != [("m", 62, 1, 2, 1.0, "GPU")]:
+        fails.append(f"the fill cost of 3 ms over 3 megapixels: {cost}")
     if simple["fov"] != 62 or zoomed["fov"] != 22.75:
         fails.append(f"the fields measured: {simple['fov']}, {zoomed['fov']}")
     if not zoomed.get("calls") or zoomed["calls"] > simple["calls"]:

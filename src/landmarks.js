@@ -18,7 +18,8 @@ export const LANDMARK_UNIFORMS = { uLandmarkFar: { value: 950 * LANDMARK_STRETCH
 
 // a material's fog made the landmarks' haze: from the fog's start to LANDMARK_UNIFORMS' end
 export function landmarkHaze(material) {
-  const prev = material.onBeforeCompile, key = material.customProgramCacheKey();
+  // (the key asked each time: a weatherized material's changes when the snow comes or goes, src/weather.js)
+  const prev = material.onBeforeCompile, key = material.customProgramCacheKey.bind(material);
   material.onBeforeCompile = (sh, r) => {
     prev.call(material, sh, r);
     Object.assign(sh.uniforms, LANDMARK_UNIFORMS);
@@ -28,7 +29,7 @@ export function landmarkHaze(material) {
         gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, smoothstep(fogNear, uLandmarkFar, vFogDepth));
       #endif`);
   };
-  material.customProgramCacheKey = () => `${key}|landmark`;
+  material.customProgramCacheKey = () => `${key()}|landmark`;
   return material;
 }
 

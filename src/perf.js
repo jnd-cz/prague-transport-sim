@@ -6,6 +6,8 @@
 // frames over 20 / 33 / 50 ms say whether the machine keeps up, not what a frame costs (tools/frametime.py
 // measures that here, vsync off). The log is a counter per frame: no work in a frame beyond it.
 
+import { GFX } from './gfx.js';
+
 const BINS = 201;          // 1 ms bins of the frame interval, the last one 200 ms and over
 const GAP = 250;           // ms: a longer interval is a pause, a hidden tab or an idle redraw, not a frame
 const STRETCH = 100;       // m of route per bin of the slow frames' places
@@ -99,6 +101,10 @@ export function machine(renderer) {
     const gl = renderer.getContext();
     out.webgl2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
     out.pixelRatio = renderer.getPixelRatio();
+    // (what the frames were drawn with: the canvas as the browser gave it, the address's switches, src/gfx.js, #705)
+    out.antialias = !!gl.getContextAttributes()?.antialias;
+    out.logDepth = GFX.logDepth;
+    if (GFX.key) out.gfx = GFX.key;
     out.maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     // (some browsers hide it, or give only the vendor: then the GPU stays unknown)

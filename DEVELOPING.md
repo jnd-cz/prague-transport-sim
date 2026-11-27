@@ -265,6 +265,22 @@ the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the dep
 minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
 the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 
+**What the fragments cost** (#705): a weak GPU is short of fragments, not of triangles or draw calls (the testers'
+phone was no faster with both halved). The page's address takes drawing switches, each change alone or several
+(`?gfx=nolog,snowif,front,pr1,noaa`, `src/gfx.js` lists them); a performance test's result and a note's machine
+facts carry the list, the renderer's pixel ratio and whether the canvas is antialiased. Here the frame interval
+cannot see the fragments: on the Arc A770 a frame takes 3.0 ms at pixel ratio 1 and 3.1 ms at 1.75, the CPU's
+time. `tools/frametime.py --ratio 1,6` sets the renderer's ratio in the bench and prints the GPU's own time for a
+frame's draws and its cost per megapixel; 6 is 7680 x 4320, the largest buffer Chromium draws in full (at 8 it cuts
+the buffer: the row is marked and left out of the cost). Line 17, the detailed model, stop 15, ratio 6, GPU time
+of two runs each, 2026-11-27: 10.6 / 10.8 ms as drawn now; 5.9 / 5.7 without the logarithmic depth buffer; 6.1 /
+6.0 with the snow's noise in the shaders only while it snows; 9.6 / 9.6 with front faces only on the ground and the
+buildings; 6.8 / 6.8 without antialiasing; 2.9 / 2.9 without the depth buffer and the noise together, which is what
+the same frame takes at ratio 1 (2.4-3.3 ms: the GPU is then no longer the limit, and front faces on top of the two
+measure nothing more). `tools/shot.py --params gfx=front --ref .` shows what a switch changes in a picture: the
+noise's switch nothing in any weather (the snow's shader is the same text), no logarithmic depth only hairlines
+at edges in four views, front faces the roofs (wound inwards: some vanish, others show their insides).
+
 **The HUD's cost** (`python -P -E tools/bench/hud.py`, #706): what one update of the HUD changes in the page (0 when
 nothing changed: texts are written only when they change, `src/hud.js` `put`) and how long it takes with the CPU
 throttled 4 times. Line 17, 2026-11-19, before -> after: 13 -> 0 changes an idle update, an update 7.2 -> 2.9 ms (the
