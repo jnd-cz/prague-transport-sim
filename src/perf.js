@@ -9,6 +9,8 @@
 // game's steps, the scene made ready, the draw calls sent). An interval far over it is spent drawing, in the
 // browser's compositor or waiting for the display, which a smaller picture can shorten; one near it is the CPU's,
 // which it cannot (#705: Firefox has no GPU timer, and most of the weak machines' results come from it).
+// The performance test adds two measures that need no timer either (src/main.js): the draw waited for, and a
+// stretch at half the resolution.
 
 import { GFX } from './gfx.js';
 
@@ -25,7 +27,8 @@ export class PerfLog {
     this.meta = meta;
     this.hist = new Uint32Array(BINS);
     this.n = 0; this.sum = 0; this.sim = 0; this.multi = 0;
-    this.own = { n: 0, sum: 0, hist: new Uint32Array(BINS) }; // (the page's own time in a frame, 1 ms bins)
+    // (the page's own time in a frame, 1 ms bins; of it the game's steps and the draws' calls)
+    this.own = { n: 0, sum: 0, sim: 0, draw: 0, hist: new Uint32Array(BINS) };
     this.slowAt = new Map(); // route bin -> frames over 33 ms
     this.calls = { sum: 0, max: 0 }; this.tris = { sum: 0, max: 0 };
     this.last = 0;
@@ -57,10 +60,11 @@ export class PerfLog {
     return true;
   }
 
-  // a counted frame's own time (ms), at its end. A browser may round its clock to 1 ms or coarser: the mean holds.
-  spent(ms) {
+  // a counted frame's own time (ms), at its end, and of it the game's steps and the draws' calls (the scene made
+  // ready and sent, not the GPU's work). A browser may round its clock to 1 ms or coarser: the means hold.
+  spent(ms, sim = 0, draw = 0) {
     if (!(ms >= 0)) return;
-    this.own.n++; this.own.sum += ms;
+    this.own.n++; this.own.sum += ms; this.own.sim += sim; this.own.draw += draw;
     this.own.hist[Math.min(BINS - 1, Math.round(ms))]++;
   }
 
@@ -90,7 +94,8 @@ export class PerfLog {
       ...this.meta, frames: this.n, seconds: Math.round(this.sum / 100) / 10, fps: Math.round((this.n * 10000) / this.sum) / 10,
       ms: { p50: this.pct(0.5), p90: this.pct(0.9), p99: this.pct(0.99) },
       // (the page's own time a frame: its mean and the time 9 frames in 10 stay within, ms)
-      ...(this.own.n ? { cpuMs: Math.round((this.own.sum / this.own.n) * 10) / 10, cpuP90: this.pct(0.9, this.own.hist, this.own.n) } : {}),
+      ...(this.own.n ? { cpuMs: Math.round((this.own.sum / this.own.n) * 10) / 10, cpuP90: this.pct(0.9, this.own.hist, this.own.n),
+        cpuSim: Math.round((this.own.sim / this.own.n) * 10) / 10, cpuDraw: Math.round((this.own.draw / this.own.n) * 10) / 10 } : {}),
       over: { 20: this.over(20.5), 33: this.over(33.4), 50: this.over(50) },
       // (the game's time against the frames' real time: 1 when it keeps real time; the frames that took several steps, %)
       gameRate: Math.round((this.sim / this.sum) * 1000) / 1000, multiStep: Math.round((this.multi / this.n) * 1000) / 10,

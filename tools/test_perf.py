@@ -163,6 +163,10 @@ SLOW = """(() => { window.slowFrameMs = MS;
 })()"""
 
 
+def canvas(page):
+    return page.evaluate("[document.getElementById('gl').width, document.getElementById('gl').height]")
+
+
 def perf_test(page, timeout):
     page.evaluate("delete window.perfTestResult")  # (the last run's)
     page.click("#btnPerfTest")
@@ -254,7 +258,9 @@ def main():
             page.keyboard.press("Escape")
             page.evaluate("document.getElementById('btnToMenu').click()")
             page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=20000)
+            size = canvas(page)
             res = perf_test(page, 120000)
+            size_after = canvas(page)
             card = page.text_content("#resultsCard")
             page.click("#ptSend")
             page.wait_for_function("document.getElementById('ptSend').textContent.includes('Sent')", timeout=20000)
@@ -315,6 +321,19 @@ def main():
         fails.append(f"the page's own time a frame {res.get('cpuMs')} ms is not within the interval of {res.get('fps')} fps")
     if not (0 < (slow.get("cpuMs") or 0) < 500 / max(slow.get("fps", 0), 1e-9)):  # (under half their interval)
         fails.append(f"68 ms frames: the page's own time {slow.get('cpuMs')} ms of {slow.get('fps')} fps counts the wait outside it")
+    # (of it the game's steps and the draws' calls; after the minute, the draw waited for and the windows at half
+    # the resolution with the full-resolution ones between them; the canvas is back at its size after)
+    half = res.get("half") or {}
+    print(f"of it the steps {res.get('cpuSim')} ms, the draws' calls {res.get('cpuDraw')} ms; a draw waited for {res.get('drawWaitMs')} ms; "
+          f"at half the resolution {half.get('fps')} fps on {half.get('size')}, at the full one there {(half.get('full') or {}).get('fps')}; the canvas {size} -> {size_after}")
+    if not (0 < (res.get("cpuSim") or 0) and 0 < (res.get("cpuDraw") or 0) and res["cpuSim"] + res["cpuDraw"] <= res.get("cpuMs", 0) + 0.2):
+        fails.append(f"the page's own time {res.get('cpuMs')} ms does not hold its steps {res.get('cpuSim')} and draws {res.get('cpuDraw')}")
+    if not (res.get("drawWaitMs") or 0) >= (res.get("cpuDraw") or 1e9) * 0.5:
+        fails.append(f"a draw waited for {res.get('drawWaitMs')} ms is under the draws' calls {res.get('cpuDraw')} ms")
+    if not (half.get("fps", 0) > 0 and (half.get("full") or {}).get("fps", 0) > 0 and half.get("size") == [size[0] // 2, size[1] // 2]):
+        fails.append(f"no windows at half the resolution of {size}: {half}")
+    if size_after != size:
+        fails.append(f"the canvas is {size_after} after the test, {size} before")
     if own != {"first": False, "frames": 2, "cpuMs": 5, "cpuP90": 6}:
         fails.append(f"the log's own time of two frames of 4 and 6 ms: {own}")
     if not (res.get("frames", 0) > 10 and res.get("fps", 0) > 0 and res.get("test")):

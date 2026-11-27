@@ -763,6 +763,18 @@ function offerPerf(el) {
 // the reference opens line 17 (?reftest=<the line left>), runs there, and its "Back to the menu" goes back.
 // (window.perfTestMs: a shorter run for tools/test_perf.py)
 const PT_WARM = 5000, PT_LEN = window.perfTestMs || 60000;
+// After the minute, two short stretches that say where a frame's time goes without the GPU's timer (Firefox has
+// none, #705). PT_WAIT: each draw is waited for (a pixel read back, which returns once the GPU has drawn the
+// frame): the time from the draw's first call to the picture done. Then PT_WINS windows of PT_WIN, in turn at half
+// the resolution each way and at the full one (the route's places differ, so the two are measured side by side;
+// each window's first PT_SKIP is left out, the canvas's new size settling): what a smaller picture gains on this
+// machine. Neither stretch is in the minute's numbers.
+const PT_WAIT = Math.min(3000, PT_LEN / 4), PT_WIN = Math.min(3000, PT_LEN / 4), PT_WINS = 4, PT_SKIP = Math.min(500, PT_LEN / 16);
+const onePixel = new Uint8Array(4);
+function waitForDraw() {
+  const gl = renderer.getContext();
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, onePixel);
+}
 const REF_LINE = '17', REF_STOP = 'Palackého náměstí', PT_LEAD = 10;
 let perfTest = null;
 async function startPerfTest(reference = false) {
@@ -793,12 +805,37 @@ $('btnPerfRef').addEventListener('click', () => {
   else location.search = `?line=${REF_LINE}&reftest=${encodeURIComponent(data.line)}${gfxQuery}`;
 });
 function perfTestStep(now) {
-  if (!perfTest || !game || game.finished) { perfTest = null; return; }
-  const el = now - perfTest.t0;
+  if (!perfTest || !game || game.finished) {
+    if (perfTest?.phase === 'windows') { applyScale(); resize(); }
+    perfTest = null;
+    return;
+  }
+  const el = now - perfTest.t0, pt = perfTest;
   // (the minute is measured from the departure: boarding and the doors take ~14 s after the start, 2026-11-11 trace)
   const off = el > PT_WARM && (tram.v > 0.5 || el > PT_WARM + 60000);
   if (perfTest.phase === 'warm' && off) { perfTest.phase = 'run'; perfTest.t1 = now; perfTest.s0 = tram.s; perfLog.reset(perfTest.meta); }
-  else if (perfTest.phase === 'run' && now - perfTest.t1 > PT_LEN) finishPerfTest();
+  else if (pt.phase === 'run' && now - pt.t1 > PT_LEN) {
+    // (the minute's numbers are taken here: the two stretches after it are apart)
+    pt.sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null, driven: Math.round(tram.s - pt.s0), pixelRatio: renderer.getPixelRatio() };
+    pt.phase = 'wait'; pt.t2 = now; pt.wait = { n: 0, sum: 0 };
+  } else if (pt.phase === 'wait' && now - pt.t2 > PT_WAIT) {
+    pt.phase = 'windows'; pt.t3 = now; pt.k = -1;
+    pt.logs = [new PerfLog(), new PerfLog()]; // (the half resolution's windows, the full one's)
+    if (pt.timer) pt.timer.times.length = 0; // (the minute's GPU times are taken; the half windows' from here)
+  }
+  if (pt.phase === 'windows') {
+    const k = Math.floor((now - pt.t3) / PT_WIN), half = k % 2 === 0;
+    if (k !== pt.k) {
+      pt.k = k;
+      applyScale();
+      if (k < PT_WINS && half) renderer.setPixelRatio(renderer.getPixelRatio() / 2);
+      resize();
+      if (k < PT_WINS && half) pt.size = [canvas.width, canvas.height];
+    }
+    if (k >= PT_WINS) { finishPerfTest(); return; }
+    pt.half = half;
+    pt.log = now - pt.t3 - k * PT_WIN > PT_SKIP ? pt.logs[half ? 0 : 1] : null;
+  }
   perfTest?.timer?.poll();
 }
 function finishPerfTest() {
@@ -806,8 +843,13 @@ function finishPerfTest() {
   perfTest = null;
   game.paused = true;
   hud.show(false);
-  const sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null, driven: Math.round(tram.s - pt.s0),
-    pixelRatio: renderer.getPixelRatio(), ...(GFX.key ? { gfx: GFX.key } : {}) }, m = machine(renderer);
+  const half = pt.logs?.[0].summary(), full = pt.logs?.[1].summary(), r1 = (x) => Math.round(x * 10) / 10;
+  const sum = { ...pt.sum, ...(GFX.key ? { gfx: GFX.key } : {}),
+    // (the draw waited for: ms from its first call to the picture done; the windows at half the resolution, and
+    // the windows between them at the full one to read them against)
+    ...(pt.wait?.n ? { drawWaitMs: r1(pt.wait.sum / pt.wait.n) } : {}),
+    ...(half && full ? { half: { size: pt.size, fps: half.fps, over20: half.over[20], cpuMs: half.cpuMs ?? null, gpuMs: pt.timer?.median() ?? null,
+      full: { fps: full.fps, over20: full.over[20], cpuMs: full.cpuMs ?? null } } } : {}) }, m = machine(renderer);
   // (frames over 20 ms: below a 60 Hz display's rate; a steady 30 fps has nearly all of them there and few over 50:
   // playable, not smooth. The first remote run, Intel HD Graphics 400 in Firefox: 34 fps, 74 % over 20 ms, 0.6 % over 33)
   const verdict = sum.over[20] < 5 ? 'good' : sum.over[50] < 5 ? 'ok' : 'slow';
@@ -818,7 +860,9 @@ function finishPerfTest() {
     <div style="font-size:22px;font-weight:700;margin:8px 0">${t(`pt.${verdict}`)}</div>
     <table class="res">
       ${row('pt.fps', sum.fps)}${row('pt.slow20', `${sum.over[20]} %`)}${row('pt.slow33', `${sum.over[33]} %`)}${row('pt.p90', `${sum.ms.p90} ms`)}
-      ${sum.cpuMs !== undefined ? row('pt.cpu', `${sum.cpuMs} ms`) : ''}${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
+      ${sum.cpuMs !== undefined ? row('pt.cpu', `${sum.cpuMs} ms`) : ''}${sum.drawWaitMs !== undefined ? row('pt.drawWait', `${sum.drawWaitMs} ms`) : ''}
+      ${sum.half ? row('pt.half', `${sum.half.fps} (${sum.half.size.join(' x ')}); ${t('pt.halfFull')} ${sum.half.full.fps}`) : ''}
+      ${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
       ${row('pt.tris', `${(sum.triangles.mean / 1e6).toFixed(2)} M`)}${row('pt.gpuName', m.gpu || '?')}${row('pt.screen', `${m.viewport} @${m.dpr}${m.pixelRatio !== m.dpr ? ` (${m.pixelRatio})` : ''}${GFX.key ? ` · gfx ${GFX.key}` : ''}`)}
     </table>
     <div class="sub">${t('pt.note')}</div>
@@ -1220,8 +1264,9 @@ window.drawCount = 0; // (draws so far: tools/test_idle.py)
 
 function frame(now) {
   requestAnimationFrame(frame); // first, so an exception in one frame can't stop the loop
-  const began = performance.now(); // (the page's own time in this frame, for the frame log: src/perf.js)
-  let logged = false;
+  // (the page's own time in this frame, and of it the game's steps and the draws' calls, for the frame log: src/perf.js)
+  const began = performance.now();
+  let logged = null, simMs = 0, drawMs = 0;
   const span = Math.max(0, Math.min(SPAN_MAX, (now - last) / 1000));
   const dt = Math.min(STEP_MAX, span); // (the camera, weather, sound and HUD: one step a frame)
   let simmed = 0;
@@ -1237,6 +1282,7 @@ function frame(now) {
     between.back(); // (the last draw's poses are gone before anything steps: the steps read some of them)
     if (inspect.active) between.clear(); // (its steps are its own, drawn as they leave the world)
     let step = null; // (the frame's last step's game half: its traffic's focus, src/run.js)
+    const stepsFrom = performance.now();
     steps.forEach((h, i) => {
       const lastStep = i === steps.length - 1, drawn = i >= steps.length - 2;
       sWas = tram.s;
@@ -1250,6 +1296,7 @@ function frame(now) {
         if (!inspect.active && drawn) recordStep(step.go);
       }
     });
+    simMs = performance.now() - stepsFrom;
     if (arcade() && tram.eq.lever !== leverHeard) { audio.emit(tram.eq.lever > leverHeard ? 'notch.up' : 'notch.down'); leverHeard = tram.eq.lever; }
     run.gameView.syncCrowd();
     updateCamera(dt, now / 1000);
@@ -1257,8 +1304,10 @@ function frame(now) {
     updateRain(dt);
     updateSnow(dt, now / 1000);
     if (!inspect.active && step) {
+      const from = performance.now();
       run.stepTraffic(step, camera);
       recordStep(step.go);
+      simMs += performance.now() - from;
     }
     // The shift may have finished during game.update().
     if (game.finished) audio.setActive(false, !inMenu && !game.paused && !(inspect.active && inspect.paused));
@@ -1295,18 +1344,24 @@ function frame(now) {
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }
     else {
-      const timing = perfTest?.phase === 'run' && perfTest.timer;
+      const timing = (perfTest?.phase === 'run' || (perfTest?.log && perfTest.half)) && perfTest.timer;
       // (a refill redraws the mirror's cached picture too: paused at a shift's start it kept the first frame's, without
       // the trees then around the cab)
       if (world?.userData.near?.update(camera, renderer.domElement.height, scene.fog.far) && window.mirror) window.mirror.last = null;
       if (timing) timing.begin();
+      const from = performance.now();
       drawWorld();
+      // (a performance test's stretch of draws waited for, counted from the draw's first call)
+      if (perfTest?.phase === 'wait') { waitForDraw(); perfTest.wait.n++; perfTest.wait.sum += performance.now() - from; }
+      drawMs = performance.now() - from;
       if (timing) timing.end();
     }
     lastDraw = now; window.drawCount++;
     // (driving only: the menu, a pause and the results draw 4 frames a second, #149)
     if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) {
-      logged = perfLog.frame(now, tram.s, renderer.info.render, simmed);
+      // (a performance test's stretches after its minute: the waited draws in no log, the windows in theirs)
+      const log = !perfTest || perfTest.phase === 'warm' || perfTest.phase === 'run' ? perfLog : perfTest.log || null;
+      logged = log?.frame(now, tram.s, renderer.info.render, simmed) ? log : null;
       // (the automatic render scale reads the same frames, but a performance test's: it measures at one scale)
       if (scaleSet === 'auto' && !GFX.fixed && !perfTest && autoScale.frame(now) !== null) { applyScale(); resize(); }
     }
@@ -1315,10 +1370,12 @@ function frame(now) {
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.
   if (draw && mirrorShown()) {
+    const from = performance.now();
     mirror.draw(now, !lazy, poseMirror, tramModel);
+    drawMs += performance.now() - from;
   }
   between.back();
-  if (logged) perfLog.spent(performance.now() - began);
+  if (logged) logged.spent(performance.now() - began, simMs, drawMs);
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back
