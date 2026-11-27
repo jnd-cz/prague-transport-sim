@@ -23,6 +23,11 @@ def street(n=60, z=240.0):
     return a, cls
 
 
+def level(j, i):
+    """DMR 5G with a level street: no pit in the 2009-2013 lidar."""
+    return 240.1
+
+
 def dig(a, j, i, h, w, depth):
     a[j:j + h, i:i + w] -= depth
     return a
@@ -36,7 +41,7 @@ class Pits(unittest.TestCase):
     def test_a_pit_in_the_road_is_filled_from_its_rim(self):
         a, cls = street()
         dig(a, 10, 10, 4, 5, 4.0)  # (Táboritská: 5 x 4 cells, 4 m deep, a flat floor)
-        (p,) = ip.pits(a, cls, survey_z=lambda j, i: 240.1)
+        (p,) = ip.pits(a, cls, survey_z=lambda j, i: 240.1, dmr=level)
         self.assertIsNone(p["kept"])
         self.assertEqual(p["class"], "road")
         self.assertAlmostEqual(p["depth"], 4.0, places=1)
@@ -71,7 +76,7 @@ class Pits(unittest.TestCase):
         a, cls = street()
         a[:, :30] -= 0.15
         dig(a, 20, 30, 3, 3, 3.0)
-        (p,) = ip.pits(a, cls, survey_z=lambda j, i: 240.3)
+        (p,) = ip.pits(a, cls, survey_z=lambda j, i: 240.3, dmr=level)
         self.assertIsNone(p["kept"])
         self.assertEqual(p["class"], "sidewalk")
         self.assertLess(p["rough"], 0.05)
@@ -82,7 +87,7 @@ class Pits(unittest.TestCase):
         (p,) = ip.pits(a, cls, survey_z=lambda j, i: 238.9)
         self.assertEqual(p["kept"], "not at the survey's level")
 
-    def test_paved_fills_only_where_dmr5g_is_level(self):
+    def test_a_pit_fills_only_where_dmr5g_is_level(self):
         a, cls = street()
         cls[:] = PAVED
         dig(a, 10, 10, 4, 4, 1.5)
@@ -92,8 +97,15 @@ class Pits(unittest.TestCase):
         self.assertEqual(got, {0: None, 1: "in DMR 5G too"})
         (p,) = ip.pits(dig(street()[0], 10, 10, 4, 4, 1.5), np.full((60, 60), PAVED, np.uint8))
         self.assertEqual(p["kept"], "in DMR 5G too")  # (no DMR: kept)
+        # (Na Vápence's garage ramp: a road's pit 3 m deep, in the 2009-2013 lidar 1.6 m under the rim: it stays)
+        a, cls = street()
+        dig(a, 10, 10, 5, 11, 3.0)
+        (p,) = ip.pits(a, cls, survey_z=lambda j, i: 239.7, dmr=lambda j, i: 238.5)
+        self.assertEqual((p["class"], p["kept"]), ("road", "in DMR 5G too"))
+        (p,) = ip.pits(a, cls, survey_z=lambda j, i: 239.7, dmr=level)
+        self.assertIsNone(p["kept"])
 
-    def test_a_pit_longer_than_max_side_fills_only_where_dmr5g_is_level(self):
+    def test_a_long_pit_fills_where_dmr5g_is_level(self):
         # (Škrétova: 5 x 13 cells in the road, level in DMR 5G)
         a, cls = street()
         dig(a, 10, 5, 13, 5, 4.0)
@@ -107,7 +119,7 @@ class Pits(unittest.TestCase):
         a, cls = street()
         cls[:, :12] = ip.NO  # (a yard west of the road)
         dig(a, 10, 10, 4, 5, 2.0)  # (2 of its 5 columns in the yard)
-        (p,) = ip.pits(a, cls)
+        (p,) = ip.pits(a, cls, dmr=level)
         self.assertIsNone(p["kept"])
         self.assertEqual(sorted(set(p["cells"][1].tolist())), [12, 13, 14])
         cls[:, :13] = ip.NO  # (and mostly off it: kept)

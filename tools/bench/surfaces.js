@@ -12,13 +12,26 @@
 // class) where that explains more of it (a crest's change of slope is no step); one inside the street classes is a
 // seam, one where road meets a raised class a kerb. `of` counts the street samples' pairs, not the areas' borders.
 // (Without the file, #510 removed, the drawn survey's areas were told apart by their triangles.)
+// A raised tram belt's kerb is counted apart too (bedKerbs, #770; the user, 2026-11-26: "yes for the count as you
+// recommend"): a road or a parking strip beside the tram's surface, the tram's side higher by more than the belt
+// that counts as unraised (data/truth.json streetGeometry `raised-belt`, the height from which the build keeps the
+// road's own level at the belt's edge, #606) and by no more than BED_KERB. The user on Řepy, 2026-11-21: "yes there
+// is kerb at Makovského". Against IPR 1 m either side of the edge (batch D, 1,088 steps of 0.10-0.25 m on the five
+// lines): the lidar has the belt 5 cm or more over the road at 69 % of those of 0.10-0.15 m and at 80 % of those of
+// 0.15-0.25 m, and has it level or lower at 14 and 6 %. Over 0.25 m (204 samples) the lidar's median is 0.15 m,
+// about half of what is built: those stay seams, as does a road standing over the tram's surface.
+// `over10cm` is the part of them seams10 counted before.
 import { findKerbs } from '../../src/review.js';
 const STREETS = new Set(['road', 'tram', 'parking', 'sidewalk', 'island', 'median', 'cycle', 'paved', 'platform']);
 const ROAD = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'median', 'platform']);
+const BED_KERB = 0.25; // m: a raised belt's kerb at most (the calibration above)
 
 export async function run() {
   const g = window.game, r = g.route, dtm = r.ground.dtm;
   if (!dtm) return { checks: {} };
+  const truth = await (await fetch('/data/truth.json', { cache: 'no-store' })).json();
+  const belt = truth?.streetGeometry?.facts?.find((f) => f.id === 'raised-belt')?.value;
+  if (typeof belt !== 'number') throw new Error('data/truth.json streetGeometry raised-belt is missing');
   // waves: lint streetWaviness's samples (6-20 m either side, every 1 m), over 8 cm off the 21 m mean
   let wn = 0, waves = 0;
   for (const lat of [-20, -14, -9, -6, 6, 9, 14, 20]) {
@@ -48,7 +61,7 @@ export async function run() {
     return false;
   };
   // seams and kerbs: across the route every 0.25 m, a row every 4 m, where two areas meet
-  const seams = [], kerbs = [], seamSites = [], kerbSites = [], lowSites = [];
+  const seams = [], kerbs = [], seamSites = [], kerbSites = [], lowSites = [], bedKerbs = [];
   const lk = r.ground.lookup;
   for (let s = 0; s < r.length; s += 4) {
     const zs = [], cs = [];
@@ -66,6 +79,8 @@ export async function run() {
       const lat = -25 + (i - 0.5) * 0.25, p = r.offset(s, lat), site = { x: p.x, y: p.y, s, lat, classes: [a, b], heights: [zs[i - 1], zs[i]] };
       if (same) {
         if (Math.abs(jump) > 1) continue; // (another level)
+        const up = a === b ? 0 : b === 'tram' ? jump : a === 'tram' ? -jump : 0; // (the tram's side over the road's)
+        if (up > belt && up <= BED_KERB) { bedKerbs.push(up); continue; }
         seams.push(Math.abs(jump));
         if (Math.abs(jump) > 0.03) seamSites.push({ ...site, step: Math.abs(jump) });
       } else {
@@ -89,6 +104,7 @@ export async function run() {
       kerbMedianCm: { count: Math.round(med(kerbs) * 100) },
       loweredKerbs: { count: lowSites.length, medianCm: Math.round(med(lowSites.map((q) => q.step)) * 100),
         sunk: n(lowSites, (q) => q.step < -0.02), over5cm: n(lowSites, (q) => q.step >= 0.05) },
+      bedKerbs: { count: bedKerbs.length, medianCm: Math.round(med(bedKerbs) * 100), over10cm: n(bedKerbs, (v) => v > 0.1) },
     },
   };
 }

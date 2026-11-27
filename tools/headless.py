@@ -429,8 +429,15 @@ def key_of(line, check, seed):
     return f"line{line}-{check}" + ("" if check in SEEDLESS else f"-seed{seed}")
 
 
+# counts a check keeps apart from its problems: a rise is no worse (the kerbs lowered at crossings, #303; a raised tram
+# belt's kerb, #770; the kerbs' median height)
+CONTEXT = {"surfaces": {"loweredKerbs", "bedKerbs", "kerbMedianCm"}}
+
+
 def problem(check, k):
     """A count that is a problem when it rises (lint and traffic counts are; u3's yields are context)."""
+    if k in CONTEXT.get(check, ()):
+        return False
     return check in ("lint", "traffic", "surfaces") or k in BAD.get(check, ()) or k == "error"
 
 
@@ -478,7 +485,8 @@ def compare_rows(base, results):
                 rows.append(f"| {line} | {check} | | no baseline | | |")
                 continue
             c = runs[0]
-            moved = [f"{k} {b.get(k)} → {c.get(k)}" + (" **worse**" if num(c.get(k)) and c[k] > (b.get(k) or 0) else "")
+            moved = [f"{k} {b.get(k)} → {c.get(k)}" + (" **worse**" if num(c.get(k)) and c[k] > (b.get(k) or 0)
+                                                 and k not in CONTEXT.get(check, ()) else "")
                      for k in sorted(set(b) | set(c)) if b.get(k) != c.get(k)]
             rows.append(f"| {line} | {check} | | {'; '.join(moved) or 'same'} | | |")
             continue

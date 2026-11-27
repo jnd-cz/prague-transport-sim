@@ -11,7 +11,7 @@
   "notes": "reference",
   "trackHeights": "tools/import_track_heights.py, track_profile.py, track_decks.py, calibrate_track_heights.py, track_span_evidence.py, height_answers.py (the answers line_heights.py applies)",
   "trackGeometry": "tools/track_profile.py (the vertical radii), track_curve.py and track_loops.py (min-radius-network), line_heights.py (min-radius-passenger), height_answers.py (min-radius-passenger, the date of vertical-radius-min), lint.js (verticalCurves, trackRadius), through track_curve.geometry_fact where in Python (#224)",
-  "streetGeometry": "tools/street_profile.py (the radii by OSM class, the raised belt, the steepest crossfall, the sidewalks' crossfall, the raised corridors the user confirmed)",
+  "streetGeometry": "tools/street_profile.py (the radii by OSM class, the raised belt, the steepest crossfall, the sidewalks' crossfall, the raised corridors the user confirmed); tools/bench/surfaces.js (the raised belt: its kerb counted apart from the seams)",
   "kerbFacts": "tools/dtm.py, tools/kerbs.py",
   "trackStyleKinds": "src/heights.js",
   "trackStyles": "tools/track_styles.py (the sections the page reads, src/heights.js), tools/track_decks.py",
@@ -5198,9 +5198,10 @@
       -22.0
      ],
      "expect": {
-      "sloping m": 0.25
+      "sloping m": 0.25,
+      "largest step m at least": 1.0
      },
-     "why": "a wall stands between the sidewalk and the ramp (the survey has the sidewalk's edge at 260.4 m and no wall area there): one step. The written file of 2026-11-20 slopes over 1.25 m of it"
+     "why": "a wall stands between the sidewalk and the ramp (the survey has the sidewalk's edge at 260.4 m and no wall area there): one step, 2.04 m built. The written file of 2026-11-20 slopes over 1.25 m of it. Batch E's first build (2026-11-27, #757) had the ramp filled to the street as a lidar pit (#867's rule: 2.97 m deep, 55 cells; DMR 5G has it too, 1.6 m under the rim) and this step 0.1 m: the least keeps the ramp in the ground"
     },
     {
      "name": "down the ramp's middle to the foot of the door's wall",
@@ -5229,9 +5230,10 @@
       -15.5
      ],
      "expect": {
-      "sloping m": 0.25
+      "sloping m": 0.25,
+      "largest step m at least": 2.0
      },
-     "why": "a wall 0.26 m across (survey area 1419), the ramp at its foot and the road behind its top: one step"
+     "why": "a wall 0.26 m across (survey area 1419), the ramp at its foot and the road behind its top: one step, 3.08 m built. Batch E's first build (2026-11-27, #757) had the ramp filled to the street as a lidar pit (#867's rule: 2.97 m deep, 55 cells; DMR 5G has it too, 1.6 m under the rim) and this step 0.26 m: the least keeps the ramp in the ground"
     },
     {
      "name": "up Na Vápence beside the ramp to Nad Ohradou, x = 3877",

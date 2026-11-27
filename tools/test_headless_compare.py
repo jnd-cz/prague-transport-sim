@@ -68,6 +68,11 @@ class Spread(unittest.TestCase):
         cells = row(headless.compare_rows(b, {(17, "surfaces", 0): {"spikes": 4, "steps": 3}}))
         self.assertEqual(cells[3], "spikes 10 → 4")
 
+    def test_a_count_kept_apart_is_not_marked_worse(self):
+        b = {"line9-surfaces": {"counts": {"seams10": 800, "bedKerbs": 400, "loweredKerbs": 1300}}}
+        cells = row(headless.compare_rows(b, {(9, "surfaces", 0): {"seams10": 810, "bedKerbs": 620, "loweredKerbs": 1310}}))
+        self.assertEqual(cells[3], "bedKerbs 400 → 620; loweredKerbs 1300 → 1310; seams10 800 → 810 **worse**")
+
     def test_one_seed_against_the_stored_spread(self):
         runs = {(22, "traffic", 1): {"walkerHit": 96, "slide": 6000, "finished": 1}}
         cells = row(headless.compare_rows(self.base, runs))
