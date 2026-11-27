@@ -184,6 +184,16 @@ class DeployTest(unittest.TestCase):
         v = json.load(open(os.path.join(self.server, "version.json"), encoding="utf-8"))
         self.assertEqual(len(v["commit"]), 40)
         self.assertIn("snapshot", v["data"])
+        # (a machine whose git has no user.name, as CI's runner: the deploy goes on, "by" empty, #891)
+        real = deploy.git
+
+        def nameless(*args):
+            if args == ("config", "user.name"):
+                raise subprocess.CalledProcessError(1, ["git", *args])
+            return real(*args)
+        with mock.patch.object(deploy, "git", nameless):
+            self.run_deploy()
+        self.assertEqual(json.load(open(os.path.join(self.server, "version.json"), encoding="utf-8"))["by"], "")
 
     def test_git_reads_utf8(self):
         # (version.json said "Jan TichavskÃ½": git's UTF-8 read as cp1252, #487)

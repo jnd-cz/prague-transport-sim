@@ -103,6 +103,15 @@ def git(*args):
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, encoding="utf-8", check=True).stdout.strip()
 
 
+def who():
+    """Who deploys, for version.json: git's user.name, or "" where git has none (CI's runner: every deploy test
+    stopped on it, #891)."""
+    try:
+        return git("config", "user.name")
+    except subprocess.CalledProcessError:
+        return ""
+
+
 def target(cfg, name):
     """The config of one target: the top level is "test", a named one takes the top level's keys it does not set."""
     top = {k: v for k, v in cfg.items() if k != "targets"}
@@ -168,7 +177,7 @@ def site(commit, reports=False, github=True, public=False):
     version = {"commit": commit, "subject": git("log", "-1", "--format=%s", commit),
                "data": {k: man[k] for k in ("snapshot", "built_at_commit", "published", "note") if k in man},
                "deployed": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-               "by": git("config", "user.name")}
+               "by": who()}
     if tag(commit):
         version["tag"] = tag(commit)
     out["version.json"] = json.dumps(version, ensure_ascii=False, indent=1).encode()
