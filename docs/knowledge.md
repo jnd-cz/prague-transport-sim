@@ -1242,8 +1242,10 @@ Grades and vertical curves of streets with a tram in the carriageway follow ČSN
   - **The surfaces check counts that kerb apart** (`bedKerbs`, #770, 2026-11-26): until then it was a seam, and
     batch C's kerbs (#606) put `seams10` over W3's on four lines (road beside tram 994 -> 1,454 samples over the five
     lines, every other pair falling). The band and its calibration against IPR are in `tools/bench/surfaces.js`.
-    What stays a seam there: a step over 0.25 m (204 samples on batch D, the lidar having half of it) and a road
-    standing over the tram's surface (157).
+    What stays a seam there: a step over 0.30 m and a road standing over the tram's surface (157 on batch D). The
+    band ended at 0.25 m until #876 (2026-11-27): batch E's 205 steps over that were Vinohradská's corridor (98,
+    the lidar having a third of what is built: its heights) and 96 kerbs of 0.25-0.30 m on the other lines that
+    the lidar has too (a median 0.22 m, read 2 m either side).
 - **A street's crown ends where a side street leaves it downhill** (#780, measured 2026-11-20). A street's surface
   is its centreline's profile and a crossfall either side, the crossfall smoothed along the street. Its road area
   runs on into a side street's mouth, and there the smooth is not the ground: on Nad Ohradou (line 37 (3877, -10))
@@ -1307,7 +1309,10 @@ Chapter 7 is the tram's; the platform surface and the bus clauses in 6.2.2 apply
   672 bridges, 7.7 MB): the height import reads it city-wide (`tools/mosty3d.py`). Its top at a tram bridge's
   end is within 1.05 m of the rail (p50 0.13 m); a bridge over a tram is 3.3 m or more above it (#192). Its
 footprints include abutments on land (top within 1.5 m of the lidar terrain): 10 % of the tram bridges' track. Spans
-  are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. It has gaps: no bridge between the Libeň
+  are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. Where a track climbs onto a viaduct its top
+  parts from the rails: at Krejcárek's north end (line 37 s 3470-3496) the track climbs 6.2 % (numeric DI of 2023 and
+  the archive alike) and the model's top falls 2 %, 0.06-0.19 m into the ballast; `src/buildings.js` brings the
+  model's corners in the trams' sweep, both tracks', under the bed top (#742). It has gaps: no bridge between the Libeň
   river bridge and its viaduct (14.4624–14.4660 E).
 - **A building's ground height** (#507, `ground_partition.py --calibrate`): the survey's 3D building outlines (ZPS KR
   `Hranice_budovy`) against IPR's ground 0.5 m outside the OSM footprint, 17,240 buildings on the five lines: IPR's

@@ -84,7 +84,7 @@ RULES = {
                  "ground_mesh.BED_*", "ground_mesh.RAIL_*"],
         "places": ["bertramka-track-level", "marjanka-track-level", "belohorska-median", "ballast-bed-off-the-route",
                    "marianske-hradby-upper-track", "vinohradska-raised-corridor", "vinohradska-crossing",
-                   "zizkov-depot-paving", "rasinovo-quay"],
+                   "zizkov-depot-paving", "rasinovo-quay", "belohorska-grass-track"],
     },
     "stairs": {
         "what": "flights of stairs and ramps: their steps, sides and ends (#447, #653, #786)",

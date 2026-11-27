@@ -69,8 +69,14 @@ class SurfacesCheck(unittest.TestCase):
         self.assertEqual(r['bedKerbs'], 0)
         self.assertEqual((r['seams3'], r['seams10']), (3 * ROWS, ROWS))
 
+    def test_a_kerb_of_a_raised_track_body_is_one_too(self):
+        # (#876: 96 kerbs of 0.25-0.30 m on batch E where the lidar has a median 0.22 m)
+        r = self.run_strip(0.28)
+        self.assertEqual((r['bedKerbs'], r['over10cm']), (2 * ROWS, 2 * ROWS))
+        self.assertEqual((r['seams3'], r['seams10']), (ROWS, ROWS))
+
     def test_a_step_higher_than_a_kerb_is_a_seam(self):
-        r = self.run_strip(0.30)
+        r = self.run_strip(0.35)
         self.assertEqual(r['bedKerbs'], 0)
         self.assertEqual((r['seams3'], r['seams10']), (3 * ROWS, 3 * ROWS))
 
