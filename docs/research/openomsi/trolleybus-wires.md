@@ -5,8 +5,8 @@ below are under `crates/`. Our side: main at 619e0e9. Prague counts from our ext
 from `czech-republic-261104.osm.pbf`) and the 17 districts' ZPS in `raw/dtm/`, counted with pyosmium and sqlite on
 2026-11-13. The poles, dewiring, frogs' switching, sections, arcs and drives are in
 [vehicles-and-wire.md](vehicles-and-wire.md) ("Trolleybus gear", "Supply"); this note is the wire as a thing in the
-world, asked by the user (2026-11-13): "how does the project draw trolleybus wires which I would like to have
-eventually implemented since Prague has real trolleybus lines".
+world, asked by the maintainer (2026-11-13), who would like them eventually, since Prague has real trolleybus
+lines.
 
 ## How the network is authored
 
@@ -112,7 +112,7 @@ reads `trolley_wire`: `tools/build_line.py:1110-1154` keeps a road's width, lane
 2. **Where the centre line comes from:** openOMSI needs an author; we have the tags. **Ours:** `build_line.py`
    keeps `trolley_wire`, `:forward` and `:backward` on its roads; the game puts one pair per wired direction over its
    outer lane (the DTM carriageway's edge where the street is surveyed, OSM width and lanes else). Height and
-   spacing come from a source or the user into `data/truth.json`, not openOMSI's 0.6 m or our tram's 5.34 m.
+   spacing come from a source or the maintainer into `data/truth.json`, not openOMSI's 0.6 m or our tram's 5.34 m.
 3. **Straight pulls between supports.** **Take**: the pair as chords between the span stations `buildCatenary`
    already places (12–32 m by radius), the polygon a curve's wire makes in the street. No sag, as openOMSI.
 4. **Supports:** openOMSI leaves them to the map. **Ours:** on a tram street the pair hangs from the tram's span
@@ -134,7 +134,7 @@ crossings with the tram wire** (`lane:world`, W4 Structures and scenery, blocked
 - Now: no trolleybus wire; `tools/build_line.py` drops `trolley_wire`. Prague: 31.2 km of wired street, routes 51,
   52, 53, 58, 59; on our lines line 9 at náměstí Kinských (140 m, one crossing with the tram wire).
 - What: the build keeps the tags per road and direction; the game draws a pair per wired direction over the outer
-  lane, height and spacing from `data/truth.json` (a cited source or the user), chords between support stations,
+  lane, height and spacing from `data/truth.json` (a cited source or the maintainer), chords between support stations,
   offsets mitred and shared at joints; hung from the tram's spans on shared streets, on its own poles, rosettes or
   arms elsewhere; frogs at the turns the route relations take; an insulated crossing piece over each tram crossing;
   the F8 overlay says which supports and offsets came from a rule.

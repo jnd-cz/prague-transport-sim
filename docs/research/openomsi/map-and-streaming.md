@@ -120,7 +120,7 @@ derived once per map and cached under a key of the tiles' sizes and dates (`omsi
   `buildWorld` (`src/world.js:393`, parts in `WORLD_PARTS` `:383`) builds terrain, survey, streets, buildings,
   trees and catenary; `uploadWorld` (`src/main.js:207-230`) puts everything on the GPU in one frame with culling
   off and drops the JS copies (~660 MB on line 17) unless `?keepgeo`/`?bot`. Line 17 loads in 16.4 s (#509, main
-  19f587f); the JS heap is 1.1-1.6 GB after load (`docs/knowledge.md` #205; `docs/history/PERF-ANALYSIS.md` §2).
+  19f587f); the JS heap is 1.1-1.6 GB after load (`docs/knowledge.md` #205; [`docs/history/PERF-ANALYSIS.md`](https://github.com/jnd-cz/prague-transport-sim/blob/35133a2/docs/history/PERF-ANALYSIS.md) §2).
 - **Merged meshes** in 350 m cells per material (`ChunkedGeometry`, `src/world.js:11, 141`).
 - **The ground as layers fitted at load:** terrain lowered 0.25 m under the survey and the tracks
   (`src/world.js:877-906`), the survey laid flush with the rails (`flushDtm` `:920`), surfaces lifted by class

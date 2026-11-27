@@ -2,7 +2,7 @@
 
 Researched 2026-11-26. **M** marks a measured or registry value, with its source and its place in that source. **E** marks an estimate. The main source is TSK hl. m. Prahy, *Ročenka dopravy Praha 2025* (published 2026; data for 2025), in the store's `raw/reference/tsk/`:
 - the PDF, whose charts were read by rendering its pages with pdf.js;
-- the user's Markdown conversion, which kept the tables.
+- the maintainer's Markdown conversion, which kept the tables.
 
 Page numbers are the yearbook's printed ones; the PDF's page number is the same.
 

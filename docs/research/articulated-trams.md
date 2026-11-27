@@ -8,7 +8,7 @@ Read-only web research by a research agent, 2026-11-18; nothing downloaded. Posi
 - **[E]** my estimate, low confidence;
 - **[?]** not found.
 
-**Bottom line.** For KT8D5, KT4 and (roughly) K2, the bogie positions follow from published pivot spacings. For 14T, 15T and 52T, no public HTML source gives section lengths or bogie positions. The DPP driver textbooks (PDF, listed at the end) are the most likely place to find them. The user's three recollections:
+**Bottom line.** For KT8D5, KT4 and (roughly) K2, the bogie positions follow from published pivot spacings. For 14T, 15T and 52T, no public HTML source gives section lengths or bogie positions. The DPP driver textbooks (PDF, listed at the end) are the most likely place to find them. The maintainer's three recollections:
 - **14T fixed bogies:** confirmed.
 - **52T limited bogies:** confirmed for the two inner bogies, but no angle or mechanism was found.
 - **KT4 fixed bogies:** not supported. The KT4 runs on pivoting T3-type bogies, and a linkage ties their rotation to the joint.
@@ -204,14 +204,14 @@ Sources: https://cs.wikipedia.org/wiki/Tatra_K2 · https://de.wikipedia.org/wiki
 
 [D] Overhang = (18.11 − 8.90) / 2 = 4.605 m. Add about 0.47 m for the coupler face.
 
-- **The bogies pivot.** The user remembered fixed KT4 bogies; the sources say otherwise.
+- **The bogies pivot.** The maintainer remembered fixed KT4 bogies; the sources say otherwise.
   - en.wiki: with no bogie at the joint, the design "necessitates a scissor joint connecting both bogies".
   - ru.wiki: the joint is two hinges, one at the floor and one at the roof, both on one vertical axis. Rods between the bogies and both sections deflect the joint according to the relative bogie rotation, which keeps the car steady on straight track and limits overhang in curves. (The section carries uncited-source tags.)
   - strassenbahn-online: the steering mechanism for the middle joint was newly developed for the KT4.
 - **Consequence for the solver [D].** Two hinges on one vertical axis allow yaw only. Vertically, the whole car behaves as one rigid beam on its two bogie pivots 8.9 m apart.
 - **Not found.** Exact linkage geometry and ratio [?]; it is probably in I. Köhler, *KT4 – Der Kurzgelenkwagen aus Prag* (GVE 2009). Minimum radius [?]; vertical radii [?].
 
-**The steering linkage, from photos (the user's find, 2026-11-18).** The k-report.net forum thread "Archiv diskuse
+**The steering linkage, from photos (the maintainer's find, 2026-11-18).** The k-report.net forum thread "Archiv diskuse
 Tramvaje Tatra typů T a K do 15. 10. 2023" (https://www.k-report.net/discus/messages/48/337217.html), posts of
 5–11 October 2023, has:
 - ten photos from under a Potsdam KT4D in the workshop's pit, by a Potsdam tram worker (forum images 1530026–1530035);
@@ -346,7 +346,7 @@ Coupler pivot positions: not found for any type.
 
 ## 12. ForCity Plus: 29T, 30T and 52T (second research run, 2026-11-18)
 
-The user (2026-11-18): the 52T's development is said to come from Bratislava's trams of a similar construction.
+The maintainer (2026-11-18): the 52T's development is said to come from Bratislava's trams of a similar construction.
 
 Read-only web research, 2026-11-18. Tags: [S] stated by the cited source, [D] derived (arithmetic shown),
 [E] my estimate, [?] not found. No PDFs were opened. The ones that look worth opening are listed at the end
@@ -620,9 +620,9 @@ A practical route to the missing lengths: measure a perpendicular side photo of 
 
 ## 13. The 14T and the 52T measured on pictures, and the best guesses (2026-11-18)
 
-The user (2026-11-18), on the open questions: "I do not have the information for your user question. Make your best guess for each question based on all material we have found so far." The pictures and documents are kept in `raw/reference/` (`photos/52t/`, `photos/14t/`, `skoda/`), listed in its `SOURCES.md`.
+The maintainer (2026-11-18), on the open questions: no further information; a best guess for each, from all the material found so far. The pictures and documents are kept in `raw/reference/` (`photos/52t/`, `photos/14t/`, `skoda/`), listed in its `SOURCES.md`.
 
-**The 52T, measured on the side view the user sent** (DPP's render of the livery, both sides, 1778 × 1000; `photos/52t/user-52t-sides.jpg`):
+**The 52T, measured on the side view the maintainer sent** (DPP's render of the livery, both sides, 1778 × 1000; `photos/52t/user-52t-sides.jpg`):
 - The upper view: the cab at the right, its end at x 1615, the rear end at 169. 1,446 px = 31.99 m over the bumpers, 22.1 mm a pixel.
 - Positions from the cab end, m [M, ±0.1; a bogie's middle is its fairing's]:
 
@@ -653,7 +653,7 @@ The user (2026-11-18), on the open questions: "I do not have the information for
   - section 3: 12.97 – 17.28 m, its fixed bogie at 15.13 m;
   - section 5: mirrored.
 
-**Best guesses** (the user, above):
+**Best guesses** (as asked above):
 
 | question | guess | why |
 |---|---|---|

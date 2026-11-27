@@ -216,7 +216,7 @@ Source [2006041276](https://www.prazsketramvaje.cz/view.php?cisloclanku=20060412
   set has passed (why the 35 m advance gauntlet at Ke Stírce barely helps).
   [2006041394](https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041394)
   **Game:** only the first car's pantograph, 4.5 m behind the front, works the contacts
-  (`src/tram.js:34`); which car's pantograph is up in a 2×T3 is a question for the user.
+  (`src/tram.js:34`); which car's pantograph is up in a 2×T3 is a question for the maintainer.
 - **Oerlikon toggle drive (old pivot switches)**: any pulse from the contact throws the switch to the
   other position, whatever it is in; hand-throwing also re-arms it. Last one burnt out 17 Sep 2012
   (Kubánské náměstí).

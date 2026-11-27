@@ -69,7 +69,7 @@ python -P -E tools/line_heights.py 17 22           # top of rail (#197), after t
 ```
 
 `rebuild.py` ends with `line_heights.py` for all the lines it built `line_structures.py` and `cross_level.py` per line (~2.5 min: it stages the network's heights
-with the user's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
+with the maintainer's answers and assembles one profile per DI track, docs/decisions/2026-11-02-vertical-profile.md);
 `reports/line-heights.json` lists the stretches without a height, the junctions where the radius gave way and
 the steps. `headless.py --checks heights` compares the game's track with the staged heights. Its log says when each
 stage ended (`(staged: 97 s from the start)` …), and the staging's parts. The staging matches and decides its samples
@@ -134,7 +134,7 @@ Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait t
 | `geoportal` | `lineN.geo.json`, `lineN.bld.bin` | 110 m either side of the route: IPR LOD2 buildings and Mosty 3D bridges (I3S), retaining walls with heights, the city tree register (`--trees-only`); without it the game extrudes OSM footprints |
 | `dtm` → `zps_source` | `lineN.dtm.json`, `lineN.zps.json` | the surveyed streets (DTM ZPS), their ground level judged against IPR (`tools/zps_ground.py`, #446), their decks checked against Mosty 3D and the raised rails, flat over the ways under them, thinner by `maxheight` (`tools/zps_decks.py`, #445), railway yards, lawns and paved yards on IPR's ground marked to take the lidar inside and the passages' plugged portals on IPR's floor (`tools/zps_inside.py`, #444), with their kerbs put back (`tools/kerbs.py`, #21), then the survey's own lines for review mode; the districts per line are `DTM` in `tools/dtm_packages.py`, lines held from it are `HOLD` |
 | `placement` | `lineN.json`, `lineN.built.geojson` | where each signal stands and where the front stops beside a hung one, by the game's rules with the rule that decided (`signals`; `signalsRaw` as `build_line` found them), where each platform is drawn, and the stop types from the survey's areas (`vienna`: so after `dtm`, #701). The compiled world for review (docs/architecture.md §10.4). The game logs where its own rules disagree (`game.placementDiffs`, #22). From here on a line with surveyed streets needs its `lineN.dtm.json`: a step that reads it and finds none stops `rebuild.py` (`tools/step_inputs.py`) |
-| `track_styles` | `lineN.json` | the track styles (`styles`: the user's marks, prazsketramvaje.cz's grassed-track list, answered review cards, the survey's grass; cut at platforms and crossings, #479, #503) and the rails' height over the bed every 2 m (`lift`, blended inside each section, #480) |
+| `track_styles` | `lineN.json` | the track styles (`styles`: the maintainer's marks, prazsketramvaje.cz's grassed-track list, answered review cards, the survey's grass; cut at platforms and crossings, #479, #503) and the rails' height over the bed every 2 m (`lift`, blended inside each section, #480) |
 | `line_heights` (all lines once) | `lineN.json` | the top of rail every 2 m along the path, the opposite path and every drawn track (`heights`, `heightSource`, a track's `zs`, #197); where no source has one, the surface plus the lift (`surface`, #480): no sample is left without a height, else the build fails |
 | `line_structures` | `lineN.json` | the spans the route runs on a bridge, those with a deck the track lies on, and the roads under it with their clearance (`spans`, `realDecks`, `underpasses`, #480) |
 | `cross_level` | `lineN.json` | the cross level of paved track where the road tilts across both tracks: one plane of IPR across them, the rails tilted with it (`crossLevel`, #538) |
@@ -251,8 +251,7 @@ names one that is not there) or linked at the author's address (`--url` for an u
 
 **Sound packs' files** (#636): a pack's WAV masters become the Ogg Opus files it plays and their MP3 fallbacks with
 `python -P -E tools/sound_encode.py assets/<id>`: headless Chromium encodes the Opus (WebCodecs), LAME the MP3s
-(`python -m pip install --user lameenc`, the user, 2026-11-17: "please install mp3 encoder and use mp3 as fallback
-in some good quality setting"), and each is checked against its master; the manifest then names the `.ogg` files,
+(`python -m pip install --user lameenc`; maintainer, 2026-11-17), and each is checked against its master; the manifest then names the `.ogg` files,
 each with its MP3 as `fallback` and its master as `master`, and every file's size and hash. `--check` checks a pack
 as it is (`tools/test_sound_encode.py` runs it on the shipped one). The format:
 [docs/vehicles.md](docs/vehicles.md#sound-packs).
@@ -514,7 +513,7 @@ grey. The answers are kept per line in the browser and sent to the server, which
 Each answer keeps the finding's kind, place, street and info with it, so it can be read without the page.
 A findings file can bring its own answers (`"options": [...]`). Lists for review are committed in
 `reports/review/` and deployed with the site (the review directory lists them). A set whose issue is
-closed while findings wait is out of date and is deleted (the user, 2026-11-05): #106's track-height
+closed while findings wait is out of date and is deleted (maintainer, 2026-11-05): #106's track-height
 disagreements (`track-z.json`, `tools/dtmp_tracks.py --findings`) went that way.
 `?line=17&review=reports/review/grass-track-17.json` lists where OSM maps grass over the track and nothing we know
 says so (#503, `python -P -E tools/grass_review.py`, which also prints how near the built grass's holes come to OSM's
@@ -533,7 +532,7 @@ steep step) and offers `archive, bridged over a dip` and `follows survey surface
 `python -P -E tools/track_structure_review.py` rewrites those offers from the committed queue after the
 import rules change. Regenerated with `--input`, the queue also takes street track where the heights build
 (`reports/line-heights.json`, `--heights`) still has no height after its rules, as a `street` decision named
-by its nearest stops, offering the archive, the survey and unsure (#202). Answers talked over with the user are recorded in `data/truth.json`
+by its nearest stops, offering the archive, the survey and unsure (#202). Answers talked over with the maintainer are recorded in `data/truth.json`
 (`trackHeights.reviewAnswers`, one per decision with its quote): `python -P -E tools/track_span_evidence.py`
 converts those; `--from-reviews reports/reviews/line17.json` converts a page's unambiguous answers instead.
 A decision whose answer there imports carries it in the findings (`recorded`), and its card and the review
@@ -545,7 +544,7 @@ reproduction commands and `--evidence` format.
 IPR's lidar where neither DI's rails nor DMR 5G say which is right (#446): `tools/dtm.py` writes the set per line
 (`tools/zps_ground.py`) and deletes it when nothing is held. `python -I tools/survey_ground_answers.py
 reports/reviews/line37.json` turns the answers that are a card's option into `data/truth.json` `surveyGround.places`,
-which the next `dtm.py` obeys; others stay held. An area without an answer takes the user's rule
+which the next `dtm.py` obeys; others stay held. An area without an answer takes the maintainer's rule
 (`surveyGround.heldRule`: courtyards to the lidar, greenery outside to the survey), so a set appears only without it. `python -P -E tools/bench/survey_ground.py` measures every line's
 ground level against IPR and the rails (`--dtm DIR` for main's copies). `python -P -E tools/bench/decks.py` measures
 the decks (level 1 and up) against Mosty 3D and the raised rails, the Krejcárek viaduct and Divadelní's deck and
@@ -590,7 +589,7 @@ the pinned #291 and only proposes.
 **Heavy jobs** (`baseline_store.HeavyJob`, first come first served, the short ones first, the long ones at night;
 #280, #536, #728, #851):
 - Every job that keeps several cores or GBs busy for over a minute waits for the machine's other heavy jobs and
-  holds its turn, so that it does not spoil another's measurement (the user, 2026-11-12, #516). These take their
+  holds its turn, so that it does not spoil another's measurement (#516). These take their
   turn themselves: `headless.py`, `rebuild.py`, `frametime.py`, `city_terrain.py`, `ground_mesh.py`;
   `build_line.py`, `dtm.py`, `line_heights.py`, `import_track_heights.py`, `street_profile.py` and
   `ground_partition.py` when run alone; `ground_place.py` for several places or `--rings` (one place runs as it
@@ -611,8 +610,7 @@ the pinned #291 and only proposes.
   not known it keeps its turn; one that runs over delays a job alone but never runs beside it. A ticket from a
   checkout older than #728 is a job alone, and such a checkout's jobs wait for every job as before. A tool becomes shared when its peak is measured
   and written at its `HeavyJob(...)`.
-- By day (07:00-23:00) a job expected over 30 min, or whose time is not known, waits for the night (#851; the user,
-  2026-11-24: "I thought it will go faster and heavy testing will be left for night unattended runs"; on that day
+- By day (07:00-23:00) a job expected over 30 min, or whose time is not known, waits for the night (#851; on 2026-11-24
   three 6-min test suites waited 27-97 min behind a 95-min job of #800, and #800's chains of 56-182 min ran by day).
   Its time is its `--expect`, its tool's plan (`headless.py`, `ground_place.py`), or the median of its kind's last
   runs (`heavy.py --history`); a chain named for the first time has none, so state it. While it waits it stands
@@ -643,11 +641,9 @@ the pinned #291 and only proposes.
   on 2026-11-24 three shared ground places waited 22 min beside #800's shared chain, during its
   `street_profile` steps.)
 - A batch of heavy steps goes into the queue at its start. A loop that calls one heavy tool after another sends
-  each step to the back of the queue, behind every job queued while the last one ran (the user, 2026-11-23: "even
-  if it's bunch of 5 minute jobs"; #800's last of five 5-min street builds still waited at 14:17, nearly 4 h after
-  the first was done). The batch is split by kind, its shared steps apart from its alone ones (the user,
-  2026-11-24: "if it's a mix of jobs that can run shared, together with other tasks, then put them in the queue
-  separately from alone jobs to speed up the whole queue"). A shared step inside a job alone holds the whole
+  each step to the back of the queue, behind every job queued while the last one ran, however short its steps (#800's last of five 5-min street builds still waited at 14:17, nearly 4 h after
+  the first was done). The batch is split by kind, its shared steps apart from its alone ones, so that the shared
+  ones run beside other jobs (maintainer, 2026-11-24). A shared step inside a job alone holds the whole
   queue for its time: #800's chain of builds of 2026-11-23 (23:11-02:13) ran alone, and three shared jobs of
   9-21 min waited 3 h behind it.
   - Steps that need nothing of each other take a ticket each, all at the start. A tool that takes its own turn
@@ -714,8 +710,7 @@ go into a "Findings" section of the PR.
   #176).
 - The file names its `issue` and `line` (or `lines`): the review directory (`reviews.html`, #288) lists it under
   them, and lists the sets of closed issues apart.
-- A set whose issue is closed while findings wait is deleted (the user, 2026-11-05: "If the issue is closed and
-  reviews are unasnwered then it's out of date and can be deleted"), unless a build reads it
+- A set whose issue is closed while findings wait is deleted (maintainer, 2026-11-05), unless a build reads it
   (`tools/review_sets.py` `READ_BY`: deleting one broke the build, #416).
 
 **Page checks and tests:**
@@ -736,20 +731,20 @@ replayed up to route s and handed over paused: a stuck scene as it was, #157).
 
 | rule | from |
 |---|---|
-| `Closes #N` only with every point met | #146 was nearly closed with six places still awaiting the user's answers |
+| `Closes #N` only with every point met | #146 was nearly closed with six places still awaiting the maintainer's answers |
 | calibrate a check before it holds data | #119's survey check held 4.6 km of line 17's open track: it was calibrated on street track only |
 | don't reformat what you don't change | #119's reflow buried its changes |
-| no seeded checks on a world change | they measure traffic reshuffled by the new data (#156). The user, 2026-11-05: "build up the static world … without regression checks at every step where they don't make sense yet (like traffic behavior because of shifting terrain)" |
-| the world first, a lane may pause | the user, 2026-11-05: "pause simulation work after finishing the current PRs"; the simulation lane waited for checkpoint W2 and resumed there (#414) |
-| heavy jobs take turns | the user, 2026-11-12, #516: "Make sure to run any comparison or heavy job in a queue to not affect other work" |
-| count runs and builds share the machine | the user, 2026-11-19, #728, asked whether they may when memory allows, the rule above staying for timings: "yes". A night's sessions waited in one line: 33 min behind another job's count run (PR #461) |
+| no seeded checks on a world change | they measure traffic reshuffled by the new data (#156); the static world is built up first, the traffic checks come where they make sense (maintainer, 2026-11-05) |
+| the world first, a lane may pause | the simulation lane paused after its open PRs (maintainer, 2026-11-05), waited for checkpoint W2 and resumed there (#414) |
+| heavy jobs take turns | a comparison measured beside another heavy job is spoilt (#516) |
+| count runs and builds share the machine | when memory allows, timings staying alone (#728). A night's sessions waited in one line: 33 min behind another job's count run (PR #461) |
 | one rebuild at a time | two branches publishing rebuilt data overwrite each other's lines (#280) |
-| findings off the path go on a lane's list | issues opened faster than closed: 410 against 251 in 26 days. The user, 2026-11-19: "yes" (#731) |
-| a finding's own issue only for the next step or a failing check, after a search; one issue for a place's or a batch's reports | 202 open on 2026-11-21, 120-129 opened a week against 41-87 closed; a session opened #797 and #800 in a day and reported a build race on #735 that #701 already held. The user, 2026-11-21, on "their number is still slowly but steadily climbing": "yes let's do this" |
-| merges in batches, the heaviest work at night | the user, 2026-11-21, having stopped the other lanes' sessions to save "resources, time as well as attention": "If we can merge in batches like today, keep the heavy work for nights, I'll be happy to resume the other lanes and sessions"; night from 22:00 to 07:00, plus any time the user says go: "yes". From 23:00 (the user, 2026-11-23: "I want to adjust the night runs to start at 23:00 instead of 22") |
-| a ground rule's issue closes at the rule's merge | it stayed open as "Part of" until the batch's rebuild, 5-10 issues between batches, while #757 tracks the batch. The user, 2026-11-21: "ok, let's try this approach" |
-| a ground change runs the locality set and its rules' places, `--all --rings` the batch | #812's proof, 61 places with one ring and two, took 2 h 10 min of the queue a round and ran six times as main's merges brought rules and places. The user, 2026-11-26: "the number of places to check are steadily climbing which is becoming not sustainable to keep checking in a loop"; the proposal (#865): "Yes to all three" |
-| a security hole is not written up in public | the repository is public and the alpha is live. The user, 2026-11-19: "fix and file privately" |
+| findings off the path go on a lane's list | issues opened faster than closed: 410 against 251 in 26 days (#731) |
+| a finding's own issue only for the next step or a failing check, after a search; one issue for a place's or a batch's reports | 202 open on 2026-11-21, 120-129 opened a week against 41-87 closed; a session opened #797 and #800 in a day and reported a build race on #735 that #701 already held (maintainer, 2026-11-21) |
+| merges in batches, the heaviest work at night | the other lanes' sessions were stopped to save machine time and the maintainer's attention, and resumed on this rule (maintainer, 2026-11-21); night from 22:00 to 07:00, from 23:00 since 2026-11-23, plus any time the maintainer says go |
+| a ground rule's issue closes at the rule's merge | it stayed open as "Part of" until the batch's rebuild, 5-10 issues between batches, while #757 tracks the batch (maintainer, 2026-11-21) |
+| a ground change runs the locality set and its rules' places, `--all --rings` the batch | #812's proof, 61 places with one ring and two, took 2 h 10 min of the queue a round and ran six times as main's merges brought rules and places; the places to check kept growing (#865) |
+| a security hole is not written up in public | the repository is public and the alpha is live (maintainer, 2026-11-19) |
 
 ## How the game's parts work
 

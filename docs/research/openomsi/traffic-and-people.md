@@ -200,7 +200,7 @@ OSM's signs decide few junctions; the rest need a rule.
    time per driver shrinking with the wait, the car that cannot stop first, room on the exit promised once, courtesy
    in a slow queue. **Take, reimplemented,** with priorities from our data: `give_way` / `stop` nodes and
    `priority_road` where tagged, else the road class (OSM `highway`, TSK's class from #556), else the rule for
-   unmarked junctions in Czech road law (right before left, the tram's own rules there from the user). openOMSI
+   unmarked junctions in Czech road law (right before left, the tram's own rules there from the maintainer). openOMSI
    dropped right-before-left because its maps carry no priorities; our class rule gives them. Conflicts become
    meeting stretches (the place along both connectors and how far they stay within 2.6 m) instead of `_conflict`'s
    yes or no, so a car is released when the other's tail leaves the stretch: offsets on edges, as #32 wants.
@@ -237,7 +237,7 @@ OSM's signs decide few junctions; the rest need a rule.
 - **The tram among the cars.** openOMSI: a train always goes first, a level crossing is a light, rail and street
   lanes meet only as bodies. No car turning across a moving tram by its braking, none queueing on the rails of a
   shared lane, no tram driver who sees a car on the track (bell, braking). Ours does all three (:771–858,
-  `carsOnTrack`, `carsCrossing`, the autopilot) from the user's facts (U3, #268). Nothing to take.
+  `carsOnTrack`, `carsCrossing`, the autopilot) from the maintainer's facts (U3, #268). Nothing to take.
 - **Where things stand.** Our stop lines, car heads, crossings and kerbs come from OSM and the survey (`_stopLine`,
   `src/pedestrianCrossings.js`, #146); openOMSI's are placed by hand in map objects.
 - **The tram's priority.** Our call from 140 m, the dilemma hold and the on-demand crossing follow Prague practice;

@@ -16,7 +16,7 @@ what each milestone is for; the issues hold the tasks.
 
 ## World checkpoints
 
-The user's plan of 2026-11-05: the static world is built bottom-up, one layer at a time on all five
+The maintainer's plan of 2026-11-05: the static world is built bottom-up, one layer at a time on all five
 lines, and each layer ends at a **checkpoint**: one run of every check on every line, a PR that explains
 what moved, and a tag on main (`W1` …). Within a layer one branch rebuilds and publishes (the `rebuild`
 label, AGENTS.md). The simulation lane waited for W2. GitHub's blocked-by links hold the order between
@@ -39,7 +39,7 @@ the issues.
 
 The first public target is a T3 that can drive the whole Prague tram network in one world. Passengers need connected walks, stops and boarding. The work follows the order agreed in [#731](https://github.com/jnd-cz/prague-transport-sim/issues/731).
 
-**First, the fused ground** (the user, 2026-11-19, [#757](https://github.com/jnd-cz/prague-transport-sim/issues/757): "making the fused ground stable and free of issues as the immediate goal", with "faster iteration over specific problematic places"). A ground rule is tried on named places, each built alone in about a minute (`tools/ground_place.py`, `data/truth.json` `groundPlaces`); the open ground issues are fixed through them and the lines rebuilt once for the batch. A tile's ground is made to depend on the tile and its neighbours only, which step 2 builds on.
+**First, the fused ground**, stable and free of issues as the immediate goal, with faster iteration over specific problem places ([#757](https://github.com/jnd-cz/prague-transport-sim/issues/757)). A ground rule is tried on named places, each built alone in about a minute (`tools/ground_place.py`, `data/truth.json` `groundPlaces`); the open ground issues are fixed through them and the lines rebuilt once for the batch. A tile's ground is made to depend on the tile and its neighbours only, which step 2 builds on.
 
 1. Make the existing build and checks reliable. Cache the ground and its dependent network together, identify their build, and measure raster error when the change calls for it. [Build integrity](https://github.com/jnd-cz/prague-transport-sim/issues/702) · [Raster checks](https://github.com/jnd-cz/prague-transport-sim/issues/704)
 2. Agree on identities for track edges, areas and routes. Build the ground and lightweight network once per city tile, stream them around the player, and compare a streamed drive with the pinned five-line world. The five lines currently list 854 ground tiles at 561 distinct positions. [City data model](https://github.com/jnd-cz/prague-transport-sim/issues/714) · [City build](https://github.com/jnd-cz/prague-transport-sim/issues/715) · [Player-load check](https://github.com/jnd-cz/prague-transport-sim/issues/710)
@@ -54,4 +54,4 @@ The remaining ground work has two inputs to the city build. Streets outside surv
 
 W4 scenery and the remaining Backlog wait until the tram city runs. The lane lists keep off-path findings for the next checkpoint. [World findings](https://github.com/jnd-cz/prague-transport-sim/issues/732) · [Asset findings](https://github.com/jnd-cz/prague-transport-sim/issues/734)
 
-History of how the project got here: [docs/history/](docs/history/) (not maintained).
+History of how the project got here: [docs/history/ at 35133a2](https://github.com/jnd-cz/prague-transport-sim/tree/35133a2/docs/history), the last commit that has them (not maintained).

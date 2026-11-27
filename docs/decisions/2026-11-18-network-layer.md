@@ -1,15 +1,13 @@
 # The network as a layer the build makes (#658)
 
-Status: **accepted** with the user's answers (Claude Code session 2026-11-18), quoted at the end: (a) the port, heights
-stored, one file a line.
+Status: **accepted** with the maintainer's answers (PR #665), listed at the end: (a) the port, heights stored, one
+file a line.
 
 ## Why
 
-The user, 2026-11-17 (#654): "I realize when the game was keeping all the data it was easier to work with it for both
-driving and putting correctly sized platforms on top. So the lanes, footpaths, basically the whole network graph for
-different transport modes will have to come as lightweight metadata layer and be used together with the single drawn
-grown surface. A lot of work but seems like it should be divided this way. Game start won't build anything new, only
-place things on the settled surface and use data to drive traffic there."
+The maintainer's direction (#654): the lanes, footpaths, the whole network graph of every transport mode come as a
+lightweight data layer, used together with the single drawn ground surface. The game's start builds nothing new; it
+only places things on the settled surface and drives traffic there with the data.
 
 Each Start builds the network from the survey: roads fitted to their kerbs, lanes, footways, their links, doors,
 signals bound to lanes, platforms and their stop types (#658's table). Those reads go through the ground's lookups.
@@ -83,7 +81,7 @@ Three.js's object ids).
 **Recommended: (a).**
 - The build stays one language with one survey reader (`placement.py`'s).
 - The rules become build rules a test can hold, as the placement's did.
-- The parity test is the proof the user asked for in #658 ("the build's lanes are the page's lanes"). It runs only
+- The parity test is the proof #658 asks for: the build's lanes are the page's lanes. It runs only
   until the page's code is removed.
 
 ## 2. What the layer holds
@@ -136,9 +134,9 @@ seeded `u3,redruns,traffic,stops` should not move outside main's spread.
 6. Signals: stop lines, heads, pedestrian heads.
 7. Start reads only the layer. The lookups are trimmed to the window again, and the test of the reads is added.
 
-## The user's answers (2026-11-18, PR #665)
+## The maintainer's answers (PR #665)
 
-To 1: "sounds good, go ahead with the port". To 2: "yes". To 3: "yes".
+To 1: the port. To 2: yes. To 3: yes.
 
 The questions were:
 
@@ -150,7 +148,7 @@ The questions were:
 ## How it went (2026-11-18)
 
 - **Steps 2-6** (#667, #668): the port, every part the page's to the cm on lines 9, 17, 22, 23 and 37.
-- **The page switched in one step** (step 7, the user: "go with the switch as recommended"), after the parity held. The
+- **The page switched in one step** (step 7, as recommended), after the parity held. The
   page's own builders went.
 - **Heights: read from the drawn ground at the load, not stored.** Answer 2 chose stored heights. Measured against the
   page, the ground file is not yet the surface the page settles things on:

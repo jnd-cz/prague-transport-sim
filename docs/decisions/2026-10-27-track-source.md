@@ -1,6 +1,6 @@
 # Track geometry and elevation: research decision and handoff
 
-> Moved 2026-10-29 into docs/decisions/. Other documents it names: TRACK-DATA-DECISION → [2026-10-27-track-source.md](2026-10-27-track-source.md); PLAN, BUILD-TOOLS-HANDOFF, REMOTE-CHANGES → [../history/](../history/).
+> Moved 2026-10-29 into docs/decisions/. Other documents it names: TRACK-DATA-DECISION → [2026-10-27-track-source.md](2026-10-27-track-source.md); PLAN, BUILD-TOOLS-HANDOFF, REMOTE-CHANGES → [docs/history at 35133a2](https://github.com/jnd-cz/prague-transport-sim/tree/35133a2/docs/history).
 
 **Date:** 2026-10-27  
 **Status:** agreed direction, being implemented: line 17's track comes from the DTM transport layer (DI) since PR #198 (#20; the other lines: #218), its curves from #204. Below: the research as of 2026-10-27.  
@@ -43,7 +43,7 @@ Near the Vozovna loop, junctions and multiple parallel tracks require explicit t
 
 ## District acquisition, 2026-10-30 (#61)
 
-**Published in source snapshot `2026-10-30`, with the user's approval.** The game and its built
+**Published in source snapshot `2026-10-30`, with the maintainer's approval.** The game and its built
 data are unchanged. Importing these tracks is [#20](https://github.com/jnd-cz/prague-transport-sim/issues/20).
 
 ### Access, formats and the HANDOFF contradiction
@@ -233,9 +233,8 @@ fork and four DI forks without an OSM switch.
 DI's rails within ~0.1 m (−0.8 / +0.75 / +2.35 / +3.8 m against DI's −0.72 / +0.72 / +2.30 / +3.74). OSM has the
 pair 4.2 m apart and up to 3 m west, with no dip at its outer rails. Line 17's GTFS shapes are one line per
 direction on the double track's midline, and they follow OSM's midline to p50 0.04 m / p90 0.13 m (DI's:
-0.14 / 0.42 m): generated from OSM, so they are no independent check of DI. The user, with street photos
-(Claude Code session 2026-11-03, #20): "Yeah di is right which also explains why our osm based track tried to
-clip the building there". Measured: on main's OSM build the southbound track centre came within 0.71 m of a
+0.14 / 0.42 m): generated from OSM, so they are no independent check of DI. The maintainer's street photos confirm DI there (#20).
+Measured: on main's OSM build the southbound track centre came within 0.71 m of a
 building footprint at 50.08537 N 14.41393 E (22 m of it within the T3's half width, 1.25 m); with DI no track
 centre of line 17 comes within 1.6 m of a building.
 

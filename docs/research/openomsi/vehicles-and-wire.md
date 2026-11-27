@@ -200,5 +200,5 @@ no blocker; drawing only).
 Every take above is an idea or a short equation, rewritten in our code and units with our numbers: none needs
 openOMSI's code. openOMSI is **AGPL-3.0-only**; ours is AGPL-3.0-or-later (#518). A ported file would carry
 `SPDX-License-Identifier: AGPL-3.0-only`, openOMSI's notice, its URL and commit, and the game as a whole could then
-be offered under AGPL-3.0 only: a decision for the user before any port. Nothing here reads OMSI 2's files or
+be offered under AGPL-3.0 only: a decision for the maintainer before any port. Nothing here reads OMSI 2's files or
 formats, and no OMSI 2 content or sample file is needed.

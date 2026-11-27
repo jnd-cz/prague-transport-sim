@@ -118,12 +118,12 @@ and download it only with `--fetch` (#223).
    writes `snapshots/<id>.json` and sets `snapshots/CURRENT`. Add its row at the top of
    [snapshots/README.md](snapshots/README.md).
 4. `data-publish`, then commit `snapshots/` and `data/MANIFEST.json` together.
-5. `python -I tools/fact_status.py`: the user's facts in `data/truth.json` that override a source, by their state in
-   the new build (#670). One the new sources now match is retired on the user's answer to its review card
+5. `python -I tools/fact_status.py`: the maintainer's facts in `data/truth.json` that override a source, by their state in
+   the new build (#670). One the new sources now match is retired on the maintainer's answer to its review card
    (`tools/fact_review.py`, below), in a PR that names the snapshot (git keeps the fact). One that changed (the source gives neither the
-   value recorded with the fact nor the fact's) or moved (a source the user confirmed has left it) is looked at again.
+   value recorded with the fact nor the fact's) or moved (a source the maintainer confirmed has left it) is looked at again.
    A DTM refresh's stop signs come before OSM's (`sources.LAYERS` signs) and are reviewed like any new data
-   (`tools/stop_signs_review.py`; the user, 2026-11-18: "the new data should be reviewed anyway").
+   (`tools/stop_signs_review.py`; maintainer, 2026-11-18).
 
 **Checking a publish:** `python -I tools/snapshot.py verify` (#107). It lists the store once and fetches
 back only what this publish added: source files no earlier snapshot in `snapshots/` has, built files not in
@@ -138,11 +138,11 @@ be retired), changed, and for a fact that confirmed a source agrees or moved (`t
 across the built lines; the weekly housekeeping pass posts those to retire or look at again, and `tools/rebuild.py`
 prints the counts. A fact that corrects a source records what the source said when it was recorded (`postedSpeeds`
 `osm`, a stop sign's `pin`, a stepped-curve answer's `step`: its card's radii, #672), so a later change of the source can show as changed, and a source that still gives
-what it gave then holds, however near the fact: the user saw that value and set theirs apart (#685).
+what it gave then holds, however near the fact: the maintainer saw that value and set theirs apart (#685).
 
-Each match is reviewed before it retires (the user, 2026-11-18: "I will need to review each case of new match to make
-sure we get proper fact replacement"): `python -P -E tools/fact_review.py` writes a card per match with a point
-(`reports/review/fact-matches-N.json`: the user's fact and the source's over the orthophoto), and `--import` applies
+Each match is reviewed before it retires, so that each fact is replaced properly (maintainer, 2026-11-18):
+`python -P -E tools/fact_review.py` writes a card per match with a point
+(`reports/review/fact-matches-N.json`: the maintainer's fact and the source's over the orthophoto), and `--import` applies
 the answers. A retired stop sign becomes a confirmation of the DTM's sign (the build takes the same sign, its card stays
 answered, a DTM refresh that moves it shows as moved); any other retired fact is cut out of `truth.json`. A placed
 stop sign matches the DTM's sign within 2 m in the plane, never OSM's stop position, which lies on the track's centre
@@ -163,7 +163,7 @@ that reads them; `tools/dtmp_tracks.py` `kept`) and the rebuild's step records w
 only, in all four formats (GPKG, JVF, SHP, DGN); the 2026-09-30 packages are no longer listed (ours stay
 in the store and in snapshots up to `2026-11-05`). October is the last state published before the JVF
 1.5.0.2 freeze (2026-11-10 22:00). **Snapshot `2026-11-05b` pins it** for the 17 districts of the five
-lines (the user, 2026-11-05: "yes we should snapshot the October data"). Its schema is September's:
+lines (maintainer, 2026-11-05). Its schema is September's:
 `tools/dtm_schema.py --compare` of all 34 packages finds 24 identical and 10 that differ only in which
 classes a district has objects of (layers new or gone in that district), each class with the same
 columns as in other districts' September packages; the one of them our tools read, the tree pits
@@ -325,5 +325,5 @@ An SFTP-only account `tramdata` on the storage server, chrooted to its folder (`
 `--store HOST:DIR` or set `TRAMDATA_STORE`.
 
 Licences of the stored sources are listed per group in each snapshot manifest; the game's attribution
-line repeats them. The store is private: `reference/` (the DPP textbook, the ČKD manuals, the other research downloads and the user's ride recordings, per file in
+line repeats them. The store is private: `reference/` (the DPP textbook, the ČKD manuals, the other research downloads and the maintainer's ride recordings, per file in
 its `SOURCES.md`) is for private reference only, with no licence cleared, and is not served with the game.

@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-02. **Issue:** #188. **Rule:** `tools/track_profile.py` (`vertical_profile`).
 Applying it to the game's profile is #197 (`tools/line_heights.py`): since 2026-11-03 by the band rule
-(`banded_profile`, below), the design radius within 10 cm of the data, the rest for the user's review.
+(`banded_profile`, below), the design radius within 10 cm of the data, the rest for the maintainer's review.
 
 ## Why
 
@@ -34,8 +34,7 @@ a 0.27 m one-point bump stays 2 cm above the grade while its neighbours move und
 crest and a straight −5.8 % grade (Klárov) are kept (`tools/test_track_profile.py`).
 
 The design radius, not a fit to the data, is the basis: no source is independent of the archive and precise
-enough at 5 m to set a limit (below). The user confirmed it on 2026-11-02: "I confirm the rule should enforce
-500m ČSN radius."
+enough at 5 m to set a limit (below). The maintainer confirmed the 500 m ČSN radius (2026-11-02).
 
 ## Calibration (2026-11-02)
 
@@ -86,9 +85,9 @@ It fails on a step over 1 m whose cause is not `di`, `dip` or `structure`.
 - `dip` −4.7 m at the end of the Libeň river bridge (14.4642 E, the street under it, where Mosty 3D has no
   bridge), −3.6 m at Modřany (50.0142 N 14.4018 E). The −5.5 m and −4.2 m dips at 50.0549 N 14.4723 E are a
   Mosty 3D bridge now (feature 237).
-- Before the user's answer, `terrain` +3.9 m in both directions on the Libeň bridge's rebuilt eastern approach
+- Before the maintainer's answer, `terrain` +3.9 m in both directions on the Libeň bridge's rebuilt eastern approach
   (the archive and the lidar alternate between the deck, ~190 m, and the ground under it, ~184 m). It is now the
-  user's structure ([height fallback](2026-10-30-track-height-fallback.md)).
+  maintainer's structure ([height fallback](2026-10-30-track-height-fallback.md)).
 
 Under 1 m (0.3–1 m): `archive` 10 groups, `di` 4, `dip` 12, `structure` 1, `terrain` 3, most of one or two points.
 
@@ -109,7 +108,7 @@ goes.
 ## Assembly in the build (#197, 2026-11-03)
 
 `tools/line_heights.py` does the above for the game; `tools/rebuild.py` runs it after the lines' steps (it reads
-every line's survey sidecar). It stages the heights with the user's answers as span evidence
+every line's survey sidecar). It stages the heights with the maintainer's answers as span evidence
 (`track_span_evidence.py` from `data/truth.json`, in the same process), bins them every 5 m along the DI
 through-chains (`chains`, copies dropped as in `tools/di_tracks.py`: 656 chains, 66,820 bins on 2026-11-03) and
 writes into the line data the heights of path and pathBack every 2 m (`heights`, `heightSource`), the opposite
@@ -128,17 +127,16 @@ with (`heights.staged`).
   after 3000 steps). Crossings each pinned to the mean of their two tracks first: their pins a few metres apart
   and centimetres off along a junction's diamonds asked for radii of a few metres, 172 s for 7 chains.
   2026-11-03: 1514 pinned meets, the largest difference 8.4 mm; no crossing over 1 m apart in the data.
-- **The band rule** (the user, 2026-11-03: "If the curve >=500m fits within 10cm then it's solved, otherwise let's keep
-  it for review again so we can find the root cause together"; `banded_profile`). The heights nearest the staged ones
+- **The band rule** (maintainer, 2026-11-03; `banded_profile`). The heights nearest the staged ones
   (least squares, with a curvature penalty of h⁴ that smooths noise over ~5 m and leaves no short humps) that stay
   within `BAND` = 10 cm of them and turn no tighter than the design radius. Within a turnout or a diamond the band is
-  15 cm (the user: "there can be little play within the junction if we account for input data errors, noise"), and
+  15 cm (the maintainer, for input data errors and noise), and
   a junction's pinned height holds within 5 mm. Not held to the band: a lone bad point (one or two bins the robust
   fit at the design radius misses by over 10 cm) and a stretch steeper than any track (9 %, the archive on the
   ground under a deck); those are the steps by cause, as before.
 - **Where no curve at the design radius fits,** the radius gives way ×0.8 at a time within 50 m of the points outside
   the band (at most 12 times, never under 20 m) so the game has a curve within the band, and the place goes to the
-  user's review if the band was missed by over 1 cm (a few millimetres at a pin only bend the radius). Where even
+  maintainer's review if the band was missed by over 1 cm (a few millimetres at a pin only bend the radius). Where even
   that cannot meet a pin, the rails join first and the band gives way within 15 m of it.
 - **Why not the radius held at any cost** (the first assembly, the same day): with L2 and Tukey, a stretch the curve
   missed by over 23 cm was dropped and the curve ran away: at Královka the loop's track, pinned at three junctions
@@ -146,7 +144,7 @@ with (`heights.staged`).
   when neither pins nor zones bind; at Malostranská 1.02 m where 500 m fits within 2 cm. Relaxing the radius there to
   250 m hid that. At junctions, short tracks of 44–58 m with 9–12 heights carried 4–7 pins from tracks with their own
   noise: a 44 m track at Strossmayerovo náměstí missed its data by 12 cm with them, 1 cm without.
-- **The user's review** (`reports/review/track-radius.json`, one decision per place `radius-<lat>-<lon>`, the staged
+- **The maintainer's review** (`reports/review/track-radius.json`, one decision per place `radius-<lat>-<lon>`, the staged
   heights, the terrain, and as the previews of its two answers the curve held to the design radius and the one
   within the band). An answer recorded in `data/truth.json` `trackHeights.radiusAnswers` (the place, `hold the
   radius` or `follow the data`, with its quote) applies to the place it is within 15 m of; `hold the radius` keeps the
@@ -160,7 +158,7 @@ with (`heights.staged`).
   page notes as quotes): 28 hold the radius, 1 follows the data, 2 unsure (left on the list); one more answer to
   follow the data is for a place of an earlier list. Where the note says "Discard the outliers" (12 places) the answer carries `"outliers": "drop"`: the worst point the held curve misses
   the band at is dropped (weight 0, no band), one per round, at most 12 rounds, and the curve at the design radius is
-  fitted to the rest (the user: "Drop outliers, fit the rest"; a 1 m hump over 30 m: four points dropped, the rest
+  fitted to the rest (a 1 m hump over 30 m: four points dropped, the rest
   within the band). An answer holds the radius against the band, not against the rails joining: where held curves
   left 24 junctions 1-2.5 cm apart, the radius gives way near the pin as without the answer. An answered place
   leaves the review list; `reports/line-heights.json` lists the dropped points.
@@ -177,7 +175,7 @@ with (`heights.staged`).
 7); no pinned junction over 1 cm apart (the largest 7 mm); moved from the staged heights on runs without a step
 p50 0.005 / p90 0.03 / p99 0.08 m; 93 held stretches over 60 m
 (6,045 m), 48 of them (3,120 m) structures and tunnels. Line 17, path and pathBack 43,632 m: DI 18,656 m, archive
-22,120 m, the user's reviewed spans 2,054 m, curve 348 m, no height 454 m (the game's surface profile there: the
+22,120 m, the maintainer's reviewed spans 2,054 m, curve 348 m, no height 454 m (the game's surface profile there: the
 archive and the survey disagree over 60 m and more between Čechův most and Strossmayerovo náměstí in both
 directions, 115 m past Staroměstská and between Přístaviště and Dvorce). Against the staged heights: p90 0.027 m
 (path), 0.037 m (pathBack).
