@@ -445,14 +445,19 @@ export function buildLod2(group, data, route, ground) {
             const onDeck = (x, y) => ground.dtm.deckAt(x, y, zd, 0.5) !== null;
             if (hz > zd - 0.1 && Math.min(az, bz, cz) < zd + 5.8 && onDeck(ax, ay) && onDeck(bx, by) && onDeck(cx, cy)) continue;
           }
-          const rd = roadUnder(mx, my);
+          const mz = (az + bz + cz) / 3;
+          // (an OSM road's ribbon is drawn on a bridge where the survey has no deck, src/streets.js: there the ribbon's
+          // width and height are the vehicles' space. Where the survey has the deck its carriageway is, below: the
+          // ribbon of a street with tracks is as wide as the tracks too, and its space took Trojský most's arch legs
+          // off 1.5-4.5 m over the deck, 147 m2, 3-8 m from the route, #13)
+          const zdk = ground.dtm?.deckAt(mx, my, mz - ROAD_CLEAR / 2 - 0.1, ROAD_CLEAR / 2 + 0.1);
+          const rd = zdk === null || zdk === undefined ? roadUnder(mx, my) : null;
           if (rd) {
-            const zr = rd.hf(mx, my), mz = (az + bz + cz) / 3;
-            if (mz > zr + 0.14 && mz < zr + 4.5) continue; // (from just over the ribbon, drawn 0.12 over zr)
+            const zr = rd.hf(mx, my);
+            if (mz > zr + 0.14 && mz < zr + ROAD_CLEAR) continue; // (from just over the ribbon, drawn 0.12 over zr)
           }
           // Over the surveyed deck (the survey is exact, the model coarse: at Štefánikův most its top stood in the track
           // and the roads): nothing of the model over a carriageway of the deck up to ROAD_CLEAR m, the vehicles' space.
-          const mz = (az + bz + cz) / 3;
           const overRoad = (cl) => { const zc = ground.dtm?.deckAt(mx, my, mz - ROAD_CLEAR / 2, ROAD_CLEAR / 2, cl); return zc !== null && zc !== undefined && mz > zc; };
           if (DECK_ROADS.some(overRoad)) continue;
           // Elsewhere on the deck the model's corners up to STREET_REACH m over it come down under it: its top 0-0.5 m
