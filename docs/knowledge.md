@@ -929,6 +929,14 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     217.70 m 0.5 m in; 129 corners on line 17); a wall's end whose edge climbs from the foot to the top in 0.5 m,
     the street past it sharing an outline with the one on the top (Smíchov, line 9 (-1035.2, -459.0), wall 325, up
     to 6 m); stair wells to underpasses (line 37 (9260, 966)) and the sidewalk round them (line 9 (-1035, -455)).
+  - *The street surface's hold at a wall* (`tools/sidewalk_walls_review.py`, 2026-11-28): of the sidewalk edges on
+    walls, stairs and strips that are a wall's face, where the sidewalk runs 2 m in, those whose own height and the
+    wall's top and foot near them all lie over 1 m off IPR 1.5 m in: line 9 616 of 6,602 m, 17 1,668 of 13,542, 22 660
+    of 6,909, 23 382 of 4,724, 37 172 of 3,332. 1.8 km lie all over IPR, 0.8 km all under it, 16 m with IPR between
+    the foot and the top. The longest is Rašínovo nábřeží's quay, lines 9 and 17 (-761.3, -1655.5), wall 2104: 222 m
+    at 192.9 m over IPR's 188.0 m. At Vyšehrad (wall 1097, 102 m at 220.9 m over 214.4 m) the lidar is right: a path
+    runs at the wall's foot and a walkway on its top (maintainer, #899). Which is right elsewhere waits for the review
+    (`reports/review/sidewalk-walls-N.json`, 15 stretches by kind), before a rule overrules the survey there.
 - **A paved strip is a wall for the sidewalk beside it** (#786, measured 2026-11-21). The survey has many a
   retaining wall and parapet as a paved area 0.2-0.5 m across and nothing else: no wall area, no `Zeď` line. What
   kept a sidewalk off IPR's smear at a wall (#653: the cells along a wall held at its level, a street corner on its

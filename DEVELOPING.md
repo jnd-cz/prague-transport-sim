@@ -538,6 +538,10 @@ edges); `--import` takes the answers into `data/truth.json` `grassReview`, and g
 steeper than 1:1, and at the places #447's thread named (`python -P -E tools/stairs_review.py`, which prints the stairs
 per line, one flight or not and how steep; `--table` alone); `--import` takes the kinds into `data/truth.json`
 `stairsReview`, keyed by a point inside the area.
+`?line=17&review=reports/review/sidewalk-walls-17.json` asks at which level a walkway meets a wall where the survey's
+heights there and IPR's lidar part by over 1 m (#653; `python -P -E tools/sidewalk_walls_review.py`, which prints the
+metres per line and kind; `--table` alone, `--list N` each kind's longest stretches); `--import` takes the answers into
+`data/truth.json` `sidewalkWallsReview`, keyed by the edge's point.
 `?line=17&review=reports/review/track-sources-17.json` lists where the track is not from DI and where DI and
 OSM disagree on a switch (#20, `tools/track_sources.py`); "matches reality" recorded in `data/truth.json`
 (`trackSources.reviewAnswers`) takes a finding off the list, anything else goes in a note.

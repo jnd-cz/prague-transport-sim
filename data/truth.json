@@ -29,7 +29,8 @@
   "groundRules": "reference: the rules tools/ground_mesh.py holds (crossing_pieces, rail_band, on_rails) and checks (heads_check)",
   "groundPlaces": "tools/ground_place.py: the places a ground change is built and measured at (#757)",
   "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)",
-  "stairsReview": "tools/stairs_review.py (an answered place gets no card); reference for the stairs rules of #447 in tools/ground_mesh.py until they read it"
+  "stairsReview": "tools/stairs_review.py (an answered place gets no card); reference for the stairs rules of #447 in tools/ground_mesh.py until they read it",
+  "sidewalkWallsReview": "tools/sidewalk_walls_review.py (an answered place gets no card); reference for the street surface's hold at walls (tools/street_profile.py sidewalks, #653) until it reads it"
  },
  "t3PhotoModel": [
   {
@@ -7511,6 +7512,30 @@
     ],
     "kind": "flight",
     "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   }
+  ]
+ },
+ "sidewalkWallsReview": {
+  "note": "The user's answers to the review of sidewalks at a wall (reports/review/sidewalk-walls-N.json, tools/sidewalk_walls_review.py, #653): at which level the walkway meets the wall where the survey's heights there and IPR's lidar part. `place` is the sidewalk's edge on the wall's line, `inside` IPR's reading 1.5 m in on the sidewalk's side (lat, lon), `survey` and `lidar` the heights the card showed there (m); `level` is lidar, survey, no walkway, or unsure (which no rule reads).",
+  "answers": [
+   {
+    "id": "sidewalk-wall-50.06605-14.41766",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0660528,
+     14.4176603
+    ],
+    "inside": [
+     50.0660648,
+     14.4176699
+    ],
+    "survey": 220.91,
+    "lidar": 214.43,
+    "level": "lidar",
+    "note": "a sidewalk on both sides of the wall: a cobbled path along the tall wall's foot, a cobbled walkway along the parapet on its top",
+    "source": "maintainer, #899 (asked whether a sidewalk runs at the wall's foot at about 214.5 m; answered with photos of both)"
    }
   ]
  }

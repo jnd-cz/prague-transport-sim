@@ -1,0 +1,294 @@
+{
+ "schema": 1,
+ "issue": 653,
+ "line": "22",
+ "title": "Sidewalks at a wall: at which level the walkway meets it",
+ "findings": [
+  {
+   "kind": "sidewalk at a wall",
+   "id": "sidewalk-wall-50.08546-14.38244",
+   "line": "22",
+   "lines": [
+    "22",
+    "23"
+   ],
+   "x": -2785.7,
+   "y": 170.1,
+   "mag": 41.0,
+   "status": "review",
+   "place": [
+    50.0854646,
+    14.3824366
+   ],
+   "inside": [
+    50.0854515,
+    14.3824417
+   ],
+   "side": "over",
+   "survey": 297.7,
+   "lidar": 294.32,
+   "marks": [
+    {
+     "x": -2785.7,
+     "y": 170.1,
+     "label": "survey 297.70 m",
+     "color": "#ffffff"
+    },
+    {
+     "x": -2785.6,
+     "y": 168.6,
+     "label": "IPR 294.32 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -2767.0,
+     "y": 168.2,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    },
+    {
+     "x": -2785.9,
+     "y": 169.8,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    }
+   ],
+   "options": [
+    "IPR's level: the walkway runs on at the blue pin's height up to the wall",
+    "the survey's level: the walkway meets the wall at the white pin's height",
+    "no walkway along the wall here (a bed, a fence, a building's face)",
+    "unsure"
+   ],
+   "info": "A sidewalk's edge along a survey wall for 41 m (on lines 22, 23), where every height the survey has here lies over IPR's walkway. At the white pin the survey has the edge at 297.70 m and the wall's outline near it from 297.70 m to 297.70 m; IPR's lidar reads 294.32 m 1.5 m in on the sidewalk's side (the blue pin). The street surface holds the edge at 297.70 m, the nearest of the survey's, so the walkway rises 3.4 m in its last 1.5 m to the wall (area 4377 of line 22 in this build). At which level does the walkway meet the wall here? The orange pins are the stretch's ends."
+  },
+  {
+   "kind": "sidewalk at a wall",
+   "id": "sidewalk-wall-50.07825-14.34042",
+   "line": "22",
+   "lines": [
+    "22"
+   ],
+   "x": -5874.7,
+   "y": -212.2,
+   "mag": 65.5,
+   "status": "review",
+   "place": [
+    50.0782515,
+    14.3404153
+   ],
+   "inside": [
+    50.0782642,
+    14.3404082
+   ],
+   "side": "over",
+   "survey": 373.05,
+   "lidar": 368.27,
+   "marks": [
+    {
+     "x": -5874.7,
+     "y": -212.2,
+     "label": "survey 373.05 m",
+     "color": "#ffffff"
+    },
+    {
+     "x": -5875.0,
+     "y": -210.8,
+     "label": "IPR 368.27 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -5876.3,
+     "y": -212.6,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    },
+    {
+     "x": -5819.2,
+     "y": -198.5,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    }
+   ],
+   "options": [
+    "IPR's level: the walkway runs on at the blue pin's height up to the wall",
+    "the survey's level: the walkway meets the wall at the white pin's height",
+    "no walkway along the wall here (a bed, a fence, a building's face)",
+    "unsure"
+   ],
+   "info": "A sidewalk's edge along a survey paved strip drawn as a wall's face for 66 m, where every height the survey has here lies over IPR's walkway. At the white pin the survey has the edge at 373.05 m and the wall's outline near it from 373.05 m to 373.05 m; IPR's lidar reads 368.27 m 1.5 m in on the sidewalk's side (the blue pin). The street surface holds the edge at 373.05 m, the nearest of the survey's, so the walkway rises 4.8 m in its last 1.5 m to the wall (area 5016 of line 22 in this build). At which level does the walkway meet the wall here? The orange pins are the stretch's ends."
+  },
+  {
+   "kind": "sidewalk at a wall",
+   "id": "sidewalk-wall-50.09184-14.40525",
+   "line": "22",
+   "lines": [
+    "22",
+    "23"
+   ],
+   "x": -1071.7,
+   "y": 649.3,
+   "mag": 33.5,
+   "status": "review",
+   "place": [
+    50.0918391,
+    14.4052491
+   ],
+   "inside": [
+    50.0918526,
+    14.4052492
+   ],
+   "side": "under",
+   "survey": 240.6,
+   "lidar": 242.82,
+   "marks": [
+    {
+     "x": -1071.7,
+     "y": 649.3,
+     "label": "survey 240.60 m",
+     "color": "#ffffff"
+    },
+    {
+     "x": -1071.5,
+     "y": 650.7,
+     "label": "IPR 242.82 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -1071.7,
+     "y": 649.3,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    },
+    {
+     "x": -1074.6,
+     "y": 671.1,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    }
+   ],
+   "options": [
+    "IPR's level: the walkway runs on at the blue pin's height up to the wall",
+    "the survey's level: the walkway meets the wall at the white pin's height",
+    "no walkway along the wall here (a bed, a fence, a building's face)",
+    "unsure"
+   ],
+   "info": "A sidewalk's edge along a survey wall for 34 m (on lines 22, 23), where every height the survey has here lies under IPR's walkway. At the white pin the survey has the edge at 240.59 m and the wall's outline near it from 240.54 m to 240.60 m; IPR's lidar reads 242.82 m 1.5 m in on the sidewalk's side (the blue pin). The street surface holds the edge at 240.60 m, the nearest of the survey's, so the walkway falls 2.2 m in its last 1.5 m to the wall (area 492 of line 22 in this build). At which level does the walkway meet the wall here? The orange pins are the stretch's ends."
+  },
+  {
+   "kind": "sidewalk at a wall",
+   "id": "sidewalk-wall-50.08009-14.41353",
+   "line": "9",
+   "lines": [
+    "9",
+    "17",
+    "22",
+    "23"
+   ],
+   "x": -663.1,
+   "y": -725.7,
+   "mag": 74.5,
+   "status": "review",
+   "place": [
+    50.0800941,
+    14.4135277
+   ],
+   "inside": [
+    50.0801002,
+    14.4135464
+   ],
+   "side": "under",
+   "survey": 188.5,
+   "lidar": 190.88,
+   "marks": [
+    {
+     "x": -663.1,
+     "y": -725.7,
+     "label": "survey 188.50 m",
+     "color": "#ffffff"
+    },
+    {
+     "x": -661.7,
+     "y": -725.2,
+     "label": "IPR 190.88 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -680.4,
+     "y": -672.4,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    },
+    {
+     "x": -658.6,
+     "y": -742.9,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    }
+   ],
+   "options": [
+    "IPR's level: the walkway runs on at the blue pin's height up to the wall",
+    "the survey's level: the walkway meets the wall at the white pin's height",
+    "no walkway along the wall here (a bed, a fence, a building's face)",
+    "unsure"
+   ],
+   "info": "A sidewalk's edge along a survey paved strip drawn as a wall's face for 74 m (on lines 9, 17, 22, 23), where every height the survey has here lies under IPR's walkway. At the white pin the survey has the edge at 188.50 m and the wall's outline near it from 188.47 m to 188.47 m; IPR's lidar reads 190.88 m 1.5 m in on the sidewalk's side (the blue pin). The street surface holds the edge at 188.50 m, the nearest of the survey's, so the walkway falls 2.4 m in its last 1.5 m to the wall (area 473 of line 9 in this build). At which level does the walkway meet the wall here? The orange pins are the stretch's ends."
+  },
+  {
+   "kind": "sidewalk at a wall",
+   "id": "sidewalk-wall-50.08645-14.40247",
+   "line": "22",
+   "lines": [
+    "22",
+    "23"
+   ],
+   "x": -1350.4,
+   "y": 82.8,
+   "mag": 17.0,
+   "status": "review",
+   "place": [
+    50.0864517,
+    14.4024725
+   ],
+   "inside": [
+    50.0864457,
+    14.4024537
+   ],
+   "side": "under",
+   "survey": 202.16,
+   "lidar": 207.71,
+   "marks": [
+    {
+     "x": -1350.4,
+     "y": 82.8,
+     "label": "survey 202.16 m",
+     "color": "#ffffff"
+    },
+    {
+     "x": -1351.8,
+     "y": 82.3,
+     "label": "IPR 207.71 m",
+     "color": "#3e9dff"
+    },
+    {
+     "x": -1348.7,
+     "y": 72.5,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    },
+    {
+     "x": -1350.4,
+     "y": 82.8,
+     "label": "the stretch's end",
+     "color": "#ffb000"
+    }
+   ],
+   "options": [
+    "IPR's level: the walkway runs on at the blue pin's height up to the wall",
+    "the survey's level: the walkway meets the wall at the white pin's height",
+    "no walkway along the wall here (a bed, a fence, a building's face)",
+    "unsure"
+   ],
+   "info": "A sidewalk's edge along a survey stairs for 17 m (on lines 22, 23), where every height the survey has here lies under IPR's walkway. At the white pin the survey has the edge at 201.59 m and the wall's outline near it from 201.51 m to 202.16 m; IPR's lidar reads 207.71 m 1.5 m in on the sidewalk's side (the blue pin). The street surface holds the edge at 202.16 m, the nearest of the survey's, so the walkway falls 5.5 m in its last 1.5 m to the wall (area 563 of line 22 in this build). At which level does the walkway meet the wall here? The orange pins are the stretch's ends."
+  }
+ ]
+}
