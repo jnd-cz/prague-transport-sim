@@ -276,6 +276,14 @@ header version in #63 and here. If a consumed name, code, attribute, encoding or
 tool-change issue with the diff. If there are no differences, record that **only for the tested new
 exports**. Until those packages exist, no post-1.5 compatibility conclusion has been made.
 
+**2026-11-26, after the switch: no new export yet.** Both indexes list all 57 districts at state
+**2026-09-30** only, in all four formats; October (listed 2026-11-05) is gone from them again. Praha 2's
+four packages from the index (OPL and KR, GPKG and JVF) are byte for byte the pre-switch September ones:
+SHA-256 `e9dce755…` and `dd7e0fe5…` as pinned in snapshot `2026-10-23`, and the JVF companions
+`ba86e8f6…` and `3384bf02…` of 2026-10-30, header `1.4.3`, `DatumZapisu` 2026-10-01. The first state that
+can be a JVF 1.5.0.2 export is 2026-11-30's, expected in the first days of December; look again after
+2026-12-08 (#63).
+
 ## Source groups
 
 The snapshots and what each one added: [snapshots/README.md](snapshots/README.md). How some groups
