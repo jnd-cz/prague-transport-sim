@@ -251,6 +251,9 @@ tram, dark glass is the game.
 - Automatic switches (the onboard computer sets every switch by radio instead of the overhead contacts);
   performance overlay (FPS, frame time, draw calls, triangles, JS heap); Performance test and Reference test (a minute
   of the autopilot on a fixed stretch, [Testing](#testing)).
+- Render resolution: automatic (while frames are slow the game draws fewer pixels by itself, and goes back when that
+  did not help), or fixed at 100 %, 75 % or 50 %; antialiasing can be turned off (the page loads again). The browser
+  remembers both.
 - Tram model: detailed and animated (a hybrid of "Tatra T3" by SimonStrikesBack, CC BY 4.0, and "Tatra T3"
   by Jakub Vaja (conflig), CC BY-NC 4.0, both on Sketchfab; CC BY-NC 4.0): its doors, collector, brake lamps
   and track-brake shoes follow the game, the second car of a set hangs on the coupling; detailed classic

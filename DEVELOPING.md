@@ -266,20 +266,40 @@ minute is measured from the departure on, all driving. The Reference test is lin
 the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 
 **What the fragments cost** (#705): a weak GPU is short of fragments, not of triangles or draw calls (the testers'
-phone was no faster with both halved). The page's address takes drawing switches, each change alone or several
-(`?gfx=nolog,snowif,front,pr1,noaa`, `src/gfx.js` lists them); a performance test's result and a note's machine
-facts carry the list, the renderer's pixel ratio and whether the canvas is antialiased. Here the frame interval
-cannot see the fragments: on the Arc A770 a frame takes 3.0 ms at pixel ratio 1 and 3.1 ms at 1.75, the CPU's
-time. `tools/frametime.py --ratio 1,6` sets the renderer's ratio in the bench and prints the GPU's own time for a
-frame's draws and its cost per megapixel; 6 is 7680 x 4320, the largest buffer Chromium draws in full (at 8 it cuts
-the buffer: the row is marked and left out of the cost). Line 17, the detailed model, stop 15, ratio 6, GPU time
-of two runs each, 2026-11-27: 10.6 / 10.8 ms as drawn now; 5.9 / 5.7 without the logarithmic depth buffer; 6.1 /
-6.0 with the snow's noise in the shaders only while it snows; 9.6 / 9.6 with front faces only on the ground and the
-buildings; 6.8 / 6.8 without antialiasing; 2.9 / 2.9 without the depth buffer and the noise together, which is what
-the same frame takes at ratio 1 (2.4-3.3 ms: the GPU is then no longer the limit, and front faces on top of the two
-measure nothing more). `tools/shot.py --params gfx=front --ref .` shows what a switch changes in a picture: the
-noise's switch nothing in any weather (the snow's shader is the same text), no logarithmic depth only hairlines
-at edges in four views, front faces the roofs (wound inwards: some vanish, others show their insides).
+phone was no faster with both halved). Two things made every fragment dear, and the page draws without both since
+2026-11-27: the logarithmic depth buffer (three.js then writes each fragment's depth, so the GPU cannot reject a
+hidden fragment before shading it) and the snow's two octaves of noise, which ran in every weather (now compiled
+into a material only while it snows; the snow's first draw compiles them anew, 381 ms once here). The page's address
+takes drawing switches to measure with, each alone or several (`?gfx=log,snowall,front,pr1,noaa`, `src/gfx.js`
+lists them: `log` and `snowall` draw the old way); a performance test's result and a note's machine facts carry the
+list, the renderer's pixel ratio, the render scale and whether the canvas is antialiased, and
+`tools/feedback.py --perf` gives each list its own row.
+
+- **Here** the frame interval cannot see the fragments: on the Arc A770 a frame takes 3.0 ms at pixel ratio 1 and
+  3.1 ms at 1.75, the CPU's time. `tools/frametime.py --ratio 1,6` sets the renderer's ratio in the bench and
+  prints the GPU's own time for a frame's draws and its cost per megapixel; 6 is 7680 x 4320, the largest buffer
+  Chromium draws in full (at 8 it cuts the buffer: the row is marked and left out of the cost). Line 17, the
+  detailed model, stop 15, ratio 6, GPU ms a frame, 2026-11-27: 10.6 the old way (`log,snowall`); 5.7-5.9 with
+  the noise only (`snowall`); 5.9-6.1 with the logarithmic depth only (`log`); 2.9 as drawn now, which is what the frame
+  takes at ratio 1 (the GPU is then no longer the limit); with the old way, 6.8 without antialiasing and 9.6 with
+  front faces only on the ground and the buildings (nothing more once the two are gone; roofs are wound inwards,
+  so `front` is for timing only).
+- **On a tester's integrated GPU** (Intel HD Graphics 400 as Firefox names it, 1699 x 1016; the reference test,
+  2026-11-27): 43.5 frames a second and 32.7 % of frames over 20 ms the old way; 59.4 and 1.0 % without the
+  logarithmic depth; 58.4 and 2.4 % without the noise. Either alone reaches that display's 60 Hz.
+- **Flicker** is what the logarithmic depth buffer was for, and `tools/flicker.py` counts it in motion: the same
+  drive drawn two ways, the pixels that change and come back. At eight places of lines 17 and 22 (cab and chase)
+  the plain buffer has 4-27 flicks a frame of its own, the logarithmic one 33-234: thin dark cracks along the
+  seams of the track bed's triangles, which the plain buffer does not draw. With the near plane put at 1 mm
+  (`--near 0.001`, its calibration) the plain buffer's own flicks rise from 6 to 103 and from 4 to 54: rails
+  against their bed, far windows against their walls. The near plane is 0.3 m and the far one the fog's end (at
+  most 970 m).
+- **The render scale** (the menu; `src/autoscale.js`): automatic, it steps to 75 % and 50 % of the display's
+  pixels along each axis while over a quarter of the driving frames take over 20.5 ms, and takes a step back when
+  the frames got no shorter for it (the CPU, or a display held to 30 frames a second). The performance overlay
+  and a note's machine facts say what it decided. A performance test and `?gfx=pr<n>` hold the scale.
+
+`tools/shot.py --params gfx=log,snowall --ref origin/main` shows what a switch changes in a picture.
 
 **The HUD's cost** (`python -P -E tools/bench/hud.py`, #706): what one update of the HUD changes in the page (0 when
 nothing changed: texts are written only when they change, `src/hud.js` `put`) and how long it takes with the CPU

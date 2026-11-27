@@ -22,7 +22,8 @@ import { Inspect } from './inspect.js';
 import { Review, parseAt } from './review.js';
 import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
 import { PerfLog, machine, gpuTimer } from './perf.js';
-import { GFX, gfxQuery } from './gfx.js';
+import { GFX, gfxQuery, setting, setSetting } from './gfx.js';
+import { AutoScale } from './autoscale.js';
 import { TouchControls } from './touch.js';
 import { Gamepad } from './gamepad.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
@@ -177,10 +178,20 @@ route.ground = ground;
 
 // ------------------------------------------------------------------ renderer & scene
 const canvas = $('gl');
-// (GFX: the address's drawing switches, each of these alone for a measurement, src/gfx.js, #705)
+// (GFX: the menu's drawing settings and the address's switches, src/gfx.js, #705)
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.antialias, logarithmicDepthBuffer: GFX.logDepth });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, GFX.maxPixelRatio));
+// The render scale: the menu's setting, or what the automatic one chose so far on this page (src/autoscale.js);
+// ?gfx=pr<n> draws at the ratio asked.
+const autoScale = new AutoScale();
+GFX.auto = autoScale.log;
+let scaleSet = setting('scale');
+function applyScale() {
+  GFX.scale = GFX.fixed ? 1 : scaleSet === 'auto' ? autoScale.scale : +scaleSet;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, GFX.maxPixelRatio) * GFX.scale);
+}
+applyScale();
 window.renderer = renderer; // (from the start, also in the menu: performance checks, tools/test_idle.py)
+window.gfx = GFX; // (what the page draws with and what the automatic scale decided; a bench sets .fixed: no scale steps)
 // Out of GPU memory (or the GPU reset), the browser drops the WebGL context. The world's geometry is no
 // longer kept in JS after upload (uploadWorld), so it cannot be rebuilt here: say so and offer a reload
 // instead of a frozen black screen.
@@ -1292,7 +1303,11 @@ function frame(now) {
     }
     lastDraw = now; window.drawCount++;
     // (driving only: the menu, a pause and the results draw 4 frames a second, #149)
-    if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) perfLog.frame(now, tram.s, renderer.info.render, simmed);
+    if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) {
+      perfLog.frame(now, tram.s, renderer.info.render, simmed);
+      // (the automatic render scale reads the same frames, but a performance test's: it measures at one scale)
+      if (scaleSet === 'auto' && !GFX.fixed && !perfTest && autoScale.frame(now) !== null) { applyScale(); resize(); }
+    }
   }
   if (perfTest) perfTestStep(now);
   if (perfOn) updatePerf(now);
@@ -1371,6 +1386,17 @@ async function replayTo(seed, at) {
 // renderer drew and the JS heap where the browser reports it (Chromium: performance.memory).
 let perfOn = false, perfFrames = 0, perfSince = performance.now(), perfLast = performance.now(), perfWorst = 0;
 $('optPerf').addEventListener('change', () => { perfOn = $('optPerf').checked; $('perf').classList.toggle('hidden', !perfOn); });
+// The menu's drawing settings (src/gfx.js, #705): the render scale applies at once; the antialiasing is the canvas's,
+// given when the page loads, so its change loads the page again (not where the browser keeps no settings: the
+// page would load as it was).
+$('optScale').value = scaleSet;
+$('optScale').addEventListener('change', () => { scaleSet = $('optScale').value; setSetting('scale', scaleSet); applyScale(); resize(); });
+$('optAA').checked = setting('aa') === 'on';
+$('optAA').addEventListener('change', () => {
+  const want = $('optAA').checked ? 'on' : 'off';
+  setSetting('aa', want);
+  if (setting('aa') === want) location.reload(); else $('optAA').checked = !$('optAA').checked;
+});
 function updatePerf(now) {
   perfFrames++;
   perfWorst = Math.max(perfWorst, now - perfLast);
@@ -1379,6 +1405,9 @@ function updatePerf(now) {
   const fps = (perfFrames * 1000) / (now - perfSince), info = renderer.info.render, mem = performance.memory;
   $('perf').textContent = `${fps.toFixed(0)} FPS   ${(1000 / fps).toFixed(1)} ms avg   ${perfWorst.toFixed(0)} ms worst\n`
     + `${info.calls} draw calls   ${(info.triangles / 1e6).toFixed(2)} M triangles`
+    // (what is drawn, and the automatic scale's last decision: src/autoscale.js)
+    + `\n${canvas.width} x ${canvas.height}` + (GFX.scale < 1 ? `   scale ${GFX.scale * 100} %` : '')
+    + (scaleSet === 'auto' && GFX.auto.length ? `   auto: ${GFX.auto.at(-1).why} (${GFX.auto.at(-1).slow} % slow frames)` : '')
     + (mem ? `\nJS heap ${(mem.usedJSHeapSize / 1e6).toFixed(0)} / ${(mem.jsHeapSizeLimit / 1e6).toFixed(0)} MB` : '');
   perfFrames = 0; perfSince = now; perfWorst = 0;
 }

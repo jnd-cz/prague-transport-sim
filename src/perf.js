@@ -101,9 +101,12 @@ export function machine(renderer) {
     const gl = renderer.getContext();
     out.webgl2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
     out.pixelRatio = renderer.getPixelRatio();
-    // (what the frames were drawn with: the canvas as the browser gave it, the address's switches, src/gfx.js, #705)
+    // (what the frames were drawn with: the canvas as the browser gave it, the render scale and what the automatic
+    // one decided, the address's switches: src/gfx.js, #705)
     out.antialias = !!gl.getContextAttributes()?.antialias;
     out.logDepth = GFX.logDepth;
+    out.scale = GFX.scale;
+    if (GFX.auto?.length) out.autoScale = GFX.auto;
     if (GFX.key) out.gfx = GFX.key;
     out.maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
