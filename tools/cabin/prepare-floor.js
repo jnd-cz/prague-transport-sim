@@ -4,8 +4,7 @@
 // more packings on request (opts.packings: the lab's adaptive one with other options, or tools/cabin/packing-search.js's). Otherwise as it was (#249 step 1).
 // #249 step 2: opts.cabFixtures false leaves out the fixtures that stand in the driver's cab (their box's centre in its exclusion): the
 // cab's control panel (Control_Panel_18, x 5.42-6.94 m) marked by its box the floor behind the cab's partition by the front door, which
-// is open floor (the user, 2026-11-25: "the black area behind driver's cabin. It should be also part of circulation area"). The lab's
-// own files keep them (the default).
+// is open floor, part of the circulation area (maintainer, #249). The lab's own files keep them (the default).
 /** Offline plan-area estimate from the source mesh plus explicit passenger-space policy. */
 import {finishStandingLayouts} from './standing-priority.js';
 import {adaptivePacking} from './adaptive-packing.js';

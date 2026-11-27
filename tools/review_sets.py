@@ -35,7 +35,7 @@ OUT = os.path.join(FOLDER, "index.json")
 KNOWN = {
     "track-heights.json": {"title": "Track heights: structure and street decisions", "issue": 202, "lines": ["17"]},
 }
-# sets a build reads, by the tools that read them: the user's answers become evidence through them, so they stay when
+# sets a build reads, by the tools that read them: the maintainer's answers become evidence through them, so they stay when
 # their issue closes (deleting one breaks the build, #416). track-heights.json maps data/truth.json's
 # trackHeights.reviewAnswers onto its decisions.
 READ_BY = {"track-heights.json": ["tools/height_answers.py", "tools/track_profile.py"]}

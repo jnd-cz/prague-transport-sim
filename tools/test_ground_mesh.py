@@ -273,8 +273,8 @@ class Stairs(unittest.TestCase):
         self.assertNotIn(0, gm.SurveySurface({"areas": [self.BESIDE]}, [0]).flights)   # (without: the outline's triangles)
 
     def test_the_stairs_own_side_keeps_its_heights_where_the_lidar_misses_the_flight(self):
-        # (the raster level at the building's foot over a narrow flight: the user, 2026-11-23, "the narrow places can't be
-        # properly seen by the lidar sampling")
+        # (the raster level at the building's foot over a narrow flight: the lidar's sampling cannot see narrow places
+        # properly; maintainer, 2026-11-23)
         sh = gm.StairsHeights({"areas": [self.BESIDE]}, self.LINES, lambda x, y: np.full(len(x), 98.5))
         self.assertIsNone(sh.outline(self.BESIDE))
 

@@ -86,7 +86,7 @@ class Assembly(unittest.TestCase):
         return min(min(lh.implied_radii(run['s'], run['z']), default=math.inf) for run in c.runs)
 
     def test_a_sag_tighter_than_the_floor_holds_the_floor_and_goes_to_review(self):
-        # (the user, 2026-11-07: "hold minimum radius at 500m everywhere and get back with review cases which can't fit")
+        # (the 500 m minimum radius held everywhere, what cannot fit goes to review; maintainer, 2026-11-07)
         c = chain([(0, 0), (200, 0)], self.sag, terrain=self.sag)
         quiet(lh.assemble, [c])
         self.assertGreater(self.tightest(c), lh.radii()['min'] * .97)
@@ -130,8 +130,8 @@ class Assembly(unittest.TestCase):
 
     def test_a_hold_answer_at_a_junction_holds_the_floor_and_the_tracks_meet_half_way(self):
         # (a track crossing two others 4 m apart whose heights differ by 20 cm: alone it meets them on a 320 m curve; held,
-        # the two give way towards it. The user, 2026-11-07: "best fit to 500m limit even at the price of larger height
-        # difference from source")
+        # the two give way towards it: the best fit to the 500 m limit, even at a larger height difference from the source;
+        # maintainer, 2026-11-07)
         a = chain([(100, -150), (100, 150)], lambda s: 100.0)
         b = chain([(104, -150), (104, 150)], lambda s: 100.2)
         c = chain([(0, 0), (200, 0)], lambda s: 100.1)

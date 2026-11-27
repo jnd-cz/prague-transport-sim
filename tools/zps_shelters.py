@@ -3,8 +3,8 @@
 the street furniture (#523). Read by tools/dtm.py, after the kerbs.
 
 The survey (ZPS) draws a stop's shelter as a hole in the platform area. Nothing filled it, so the game drew a gap in the
-platform. The user, 2026-11-12: "I would fill the hole to keep our ground flat there, however store it's dimensions and
-place so the street furniture worker can build shelter there". A hole of a level-0 platform with no survey area of its
+platform. The hole is filled to keep the ground flat, its size and place kept for the street furniture to build the
+shelter there (maintainer, 2026-11-12). A hole of a level-0 platform with no survey area of its
 own in it is dropped from the platform, whose surface spans it from its outline, and written to `shelters` in
 lineN.dtm.json: its centre, length and width (the minimum rotated rectangle), bearing, the platform's height there, the
 hole's ring, and the stop (line.json's platforms: name, code, PID id) whose platform holds it. A hole with an area of its own in it stays

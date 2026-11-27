@@ -377,27 +377,26 @@ def judge(r):
         "the wheels on the rail at the pivots +-0.95 m": len(r["wheelZ"]) == 4
         and all(near(z, w, 0.01) for z, w in zip(r["wheelZ"], (-4.15, -2.25, 2.25, 4.15))),
         "the couplers' heads at +-7.52 m": near(r["couplers"][0], -7.52, 0.01) and near(r["couplers"][1], 7.52, 0.01),
-        # the other models' height (classic 0.594 m, hybrid 0.584 m): the user, 2026-11-10, "take it from the others"
+        # the other models' height (classic 0.594 m, hybrid 0.584 m), taken from them (maintainer, 2026-11-10)
         "the coupler's bar 0.59 m over the rail": near(sum(r["couplerBar"]) / 2, 0.59, 0.005),
         "the collector's head just under the wire": near(r["top"], r["wire"] - 0.005, 0.01),
         # the plan view: straight sides, the ends tapering from 4.51 m ahead / 4.84 m behind the centre
         "the plan: 1.25 m half width amidships": near(r["halfWidth"]["0"], 1.25, 0.01) and near(r["halfWidth"]["3"], 1.25, 0.01),
-        # the ends wider than the plan view's, to 6892 head on (the corner units at 0.93 m: the user, 2026-11-10,
-        # "Let's try widening")
+        # the ends wider than the plan view's, to 6892 head on (the corner units at 0.93 m; maintainer, 2026-11-10)
         "the plan: the front tapered to 1.14 m at 5.5 m": near(r["halfWidth"]["5.5"], 1.141, 0.01),
         "the plan: the rear tapered to 1.13 m at -5.8 m": near(r["halfWidth"]["-5.8"], 1.127, 0.01),
-        # the user's photo of a bogie from the side: the skirt in arches 2 cm over the wheels, level between them
+        # the maintainer's photo of a bogie from the side: the skirt in arches 2 cm over the wheels, level between them
         "the skirt's arches over the wheels": r["arches"] == {"0 0.7": 0, "0 0.74": 255, "0.95 0.7": 0, "0.95 0.74": 255, "1.25 0.5": 0, "1.25 0.6": 255, "1.4 0.4": 255},
         # the side view: the nose at 7.0 m at the windscreen's foot, the windscreen leaning back 0.44 m, the visor
         "the side: the windscreen's foot at 7.0 m": near(r["noseF"]["1.65"], 7.0, 0.02),
         "the side: the windscreen's top 0.44 m back": near(r["noseF"]["2.53"], 6.56, 0.03),
         "the side: the visor over it": r["noseF"]["2.65"] > r["noseF"]["2.53"] + 0.05,
         "the side: the rear window's foot at -7.0 m": near(r["noseR"]["1.69"], -7.0, 0.02),
-        # the user, 2026-11-10: "make the front brow less slanted, perhaps even perpendicular? The back should be similar"
+        # the front brow upright, not slanted, the back's the same (maintainer, 2026-11-10)
         "the brows upright over the visors": abs(r["noseF"]["2.85"] - r["noseF"]["2.65"]) < 0.005 and abs(r["noseR"]["2.85"] - r["noseR"]["2.65"]) < 0.005,
-        # "clean, rounded vertical cut on the side where it meets the doors": the edge at one z at every height
+        # a clean, rounded upright cut on the side where the window meets the doors: the edge at one z at every height
         "the windows' edges on the sides upright": r["windowEdges"] == [[True, False]] * 8,
-        # "adjust the line plate to sit lower, near the edge": its foot 3 cm over the brow's lower edge (2.56 m)
+        # the line plate lower, near the edge: its foot 3 cm over the brow's lower edge (2.56 m)
         "the route box 3 cm over the brow's edge": near(r["routeBox"][0], 2.59, 0.005) and near(r["routeBox"][1], 2.89, 0.005),
         "two cars CAR_PITCH apart": near(r["pitch"], r["CAR_PITCH"], 0.005),
         "the coupled heads meet": r["couplerGap"] < 0.01,
@@ -406,16 +405,17 @@ def judge(r):
         # #454: the body, the fixed parts, the lamps, the fleet numbers; the bogies, wheelsets, couplers and the
         # pantograph's frame instanced
         "at most eight draw calls a car besides the plates": r["drawn"][0] - r["plates"][0] <= 8 and r["drawn"][1] - r["plates"][1] <= 8,
-        # #436 (the user, 2026-11-10): the dipped headlights and tail lamps on in service, the front's on the leading car
-        # only, the rear end's red lamps on every car ("in between cars only the rear red lights light up"), the brake
+        # #436 (maintainer): the dipped headlights and tail lamps on in service, the front's on the leading car
+        # only, the rear end's red lamps on every car (between the cars only those), the brake
         # lamps (the rear corners) while braking, the indicators on every car blinking 1.5 times a second, the reversing
         # lamp off, the high beams' glow on the leading car
         "the lamps in service: the front's on the leading car, the tail lamps on every car": r["lampState"]["rest"] == ["head pos tail", "tail"],
         "braking with the left indicators: the brake lamps and the left indicators on every car": r["lampState"]["left"] == ["head pos tail brake indL", "tail brake indL"],
         "the indicators' dark half": r["lampState"]["leftDark"] == ["head pos tail brake", "tail brake"],
         "the hazard lights: both sides": r["lampState"]["hazard"] == ["head pos tail indL indR", "tail indL indR"],
-        # the user, 2026-11-10: "Turning at junction and stopping at street level stop across car lane", at such a stop the
-        # right ones "braking to start": from 50 m before the switch until the turn is 80 % done (16 deg/m here: 125 m)
+        # indicators when turning at a junction and when stopping at a street-level stop across a car lane (maintainer,
+        # 2026-11-10), at such a stop the right ones from braking to the start; at a turn from 50 m before the switch
+        # until the turn is 80 % done (16 deg/m here: 125 m)
         "the indicators at a junction turn, its side, and at a stop across a car lane": [(t["s0"], t["side"]) for t in r["indicators"]["turns"]] == [(50, "left")]
         and 124 <= r["indicators"]["turns"][0]["s1"] <= 128 and r["indicators"]["right"] == ["right"]
         and r["indicators"]["at"] == [None, "left", "left", None, None, "right", "right", "right", None],
@@ -437,7 +437,7 @@ def judge(r):
         "the side indicators on both sides": r["displays"]["indicators"] == [True, True],
         "the T3M's display dark, the T3SUCS's and the T3's plates blue": sum(r["variants"]["mDisplay"][:3]) < 90
         and r["variants"]["sucDisplay"][2] > 120 and r["variants"]["t3Display"][2] > 120,
-        # the user, 2026-11-10: the route box square on a T3, rounded on a T3SUCS and round a T3M's display (6892, 7290)
+        # the route box square on a T3, rounded on a T3SUCS and round a T3M's display (maintainer, 2026-11-10; 6892, 7290)
         # #600, a tester's note of 2026-11-14: "The end panel with line number on T3M type should be same led dot style as in front"
         "the T3M's rear number on its green display, lit and swapped with the line; the T3's a white card": r["rear"]["mGreen"] > 200
         and sum(r["rear"]["mCorner"][:3]) < 90 and r["rear"]["t3Green"] == 0 and min(r["rear"]["t3Corner"][:3]) > 200
@@ -452,10 +452,10 @@ def judge(r):
         and set(r["bumpers"]["suc"]) == {"55332f"} and set(r["bumpers"]["m"]) == {"55332f"}
         and near(r["bumpers"]["suc"]["55332f"][0], 0.76, 0.002) and near(r["bumpers"]["suc"]["55332f"][1], 0.86, 0.002)
         and near(r["bumpers"]["t3"]["b3201a"][0], 0.7715, 0.002) and near(r["bumpers"]["t3"]["b3201a"][1], 0.8485, 0.002),
-        # the user, 2026-11-10: "front and back is open under the bumper", the skirt to where the headlights start
+        # front and back open under the bumper, the skirt to where the headlights start (maintainer, 2026-11-10)
         "the ends open under the bumper to +-0.65 m, the skirt's corners and the red kept": all(r["open"][f"{e} 0 0.5"] == 0 and r["open"][f"{e} 0 0.72"] == 0
         and r["open"][f"{e} 0.6 0.5"] == 0 and r["open"][f"{e} 0.72 0.5"] == 255 and r["open"][f"{e} 0 0.95"] == 255 for e in "fr"),
-        # 6892 head on: the headlights 1.11 m up, 1.08 m apart ("a tad to far apart" at 1.11 m), pointing straight;
+        # 6892 head on: the headlights 1.11 m up, 1.08 m apart (1.11 m was a little too far apart), pointing straight;
         # the corner units' lenses 0.99-1.29 m, round the corners about 0.93 m off the centreline
         "the headlights 1.11 m up, 1.08 m apart, pointing straight": near(r["lamps"]["head"][1], 1.11, 0.005)
         and near(r["lamps"]["head"][0], 0.54, 0.005) and r["lamps"]["headZ"] < 1e-5,
@@ -464,9 +464,9 @@ def judge(r):
         "fleet numbers by type, each car its own": all(6400 <= n <= 6992 for n in r["fleet"]["t3"]) and all(7001 <= n <= 7292 for n in r["fleet"]["suc"])
         and all(8005 <= n <= 8106 for n in r["fleet"]["m"]) and len(set(r["fleet"]["suc"])) == 2 and r["fleet"]["meshes"] == [1, 1],
         "AI sets of every type by run number": set(r["fleet"]["auto"]) <= {"T3", "T3SUCS", "T3M"} and len(r["fleet"]["auto"]) >= 2,
-        # the user, 2026-11-10: "their proportion in service ... roughly related to their range sizes"
+        # the types' proportion in service roughly as their fleet ranges' sizes (maintainer, 2026-11-10)
         "the types' shares as their fleet ranges' lengths (within 3 points)": all(abs(got - want) < 0.03 for got, want in r["fleet"]["shares"].values()),
-        # the user's photos and conflig's model (src/t3simple.js FLEET): the digits 0.14 m tall on every side; the
+        # the maintainer's photos and conflig's model (src/t3simple.js FLEET): the digits 0.14 m tall on every side; the
         # front's on the headlights' line, the rear's over the lamps, the sides' 1.36-1.50 m up, 4.17 m ahead
         f"the fleet numbers' digits 0.14 m tall on every side ({fleet_digits(r):.3f} m)": abs(fleet_digits(r) - 0.14) < 0.004
         and max(q["h"] for q in r["fleet"]["quads"].values()) - min(q["h"] for q in r["fleet"]["quads"].values()) < 1e-6,

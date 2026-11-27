@@ -168,7 +168,7 @@ def main():
             r["held"] = page.evaluate("window.game.tram.eq.lever")
             page.mouse.up()
             r["released"] = page.evaluate("window.game.tram.eq.lever")
-            # brake held while the emergency stop is let go: brake step 5, until brake is let go too (the user, 2026-11-23)
+            # brake held while the emergency stop is let go: brake step 5, until brake is let go too (maintainer, 2026-11-23)
             page.keyboard.down("Space")
             page.keyboard.down("s")
             r["stopBrake"] = [page.evaluate(lever)]

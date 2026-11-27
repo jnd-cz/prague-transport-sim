@@ -104,7 +104,7 @@ def extend_holds(rows, guard, reach=6):
 
 
 def truth_structures(root, structures, ids, width=6):
-    """The user's structures that no source maps (data/truth.json trackHeights.structures, #190), added to the
+    """The maintainer's structures that no source maps (data/truth.json trackHeights.structures, #190), added to the
     OSM structure mask as a corridor from 'from' to 'to'."""
     path = root / 'data/truth.json'
     truth = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
@@ -119,13 +119,14 @@ def truth_structures(root, structures, ids, width=6):
     return unary_union([structures, *corridors]), ids + ['truth:' + f['id'] for f in facts]
 
 
-COVERED = 0.9  # of a user's structure's length the sources map for its fact to match (#670)
+COVERED = 0.9  # of a maintainer's structure's length the sources map for its fact to match (#670)
 
 
 def structure_states(root, mapped):
-    """Each user's structure (data/truth.json trackHeights.structures) against what the sources map (`mapped`: OSM's
-    structure mask, Mosty 3D's bridges and the survey's decks, without the user's): matches where they cover COVERED
-    of its length from 'from' to 'to', else holds (#670). `cover`: the share; `ends`: from and to in city metres."""
+    """Each of the maintainer's structures (data/truth.json trackHeights.structures) against what the sources map
+    (`mapped`: OSM's structure mask, Mosty 3D's bridges and the survey's decks, without the maintainer's): matches
+    where they cover COVERED of its length from 'from' to 'to', else holds (#670). `cover`: the share; `ends`: from and
+    to in city metres."""
     path = root / 'data/truth.json'
     truth = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
     frame, out = Frame(), []
@@ -234,7 +235,7 @@ def stage(review):
     provenance, _, archived_paths = archive_data()
     current, archive = Segments(paths), Segments(archived_paths)
     structures, structure_ids, tunnels = structure_mask(separate_tunnels=True)
-    osm_mapped = structures  # (what OSM maps, before the user's structures: their state, #670)
+    osm_mapped = structures  # (what OSM maps, before the maintainer's structures: their state, #670)
     structures, structure_ids = truth_structures(ROOT, structures, structure_ids)
     terrain = Terrain()
     structures, structure_ids, bridge_pieces, bridges = bridge_structures(structures, structure_ids, paths, current,

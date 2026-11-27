@@ -409,7 +409,7 @@ def street_geometry(truth=None):
 
 # (m: by class, the other classes'; m: a belt raised more is a kerb; rise per m: the steepest crossfall, a sidewalk's)
 R_CLASS, R_STREET, RAISED_BED, FALL_MAX, SW_FALL = street_geometry()
-# (the places the user confirmed as a raised tram corridor: the line-wide report measures raised_bed() on them)
+# (the places the maintainer confirmed as a raised tram corridor: the line-wide report measures raised_bed() on them)
 with open(os.path.join(ROOT, "data", "truth.json"), encoding="utf-8") as _fh:
     RAISED_PLACES = next(x["value"] for x in json.load(_fh)["streetGeometry"]["facts"] if x["id"] == "raised-corridors")
 CONFIRMED_NEAR = 10.0  # m: a tracks string's point this near the line between a confirmed corridor's ends lies on it
@@ -426,16 +426,16 @@ KERB_NEAR = (0.5, 0.75, 1.0)  # m in from a kerb edge: IPR's readings of a walkw
 # smear of a wall at the edge itself (a 1 m raster) and before a drop behind a walkway that narrow
 WALL_SEEN = 0.5  # of a wall's step at a kerb edge (the walkway's level less the road's surface beyond): what IPR 1 m in
 # must stand off that surface where the walkway's level is the edge's own surveyed height. On the five lines (#800) the
-# verge by a car park with no wall (line 22 (3449, -2602)) bears 0.15-0.44, and the three kerbs the user found plain or
+# verge by a car park with no wall (line 22 (3449, -2602)) bears 0.15-0.44, and the three kerbs the maintainer found plain or
 # with the wall further back (#834: Bělohorská, line 22 (-4170, 145); a park's wall behind the walkway, lines 22/23
 # (-885, 1105); line 37 (9065, 1055)) are of this kind: a walkway at the road's level with the step 1-3 m behind it, or
 # none. (Not IPR 1 m out: under a deck it reads the ground, not the road, and on Modřanská, line 17 (-2495, -8295), the
 # walkway under the road's deck rose 3.5 m to it)
 WALL_SEEN_RUN = 0.25  # the same where the walkway's level is IPR's own 1.5 m in, on a sidewalk the survey draws on
 # unbroken past it: the step is IPR's and the survey has no line at it, so it stands at the kerb, IPR 1 m in only leaning
-# its way. The four walls the user confirmed are of this kind: three bear 0.60-1.01, and the one with the walkway lower
-# beside a building, line 17 (-360, 30) (the user, 2026-11-24: "street has a wall and lower sidewalk next to the
-# building"), 0.28-0.82 along its 82 m, its wall 0.7-1.2 m in: at 0.35 its weakest metres were kerbs, and the walkway
+# its way. The four walls the maintainer confirmed are of this kind: three bear 0.60-1.01, and the one with the walkway
+# lower beside a building, line 17 (-360, 30) (maintainer, 2026-11-24: a wall at the street, the sidewalk lower by the
+# building), 0.28-0.82 along its 82 m, its wall 0.7-1.2 m in: at 0.35 its weakest metres were kerbs, and the walkway
 # rose between them. 93 % of such walls' metres bear 0.5 or more, under 1 % less than 0.25
 SEEN_ALONG = 1.0  # m either side along a kerb edge over which a wall's point takes the median of what IPR bears
 BED = 2.0  # m beyond the centre of the outer track: the track bed, held at the tracks' surface level
@@ -647,8 +647,8 @@ def _along(arr, step, s):
 def track_streets(L, road, box):
     """The line's tracks as the governing streets where they run in the survey's road areas: the centre between the
     route and the opposite track, its height their surface level (top of rail less the style's lift), and the plane
-    through the two tracks carried across the road (the user, 2026-11-12: the tracks from Ohrada to Palmovka "are
-    tilted by the straight Sokolovská slope, roads lie flush besides tracks"). Where one track runs alone, crossfall()
+    through the two tracks carried across the road (maintainer, 2026-11-12: from Ohrada to Palmovka the tracks tilt
+    with Sokolovská's straight slope and the road lies flush beside them). Where one track runs alone, crossfall()
     reads it from IPR."""
     import shapely
     # (the whole line's centre is worked out once per line: per 300 m square it took 5.5 of three squares' 49 s)
@@ -710,14 +710,13 @@ def raised_bed(c, F, ipr, road, confirmed=None, own=None):
     beside it in IPR: IPR on the tracks (between them and at each) against IPR 1-2 m beyond the bed's edge, where that
     is road; held over 5 m runs (a crossing's ramp, where IPR beside the bed is at its level, is a gap in the run).
     (IPR against itself, not against the tracks' heights: those stood 0.13 m under IPR's corridor at Hartigova, which
-    the user confirmed raised, and read it unraised (2 % of its samples).) Where the user confirmed a corridor that IPR
-    reads level (`confirmed`, per sample: confirmed_corridor), the tracks' own surface (`z`) against IPR beside it
-    decides too: on Vinohradská from Olšanské hřbitovy towards Flora the tracks stand 0.26-0.29 m over IPR and the
-    survey, both level across, and the user: "yes it's raised" (#606). There a crossing has no gap in IPR to show it
-    (IPR is older than the corridor), so the survey shows it: where the string's centre lies outside the survey's own
-    tram area (`own`), a road or a footpath runs across the corridor, and its surface comes up to the rails (the
-    user, 2026-11-21: "Where roads or footpaths cross it's level crossing like usual, so the surface comes up to the
-    rail top"): no confirmed sample there."""
+    the maintainer confirmed raised, and read it unraised (2 % of its samples).) Where the maintainer confirmed a
+    corridor that IPR reads level (`confirmed`, per sample: confirmed_corridor), the tracks' own surface (`z`) against
+    IPR beside it decides too: on Vinohradská from Olšanské hřbitovy towards Flora the tracks stand 0.26-0.29 m over IPR
+    and the survey, both level across, and the maintainer confirmed it raised (#606). There a crossing has no gap in
+    IPR to show it (IPR is older than the corridor), so the survey shows it: where the string's centre lies outside the survey's own
+    tram area (`own`), a road or a footpath runs across the corridor, and its surface comes up to the rail top as
+    at any level crossing (maintainer, 2026-11-21): no confirmed sample there."""
     import shapely
     n = np.column_stack([-c["t"][:, 1], c["t"][:, 0]])
     out = np.zeros((len(c["p"]), 2), bool)
@@ -749,7 +748,7 @@ def raised_bed(c, F, ipr, road, confirmed=None, own=None):
 
 
 def confirmed_corridor(ln, p, places=None):
-    """Per point of a tracks string, whether it lies on a corridor the user confirmed raised between two ends
+    """Per point of a tracks string, whether it lies on a corridor the maintainer confirmed raised between two ends
     (data/truth.json raised-corridors with `from` and `to`: within CONFIRMED_NEAR m of the line between them, between
     its ends), on line `ln`."""
     out = np.zeros(len(p), bool)
@@ -1475,8 +1474,8 @@ def strip_edges(ln, walk, box, lidar, strips=None):
     199.6 m and a sidewalk 0.6 m wide outside it at 196.5 m by the road (#786).
     - The walkway's level is IPR (lidar(x, y)) SW_KERB_SMEAR in from the strip, or halfway across a walkway narrower
       than twice that, its mean over STRIP_ALONG along the strip. North of that stop a ramp 2.15 m wide climbs to the
-      platform between the strip and the wall under the track (line 17 (-2481, -8410); the user's photo from the bus
-      stop, 2026-11-21): IPR has it at its middle, 197.5 to 199.9 m in 36 m, and the track's 200 m and the road's
+      platform between the strip and the wall under the track (line 17 (-2481, -8410); the maintainer's photo from the
+      bus stop, 2026-11-21): IPR has it at its middle, 197.5 to 199.9 m in 36 m, and the track's 200 m and the road's
       196.1 m a metre either side.
     - The ground steps across the strip where that level and IPR SW_KERB_SMEAR past the strip's other side part by
       wall_lines.STEP or more, along runs as wall_lines' (runs()). (wall_lines.stretches reads a side 2.5-4 m off or,
@@ -1646,8 +1645,8 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
     the sidewalk on their left, wall_edges()): where the walkway stands STEP_CUT or more over or under a kerb on that
     road, along an edge that stands KERB_WALL or more off it somewhere. A garage ramp sunk between walls is a road in
     the survey and its side a kerb edge: on Na Vápence, line 37 (3868, -22), the walkway held at the ramp's surface
-    plus a kerb sank 2.2 m into the ramp along its edge, its own edge surveyed at 260.4 m (the user's Street View
-    viewpoint, 2026-11-20: a level sidewalk behind a wall with a railing, #779). The wall grows from nothing at the
+    plus a kerb sank 2.2 m into the ramp along its edge, its own edge surveyed at 260.4 m (the maintainer's Street
+    View viewpoint: a level sidewalk behind a wall with a railing, #779). The wall grows from nothing at the
     ramp's head: the edge is its top from STEP_CUT on. And a sidewalk at the foot of a road's wall rose to the road
     along its edge: line 22 (1897.5, -2211.9), 221.2 m to 223.5 m in its last 1.25 m, the road at 223.8 m (#770).
     ground: IPR SW_KERB_SMEAR in from each point, on the sidewalk; wide: whether the sidewalk reaches that far in and
@@ -1665,9 +1664,9 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
     height. With `near`, a wall's edge is one IPR bears WALL_SEEN of: IPR 1 m in stands off the road's surface by that
     share of the step. By a car park on line 22 (3449, -2602) the verge's edge was surveyed at 211.38 m, 0.41 m off IPR
     1.5 m in, and was held 0.66 m under the car park: IPR has the verge at the car park's level there and falling 0.2 m
-    a metre towards the road, and the user sees a slope with grass and bushes (2026-11-23, #834). Where the walkway's
+    a metre towards the road, and the maintainer sees a slope with grass and bushes (#834). Where the walkway's
     level is IPR's 1.5 m in, IPR 1 m in need only lean its way, WALL_SEEN_RUN: beside a building on line 17 (-360, 30)
-    the user sees a wall at the street and the walkway lower, and IPR 1 m in bears 0.28-0.82 of it (2026-11-24, #834).
+    the maintainer sees a wall at the street and the walkway lower, and IPR 1 m in bears 0.28-0.82 of it (#834).
     Without `near`: any step."""
     from kerbs import KERB
     level = np.asarray(own, float)
@@ -1693,7 +1692,7 @@ def wall_tops(q, n, own, zr, ground=None, wide=None, near=None):
             share = (z1 - np.asarray(zr, float)) * np.sign(claim) / np.maximum(np.abs(claim), 1e-6)
             # (a wall's smear lies between its two levels: IPR 0.5 m in STEP_CUT or more past the road the other way is
             # a hole or a structure, no wall's face. On Bělohorská, line 22 (-4159, 149), 1.7-2.7 m under the road, the
-            # walkway's level 2.3-4.2 m over it, on a street the user found plain, 2026-11-24)
+            # walkway's level 2.3-4.2 m over it, on a street the maintainer found plain, 2026-11-24)
             dip = (nr[:, KERB_NEAR.index(0.5)] - np.asarray(zr, float)) * np.sign(claim) <= -STEP_CUT
             share = np.where(dip, 0.0, share)
             share = np.where(off >= STEP_CUT, share, np.nan)
@@ -1741,8 +1740,8 @@ def flush_parking(ctx, box, q, n):
 def sidewalks(ctx, road_z, box, cell=SW_CELL):
     """The sidewalks around the generated road. The walkway, up to SW_WALK from the kerb, is a plane: at the kerb the
     road's surface 0.5 m beyond it plus KERB (tools/kerbs.py, the measured step), rising across at IPR's crossfall held
-    to SW_FALL (data/truth.json sidewalk-crossfall: ČSN 73 6110's 0.5-2 % and the user's "small angle is good for
-    draining water but shouldn't be noticeably too much"); where it cannot be read (a walkway under 1 m past the
+    to SW_FALL (data/truth.json sidewalk-crossfall: ČSN 73 6110's 0.5-2 %, and the maintainer's: enough for the water
+    to drain, not noticeably more); where it cannot be read (a walkway under 1 m past the
     kerb's smear), the edge's median. Beyond the walkway a wider area (a forecourt, a slope) is a fill to IPR held to
     the walkway's edge. Returns a field for bilinear()."""
     import shapely
@@ -2184,14 +2183,14 @@ def line_wide(lines, cell, out_path, jobs=None):
         sw = {k: {"dev": [], "kerb": [], "bend": [], "steps": 0, "bumps": 0, "walls": 0} for k in ("survey", "generated")}
         places, tram = [], {"survey": [], "generated": []}
         scat, tri = {}, {}
-        # (the places the user confirmed raised (data/truth.json raised-corridors): how much of each raised_bed() reads)
+        # (the places the maintainer confirmed raised (data/truth.json raised-corridors): how much of each raised_bed() reads)
         raised_at = []
         for r in RAISED_PLACES:
             if r["line"] == ln:
                 x, y = F.xy([r["lat"]], [r["lon"]])
                 raised_at.append({"place": r["place"], "xy": np.array([float(np.ravel(x)[0]), float(np.ravel(y)[0])]),
                                   "n": 0, "raised": 0})
-        # (a stretch the user confirmed between two ends: its tracks' samples on it, #606)
+        # (a stretch the maintainer confirmed between two ends: its tracks' samples on it, #606)
         xy = [r["xy"] if not (q.get("from") and q.get("to")) else q
               for r, q in zip(raised_at, [q for q in RAISED_PLACES if q["line"] == ln])]
         if jobs > 1:

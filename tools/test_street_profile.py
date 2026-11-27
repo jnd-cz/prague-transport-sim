@@ -99,7 +99,7 @@ class Junctions(unittest.TestCase):
         level = SimpleNamespace(sample=lambda x, y: np.full(len(np.atleast_1d(x)), 200.0))
         self.assertTrue(sp.raised_bed(dict(c, z=np.full(len(s), 200.07)), F, raised, road).all())
         self.assertFalse(sp.raised_bed(dict(c, z=np.full(len(s), 200.25)), F, level, road).any())
-        # (#606: on a corridor the user confirmed, IPR level across it, the tracks' own surface decides: raised there,
+        # (#606: on a corridor the maintainer confirmed, IPR level across it, the tracks' own surface decides: raised there,
         # not where the tracks stand within RAISED_BED of IPR beside)
         on = s < 25
         got = sp.raised_bed(dict(c, z=np.full(len(s), 200.25)), F, level, road, on)
@@ -365,7 +365,7 @@ class Sidewalks(unittest.TestCase):
         self.assertTrue(sp.wall_tops(*run, lean)[0].all())
         self.assertTrue(sp.wall_tops(*run, lean + np.array([0.0, 0.0, 0.22]))[0].all())
         self.assertFalse(sp.wall_tops(*run, lean + np.array([0.0, 0.0, 0.36]))[0].any())
-        # (#834: Bělohorská, line 22 (-4159, 149), a street the user found plain. The walkway's level IPR's 1.5 m in,
+        # (#834: Bělohorská, line 22 (-4159, 149), a street the maintainer found plain. The walkway's level IPR's 1.5 m in,
         # 2.34 m over the road, IPR 1 m in bearing 0.38 of it, but 0.5 m in 2.68 m under the road: no wall's smear)
         up = (edge[0], edge[1], np.full(n, 320.87), np.full(n, 320.40), np.full(n, 322.74), np.ones(n, bool))
         dip = np.column_stack([np.full(n, 317.72), np.full(n, 318.40), np.full(n, 321.30)])

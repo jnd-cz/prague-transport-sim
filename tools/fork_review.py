@@ -6,10 +6,10 @@ The build (tools/build_line.py) writes reports/track-problems-N.json: curves hel
 fitted curve misses by more than MISS, stretches off DI's network. Each place
 (one per GROUP m, the worst) becomes a card in reports/review/track-forks-N.json with DI's forks within
 di_tracks.FORK (red, the nearest is the pin; "drawn twice" where two legs lead to the same next node) and OSM's
-switches (blue: railway=switch or a node where three track ways meet, from the build's cached tracks.json). The user
+switches (blue: railway=switch or a node where three track ways meet, from the build's cached tracks.json). The reviewer
 places the pin on the switch's tip; the answers become data/truth.json trackSources.switchTips, which the network
-takes (di_network.Network.move_tips). The user, 2026-11-05: "focus only on the places which cause di track
-deviation, kinks, forced radius or missing segments".
+takes (di_network.Network.move_tips). Only the places where DI's track deviates, kinks, has a forced radius or a
+missing segment (maintainer, 2026-11-05).
 """
 import json
 import math
@@ -96,7 +96,8 @@ def problems(line):
 
 def review(line, net, switches, frame):
     """A card per problem place: the pin on DI's nearest fork (else the place), DI's forks and OSM's switches near."""
-    # (switches only: a node where two tracks cross is no fork, the user 2026-11-05: "looks misjudged crossings")
+    # (switches only: a node where two tracks cross is no fork; crossings were misjudged as forks: maintainer,
+    # 2026-11-05)
     forks = [(v['xy'], n) for n, v in net.nodes.items() if net.through(n)]
     cards = []
     for x, y, what, size in problems(line):
@@ -119,8 +120,8 @@ def review(line, net, switches, frame):
 
 def photo_ends(line, tracks, net, switches, frame):
     """A card per switch a track measured on the orthophoto ends at (data/truth.json photoTracks), on a line that draws
-    it: such a track starts at a fork no measured point stands on, so the fork's place is the curve's. The user,
-    2026-11-06: "You can send the fork's positions for review"."""
+    it: such a track starts at a fork no measured point stands on, so the fork's place is the curve's, and goes to
+    review (maintainer, 2026-11-06)."""
     lines = [LineString(t['p']) for t in tracks if len(t['p']) > 1]
     cards = []
     for ed in net.edges.values():

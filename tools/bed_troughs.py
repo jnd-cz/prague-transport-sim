@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The troughs beside the track beds, for the user to review (#548).
+"""The troughs beside the track beds, for the maintainer to review (#548).
 
     python -P -E tools/headless.py --lines 9,17,22,23,37 --checks canted --out reports/troughs
     python -P -E tools/bed_troughs.py --cards reports/troughs          # reports/review/bed-troughs-N.json
@@ -8,8 +8,8 @@
 The `canted` check's `buriedRails` (tools/lint.js) measures every drawn track's bed: where the ground 1 m past its edge
 lies lower than both the edge and the ground 4 m out, by 10 cm to 1 m, it is a trough. What it is the measure cannot
 tell: a ditch or a cutting's foot is real, a missing retaining wall leaves the terrain sloping where a wall stands, and
-our ground laid wrongly sinks a ring around the bed. The user, 2026-11-13: "i would review those places to see what's
-there. The one screenshot on line 37 shows there should be a wall there".
+our ground laid wrongly sinks a ring around the bed. So the places are reviewed (maintainer, #548): a screenshot on
+line 37 showed a wall missing there.
 
 A card per place: the deepest trough of its line within SAME m, CARD_CM deep or more, not answered yet. The answers go
 to data/truth.json `bedTroughReview`, keyed by the place's lat/lon: `real` (a ditch, a cutting: the measure leaves it),

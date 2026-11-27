@@ -72,7 +72,7 @@ class Floor(unittest.TestCase):
 
     def test_the_floor_is_the_users(self):
         from sources import TERRAIN_FLOOR
-        self.assertEqual(TERRAIN_FLOOR, 170.0)  # (the user, 2026-11-09, #428)
+        self.assertEqual(TERRAIN_FLOOR, 170.0)  # (maintainer, #428)
         self.assertTrue(np.isnan(ground(np.array([0.0, np.nan, -9999.0], np.float32))).all())
 
 

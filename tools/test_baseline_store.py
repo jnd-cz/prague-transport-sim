@@ -194,7 +194,7 @@ class DayAndNight(unittest.TestCase):
         self.assertEqual(self.job(expect=2400).night_hold(late, []), "")
         self.assertEqual(self.job(expect=2400, day=True).night_hold(noon, []), "")
         with mock.patch.dict(os.environ, {baseline_store.DAY: "1"}):
-            self.assertTrue(baseline_store.HeavyJob("j", wait=False).day)  # (TRAM_HEAVY_DAY=1: the user's word)
+            self.assertTrue(baseline_store.HeavyJob("j", wait=False).day)  # (TRAM_HEAVY_DAY=1: the maintainer's word)
 
     def test_the_short_ones_first_but_not_before_one_waiting_two_hours(self):
         now = self.at(12)
@@ -898,7 +898,7 @@ class Watch(unittest.TestCase):
 
 
 class Inputs(unittest.TestCase):
-    """The user's facts are measured like the code: truth.json alone changes a baseline's key (#126)."""
+    """The maintainer's facts are measured like the code: truth.json alone changes a baseline's key (#126)."""
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

@@ -25,8 +25,8 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # m: a terrain height under this is no ground, in every terrain source the tools read: IPR's raster (ipr_dtm.py), the
-# DMR 5G tiles (city_terrain.py) and the coarse grid (build_line.py). The user, 2026-11-09 (#428): "I
-# would put lower limit to 170 metres height which is well below lowest point of Prague". IPR's lowest cell is 170.73 m
+# DMR 5G tiles (city_terrain.py) and the coarse grid (build_line.py). 170 m lies well under Prague's lowest point
+# (maintainer, #428). IPR's lowest cell is 170.73 m
 # (the file's minVal); line 17's 10 m grid holds 57 cells of 163.1-169.8 m at Troja (docs/knowledge.md, #325).
 TERRAIN_FLOOR = 170.0
 
@@ -90,9 +90,9 @@ SOURCES = {
 LAYERS = {
     "terrain": ("ipr-dtm", "dmr5g", "coarse"),
     "streets": ("zps", "dtmp", "osm"),  # areas and kerbs; OSM: road centre lines with widths
-    "tracks": ("ortho", "dtm-di", "dtmp-tracks", "osm"),  # centrelines (#20); the orthophoto only where the user took
+    "tracks": ("ortho", "dtm-di", "dtmp-tracks", "osm"),  # centrelines (#20); the orthophoto only where the maintainer took
                                                           # it (truth.json photoTracks, #204); OSM reviewed gaps only
-    # top of rail (#197): numeric DI, the archive, the user's reviewed spans, survey plus the style fact, the lidar where
+    # top of rail (#197): numeric DI, the archive, the maintainer's reviewed spans, survey plus the style fact, the lidar where
     # nothing else has a height (#202), the curve across a short hold; where none, the game's surface profile
     "heights": ("dtm-di", "dtmp-tracks", "truth", "zps", "ipr-dtm", "rule:curve", "rule:surface"),
     "structures": ("zps", "mosty3d", "osm"),  # bridge decks (survey) over the model over OSM tags (#13)
@@ -101,11 +101,11 @@ LAYERS = {
     "walls": ("zps", "walls", "rule:placement"),
     "trees": ("trees", "osm"),
     "stops": ("osm", "gtfs"),  # platforms and stop positions from OSM, names and lines from the timetable
-    "signs": ("truth", "dtmpoints", "osm", "gtfs"),  # where the tram front stops: the user's placed sign, the archive
+    "signs": ("truth", "dtmpoints", "osm", "gtfs"),  # where the tram front stops: the maintainer's placed sign, the archive
                                                      # DTM's sign, OSM's stop position (#258)
     "timetable": ("gtfs",),
     "signals": ("osm", "rule:placement"),
-    "speeds": ("truth", "osm", "rule:curvature"),  # a posted speed the user saw over OSM's maxspeed (#612)
+    "speeds": ("truth", "osm", "rule:curvature"),  # a posted speed the maintainer saw over OSM's maxspeed (#612)
     "clearances": ("osm", "rule:assumed"),  # OSM maxheight, else the default per kind
     "crossings": ("osm",),  # where roads and paths cross the tracks (#24)
     "areas": ("osm",),  # water, green, landuse
@@ -191,13 +191,12 @@ def stamp(tool, lists, prev=None, root=ROOT, facts=None):
     return out
 
 
-# The state of a data/truth.json fact the build applies over a source, on every build (#670; the user, 2026-11-18: "report
-# the custom facts which are overriding source data once they match [...] so we can eventually retire the manual
-# corrections"). A correction holds while the source still differs from it, matches once the source gives the fact's
-# value (it can be retired: deleted from truth.json on the user's word, "git history is good enough"), and changed when
-# the source gives neither the value recorded with the fact nor the fact's (look again). A confirmation (the user said
-# the source was right) agrees while the source still gives it, and moved once the source left it: the fact then holds
-# against the source.
+# The state of a data/truth.json fact the build applies over a source, on every build, so that a correction can be
+# retired once the source matches it (#670). A correction holds while the source still differs from it, matches once
+# the source gives the fact's value (it can be retired: deleted from truth.json on the maintainer's word, git history
+# keeping it), and changed when the source gives neither the value recorded with the fact nor the fact's (look again).
+# A confirmation (the maintainer said the source was right) agrees while the source still gives it, and moved once the
+# source left it: the fact then holds against the source.
 FACT_STATES = ("holds", "matches", "changed", "agrees", "moved")
 
 # The data/truth.json sections whose facts override a source (#670): where their facts are in the file, each fact's
@@ -237,9 +236,10 @@ def fact_id(section, fact):
 def fact_state(fact, recorded, now, same=None, confirms=False, unchanged=None):
     """The state of a fact whose value is `fact`, recorded when the source said `recorded` (None: not recorded), where
     the source now says `now` (None: nothing there). `same(a, b)`: within the kind's tolerance (default: equal);
-    `unchanged(a, b)`: the source says what it said when the user answered (default: equal). A correction whose
-    source is unchanged holds, even within the tolerance of the fact: the user saw that value and set theirs apart
-    (#685: Královka's sign, placed 1.6 m from the DTM's the user judged misplaced); a match is a source that moved."""
+    `unchanged(a, b)`: the source says what it said when the maintainer answered (default: equal). A correction
+    whose source is unchanged holds, even within the tolerance of the fact: the maintainer saw that value and set theirs
+    apart (#685: Královka's sign, placed 1.6 m from the DTM's the maintainer judged misplaced); a match is a source
+    that moved."""
     same = same or (lambda a, b: a == b)
     unchanged = unchanged or (lambda a, b: a == b)
     if confirms:

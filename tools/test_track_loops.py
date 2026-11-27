@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Turning loops by the user's rule (tools/track_loops.py, #211): python -P -E tools/test_track_loops.py."""
+"""Turning loops by the maintainer's rule (tools/track_loops.py, #211): python -P -E tools/test_track_loops.py."""
 import math
 from pathlib import Path
 import sys
@@ -10,7 +10,7 @@ import di_network as dn  # noqa: E402
 import di_tracks as dt  # noqa: E402
 import track_loops as tl  # noqa: E402
 
-dn.SMOOTHED = []  # (made-up networks: none of the user's answers in data/truth.json applies to them)
+dn.SMOOTHED = []  # (made-up networks: none of the maintainer's answers in data/truth.json applies to them)
 
 
 def rec(i, pts):

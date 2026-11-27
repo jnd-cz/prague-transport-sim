@@ -15,8 +15,8 @@ def _num(v):
 
 
 def tram_platform(t):
-    """A tram platform at street level, by its OSM tags. The user, 2026-11-09: metro and underground stops are not drawn,
-    "they're not tram stops and don't use their stop sign, besides not being visible to the player". Tagged tram=yes:
+    """A tram platform at street level, by its OSM tags. The maintainer, 2026-11-09: metro and underground stops are not
+    drawn: they are no tram stops, have no tram stop sign and the player does not see them. Tagged tram=yes:
     a tram platform wherever it is (Nádraží Zahradní Město's lies under the railway viaduct: tunnel=yes, layer -1).
     Otherwise an untagged railway=platform on the street, not a metro, train or bus one (the metro A platform at
     Náměstí Míru, 119 m under line 9's stop, was drawn as a tram platform and read as a Vienna-type stop)."""
@@ -145,8 +145,8 @@ def leftovers(platforms, paths=()):
     """Marks each OSM platform without a PID stop (`stop`): `twin` where it is a piece of one with it (OSM draws one
     platform as several ways: Flora and Malostranská overlap theirs, Lazarská's lie 11-14 m apart along Spálená): on
     the same side of a path it is beside, overlapping or under PIECES m apart along it, or off the paths touching it;
-    else `unused` (no tram stops there on the service date: drawn, its sign without the lines' plate; the user,
-    2026-11-09: "If they are real I would draw them but mark them as not currently in use")."""
+    else `unused` (no tram stops there on the service date: drawn, its sign without the lines' plate: a real one
+    is drawn and marked as not in use, maintainer, 2026-11-09)."""
     with_stop = [p for p in platforms if p.get("stop")]
     for p in platforms:
         if p.get("stop"):

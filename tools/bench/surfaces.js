@@ -12,12 +12,11 @@
 // class) where that explains more of it (a crest's change of slope is no step); one inside the street classes is a
 // seam, one where road meets a raised class a kerb. `of` counts the street samples' pairs, not the areas' borders.
 // (Without the file, #510 removed, the drawn survey's areas were told apart by their triangles.)
-// A raised tram belt's kerb is counted apart too (bedKerbs, #770; the user, 2026-11-26: "yes for the count as you
-// recommend"): a road or a parking strip beside the tram's surface, the tram's side higher by more than the belt
-// that counts as unraised (data/truth.json streetGeometry `raised-belt`, the height from which the build keeps the
-// road's own level at the belt's edge, #606) and by no more than BED_KERB. The user on Řepy, 2026-11-21: "yes there
-// is kerb at Makovského". Against IPR 1 m either side of the edge (batch D, 1,088 steps of 0.10-0.25 m on the five
-// lines): the lidar has the belt 5 cm or more over the road at 69 % of those of 0.10-0.15 m and at 80 % of those of
+// A raised tram belt's kerb is counted apart too (bedKerbs, maintainer, #770): a road or a parking strip beside the
+// tram's surface, the tram's side higher by more than the belt that counts as unraised (data/truth.json
+// streetGeometry `raised-belt`, the height from which the build keeps the road's own level at the belt's edge, #606)
+// and by no more than BED_KERB. On Řepy such a kerb stands at Makovského (maintainer, 2026-11-21). Against IPR 1 m
+// either side of the edge (batch D, 1,088 steps of 0.10-0.25 m on the five lines): the lidar has the belt 5 cm or more over the road at 69 % of those of 0.10-0.15 m and at 80 % of those of
 // 0.15-0.25 m, and has it level or lower at 14 and 6 %. Over 0.25 m (204 samples) the lidar's median is 0.15 m,
 // about half of what is built: those stay seams, as does a road standing over the tram's surface.
 // `over10cm` is the part of them seams10 counted before.

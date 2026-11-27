@@ -23,24 +23,22 @@ const SHOULDER = ROOF - EAVE;                       // its radius (the front vie
 const PIVOT = T3.bogies / 2;                // 6 400 mm apart, 3 800 mm from each end
 const WHEELBASE = 1.9, WHEEL_R = 0.35;              // 1 900 mm; wheels 700 mm
 // the coupler's bar 0.59 m over the rail, as the two other models have it (conflig's classic 0.594 m, the hybrid's 0.584 m;
-// the user, 2026-11-10: "I don't know proper figures so you might as well take it from the others")
+// no real figure known, maintainer, 2026-11-10)
 const COUPLER_H = 0.59;
 const COUPLER_FACE = T3.length / 2 - T3.couplerOverlap / 2; // where two coupled heads meet (src/tram.js)
 // The ends in plan: straight sides between SIDE.r and SIDE.f (the plan view), then tapering to the end's
 // corners (CORNER: half width, its z with the nose at 7.0 m), rounded by FILLET; the face bulges FACE m from
 // the corners to the nose. Up to SPLIT the taper is the same at every height (the front and rear doors stand on
 // it); beyond it, it follows the end's profile to the corner. The corners are wider than the plan view's (0.73 and
-// 0.78 m): the user's head-on photos of 6892 put the corner lamp units at ±0.93-0.99 m on the front and ±0.96 m on
-// the rear, and the windscreen's posts at ±0.71 m (the user, 2026-11-10: "Let's try widening and we'll see how it
-// looks")
+// 0.78 m): the maintainer's head-on photos of 6892 put the corner lamp units at ±0.93-0.99 m on the front and ±0.96 m
+// on the rear, and the windscreen's posts at ±0.71 m (widened on trial, maintainer, 2026-11-10)
 const SIDE = { f: 4.51, r: -4.84 }, SPLIT = { f: 6.05, r: -6.10 };
 const CORNER = { f: [1.0, 6.79], r: [1.0, -6.79] };
 const FACE = 0.21, FILLET = 0.32;
 // the nose (on the centreline) by height (the side view): the lower end, the windscreen leaning back from
 // 1.65 m, the roof cap's visor over it at 2.56 m; the brow over it upright to 2.86 m, then rolling into the roof
-// over 0.5 m (a quarter ellipse, 0.16 m high), the rear's likewise (the user, 2026-11-10, beside the photo of 7290:
-// "make the front brow less slanted, perhaps even perpendicular? The back should be similar", then "make the brow on
-// both sides a bit thinner, like running a bit down towards the front and back"; the side view had it leaning back)
+// over 0.5 m (a quarter ellipse, 0.16 m high), the rear's likewise (maintainer, 2026-11-10, beside the photo of 7290:
+// the brow upright at both ends, thinner as it runs down towards them; the side view had it leaning back)
 const BROW = { top: 2.86, run: 0.5 };
 const brow = (z) => [0, 20, 40, 55, 70, 80, 90].map((d) => {
   const a = (d * Math.PI) / 180;
@@ -68,7 +66,7 @@ const DOORS = [[-6.04, -4.71], [-1.41, -0.10], [4.71, 6.03]];
 // cab the red starts lower, under the cream band with the flap (the front view: 1.47 m on the face, 1.51 m on the
 // cab's sides), and steps up to the sill line behind it with a rounded corner: by the front door's edge on the
 // right (the red's corner rounded), behind the cab window on the left (the cream's corner rounded); the colour
-// elevation, the user, 2026-11-09: "the shape is closer to the 2d picture". The bumper 0.76-0.86 m: the user's
+// elevation, its shape the closer (maintainer, 2026-11-09). The bumper 0.76-0.86 m: the maintainer's
 // head-on photo of 6892 (2026-11-10), scaled by the skirt's foot (0.35 m), the red's top (1.48 m) and the roof
 // (3.02 m), which agree to 3 %; the colour elevation has it 6 cm lower.
 const LIV = { bumper: [0.76, 0.86], red: [0.84, 1.62], redCab: 1.48, glass: [1.71, 2.52], transom: [2.10, 2.135], eave: 2.56, gutter: 2.85, capSide: 3.05, capTop: 6.08 };
@@ -84,18 +82,17 @@ export const CAB = {
   face: (x, h) => onFace(1, x, h).z, half: (z) => taperHW('f', z),
 };
 // the skirt cut out over each bogie in arches round the wheels, 2 cm clear of their treads, level over their tops
-// between them (the user's photo of a T3's bogie from the side, 2026-11-10; the colour elevation and conflig's
+// between them (the maintainer's photo of a T3's bogie from the side, 2026-11-10; the colour elevation and conflig's
 // model have a lower, square cutout to 0.62 m)
 const CUTOUT = { arch: WHEEL_R + 0.02, top: 2 * WHEEL_R + 0.02, half: WHEELBASE / 2 + WHEEL_R + 0.02 };
 // the ends open under the bumper between the skirt's corners, which reach in to where the headlights start
-// (the user, 2026-11-10: "the skirt stays only on sides up until where the headlights start, front and back is
-// open under the bumper"; 6892's front and rear: ±0.65 m)
+// (maintainer, 2026-11-10; 6892's front and rear: ±0.65 m)
 const OPEN = 0.65;
 const COL = {
   red: '#b3201a', cream: '#e6d8b8', roof: '#6e7276', glass: '#25303a', sky: '#56697a', rubber: '#1c1c1c', step: '#3e2416',
   // the bumper brown on a T3SUCS or T3M (the photo of 7290), silver with two thin red stripes on a T3 (6892)
   bumper: '#55332f', silver: '#c3c5c4',
-  louvre: '#6d1611', lamp: '#f2ecd6', panto: '#c49a3a', // (the pantograph's ochre as on conflig's model: the user, 2026-11-09, "Pantograph color is good")
+  louvre: '#6d1611', lamp: '#f2ecd6', panto: '#c49a3a', // (the pantograph's ochre as on conflig's model: maintainer, 2026-11-09)
 };
 
 const lerpProfile = (P, h) => {
@@ -294,8 +291,7 @@ function livery(paint = {}) {
   // it (±0.71 m: 6892 head on); the rear window likewise, with posts at the corners as well
   // (A window's upright edges on the sides are drawn through the body's own coordinates at each height: the
   // outline's points round an end move back with the leaning windscreen, so an edge straight in the texture
-  // came out kinked on the body; the user, 2026-11-10: "clean, rounded vertical cut on the side where it meets
-  // the doors, currently there's kind of zig zag pattern".)
+  // came out kinked on the body, a zigzag where it met the doors; maintainer, 2026-11-10.)
   const wrapped = (e, zr, zl, h0, h1, r) => { // e 1 the front; zr, zl: its edges' z on the right and the left
     const pts = [], N = 6, steps = Math.ceil((h1 - h0 - 2 * r) / 0.04);
     const arc = (sign, zc, hc, a0, a1) => { for (let i = 0; i <= N; i++) { const a = a0 + (a1 - a0) * i / N; pts.push([sign, zc + e * r * Math.cos(a), hc + r * Math.sin(a)]); } };
@@ -489,7 +485,7 @@ function onFace(sign, x, h) {
   return { z: sign * (lerpProfile(NOSE[k], h) - FACE * (x / cw) ** 2), yaw: Math.atan2(2 * FACE * x / cw ** 2, sign) };
 }
 
-// The bogie as the user's photos show it (one over the pit, 2026-11-09; one from the side, 2026-11-10): the wheels
+// The bogie as the maintainer's photos show it (one over the pit, 2026-11-09; one from the side, 2026-11-10): the wheels
 // outermost, grey discs with the hub's big hex nut and a boss inside rust-brown tyres, a curved guard inside each
 // wheel; between them, over the rail, the track-brake shoe 12 mm up, its upper bar with a row of nuts, hung from the
 // side beam at 0.40 m; the ribbed rubber spring in the middle up to the skirt, the gearbox's housing beside it, coil
@@ -548,22 +544,21 @@ function bogie(zc = 0) {
   return mergeGeometries(P);
 }
 
-// The mirror (the user's photos of 6921 and 7122): its arm rises from the cap's side over the front door, runs out
+// The mirror (the maintainer's photos of 6921 and 7122): its arm rises from the cap's side over the front door, runs out
 // and drops; the route plate hangs on the drop facing forward (src/models.js puts the plate on it), the mirror
 // below it, its back to the front. A small mirror on a bracket at the left corner.
 const SIDE_INDICATOR = { z: 3.05, h: 1.81 };
-// The headlights' centres and the corner units' housings and lenses, from the user's head-on photo of 6892
-// (2026-11-10: "check headlight position from this head on shot"), on the scale of the bumper's note (LIV): the
-// headlights 1.11 m up (the colour elevation: 1.03 m), 1.08 m apart (the photo 1.11 m; the user: "a tad to far
-// apart"), pointing straight ahead in a dark surround with a chrome rim ("they should both point straight", "dark
-// accent around them"); the corner units 0.98-1.30 m with the clear (rear: red) lamp just under the headlights'
+// The headlights' centres and the corner units' housings and lenses, from the maintainer's head-on photo of 6892
+// (2026-11-10), on the scale of the bumper's note (LIV): the headlights 1.11 m up (the colour elevation: 1.03 m),
+// 1.08 m apart (the photo 1.11 m, a tad too far apart: maintainer), pointing straight ahead in a dark surround with a
+// chrome rim (maintainer); the corner units 0.98-1.30 m with the clear (rear: red) lamp just under the headlights'
 // line, the indicator over it, round the corners 0.93 m off the centreline (the photo, both ends)
 const HEADLIGHT = { x: 0.54, h: 1.11 };
 const CORNER_LAMP = { housing: [0.98, 1.30], low: [0.99, 1.14], high: [1.17, 1.29], x: 0.93 };
-// the T3M's side display: in the upper part of the right side's second window from the front (the user's photo of 8015)
+// the T3M's side display: in the upper part of the right side's second window from the front (the maintainer's photo of 8015)
 const SIDE_DISPLAY = { z: 2.29, h: 2.31, w: 1.05, hh: 0.33 };
-// the route box on the front cap: its corners square on a T3, rounded on a T3SUCS and round the T3M's display (the
-// user, 2026-11-10; 6892 and 7290: 0.49 x 0.30 m, the corners' radius 0.05 m); src/models.js draws it
+// the route box on the front cap: its corners square on a T3, rounded on a T3SUCS and round the T3M's display
+// (maintainer, 2026-11-10; 6892 and 7290: 0.49 x 0.30 m, the corners' radius 0.05 m); src/models.js draws it
 export const ROUTE_BOX = { w: 0.49, h: 0.30, r: 0.05 };
 const ARM = [[-0.86, 2.82, 6.05], [-1.2, 3.02, 6.22], [-1.54, 3.02, 6.28], [-1.62, 2.94, 6.28], [-1.62, 2.3, 6.28]];
 const MIRROR_PLATE = [-1.62, 2.52, 6.31];
@@ -612,12 +607,12 @@ function partsGeometry(variant) {
   }
   for (const sign of [-1, 1]) P.push(part(box(0.016, 0.135, 0.08), '#262626', { at: [sign * (HW + 0.006), SIDE_INDICATOR.h, SIDE_INDICATOR.z] }));
   // the roof (the colour elevation): three hatches, a low cover behind the pantograph, a box amidships, the
-  // aerial on the front cap, the pantograph's base; on a T3M the resistors' box towards the rear (the user's photos
-  // of 8080 and 8088: "Box on top with resistors towards back only for t3m")
+  // aerial on the front cap, the pantograph's base; on a T3M the resistors' box towards the rear (the maintainer's
+  // photos of 8080 and 8088)
   for (const z of [-5.2, -0.78, 4.69]) P.push(part(box(0.62, 0.06, 1.05), '#7c8084', { at: [0, ROOF + 0.03, z] }));
   P.push(part(box(0.9, 0.05, 1.45), '#5c6064', { at: [0, ROOF + 0.025, 1.7] }));
   P.push(part(box(0.5, 0.12, 0.5), '#5c6064', { at: [0, ROOF + 0.06, 0.18] }));
-  if (variant === 'T3M') { // (short but wide, its top a grille: the user, 2026-11-09, and a model of an 8xxx)
+  if (variant === 'T3M') { // (short but wide, its top a grille: maintainer, 2026-11-09, and a model of an 8xxx)
     P.push(part(box(1.4, 0.2, 0.85), '#45484b', { at: [0, ROOF + 0.1, -3.0] }));
     for (let k = 0; k < 8; k++) P.push(part(box(1.32, 0.02, 0.05), '#5d6164', { at: [0, ROOF + 0.205, -3.35 + 0.1 * k] }));
   }
@@ -630,7 +625,7 @@ function partsGeometry(variant) {
   return mergeGeometries(P);
 }
 
-// The coupler (the user's picture of a T3's, 2026-11-10: "something like the attached image, only dark"): a round
+// The coupler (the maintainer's picture of a T3's, 2026-11-10, only dark): a round
 // bar from the yoke's pin under the body end (T3.couplerPivot) to a clamp, the head cast in one with a neck, its
 // mouth two jaws with the coupling pin down through them and its handle on top; the jaws' faces at the plane
 // where two coupled heads meet. Built as the front one about its pin (the yoke's): posed on either end (gear)
@@ -652,10 +647,9 @@ function coupler() {
 }
 
 // The lamps: the round headlights; rectangular units by the corners, an orange indicator over a clear
-// lamp at the front and over a red one at the rear (the user, 2026-11-09: "round or rectangle, I would choose
-// the latter"); on the rear face two red lamps and the white one between them, the round red reflectors under
-// the bumper (the photos of 6892 and 6921). By function (the user, 2026-11-10, #436): the front corners' clear
-// lamps are the position lamps, the rear corners' red ones the brake lamps ("as on the hybrid"), the rear face's
+// lamp at the front and over a red one at the rear (maintainer, 2026-11-09); on the rear face two red lamps and the white one between them, the round red reflectors under
+// the bumper (the photos of 6892 and 6921). By function (#436): the front corners' clear
+// lamps are the position lamps, the rear corners' red ones the brake lamps (as on the hybrid), the rear face's
 // red pair the tail lamps, the white one between them the reversing lamp. Each part is tagged with its function
 // (geometry.userData.lamps: vertex ranges in merge order); a car lights them by its colours (setLamps).
 function lampsGeometry() {
@@ -675,7 +669,7 @@ function lampsGeometry() {
     add(fn, part(box(w, hh, 0.02), color, { at: [x + 0.012 * Math.sin(f.yaw), h, f.z + 0.012 * Math.cos(f.yaw)], rot: [0, f.yaw, 0] }));
   };
   // the side indicators: on the pillar between the first and second windows on the right, the second and third on
-  // the left (both 3.05 m ahead of the centre), at the window band's foot (the user's photos of 8015 and 8080)
+  // the left (both 3.05 m ahead of the centre), at the window band's foot (the maintainer's photos of 8015 and 8080)
   for (const sign of [-1, 1]) add(side(sign), part(box(0.012, 0.11, 0.06), '#ff9a22', { at: [sign * (HW + 0.016), SIDE_INDICATOR.h, SIDE_INDICATOR.z] }));
   for (const x of [-0.47, 0.47]) onRear('tail', x, 0.95, 0.2, 0.07, '#d8261a');
   onRear('rev', 0, 0.95, 0.16, 0.055, '#f4f4ee');
@@ -692,8 +686,8 @@ function lampsGeometry() {
 // A car's lamps: its own copy of the lamps' colours, each function lit or dimmed to LAMP_DIM of its colour when
 // its state changes. A lamp off shows its lens, darker; the reflectors are not lamps and stay as they are.
 const LAMP_DIM = 0.2;
-// a lamp lit at twice its colour, not tone mapped: as bright as the hybrid's glows (the user, 2026-11-10: "The hybrid
-// model's light are brighter")
+// a lamp lit at twice its colour, not tone mapped: as bright as the hybrid's glows (maintainer,
+// 2026-11-10)
 const LAMP_LIT = 2;
 function carLamps(shared) {
   const geo = shared.clone(), lit = shared.attributes.color.array, byFn = {};
@@ -716,8 +710,7 @@ function setLamps(lp, want) {
   if (dirty) C.needsUpdate = true;
 }
 // the lamps of car k wanted for the set's state: the front end lit on the leading car only, the rear end's red lamps
-// on every car (the user, 2026-11-10, with a photo of 8088 coupled behind another: "in between cars only the rear red
-// lights light up"), the indicators on every car
+// on every car (maintainer, 2026-11-10, with a photo of 8088 coupled behind another), the indicators on every car
 function lampsWanted(k, { braking = false, signals = {} } = {}) {
   const lead = k === 0;
   return { head: lead, pos: lead, tail: true, brake: braking, rev: false, indL: !!signals.left, indR: !!signals.right };
@@ -756,8 +749,8 @@ function onFlank(sign, z, h, w, hh) {
   return new THREE.PlaneGeometry(w, hh).applyMatrix4(new THREE.Matrix4().makeBasis(right, new THREE.Vector3(0, 1, 0), n).setPosition(sign * (HW + 0.004), h, z));
 }
 
-// The fleet number, yellow as on the T3Ms (the user's photos of 8080 and 8088: "in style of the t3m photos, no
-// logos"), its digits 0.14 m tall on every side (the user, 2026-11-10: "same size in all sides"). Measured on the
+// The fleet number, yellow as on the T3Ms, no logos (the maintainer's photos of 8080 and 8088), its digits 0.14 m
+// tall on every side (maintainer, 2026-11-10). Measured on the
 // photos (the red band's heights as the scale): 0.13-0.15 m on the fronts of 8080, 0.14 m on the sides of 8015
 // and 8080; conflig's model 0.146 m on its ends, 0.13 m on its sides. Placed as on the photos:
 // - front: between the headlights, centred on them;
@@ -773,8 +766,7 @@ function fleetTexture(n, numbers = null) {
   cv.width = 512; cv.height = 160;
   const g = cv.getContext('2d'), s = n == null ? '' : String(n);
   if (!s) return new THREE.CanvasTexture(cv); // (a vehicle without fleet numbers for this type)
-  // (the hybrid's font and colour, src/rigged.js fleetTexture: the user, 2026-11-10, "the new model uses different font
-  // from the hybrid model and my photos")
+  // (the hybrid's font and colour, src/rigged.js fleetTexture, as on the maintainer's photos: maintainer, 2026-11-10)
   g.fillStyle = numbers?.colour || '#e3b625';
   g.font = `bold 100px ${numbers?.font ? `"${numbers.font}", ` : ''}Arial, sans-serif`;
   // the digits' own box scaled to FLEET_PX.h, whichever font the system has (squeezed only past FLEET_PX.w)
@@ -796,10 +788,9 @@ function shapes(variant) {
     const probe = new THREE.Mesh(body);
     probe.updateMatrixWorld(true);
     // Prague's plates and cards (src/models.js): the route number in the box on the front's brow (0.49 x 0.30 m,
-    // 6892 and 7290; its foot 3 cm over the brow's lower edge, the user, 2026-11-10: "adjust the line plate to sit
-    // lower, near the edge") and on the mirror arm (smaller, taller than wide), the
-    // destination and the run number resting on the windscreen's lower edge (the user, 2026-11-09: "closer to
-    // the bottom glass border"), the run number on the pane right of the post (left as seen from the front), the
+    // 6892 and 7290; its foot 3 cm over the brow's lower edge, maintainer, 2026-11-10) and on
+    // the mirror arm (smaller, taller than wide), the destination and the run number resting on the windscreen's lower
+    // edge (maintainer, 2026-11-09), the run number on the pane right of the post (left as seen from the front), the
     // route inverted in the rear window
     const plates = {
       rb: onBody(probe, 0, 2.59 + ROUTE_BOX.h / 2, 1, ROUTE_BOX.w, ROUTE_BOX.h), mir: new THREE.PlaneGeometry(0.22, 0.28).translate(...MIRROR_PLATE),

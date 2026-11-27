@@ -19,16 +19,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 ANGLE = 30     # degrees: two records leaving one place within this of each other may fork there
 JOIN = 0.5     # m: source record ends closer than this continue each other (DI: 19,227 of 20,742 ends meet
                # exactly, 1,168 more within 0.5 m)
-FORK = 15.0    # m: a switch tip the user placed (data/truth.json switchTips) belongs to a fork this near (the user's
-               # answers of 2026-11-03, #204: forks 5.3-7.4 m from OSM's switch are the same switch, "Switch is there,
-               # likely a bit further than 5m")
+FORK = 15.0    # m: a switch tip the maintainer placed (data/truth.json switchTips) belongs to a fork this near (the
+               # maintainer's answers, #204: forks 5.3-7.4 m from OSM's switch are the same switch, likely a bit further
+               # than 5 m)
 OVERLAP = 0.03  # m: a branch ending on a track's middle stays within this of its distance at the end while it runs
                 # on it as a copy (Vozovna Kobylisy: two records 1-3 cm apart for 15 m, then they part)
 OVERLAP_MIN = 3.0  # m: running on as a copy this far: the fork is where it leaves, else at the branch's end
 INTERLACE = 0.05, 0.2, 10.0  # m: a branch running beside a track within 0.2 m for 10 m or more, at a median offset of
                 # 5 cm or more, is interlaced track: the switch is at the branch's end, where it starts beside the
                 # track (Čechův most 13 cm for 28 m, Ohrada 12-13 cm for 51 m; a switch's branch is 0.2 m off within
-                # 4-9 m). The user, 2026-11-03: "the fork starts and ends well in front of/behind the road junction"
+                # 4-9 m). The interlace starts and ends well before and past the road junction (maintainer, 2026-11-03)
 PHOTO_COVER = 0.6  # m: an orthophoto track covers a source chain within this (Podolská vodárna: DI up to 0.34 m off)
 SECTION = 6.0   # m: a switch's two legs drawn as records this long or shorter from its tip (Dvorecký most: 4.7 m)
 TONGUE = 8.5    # m: where DI starts an interlaced branch already beside the track at a record joint, the switch's tip
@@ -101,8 +101,8 @@ def _meetings(recs):
     (Ke Stírce: the branch starting 11.7 cm beside the through track's record joint met it there, and line 17 stepped
     12 cm through the node; Čechův most: the through track's joint 0.6 m apart, the branch's end and a scrap 12 cm beside
     it; Nádraží Libeň: no through track for 33 m beside the branch, joined to it by steps of 11 and 13 cm, the branch
-    6 m short of its curve. The user, 2026-11-07: "there is interlaced switch coming all the way from near the
-    crosswalk ... So there should be two tracks running with a small shift that corresponds to the current jolts.")"""
+    6 m short of its curve. Maintainer, 2026-11-07: an interlaced switch runs there from near the crosswalk, two tracks
+    with a small shift between them, where the jolts were.)"""
     lines = [LineString(xy) for _, xy in recs]
     pts = [xy[0] if k == 0 else xy[-1] for _, xy in recs for k in (0, 1)]
     if not pts:
@@ -480,8 +480,8 @@ class Source:
                     break
 
 def switch_tips(truth=None):
-    """[(near, tip, place)] in city metres: switches whose tip the user placed (data/truth.json trackSources.switchTips);
-    `near` is DI's fork when the user answered, `place` the fact's id (#670)."""
+    """[(near, tip, place)] in city metres: switches whose tip the maintainer placed (data/truth.json
+    trackSources.switchTips); `near` is DI's fork when the maintainer answered, `place` the fact's id (#670)."""
     import json
     from geo import Frame
     path = truth or Path(__file__).resolve().parent.parent / 'data' / 'truth.json'
@@ -494,7 +494,7 @@ def switch_tips(truth=None):
 
 
 def photo_tracks(truth=None):
-    """Tracks measured on the orthophoto that the user took over DI's (data/truth.json trackSources.photoTracks, each
+    """Tracks measured on the orthophoto that the maintainer took over DI's (data/truth.json trackSources.photoTracks, each
     an exception), as source records in city metres."""
     import json
     from geo import Frame
@@ -509,7 +509,7 @@ def photo_tracks(truth=None):
 
 
 def stepped_answers(truth=None):
-    """[(xy, answer, reach)] in city metres: the user's answers on the stepped-curve review (data/truth.json
+    """[(xy, answer, reach)] in city metres: the maintainer's answers on the stepped-curve review (data/truth.json
     trackSources.steppedAnswers, reports/review/stepped-curves.json, #368): 'smooth' draws one curve through the place,
     'keep' leaves it as drawn."""
     import json
@@ -545,7 +545,7 @@ STEPPED_REACH = 10.0  # m: a 'smooth' answer frees DI's vertices this near its p
 
 
 def photo_source():
-    """The orthophoto's tracks the user took over DI's as a source (TrackGeometry `photo`), or None."""
+    """The orthophoto's tracks the maintainer took over DI's as a source (TrackGeometry `photo`), or None."""
     photo = photo_tracks()
     return Source('ortho', photo) if photo else None
 

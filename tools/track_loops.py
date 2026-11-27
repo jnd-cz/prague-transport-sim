@@ -5,9 +5,9 @@
     python -P -E tools/track_loops.py          # every loop on the network by its nearest stop, and the GTFS termini
                                                # without one (the rule's calibration)
 
-The user's rule (Claude Code session 2026-11-09, #211): "it's loop at the end of gtfs route, or any loop where two track
-diverge and come back together with larger than 180 degree turn, that's for double track loop (Sídliště Petřiny). There
-are side loops like Dvorce or Hlubočepy which are not used by regular service but still need the limit."
+The maintainer's rule (#211): a loop at the end of a GTFS route, or any loop where two tracks diverge and come back
+together after a turn of more than 180°, a double-track loop (Sídliště Petřiny). Side loops like Dvorce or Hlubočepy,
+not used by regular service, still need the limit.
 
 **A loop** is a path over the network's passes (tools/di_network.py) from a switch entered by its toe (the switch into
 the loop) to a switch left by its toe (the switch out of it; the same one for a balloon) that:
@@ -19,7 +19,7 @@ the loop) to a switch left by its toe (the switch out of it; the same one for a 
 - runs at most BOUND m;
 - is drivable: its mean radius at least `min-radius-network` (data/truth.json trackGeometry): a 52 m path turning 276°
   at Radošovická is a junction drawn in pieces, not a track.
-The user reviewed the 47 it finds (2026-11-09): all are real loops.
+The maintainer reviewed the 47 it finds (2026-11-09): all are real loops.
 
 **On a route** (rule 1 as well as 2): a route is in a loop where it follows the loop's whole path, or the part of it
 from its own start or to its own end (a route that starts or ends in its loop). A route that runs over a circuit's

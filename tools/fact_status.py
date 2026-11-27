@@ -8,11 +8,10 @@
 Each build tool that applies such a fact over a source states it in the provenance of the file it writes
 (`provenance.facts`, tools/sources.py fact_state). This reads them from every built file in data/ and lists each
 fact once, with the lines whose files state it. To look at:
-  matches  the source gives the fact's value now: the fact can be retired, deleted from data/truth.json on the user's
-           word in a PR that quotes it and names the snapshot that matches (the user, 2026-11-18: "git history is
-           good enough");
+  matches  the source gives the fact's value now: the fact can be retired, deleted from data/truth.json on the
+           maintainer's word in a PR that quotes it and names the snapshot that matches (git history keeps it, #670);
   changed  the source gives neither the value recorded with the fact nor the fact's: look at the place again;
-  moved    a confirmation (the user said the source was right) the source has since left: the fact holds against it.
+  moved    a confirmation (the maintainer said the source was right) the source has since left: the fact holds against it.
 The others: holds (a correction still needed) and agrees (a confirmation the source still gives). A fact of a section
 in sources.OVERRIDES that no built file states is "not stated": no built line applies it, or its tool does not state
 it yet. A stated fact whose id is no longer in data/truth.json is "retired" until the lines are rebuilt.

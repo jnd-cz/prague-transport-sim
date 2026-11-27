@@ -19,8 +19,7 @@ takes the user's answers (fetched with python -I tools/deploy.py --pull-reviews)
 stopSigns: per stop and direction (the stop, the next stop or for a last stop the previous one) the sign's
 point, which tools/build_line.py makes the stop's point. The newest answer per card counts; a point placed on
 the map wins over the answer's pin. The card's OSM node and timetable point are kept with it, so a later
-source that moves away from the fact can be told apart (the user, 2026-11-05: "significant shift away from
-open data should trigger review later")."""
+source that moves away from the fact can be told apart and sent to review again (maintainer, 2026-11-05)."""
 import argparse
 import csv
 import io
@@ -39,9 +38,8 @@ from atomic import replacing  # noqa: E402
 from geo import Frame  # noqa: E402
 import sources  # noqa: E402
 
-# A card's answers: the sources it has, the user's own point and unsure (the user, 2026-11-05: "pick which is
-# right: DTM, OSM, GTFS/timetable, other - my own mark", #310). The own mark starts placing on the review page;
-# the point is saved with the answer as px, py.
+# A card's answers: the sources it has, the user's own point and unsure (#310). The own mark starts placing on the
+# review page; the point is saved with the answer as px, py.
 BY_SOURCE = {"DTM": "the DTM sign (red)", "OSM": "OSM's stop position (blue)", "GTFS": "the timetable point, GTFS (orange)"}
 OWN, UNSURE = "my own mark: place it on the map", "unsure"
 MARK_OF = {"DTM": "DTM stop sign", "OSM": "OSM stop position", "GTFS": "timetable (GTFS) point"}  # (the marks' labels)
@@ -50,11 +48,10 @@ OPTIONS = ["sign at the pin", "sign at the timetable point (GTFS)", "unsure"]
 # The answers that said the sign the build takes was right (the card's pin was the DTM sign where it had one, else
 # OSM's stop position): a fact with one confirms that source; the others (placed on the map, the GTFS point) correct
 # it. A placed fact matches the DTM's sign within MATCH in the plane, and only the DTM's: OSM's stop position lies on
-# the track's centre line, 2-3 m across from the pole (the user, 2026-11-18, #670: "within 1 meter would be good match
-# but the actual 2D position on the stop platform matters (for visual purposes), not only the position along the
-# tracks"; then, on pictures of the signs 1.3-1.6 m from the DTM's: "I would extend the tolerance to 2 meters because
-# in your images I can see Čechova čtvrť, Malostranské náměstí, Podolská vodárna, Národní divadlo look right too", "I
-# would treat DTM as the most accurate so retire only those and if it's missing then keep my answer").
+# the track's centre line, 2-3 m across from the pole (maintainer, #670: the sign's place on the platform matters for
+# the picture, not only its place along the track; within 1 m at first, then 2 m on pictures of the signs 1.3-1.6 m
+# from the DTM's, which looked right at Čechova čtvrť, Malostranské náměstí, Podolská vodárna and Národní divadlo. The
+# DTM is the most accurate: only facts it matches retire, and where it has no sign the answer stays).
 CONFIRMS = (OPTIONS[0], BY_SOURCE["DTM"], BY_SOURCE["OSM"])
 MATCH = 2.0  # m
 PLACED = "placed on the map"  # (a fact the user placed on the review page's map)
@@ -86,7 +83,7 @@ def sign_state(fact, chain):
             "at": [round(fact["x"], 2), round(fact["y"], 2)], "src": [round(now[0], 2), round(now[1], 2)] if now else None}
 OSM, GTFS, END, DTM, YOURS = "#3e9dff", "#ff9e31", "#ffffff", "#ff3b30", "#ffd60a"
 # The other direction's stop position lies on the parallel track, 3.1-5.9 m off ours: within 6 m it was taken
-# at 5 stops (Hercovka on 17, Vršovické náměstí on 22: the user, review 2026-11-05), while our direction's
+# at 5 stops (Hercovka on 17, Vršovické náměstí on 22: the maintainer's review, 2026-11-05), while our direction's
 # node lies on our track (under 1.5 m) at all 174 stops of the 5 lines. Hercovka's own is 86 m past the GTFS point.
 ON_TRACK, ALONG = 1.5, 100
 

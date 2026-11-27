@@ -11,8 +11,8 @@ The dealer (FleetDealer) gives each sample to about its `share` of the AI sets o
 wrap (the fleet's `liveries`) to that number. Then the game (line --line, seed --seed, the built-in car, the green
 sample remembered in the menu), driven by the autopilot for --secs simulated seconds with the traffic on: our tram
 wears it, and the AI trams that are dealt it wear it. Needs the line's data (python -I tools/snapshot.py
-data-fetch); skips without it. The game ships no livery yet (the user, 2026-11-13: "For now I would keep only the
-default liveries, with future possibility to add more variety"): the samples are made here and served to the page
+data-fetch); skips without it. The game ships no livery yet, only the default ones, more may come later (maintainer,
+2026-11-13): the samples are made here and served to the page
 as folders listed in assets/vehicles.json.
 """
 import argparse

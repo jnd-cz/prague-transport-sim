@@ -43,9 +43,9 @@ import sources  # noqa: E402  (fact_state, #670)
 JOIN = di_tracks.JOIN    # m: record ends this near meet
 ATTACH = 0.5             # m: a lone chain end this near another chain's middle joins it there
 END_CLEAR = 0.5          # m: a split point this near a chain's end is that end
-TIP_MATCH = 1.0          # m: a switch whose fork lies this near the point the user's tip gives it is at that point already
-                         # (as the user's placed stop signs, 2026-11-18, #670: "within 1 meter would be good match"; DI's
-                         # fork at Ohrada lies 0.75 m along the track from the user's pin since #368, Podolská's 0.18 m)
+TIP_MATCH = 1.0          # m: a switch whose fork lies this near the point the maintainer's tip gives it is at that point
+                         # already (as the maintainer's placed stop signs, #670: within 1 m is a match; DI's fork at
+                         # Ohrada lies 0.75 m along the track from the maintainer's pin since #368, Podolská's 0.18 m)
 LOOK = 2.0               # m along an edge for its direction out of a node
 TURN = 16.0              # degrees: two edges at a node continue each other when their directions out of it are within
                          # this of opposite (measured on DI 2026-10-31: of 913 switches' diverging legs against their
@@ -61,7 +61,7 @@ ARCHIVE_NEAR = 1.0       # m: the archive's axis this near both ends of a gap fi
 SHORT = 2.0              # m: nodes where tracks meet, joined by a shorter edge, are one node
 ZONE = 2.7               # m: another track this near makes a junction (plain double track: 2.75-3.5 m apart)
 TOUCH_LOOK = 15.0        # m along both tracks either way from where they touch
-TOUCH_APART = 2.5        # m apart by then, all four ways: the two tracks only share this place (2 places in the network, Dvorce and Vozovna Střešovice, both confirmed by the user 2026-11-06)
+TOUCH_APART = 2.5        # m apart by then, all four ways: the two tracks only share this place (2 places in the network, Dvorce and Vozovna Střešovice, both confirmed by the maintainer, 2026-11-06)
 STUB = 3.0               # m: a shorter dead-end edge from a node where tracks meet is dropped
 SECTION_TURN = 60.0      # degrees: the most a section's branch may leave its legs' line at the node they end at
 WALK_RADIUS = 50.0       # m: a track ending a step h beside its node gives up its points within sqrt(h * this) of the
@@ -277,8 +277,8 @@ class Network:
     @staticmethod
     def _meet_point(ms, chains, tips, txy):
         """Where record ends meeting at one place (within JOIN) have their node: on the straight track through them,
-        which a branch must not pull aside (the mean of a fork's three ends lay up to 12 cm off it; the user, 2026-11-06:
-        "Straight tracks should have priority"). Two straight pairs crossing: where they cross. Else the mean."""
+        which a branch must not pull aside: straight tracks have priority (maintainer, 2026-11-06; the mean of a fork's
+        three ends lay up to 12 cm off it). Two straight pairs crossing: where they cross. Else the mean."""
         xs = [txy[m] for m in ms]
         mean = (sum(x for x, _ in xs) / len(xs), sum(y for _, y in xs) / len(xs))
         real = [m for m in ms if chains[tips[m][0]].length >= 1.0]
@@ -439,9 +439,9 @@ class Network:
 
     def _sections_into_junctions(self):
         """A switch drawn as a section whose two legs end at a node where other tracks meet too (Strossmayerovo náměstí:
-        from the fork both legs run side by side 8 m into a crossing, where the diverging curve leaves 35° off; the user,
-        2026-11-05, "the both di forks are fine"): the straight leg stays; the other leg goes and the diverging track
-        starts at the fork, DI's points from where it leaves on (the fit joins it to the fork tangent). Tracks crossing
+        from the fork both legs run side by side 8 m into a crossing, where the diverging curve leaves 35° off; both DI
+        forks there are right: maintainer, 2026-11-05): the straight leg stays; the other leg goes and the diverging
+        track starts at the fork, DI's points from where it leaves on (the fit joins it to the fork tangent). Tracks crossing
         through the node (two ends of one chain) are not the branch."""
         cos_t = math.cos(math.radians(TURN))
         cos_max = math.cos(math.radians(SECTION_TURN))
@@ -493,8 +493,8 @@ class Network:
         """A track ending beside its node (DI's record end a step h off: a branch ending on a track, a provider's joint,
         a fork whose ends lie apart) gives up its points within sqrt(h * WALK_RADIUS) of the node: the curve fit takes it
         to the node in a smooth bend instead of following DI's ragged end. A straight track with no step keeps all its
-        points (`_meet_point` put the node on it). The user, 2026-11-06: "when you encounter end of di walk back ... so that connecting with
-        existing di or change to its alternative ... will be smoother and without kinks"."""
+        points (`_meet_point` put the node on it). So the join to another DI track, or to the source taking over from DI,
+        is smooth and without kinks (maintainer, 2026-11-06)."""
         for n, v in self.nodes.items():
             ends = self.at.get(n, [])
             if v['kind'] in ('crossing', 'mid') or len(ends) < 2:
@@ -550,8 +550,9 @@ class Network:
 
     def _twice(self):
         """Two short edges (SECTION_LEGS or less) between the same two nodes, within TWICE of each other, are one track
-        drawn twice: one goes (Strossmayerovo náměstí: two 8 m records from a fork into the crossing; the user,
-        2026-11-05: the DI forks there are right, the bend came from the double). A gauntlet's tracks are longer."""
+        drawn twice: one goes (Strossmayerovo náměstí: two 8 m records from a fork into the crossing;
+        the DI forks there are right, the bend came from the double: maintainer, 2026-11-05). A gauntlet's tracks are
+        longer."""
         by = defaultdict(list)
         for e, ed in self.edges.items():
             if ed['a'] != ed['b'] and ed['line'].length <= SECTION_LEGS:
@@ -598,7 +599,7 @@ class Network:
     def _crossing_gaps(self, archive):
         """Two track ends facing each other across a gap of up to CROSS_GAP are one track the provider broke where
         it crosses another (Ohrada: the track from the east ends on the through track, its continuation starts 5 m on;
-        the user, 2026-11-05: "sadly missing piece of data ... fill it here with a nice curve fit"). They are joined
+        data missing there, filled with a curve fit: maintainer, 2026-11-05). They are joined
         along the archive's axis where it runs within ARCHIVE_NEAR of both ends, else straight (the curve fit smooths
         it as fill); where the joint crosses another track the two meet in a crossing, each going on as itself."""
         # (an end left without a continuation at a node where tracks meet: none of the node's other ends lies within
@@ -765,11 +766,11 @@ class Network:
         return toe, a, b
 
     def move_tips(self, tips):
-        """A switch whose tip the user placed (data/truth.json trackSources.switchTips: [(near, tip)] in city metres)
+        """A switch whose tip the maintainer placed (data/truth.json trackSources.switchTips: [(near, tip)] in city metres)
         forks at the point of its through track nearest the tip: the through edge splits there and the diverging
         leg starts at it (Podolská vodárna: 3.3 m east of DI's fork, at the manhole). The switch is the through fork
-        nearest the tip within di_tracks.FORK, else nearest `near` (DI's fork when the user answered): DI's network may
-        have moved its fork since (#677: Ohrada's interlaced switch forks at the user's pin since #368). A fork within
+        nearest the tip within di_tracks.FORK, else nearest `near` (DI's fork when the maintainer answered): DI's network may
+        have moved its fork since (#677: Ohrada's interlaced switch forks at the maintainer's pin since #368). A fork within
         TIP_MATCH of that point stays. Each tip's state (#670): matches where the fork lies within TIP_MATCH of that
         point (the tip has no effect), holds where it is still at `near`, changed where it is at neither. A tip with no
         switch, or whose point lies past the switch's through edges, stops the build with its place (#677: both tips
@@ -880,7 +881,7 @@ class Network:
         return out
 
     def take_photo(self, photo):
-        """Tracks measured on the orthophoto the user took over DI's (data/truth.json photoTracks): an edge the photo
+        """Tracks measured on the orthophoto the maintainer took over DI's (data/truth.json photoTracks): an edge the photo
         track covers along PHOTO_SHARE of its length within di_tracks.PHOTO_COVER takes the photo's line between its
         nodes. Each photo's state against DI's lines it replaces (#670): matches where they lie within PHOTO_MATCH of
         every point of it, holds where they are farther, changed where DI no longer covers it (the photo is not taken)."""
@@ -1435,7 +1436,7 @@ def _frog(leg, on_route):
 
 
 def load_network():
-    """DI's network with the user's switch tips and orthophoto tracks (data/truth.json trackSources), built once per machine
+    """DI's network with the maintainer's switch tips and orthophoto tracks (data/truth.json trackSources), built once per machine
     for its sources and this code (tools/dtmp_tracks.py `kept`: ~20 s in each build_line, #517)."""
     import json
     from dtmp_tracks import DI, RAW, archive_checked, di_checked, kept, sha
@@ -1454,7 +1455,7 @@ def load_network():
 def dense(coords, step=DENSE):
     """A surveyed line with points at most `step` m apart along its own segments: DI draws a straight track with
     vertices tens of metres apart, and the fit, with no data between them, sagged 0.41 m in a 462 m straight leaning
-    into curves at both ends (line 37 east of Ohrada). The user, 2026-11-06: "Straight tracks should ... be stiffer"."""
+    into curves at both ends (line 37 east of Ohrada). Straight tracks are stiffer (maintainer, 2026-11-06)."""
     out = [coords[0]]
     for a, b in zip(coords, coords[1:]):
         n = int(math.dist(a, b) / step)
@@ -1516,7 +1517,7 @@ SMOOTHED = None  # the 'smooth' answers of the stepped-curve review, [(xy, reach
 
 
 def without_steps(coords, nodes=(True, True)):
-    """A surveyed line for the curve fit without its points within reach of a place the user answered 'smooth' on the
+    """A surveyed line for the curve fit without its points within reach of a place the maintainer answered 'smooth' on the
     stepped-curve review (#368): the fit draws one curve through there. The line's own ends stay where they are its nodes
     (`nodes`); an end walked back to a node is DI's record end 1.8-2.3 m from it, and held, it kept the step (Čechovo
     náměstí: line 22's track hooked 3.5 cm in the last 0.76 m before the fork, 44 m over 5 m)."""
@@ -1531,7 +1532,7 @@ def without_steps(coords, nodes=(True, True)):
 
 
 def smooth_nodes(pos, pts, net):
-    """The surveyed nodes within reach of a place the user answered 'smooth' on, as track_curve's `loose` {(node, edge): 0}:
+    """The surveyed nodes within reach of a place the maintainer answered 'smooth' on, as track_curve's `loose` {(node, edge): 0}:
     no data point there, the node lands where the fitted curve passes (#368). Freeing the points between nodes was not
     enough where the node itself lies on the step: at Čechovo náměstí DI zig-zags -8 to +9 cm in the 10 m before a fork,
     and the fork lands 8.7 cm from DI's node (with the walked-back record ends freed too, without_steps; line 22, s 14233:
@@ -1552,8 +1553,8 @@ TONGUE_MIN = 2.0  # m: DI's first vertex past an interlaced tip further than thi
 def splay_ends(net):
     """At each interlaced tip (`Network.tips`), the end approaching it and the two leaving it: {node: ((e, end) approaching,
     [(e, end), (e, end)] leaving)}. Unlike a classic switch's straight track, neither leaving track continues the approach:
-    both leave its axis, on either side (the user, 2026-11-08, on a street-view photo of Čechův most: "I think it's the case
-    for interlaced switches that they have splay for both tracks unlike classical switch"; DI there: +4.7 and -8.7 cm off the
+    both leave its axis, on either side (maintainer, 2026-11-08, on a street-view photo of Čechův most: an interlaced
+    switch splays both tracks, unlike a classic one; DI there: +4.7 and -8.7 cm off the
     approach's axis 7 m on, which the fit had drawn as a straight track and a branch, with a 2-degree bend 1 m past each tip)."""
     out = {}
     for n, u in getattr(net, 'tips', {}).items():
@@ -1591,8 +1592,8 @@ def without_tongue(coords, cut):
 
 def without_chords(coords):
     """A surveyed line for the curve fit without the points inside the chords of a curve. DI draws some curves with vertices 22-28 m
-    apart and 4-5 degrees at each (line 37, Ohrada - Palmovka: "stepped curve instead of continuous radius", the user,
-    2026-11-06). The vertices lie on the curve and the chords inside it, 22 cm at their middles: the opposite track, at
+    apart and 4-5 degrees at each (line 37, Ohrada - Palmovka: a stepped curve instead of a continuous radius,
+    maintainer, 2026-11-06). The vertices lie on the curve and the chords inside it, 22 cm at their middles: the opposite track, at
     vertices every 1.25 m, runs parallel to the curve through the vertices alone, and the archive's vertices lie within
     3.2 cm of it."""
     drop = set()
@@ -1938,10 +1939,10 @@ def corridor(net, ways, pos, bridges=(), route=()):
     spans = {e: sp for e, sp in spans.items() if sp[1] - sp[0] >= MIN_SPAN}
     flags = {e: on_bridge[e] >= 0.5 * run_on[e] for e in spans}
     # (an edge under MIN_SPAN with drawn tracks going on from both its ends is a piece of them: left out, the rail broke
-    # between two crossings 1.3 m apart, Strossmayerovo náměstí. The user, 2026-11-06: "two spots at Strossmayerovo")
+    # between two crossings 1.3 m apart, Strossmayerovo náměstí, at two spots: maintainer, 2026-11-06)
     # (nor may a drawn track end in the air where its only continuation reaches another drawn track: the way runs on the
-    # track beside it, Ohrada's long interlaced switch, a branch 13 cm beside the through track to its tip 92 m on. The
-    # user, 2026-11-06: "shouldn't there run two lines for the interlaced switch up to the fork point")
+    # track beside it, Ohrada's long interlaced switch, a branch 13 cm beside the through track to its tip 92 m on: an
+    # interlaced switch draws two tracks up to its fork point, maintainer, 2026-11-06)
     for e, ed in net.edges.items():
         # (also an edge drawn only partly: a stretch that stops short of a drawn track, line 22's 54 m at Vypich)
         if e in route or (e in spans and spans[e][0] <= 0.0 and spans[e][1] >= ed['line'].length):

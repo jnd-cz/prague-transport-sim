@@ -365,7 +365,7 @@ def build(LINE, SOURCES=(), root=ROOT):
     print("medians:", zps_medians.sort(areas, line.get("green") or []))
 
     # the survey's ground level against the lidar: an area steadily off IPR moves where the rails or DMR 5G confirm IPR,
-    # stays where they confirm the survey, and waits for the user's review where neither does (tools/zps_ground.py, #446)
+    # stays where they confirm the survey, and waits for the maintainer's review where neither does (tools/zps_ground.py, #446)
     import dmr5g  # noqa: E402
     import zps_decks  # noqa: E402
     _truth_path = os.path.join(root, "data", "truth.json")

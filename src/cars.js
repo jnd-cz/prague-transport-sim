@@ -25,8 +25,8 @@ const COLS = 4, ROWS = 16, PW = 256, PH = 64;
 // ones of a type
 export const NEAR_MAX = COLS * ROWS, NEAR_IN = 65, NEAR_OUT = 73, VIEW_IN = 3, VIEW_OUT = 4;
 // and in the right mirror's view within MIRROR_IN m of its camera (kept to MIRROR_OUT), while it is shown: the cars beside
-// and behind the tram with their indicators (one turning across the tracks, to warn with the bell) and brake lamps (the
-// user, 2026-11-24: "checking traffic on the side too, like cars that want to turn left over the tracks"). The mirror's
+// and behind the tram with their indicators (one turning across the tracks, to warn with the bell) and brake lamps
+// (maintainer, 2026-11-24). The mirror's
 // picture is about 300 px tall for 30 degrees: a car at 50 m there is as tall as one at about 85 m on a 1080 px screen
 export const MIRROR_IN = 50, MIRROR_OUT = 55;
 const FAR_MAX = 64;

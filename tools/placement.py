@@ -10,10 +10,10 @@ The rules are src/game.js's, moved here whole: `_routeConflicts` (where roads, c
 the route), `_placeSignals` (each signal at its junction's stop line, dropped or on demand) and the platform rule of
 `_initSignals` (a signal along a platform goes to its head, or hangs past it and the stop point moves back 3 m before
 it). What stays in the game: the bridges (`profile.overBridge`, from the heights), the mounting (pole, span or island
-tip, which needs the rendered street) and the stop zone, which depends on the set's length (the user, 2026-11-09: "the
-stops must be universal everywhere, build the same to the real size found in the data ... the servicing stop is
-handled by game code"). The game keeps its own rules as the fallback for data built before this and logs every place
-where its result differs from the build's (`game.placementDiffs`).
+tip, which needs the rendered street) and the stop zone, which depends on the set's length (maintainer, 2026-11-09:
+stops are built the same everywhere at their real size from the data, the serving stop is the game's). The game keeps
+its own rules as the fallback for data built before this and logs every place where its result differs from the
+build's (`game.placementDiffs`).
 
 Every decision carries its `rule` (data/lineN.built.geojson, docs/architecture.md §10.4): junctionEdge, onDemand,
 afterJunction, droppedFarSide, keptPastCross, keptFar, sameStopLine, platformHead, platformHang.
@@ -259,8 +259,8 @@ def place_signals(signals, C, stops, targets):
 
 def platform_rule(placed, stops, targets):
     """A signal never stands along a platform (src/game.js _initSignals): it moves to the platform head, or, where the
-    crossing follows too closely, hangs past it. No signal moves a stop point (#694: the user, 2026-11-18, "The stop
-    sign will be the stop point by definition as D1/2 rules say"): (placed, before) with `before` the hung signals whose
+    crossing follows too closely, hangs past it. No signal moves a stop point (#694: by the D1/2 rules the stop sign is
+    the stop point by definition): (placed, before) with `before` the hung signals whose
     stop line lies before their stop's point, [(signal, stop index)] (src/game.js signalsBeforeSign). Changes `placed`
     in place; the signals' `head` is the stop's index."""
     before = []
@@ -386,7 +386,7 @@ TIE = 0.001  # (m: two paths this close to a platform run over the same track, `
 def assign(pl, R, RB):
     """The path a platform is drawn along, (route, projections, mean distance, tied) or None: the nearer of the two, the
     back path where they tie within TIE, `tied` the other path's (route, projections) then, else None. Two paths that
-    tie run over the same track the same way, and the platform serves both (the user, 2026-11-14, #419: platforms
+    tie run over the same track the same way, and the platform serves both (the maintainer, #419: platforms
     belong to the track, as the city network will place them, docs/architecture.md). On line 9's round trip both run so
     from Řepy to Motol: nine platforms there were 1e-13 m apart, and float noise had given each to one path only."""
     cands = []

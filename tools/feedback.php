@@ -3,8 +3,8 @@
 // Player feedback on the web host (#350): tools/deploy.py uploads this as /feedback.php on every target. It only
 // takes notes in: POST a JSON note (src/report.js), stored as feedback/<id>.json under an id made here. Nothing
 // is read back over HTTP (feedback/ is denied to the web); tools/deploy.py --pull moves the notes off the host
-// over FTPS. The caps below are the protection of a site without a login (the user, 2026-11-10: "reasonable
-// limits for note size, screenshot attaching allowed, number of stored records"); no IP address is stored.
+// over FTPS. The caps below are the protection of a site without a login (maintainer, 2026-11-10: limits on a
+// note's size and on the records stored, screenshots allowed); no IP address is stored.
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 const MAX_BODY = 2000000;      // bytes of one post: a 1280 px JPEG screenshot in base64 is ~0.2-0.6 MB

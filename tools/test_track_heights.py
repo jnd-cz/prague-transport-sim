@@ -410,7 +410,7 @@ class DeckFallback(unittest.TestCase):
             self.assertIn(flag, result['review_flags'])
 
     def test_on_paved_track_the_survey_over_the_archive_wins_where_the_lidar_backs_it(self):
-        # (#539, the user 2026-11-14: Bělohorská "doesn't sit lower", Plzeňská "about the same level as the road")
+        # (#539, maintainer: Bělohorská's track does not sit lower, Plzeňská's about level with the road)
         road = {**deck_record('road', 200.2), 'class': 'road', 'level': 0}
         cands = Decks([road], [offset_fact(0)]).candidates(5, 0, 'di-1')
         choose = lambda arch, terrain, di=None: HeightGuard().choose(  # noqa: E731

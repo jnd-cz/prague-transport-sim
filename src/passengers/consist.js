@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // A tram set's passengers (#249 step 2): the passenger lab's boarding controller (boarding-state.js) for each car, on the game's T3
-// cabin (assets/passengers/t3-cabin.json, tools/cabin.py --game: 24 seats and 81 standing places, the user's 105 shown a car), behind the
+// cabin (assets/passengers/t3-cabin.json, tools/cabin.py --game: 24 seats and 81 standing places, the maintainer's 105 shown a car), behind the
 // game's counts (src/game.js). Everything here is in the cars' own frames, never the world's; nothing is drawn (step 3 draws it).
 //
-// The user's rules (2026-11-25, #249):
+// The maintainer's rules (#249):
 // - about one boarder in five wishes to stand though seats are free (STAND_SHARE, a trait drawn from the game's seeded stream);
 // - who alights: the passengers nearest a door by walking (boarding-state.js alight's nearest), the counted ones first;
 // - a seat come free by a door whose exchange is over goes to the nearest standing passenger who does not wish to stand, walking at
@@ -11,7 +11,7 @@
 // - above the places shown, up to the car's declared capacity (the crush load), passengers are counted only: they climb the steps
 //   like the others and join the count at their head, and leave first, from the doorways, through the doors in turn.
 // - (2026-11-26) those alighting at a stop get ready as the tram comes near it: to their doors' doorway places (ready).
-// - (2026-11-26, Dveře I: "only the 1st door in car where driver sits"; those waiting walk to it and get on there, those to alight
+// - (2026-11-26, Dveře I: only the first car's front door, by the driver; those waiting walk to it and get on there, those to alight
 //   leave through it) with the front door alone open, everyone bound for another door goes to it: onlyDoor, gather.
 // A passenger is aboard from the head of the entry steps in to their foot out (a.aboard): the counts change there, which is where
 // the game's crossings are (update's list) and what the autopilot waits for.
@@ -19,12 +19,11 @@ import { createBoardingController } from './boarding-state.js';
 import { GAME_PACE } from './exit-flow.js';
 import { createCabinNavigator } from './cabin-navigation.js';
 
-export const STAND_SHARE = 0.2; // (the user: "some people boarding can stand even with free seats"; revisited with journeys, #40)
+export const STAND_SHARE = 0.2; // (the maintainer's rule, #249; revisited with journeys, #40)
 export const RESEAT_SPEED = 0.8; // m/s: a slow walk to a seat inside
 // (#249 step 4) the stop this near (m), those alighting there get up and go to their door's doorway places, one a door every
-// READY_GAP s at READY_SPEED (a walk in a moving tram, as RESEAT_SPEED): src/game.js. The distance as the user asked it measured
-// (2026-11-26: "how far from stop they need to start moving when tram is approaching at 50 km/h and breaking at the highest
-// step"): getting ready takes at most about 10 s (two cars, 38 % alighting, the most the game draws: 8.2-9.9 s at 100 aboard,
+// READY_GAP s at READY_SPEED (a walk in a moving tram, as RESEAT_SPEED): src/game.js. The distance as the maintainer asked it measured
+// (2026-11-26: how far out they set off with the tram coming at 50 km/h and braking on the highest step): getting ready takes at most about 10 s (two cars, 38 % alighting, the most the game draws: 8.2-9.9 s at 100 aboard,
 // less below and above, where the doorways are full); the set braking on step 5 from 50 km/h covers 69-84 m in its last 10 s
 // and 97-112 m in its last 12 s (empty to full). 120 m: those 12 s at the hardest braking; with the autopilot (lines 17 and 22,
 // 69 stops) the tram stood 15.9 s after at the soonest, everyone at the doors after 8.1 s at most.
@@ -153,8 +152,7 @@ export function createConsist(layout, { cars, crush, rand }) {
       }
       return total;
     },
-    // (#249 step 4, the user, 2026-11-26: "those getting off at the stop needs to be prepared often, to be ready to go once door
-    // opens") the stop ahead near: the n who will alight there chosen now, as alight would choose them, and those of them who can
+    // (#249 step 4: those getting off at the stop made ready to go once the doors open) the stop ahead near: the n who will alight there chosen now, as alight would choose them, and those of them who can
     // go to a free doorway place of their door (boarding-state.js ready); alight(n) at the stop takes the same ones. The number
     // setting off
     ready(n) {

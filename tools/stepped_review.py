@@ -6,8 +6,8 @@ opposite path, the places of one curve on several lines and both tracks merged, 
 
 Writes reports/review/stepped-curves.json. A step's size is read on the track as the game draws it (data/lineN.json `path`,
 `pathBack`): its corner, the turn over 5 m beyond the curve's own (5/R5 - 5/R25, the radii over 5 and 25 m as the check
-reads them), and how far the track leaves the one circle fitted to it over those 25 m. A place the user answered
-(data/truth.json trackSources.steppedAnswers, read by tools/di_network.py) leaves the list.
+reads them), and how far the track leaves the one circle fitted to it over those 25 m. A place the maintainer
+answered (data/truth.json trackSources.steppedAnswers, read by tools/di_network.py) leaves the list.
 """
 import json
 import math

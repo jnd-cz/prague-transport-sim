@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), dist/traffic/cabin-navigation.js, as it was (sha256 19f19f2b85c6ccb6);
-// accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
+// accepted by the maintainer as good enough for now (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
 // #249 step 2: changed, for speed with the same ways: a floor cell's clearance worked out once, and a route's obstacles bucketed by
 // 0.5 m cells (a way round people took 30-50 ms; the game looks for one while it runs).
 import {transformFootprint,bounds} from './packing-geometry.js';

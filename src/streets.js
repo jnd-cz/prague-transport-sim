@@ -90,7 +90,7 @@ export function buildZebras(group, data, ground, trackDist) {
   const white = new THREE.Color('#e9e9e4').toArray();
   // and the OSM signalled crossings (data.osmSignals.peds) without a zebra way of their own: across the
   // nearest car road, kerb to kerb (Palackého náměstí: the two crossings from the island over the road
-  // had no paint, user's orthophoto 2026-10-24)
+  // had no paint, the maintainer's orthophoto reading 2026-10-24)
   const ways = data.roads.filter((r) => r.z).map((r) => ({ p: r.p }));
   const segDist = (P, x, y) => { let m = Infinity; for (let i = 1; i < P.length; i++) { const a = P[i - 1], b = P[i], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-9, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)); m = Math.min(m, Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y)); } return m; };
   for (const o of data.osmSignals?.peds || []) {
@@ -159,7 +159,7 @@ export function buildStreetDetail(data, ground, near = null) {
   const kinds = {
     // (size: the width of a flat one, the height of the hydrant, for the distance it is drawn to, src/nearbatch.js)
     manhole: { geo: flat(new THREE.CircleGeometry(0.32, 14)), mat: iron(0x3a3a3c), turn: false, size: 0.64 },
-    // (caps smaller than first drawn, user 2026-10-24; reference photos of all the covers to come)
+    // (caps smaller than first drawn, maintainer, 2026-10-24; reference photos of all the covers to come)
     hydrant_cap: { geo: flat(new THREE.CircleGeometry(0.1, 10)), mat: iron(0x4a3a30), turn: false, size: 0.2 },
     valve_cap: { geo: flat(new THREE.CircleGeometry(0.06, 8)), mat: iron(0x3d3d3d), turn: false, size: 0.12 },
     gutter_inlet: { geo: flat(new THREE.PlaneGeometry(0.62, 0.36)), mat: iron(0x242424), turn: true, size: 0.5 },

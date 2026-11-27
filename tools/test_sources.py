@@ -36,7 +36,7 @@ class Registry(unittest.TestCase):
             self.assertTrue(S.dated(sid) or sid.startswith("rule:") or s.date_kind == "records", sid)
 
     def test_a_source_dated_per_record_dates_every_record(self):
-        # the user's facts have no snapshot date: each record names when and where it was said (#239)
+        # the maintainer's facts have no snapshot date: each record names when and where it was said (#239)
         per_record = [sid for sid, s in S.SOURCES.items() if s.date_kind == "records"]
         self.assertEqual(per_record, ["truth"])
         self.assertEqual((S.SOURCES["truth"].group, S.SOURCES["truth"].date), (None, ""))
@@ -94,7 +94,7 @@ class Stamp(unittest.TestCase):
         self.assertEqual([st(65, None, 70), st(65, None, None)], ["holds", "holds"])  # nothing recorded: no change seen
         near = lambda a, b: abs(a - b) <= 1  # noqa: E731
         self.assertEqual([st(10, 3, 10.8, near), st(10, 3, 3.5, near), st(10, 3, 6, near)], ["matches", "holds", "changed"])
-        # the source as when the user answered holds, even within the fact's tolerance: the user set theirs apart from it
+        # the source as when the maintainer answered holds, even within the fact's tolerance: they set theirs apart from it
         self.assertEqual([st(10, 9.5, 9.5, near), st(10, 9.5, 9.6, near), st(10, 9.5, 9.6, near, unchanged=near)],
                          ["holds", "matches", "holds"])
         self.assertEqual([st(10, 10, 10.5, near, confirms=True), st(10, 10, 12, near, confirms=True),

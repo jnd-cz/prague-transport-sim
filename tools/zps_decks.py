@@ -16,13 +16,11 @@ survey's outlines and its edges part by up to a metre.
 
 Openings. Over an OSM way that passes under a deck (`tunnel=*`, `covered=yes`, layer -1 or above: not the metro), the
 deck's top stays on its plane across the opening: its length from the way, its width from the survey's level-0
-street and kerbs under it (the user, 2026-11-10: "I would take hints from osm tunnel feature and perhaps keep the deck
-above from sagging too much, or the zps street+kerb width where the edges shouldn't sag significantly").
+street and kerbs under it, where its edges should not sag (maintainer, 2026-11-10).
 
 Thickness. A deck no model gives a body is SLAB thick, less where the way under it carries `maxheight` and SLAB would
-leave less: the gap - maxheight - MARGIN (the user, 2026-11-10: "Clearance is the 4.4 meters plus safety margin. I
-would use 1m thick deck by default if it checks out"; "0.1 margin is fine. Good point about using the osm height for
-tunnel/covered features"). Divadelní: 5.26 - 4.4 - 0.1 = 0.76 m. Written as the area's `t` where it differs from SLAB.
+leave less: the gap - maxheight - MARGIN (the clearance is OSM's maxheight plus a safety margin; maintainer,
+2026-11-10). Divadelní: 5.26 - 4.4 - 0.1 = 0.76 m. Written as the area's `t` where it differs from SLAB.
 """
 import re
 
@@ -52,9 +50,8 @@ GRADE = 0.25
 TRUSS = 1.0  # m off a deck's median top: a truss, a pylon or a portal over the deck, not the deck (Výtoň: 210.4 m on 197.5)
 SAG = 0.1  # m under the deck's plane over an opening: the target's tolerance at Divadelní
 PLANE_REACH = 15.0  # m from the way under: the deck's vertices that give its plane
-# m clear over a footway, a cycleway or steps without maxheight (with MARGIN, 2.3 m); the user, 2026-11-10, from street
-# view of the passages: "The underpasses have enough clearance, for walkway I would keep lower limit of 2.2-2.3 and then
-# whatever slab it leaves"
+# m clear over a footway, a cycleway or steps without maxheight (with MARGIN, 2.3 m), the slab whatever it leaves; the
+# passages have enough clearance on street view (maintainer, 2026-11-10)
 WALK = 2.2
 SIDEWALK = 10.0  # m from a street's way under a deck: its sidewalk, not a passage of its own
 SLAB, MARGIN, MIN_SLAB = 1.0, 0.1, 0.3  # m: the default deck, the clearance's margin, the thinnest the page draws
@@ -224,9 +221,9 @@ def check(areas, model, rails):
 
     An area that lies inside a model's faces (its footprint, EDGE wide) with every vertex more than TOL under them is on
     that structure with the survey's ground heights, and takes the model's top: Výtoň's railway and its walkway on
-    Železniční most's land span, 5 m over the street (the user, 2026-11-10: "there are really three levels: the highest
-    is the railway bridge and walkway alongside. Middle level is the one with our tram tracks and car road, sidewalk
-    towards the river. And finally there's the lowest level right next to the water"); the road over the two arches
+    Železniční most's land span, 5 m over the street (maintainer, 2026-11-10: three levels there, the highest the railway
+    bridge with its walkway, the middle one our tram tracks, the car road and the sidewalk towards the river, the
+    lowest right by the water); the road over the two arches
     on line 22 at 50.0850 N 14.3835 E. Each vertex takes the model's face nearest to its deck's median top (a portal or a
     truss over part of the deck is not the deck), the median where none is within TRUSS."""
     where, xyz = _vertices(areas)
@@ -333,8 +330,8 @@ def split(areas, model, checked=None):
     offset the area's own vertices keep from them; the parts beyond every structure keep their survey heights, the
     slivers between the decks go (in place: the area keeps its index for its first piece, the others are appended).
     Libeň's railway (line 37): the survey's railway areas span three viaducts side by side at 205.7, 210 and 212 m and
-    sloped 7 m across the gaps between them (the user, 2026-11-10: "Libeň viaduct's are several different one but they
-    should all hold straight across the spans"). checked: check's record, kept true for the pieces.
+    sloped 7 m across the gaps between them (maintainer, 2026-11-10: several different viaducts, each
+    straight across its spans). checked: check's record, kept true for the pieces.
     Returns {"areas": n split, "pieces": n}."""
     out = {"areas": 0, "pieces": 0}
     if model.tree is None:
@@ -486,8 +483,8 @@ def openings(ways, areas, frame):
                         "width": width, "decks": over, "foot": t.get("highway") in ("footway", "cycleway", "steps", "path", "pedestrian"),
                         "sidewalk": t.get("footway") == "sidewalk"})
     # a street's sidewalk passes under with it: its opening joins the street's beside it, and the deck over it is the
-    # street's (the user, 2026-11-10, on Divadelní's: "there's not really any sidealk from what I can see, only thin kerb
-    # alongside each side"; OSM's footway=sidewalk tunnel there lay under its own three pieces of the deck)
+    # street's (maintainer, 2026-11-10, on Divadelní's: no real sidewalk there, only a thin kerb along each side;
+    # OSM's footway=sidewalk tunnel there lay under its own three pieces of the deck)
     streets = [o for o in out if not o["foot"]]
     for o in [o for o in out if o["sidewalk"]]:
         near = [s for s in streets if s["axis"].distance(o["axis"]) <= SIDEWALK]
@@ -513,8 +510,8 @@ def _plane(pts):
 
 def flatten(areas, opens, ground, checked=None):
     """Each opening's decks stay on their plane across it, and are SLAB thick or less by maxheight (in place).
-    ground: IPR at city-frame arrays (the floor: the user, 2026-11-10, on the sections: "The lidar floor generally looks
-    better and sits lower, have smooth believable curve, so I would prefer that one"); checked: the vertices a structure
+    ground: IPR at city-frame arrays (the floor: on the sections the lidar's floor looks better, sits lower
+    and has a smooth, believable curve; maintainer, 2026-11-10); checked: the vertices a structure
     checks and its height there (check's record): the plane lifts none of them over TOL above it (by Hlavní nádraží,
     decks of 195-211 m over the same ways took one plane, which lifted a vertex Mosty 3D holds at 199.5 m to 206.4 m).
     Each area keeps its own plane where it has three of the plane's vertices, else the opening's.

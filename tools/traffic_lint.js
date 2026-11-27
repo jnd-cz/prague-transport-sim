@@ -80,8 +80,8 @@ function snapshot(g, tr, view) {
   return out;
 }
 
-// The traffic check as a watcher on a whole-line drive (tools/bench/u3.js run, opts.also; #722, the user's "agree" on
-// #708): it rides on the one drive of a line and seed that u3, redruns and stops share, so the tier drives each line
+// The traffic check as a watcher on a whole-line drive (tools/bench/u3.js run, opts.also; #722, agreed by the maintainer
+// on #708): it rides on the one drive of a line and seed that u3, redruns and stops share, so the tier drives each line
 // and seed once. It only reads. Every `sample` s of game time it records what the player would see (snapshot).
 // (view: the run's traffic as drawn, src/trafficView.js)
 export function trafficWatch(g, tr, { sample = 0.2, dt = 1 / 30, view = window.run?.trafficView } = {}) {

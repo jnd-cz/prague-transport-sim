@@ -46,7 +46,7 @@ class Styles(unittest.TestCase):
         secs = T.sections(data, truth, None)
         self.assertEqual([(x["s0"], x["s1"], x["source"], x.get("stretch")) for x in secs],
                          [(0.0, 100.0, "list", 0), (100.0, 300.0, "list", 1), (300.0, 400.0, "user", None),
-                          (400.0, 550.0, "list", 0)])   # (C - B both ways; the user's mark keeps the way back)
+                          (400.0, 550.0, "list", 0)])   # (C - B both ways; the maintainer's mark keeps the way back)
 
     @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_a_mark_between_two_points_runs_between_their_route_positions(self):
@@ -183,7 +183,7 @@ class Holes(unittest.TestCase):
 
     @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_the_users_surface_answers_lay_setts_and_a_setts_junction_from_fork_to_fork(self):
-        # (#574, the user 2026-11-14: a setts junction is setts "from switch fork to the other switch forks")
+        # (#574, maintainer: a setts junction is setts from one switch's fork to the other switches' forks)
         ll = lambda x: list(map(float, T.Frame().ll(x, 0.0)))   # noqa: E731
         ans = lambda i, what, a, b, v: {"id": i, "what": what, "line": "x", "between": [ll(a), ll(b)], "answer": v}  # noqa: E731
         truth = {"trackSurfaceReview": {"answers": [ans("st", "stretch", 100, 200, "setts"),
@@ -198,7 +198,7 @@ class Holes(unittest.TestCase):
     @unittest.skipUnless(geo.have_grid(), geo.NO_GRID)
     def test_an_answer_matches_once_the_styles_without_it_give_its_style(self):
         # (#670: an answer matches where a source lays its style without it: DP Praha's grassed-track list does;
-        # the junction rule and the user's own marks lay it too, but they hold)
+        # the junction rule and the maintainer's own marks lay it too, but they hold)
         ll = lambda x: list(map(float, T.Frame().ll(x, 0.0)))   # noqa: E731
         ans = lambda i, what, a, b, v: {"id": i, "what": what, "line": "x", "between": [ll(a), ll(b)], "answer": v}  # noqa: E731
         truth = {"trackSurfaceReview": {"answers": [ans("st", "stretch", 100, 200, "setts"), ans("jn", "junction", 395, 405, "setts"),
@@ -215,7 +215,7 @@ class Holes(unittest.TestCase):
         self.assertEqual({e["id"]: (e["state"], e["share"]) for e in got["grassReview"]}, {"g1": ("holds", 0.0), "g2": ("holds", 0.0)})
         truth["trackStyles"] = [{"line": "x", "from": "A", "to": "B", "style": "grass"}]
         self.assertEqual({e["id"]: (e["state"], e["by"]) for e in T.answer_states(data, truth, None)["grassReview"]},
-                         {"g1": ("holds", "user"), "g2": ("holds", "user")})  # (the user's own mark)
+                         {"g1": ("holds", "user"), "g2": ("holds", "user")})  # (the maintainer's own mark)
         del truth["trackStyles"]
         truth["grassTrack"] = {"stretches": [{"from": "A", "to": "B", "year": 2000}]}  # (DP Praha's list: a source)
         self.assertEqual({e["id"]: (e["state"], e["by"]) for e in T.answer_states(data, truth, None)["grassReview"]},

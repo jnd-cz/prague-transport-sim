@@ -2,8 +2,8 @@
 """The site's icons (#485): python -P -E tools/make_icons.py [--out DIR]
 
 The T3's face: a cream band on top, the red below with two round headlights in dark rings, a cream "T3" between
-them, and the bumper's polished aluminium strip with its two red lines (after the user's photo of car 7000,
-2026-11-11). Drawn at 512 px and scaled down to 192 and 180 (the web manifest, the iPhone's home screen) and 32
+them, and the bumper's polished aluminium strip with its two red lines (after the maintainer's photo of car
+7000, 2026-11-11). Drawn at 512 px and scaled down to 192 and 180 (the web manifest, the iPhone's home screen) and 32
 (the browsers' tab). Writes assets/icons/icon-{32,180,192,512}.png, or into DIR.
 """
 import argparse

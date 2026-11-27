@@ -3,7 +3,7 @@
 
 The game's cabin (assets/passengers/t3-cabin.json, tools/cabin.py --game) is the hybrid T3's (its assetSha256 the model's):
 24 seats and 81 standing places, 105 shown, no two standing outlines overlapping, none in the cab. In a page, the set's
-passengers (src/passengers/consist.js) on two cars, by the user's rules (2026-11-25, #249):
+passengers (src/passengers/consist.js) on two cars, by the maintainer's rules (#249):
 - a half-empty set's exchange (50 aboard, 15 off, 20 on): everyone across, the counts and places right (check()), the
   alighters the nearest to a door in the set, and the same crossings twice for one seed;
 - about one boarder in five wishes to stand: into an empty set they stand though seats are free, the others sit;
@@ -14,11 +14,11 @@ passengers (src/passengers/consist.js) on two cars, by the user's rules (2026-11
 - the front door beside the cab takes both its streams, in and out, two people on its steps at once;
 - the doors closed during the exchange: who is on the steps finishes the way, the queue stays behind, those still to
   alight get off when the doors open again; the counts right throughout;
-- (step 4, the user, 2026-11-26: "those getting off at the stop needs to be prepared often, to be ready to go once door
-  opens") the stop near, those to alight there go to their doors' doorway places while the tram drives, nobody else moving;
-  the same ones alight, sooner after the doors open than from their places, the boarders after them; one whose stop comes
-  while they are on the way alights from where they get to.
-- (Dveře I, the user, 2026-11-26: "only the 1st door in car where driver sits") with the first car's front door alone open,
+- (step 4, maintainer, #249) the stop near, those to alight there get ready to go once the doors open: they go to their
+  doors' doorway places while the tram drives, nobody else moving; the same ones alight, sooner after the doors open
+  than from their places, the boarders after them; one whose stop comes while they are on the way alights from where
+  they get to.
+- (Dveře I, maintainer, #249) with the first car's front door alone open,
   the boarders queued at both cars' shut doors all get on through it, the second car's handed to the first where they stand;
   the first car's alighters leave through it, the second car's stay aboard until all the doors open; the counts right.
 And tools/cabin.py's game_cabin keeps one packing and what the passenger modules read.
@@ -121,8 +121,8 @@ PAGE = """async () => {
     run(p);
     out.crush = { counted0, counted1, ins: r.ins, aboard: p.aboard, left: r.left, counted2: p.cars.map((c) => c.counted), check: p.check() };
   }
-  // the front door, beside the cab: both its streams, in and out, two people on its steps at once (the user, 2026-11-25: "I hope
-  // the front door still fits two passengers going out or in at the same time"); one car, 80 aboard, 30 off, 30 on
+  // the front door, beside the cab: both its streams, in and out, two people on its steps at once (maintainer,
+  // #249); one car, 80 aboard, 30 off, 30 on
   {
     const p = set(80, 2, 1), lanes = {}, most = { in: 0, out: 0 };
     p.board(30, 7);
@@ -191,7 +191,7 @@ PAGE = """async () => {
     for (let t = 0; t < 60 && p.toAlight; t += H) count(p.update(H, true));
     out.closed = { n, ...closed, toAlightAfter: p.toAlight, insAfter: ins, outsAfter: outs, aboard: p.aboard, check2: p.check() };
   }
-  // (#249, Dveře I, the user, 2026-11-26: "only the 1st door in car where driver sits"; those waiting walk to it, those to alight
+  // (#249, Dveře I: only the first car's front door, by the driver; those waiting walk to it, those to alight
   // leave through it) 60 aboard, 20 to alight and 24 queued at the shut doors of both cars; the first car's front door alone opens:
   // everyone boards through it, the second car's boarders handed to the first car where they stand (in its frame), the first car's
   // alighters out through it, the second car's stay aboard; then all the doors: they get off. The counts right throughout

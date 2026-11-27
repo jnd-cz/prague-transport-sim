@@ -3,7 +3,7 @@
 (its own server on a free port, a page with no game in it). Checks:
 - the T3 (one section, two free bogies): on the straight as before; on a 20 m curve both pivots on it 6.4 m apart in a
   straight line, each bogie turned by asin(3.2 / R) against the body; on a 200 m crest both pivots on the profile;
-- the Prague types the user named (2026-11-18: KT8D5, 14T, 15T, 52T, K2, KT4), their running gear from
+- the Prague types the maintainer named (2026-11-18: KT8D5, 14T, 15T, 52T, K2, KT4), their running gear from
   docs/research/articulated-trams.md (the 14T's and the 52T's measured on photos, see there): on a
   25 m curve every support of every section on the curve, neighbouring sections' pins in one place, a carried
   section its length between its pins, a section on one fixed or limited bogie on the track's heading there, the
@@ -62,7 +62,7 @@ const TYPES = {
     joints: [6.35, 12.97, 17.28, 23.90].map((at) => pin(at)) },
   // 52T: free bogies under the end sections near their outer ends, the end sections resting on the next one's pin;
   // limited bogies in the middle of the short sections 2 and 4; section 3 hung between them; 31.99 m over the bumpers.
-  // Measured on the side view the user sent (DPP's render, 2026-11-18), made symmetric; wheelbase 1.8 m [E]
+  // Measured on the side view the maintainer sent (DPP's render, 2026-11-18), made symmetric; wheelbase 1.8 m [E]
   '52T': { sections: [sec(0, 9.38, free(2.25, undefined, 1.8)), sec(9.38, 13.72, limited(11.56, 1.8)), sec(13.72, 18.27), sec(18.27, 22.61, limited(20.43, 1.8)), sec(22.61, 31.99, free(29.74, undefined, 1.8))],
     joints: [9.38, 13.72, 18.27, 22.61].map((at) => pin(at)) },
 };

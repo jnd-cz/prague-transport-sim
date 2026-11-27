@@ -54,8 +54,8 @@ body.touch #rpBtn { display: none !important }
 /* (switched on: the menu says so, so a desktop that once switched them on can tell why they show, #675) */
 .tbToggle.on { background: rgba(44,107,55,.9); border: 1px solid rgba(170,230,180,.8); border-radius: 6px }
 body.shift .tbToggle { display: none }
-/* (a touch screen with the controls switched off has no pause and no way back to them: 🎮 stays in the shift, the user's
-   phone in landscape, 2026-11-11, #485) */
+/* (a touch screen with the controls switched off has no pause and no way back to them: 🎮 stays in the shift, the
+   maintainer's phone in landscape, #485) */
 @media (pointer: coarse) { body.shift:not(.touch) .tbToggle:not(.fs) { display: block } }
 /* (⛶ at the other corner: beside 🎮, a tap meant for full screen switched the controls off) */
 .tbToggle.fs { left: auto; right: 8px }
@@ -157,7 +157,7 @@ body.shift .tbToggle { display: none }
     };
     document.body.appendChild(fs);
     // ⛶ in a shift: the pause panel's (#691). A shift that had left full screen (the back gesture) had no way back but the
-    // menu (the user's phone, 2026-11-18: "there is no button for full screen"). A click, as ⛶'s: the browser takes no
+    // menu (the maintainer's phone). A click, as ⛶'s: the browser takes no
     // touch's pointerdown as the gesture full screen needs, so it is no key sent from one.
     const pause = document.getElementById('pausePanel');
     if (pause) {

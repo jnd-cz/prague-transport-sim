@@ -312,8 +312,8 @@ def check(v, vid, types, assets_md, src):
             for m in [ms] if isinstance(ms, str) else ms:
                 need(m in have, f"slot {s}: its model has no material {m}")
     need(isinstance(v.get("colours", []), list), "colours is not a list of slot names")
-    # the passengers shown (#249; the user, 2026-11-25: "I would offer passenger simulation to vehicles which have functional
-    # door and interior"): working doors and a saloon, and a cabin measured from this very model, accepted by the user
+    # the passengers shown only in vehicles with working doors and an interior (#249, maintainer): working doors and a
+    # saloon, and a cabin measured from this very model, accepted by the maintainer
     pax = v.get("passengers")
     if pax is not None:
         cabin = os.path.join(ROOT, "assets", "passengers", f"{pax.get('cabin')}-cabin.json")
@@ -387,7 +387,7 @@ def main():
         bad = livery_problems(lv, lid, manifests, os.path.join(ASSETS, lid), assets_md)
         fails += [f"{lid}: {b}" for b in bad]
         print(f"{lid}: a livery of {next(iter(lv.get('requires', {})), None)}, {len(lv.get('files', []))} files{'' if bad else ', ok'}")
-    # (none listed yet, the user, 2026-11-13: "For now I would keep only the default liveries"; the samples below and
+    # (none listed yet, only the default liveries for now, maintainer, 2026-11-13; the samples below and
     # tools/test_liveries.py's check the rules)
     # the curated list of submitted packages (#530)
     cat = json.load(open(os.path.join(ASSETS, "catalogue.json"), encoding="utf-8"))

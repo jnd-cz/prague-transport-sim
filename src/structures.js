@@ -30,7 +30,7 @@ export function buildRockTunnels(group, route, ground, rock, HW) {
       lo = Math.min(lo, lat); hi = Math.max(hi, lat);
     }
     if (!(hi - lo > 4)) { lo = -HW; hi = HW; } else { lo -= 0.3; hi += 0.3; }
-    // (the Vyšehrad tunnel: a stone semicircle springing low over the whole width, user photo)
+    // (the Vyšehrad tunnel: a stone semicircle springing low over the whole width, the maintainer's photo)
     const c0 = (lo + hi) / 2, half = (hi - lo) / 2, rise = Math.min(half, 5), spring = 2.5;
     // the vault's cross-section: lateral offset and height over the rails
     const prof = [[lo, -0.3], [lo, spring]];

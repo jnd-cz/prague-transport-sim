@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), dist/traffic/passenger-tests.js, as it was (sha256 ae74eedd2fed8cab);
-// accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
+// accepted by the maintainer as good enough for now (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
 // Scenario/timing orchestration; no renderer or wall clock. All times are simulation seconds.
 export function createPassengerTests(controller){
  let run=null,history=[];

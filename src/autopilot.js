@@ -13,17 +13,16 @@ const TRAM_GAP = 2; // m behind the tram ahead when stopping (D 1/2 § 27.6: at 
 const DECEL = 0.65; // planned braking (m/s2) behind something that moves, below B2 so there is margin
 const PLAN_DECEL = 1.0; // … to a stop, a signal or a lower limit, the most on the level and empty (planAt: 0.85 of step 5 below that). Two real
 // rides on line 23 (2026-10-31) braked late and firmly: from 23–25 km/h at 0.69 and 0.86 m/s² on average, 1.05–1.09 at p90, after ≈45 m of
-// coasting; the user, 2026-11-07: "our autopilot can lean a bit on the faster side where it makes sense", "Later braking to match real
-// driver". At 0.7 of step 5 a full set planned 0.63 and braked on step 3 from 140 m out
+// coasting; the autopilot may lean to the faster side where that makes sense and brake later, as a real driver (maintainer,
+// 2026-11-07). At 0.7 of step 5 a full set planned 0.63 and braked on step 3 from 140 m out
 // s of coasting into the braking curve before a stop or a signal, at the speed the drive comes off: two real rides on line 23 (2026-10-31)
 // took the drive pedal off 80–100 m out at ≈28–30 km/h and braked the last 25–30 m from ≈24 km/h. 8 s takes it off ≈90 m out at
 // ≈28 km/h (as metres, 45 or 60, or half the way to a closer point, it drove up to 35 km/h 90 m out). Read from GPS the rides
 // coasted 41–45 m, but the same reading takes a 32–37 m coast of the autopilot's for 7 m. ČKD, T3SU-03 p. 5: "fully use coasting,
-// above all when coming into stops"; the user, 2026-11-07: "Later braking to match real driver"
+// above all when coming into stops"; braking later, as a real driver (maintainer, 2026-11-07)
 const COAST_T = 8;
-// Time in hand (#242; the user, 2026-11-04: "coasting and braking more mildly when the driver is ahead or has enough time compared to
-// timetable"; 2026-11-10: "if there's enough time the autopilot doesn't go as hard into curves and uses less pedal presses to conserve
-// power. If he's late then he uses the probe's plan to catch up"): the next stop's time in the timetable (its departure) less now, less
+// Time in hand (#242: with time to spare on the timetable the driver coasts, brakes more mildly, goes less hard into curves and
+// presses the pedals less to save power; late, he catches up on the probe's plan): the next stop's time in the timetable (its departure) less now, less
 // the run there at the line's limits and a dwell. Up to MILD_FROM s in hand it catches up: the target UNDER_LATE under the limit, the
 // curves at the limit, brake step 1 held down a descent only to HOLD_LATE under. (At a 15 km/h limit 0.4 and 1 m/s under held it at
 // 10-14.5 km/h, where the drivers of two line 23 rides held 14-16 down Chotkova; with these and the curves at 1.0 m/s², line 23's moving
@@ -102,8 +101,8 @@ export class Autopilot {
     }
 
     // target speed: line speed, upcoming restrictions, then everything we must stop for
-    // (0.7-1.4 km/h under the limit, the penalty starting 3 km/h over it: at 15 km/h the old 2.2 km/h was a seventh of the speed, the user,
-    // 2026-11-07: "our autopilot can lean a bit on the faster side where it makes sense")
+    // (0.7-1.4 km/h under the limit, the penalty starting 3 km/h over it: at 15 km/h the old 2.2 km/h was a seventh of the speed; it may
+    // lean to the faster side where that makes sense, maintainer, 2026-11-07)
     const lim = this._limits(g, mild), own = lim !== g.limits;
     const vLim = own ? g.limitUnder(lim) : g.currentLimit;
     const ct = g.nextContact();
@@ -134,7 +133,7 @@ export class Autopilot {
     // pull, and it came into the 20 km/h at 35, line 23 seed 2 in autumn; with the whole pull to the points too, the autumn runs' mean
     // delay rose by 100 s on lines 17 and 22)
     const mu = g.muBase ?? 0.3;
-    // (0.85, the user, 2026-11-08: "a bit harder braking"; a phone on T3SUCS 7290 read 1.06 m/s² braking from 30-40 km/h, steps 4-5, and
+    // (0.85, a bit harder braking, maintainer, 2026-11-08; a phone on T3SUCS 7290 read 1.06 m/s² braking from 30-40 km/h, steps 4-5, and
     // whole stops from 20-40 km/h at 0.95-1.10, where 0.8 of step 5 planned 0.89)
     const planAt = (grade, pull = 0.5) => (1 - 0.25 * mild) * Math.max(0.2, Math.min(PLAN_DECEL, 9.81 * (0.5 * mu + pull * Math.min(0, grade)),
       0.85 * ((tr.eq.brakeForce(5, Math.max(tr.v, 2.5)) + 650 * tr.cars) / tr.inertia + (tr.mass * 9.81 * grade) / tr.inertia)));
@@ -202,7 +201,7 @@ export class Autopilot {
     if (sig2 && sig2.state === 'stop' && sig2.s - tr.s < 150) consider(sig2.s - 3, true, 'signal');
     // past a signal, its crossing still ahead (stopped in the junction behind something): the driver no
     // longer sees the signal, and the cross street gives way to a tram in the junction; cars already on
-    // the crossing drive off it first (the user, #268: "tram driver should wait until the tracks clear")
+    // the crossing drive off it first, the tram waits until the tracks clear (#268)
     const past = g.signals.find((x) => x.xroad && x.s <= tr.s && x.cross > tr.s + 1);
     if (past && past.cars.some((c) => Math.abs((past.xroad.sX - c.s) * c.dir) < 4 && c.v > 0.1)) consider(past.cross - 3, false, 'junction');
     let hazard = false;
@@ -215,7 +214,7 @@ export class Autopilot {
     }
     const gap = g.tramAheadGap();
     // (2 m behind the tram ahead, D 1/2 § 27.6: at least 1 m; 8 m since the prototype kept two 2-car sets off
-    // long platforms, the user, #258)
+    // long platforms, #258)
     if (gap !== null) {
       consider(tr.s + gap - TRAM_GAP, false, 'tram');
       const clear = g.keepClear(tr.s, tr.s + gap); // (not into a junction the tram ahead has not cleared)
@@ -232,9 +231,8 @@ export class Autopilot {
       if (c.s - tr.s < 60 && tr.v > 1) hazard = true;
     }
     // Towards a stop or a signal the plan is one curve to the point, without a crawl at its end: the pedal changes then
-    // come only from the deceleration still needed (aNeed), and once braking for it the drive pedal stays off (the
-    // user, #351: "smooth braking towards stop sign without any jums to jízda unless you're following tram in front of
-    // you"; on main the crawl's 3 km/h was held by drive pulses 1–2 m short). Behind something that moves it keeps
+    // come only from the deceleration still needed (aNeed), and once braking for it the drive pedal stays off (#351:
+    // smooth braking to the stop sign, no jumps to drive unless following a tram; on main the crawl's 3 km/h was held by drive pulses 1–2 m short). Behind something that moves it keeps
     // the curve ending 3 m short and the crawl up to it, so it closes up as a driver does.
     const dLeft = fixedAt === null ? null : fixedAt - tr.s - STOP_MARGIN;
     // (the steepest downhill between here and the point counts: a crest just before it took the brake's margin away)
@@ -401,7 +399,7 @@ export class Autopilot {
     // (between the drive plan and the brake plan: coast)
     const between = tr.v <= vt && tr.v >= vtDrive - 0.25 && vtDrive < vt - 0.25;
     // (up to 1.0 m/s² from a stand, 1.2 above 20 km/h: a phone on T3SUCS 7290 read 0.95-0.99 pulling away, step 3, and 1.21-1.29 from 20 to
-    // 40 km/h, steps 4-5; the user, 2026-11-08, on pressing step 4 at speed: "I think we can check that now")
+    // 40 km/h, steps 4-5; step 4 pressed at speed as the maintainer agreed, 2026-11-08)
     const aUp = tr.v > 20 / 3.6 ? 1.2 : 1.0;
     let aPlan = Math.max(-1.1, Math.min(aUp, ((tr.v > vt ? vt : vtDrive) - tr.v) * 0.9));
     // (once on the curve to it, not from the moment a lower limit is in sight: that had it stop accelerating 300 m before every curve)
@@ -495,9 +493,8 @@ export class Autopilot {
     const needStop = fixed && stopAt !== null && tr.v > 0.8 ? (tr.v * tr.v) / (2 * Math.max(0.5, stopAt - tr.s)) : 0;
     this.railSand = mu < 0.2 && needStop > Math.max(0.3, 1.1 * railA(false)) && tr.sand > 0;
     // (a leaf patch the driver sees, on slippery rail: at speed off the drive pedal until the tram is over it, as a careful driver eases off
-    // (the user, 2026-11-04, #265: "They ease of the drive and try again with less power"); pulling away or up a climb, where that would
-    // stall it, the drive stays on and it sands as the first axle crosses ("Only at grades where it would be difficult to get moving they would sand when
-    // accelerating"). Unsanded on the drive pedal any step spins on a patch's 0.06, and each spin is the pedal off and a press again:
+    // and tries again with less power (#265); pulling away or up a climb, where that would stall it, the drive stays on and it sands as
+    // the first axle crosses (drivers sand while accelerating only where getting moving would be hard). Unsanded on the drive pedal any step spins on a patch's 0.06, and each spin is the pedal off and a press again:
     // autumn's presses 1.2-1.4 times main's. Sanding over every patch it drove onto brought them to main's, at 2.5-3 times main's sand)
     let onPatch = false, patchFirst = false;
     if (mu < 0.2 && tr.v > 0.5) {
@@ -510,8 +507,7 @@ export class Autopilot {
     this.patchCoast = onPatch && !patchMove;
     this.sandT = this.startSand || this.climbSand || this.railSand || this.patchSand || tr.slide ? 1.5 : (this.sandT || 0) - dt;
     this.input.sand = this.sandT > 0;
-    // the track brakes only in danger (the DPP T3 textbook: "se používá jen v případě nebezpečí"; the user, 2026-11-08: "those should be
-    // used only in emergency like walker or car appearing in front of tram or the non dry weather where it can't stop"): a walker, a car
+    // the track brakes only in danger (the DPP T3 textbook: "se používá jen v případě nebezpečí"; maintainer, 2026-11-08): a walker, a car
     // or an obstacle in the way, or a rail that does not hold. A stop, a signal, a junction or a tram ahead on dry rail is service, step 5
     const dryRail = !tr.slide && Math.min(g.muAt(tr.s), g.muAt(stopAt === null ? tr.s : Math.min(stopAt, tr.s + 80))) >= 0.25;
     const trackOk = !dryRail || stopWhy === 'walker' || stopWhy === 'obstacle' || stopWhy === 'car';

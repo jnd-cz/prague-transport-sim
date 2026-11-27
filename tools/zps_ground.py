@@ -13,7 +13,7 @@ independent references decide, in this order:
   their top of rail;
 - DMR 5G (ČÚZK's lidar of 2009-2013): where it agrees with IPR, the ground has stayed the same for a decade and the
   survey alone differs.
-Neither deciding, the area is held for the user's review (reports/review/survey-ground.json); their answers are facts in
+Neither deciding, the area is held for the maintainer's review (reports/review/survey-ground.json); their answers are facts in
 data/truth.json `surveyGround` keyed by place. An area judged wrong moves by its offset, and so do the same heights at
 the same places in the other ground-level areas (they took them from the same survey line).
 """
@@ -44,9 +44,9 @@ MIN_INNER = 2 / 3  # share of its vertices with a point INNER m inside it
 # own rule, #447)
 NOT_GROUND = {"wall", "roof", "deck", "tunnel", "underpass", "water", "stairs"}
 RAIL_STEP = 2.0  # m between rail stations
-# Areas neither the rails nor DMR 5G decide: the user's rule (data/truth.json surveyGround.heldRule), a courtyard to the
+# Areas neither the rails nor DMR 5G decide: the maintainer's rule (data/truth.json surveyGround.heldRule), a courtyard to the
 # lidar, greenery outside to the survey. A courtyard: OSM buildings within COURT_REACH in COURT_SHARE of COURT_RAYS
-# directions from the area's point. On the user's 19 answered cards of 2026-11-10: the courtyards 7 of 9 answered
+# directions from the area's point. On the maintainer's 19 answered cards of 2026-11-10: the courtyards 7 of 9 answered
 # lidar; outside, greenery 4 of 7 survey, paved 3 of 3 lidar (14 of 19; "outside to the survey" alone matches 11).
 COURT_RAYS, COURT_REACH, COURT_SHARE = 16, 60.0, 0.75
 FLOOR = 170.0  # m: no ground under it (tools/sources.py TERRAIN_FLOOR; DI writes 0 for a missing height)
@@ -236,7 +236,7 @@ def enclosed(x, y, buildings):
 
 
 def held_verdict(v, rule, buildings):
-    """The user's rule for an area nothing else decides: the verdict, or None without the rule."""
+    """The maintainer's rule for an area nothing else decides: the verdict, or None without the rule."""
     if not rule:
         return None
     v["enclosed"] = round(enclosed(v["x"], v["y"], buildings), 2)
@@ -246,7 +246,7 @@ def held_verdict(v, rule, buildings):
 
 
 def facts_to_areas(areas, facts, frame, hits=None):
-    """{area index: verdict} for the user's answers: the ground-level area that holds the answer's point (its holes
+    """{area index: verdict} for the maintainer's answers: the ground-level area that holds the answer's point (its holes
     left out: a courtyard's lawn is a hole in the sidewalk around it), of the card's class, the nearest the card's size.
     `hits`, a dict: filled with {the fact's index: its area index} (#670)."""
     if not facts:
@@ -284,9 +284,9 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
     tools/geo.Frame (areas in its city frame); facts: data/truth.json surveyGround.places ({lat, lon, verdict});
     changing: the union of OSM's construction sites; rule: data/truth.json surveyGround.heldRule, with buildings (the
     union of OSM's building footprints) for what neither the rails nor DMR 5G decide, else such an area is held.
-    states, a dict: filled with each fact's state by its index (#670): matches where a source decides as the user did
-    without the answer (the area fits IPR now, or the rails or DMR 5G give the same verdict), holds where none does,
-    the user's held rule included (a rule is no source catching up), with the verdict and what gives it: (state,
+    states, a dict: filled with each fact's state by its index (#670): matches where a source decides as the maintainer
+    did without the answer (the area fits IPR now, or the rails or DMR 5G give the same verdict), holds where none does,
+    the maintainer's held rule included (a rule is no source catching up), with the verdict and what gives it: (state,
     verdict, by: fits, rails, dmr5g, rule or None); a fact whose point lies in none of these areas is left out (its area
     is on another line, or gone)."""
     out = {}
@@ -294,7 +294,7 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
     rtree = shapely.STRtree(shapely.points(rx, ry)) if len(rx) else None
     hits = {}
     fact_of = facts_to_areas(areas, facts, frame, hits)
-    decided = {}  # area index: (state, what the sources decide, by which) for the areas the user answered
+    decided = {}  # area index: (state, what the sources decide, by which) for the areas the maintainer answered
 
     def by_sources(v, r, pin, inside, poly, E, N, g):
         """The verdict the sources and the rules give an area off IPR, and by which (None: by its size or cover)."""
@@ -344,20 +344,20 @@ def judge(areas, ground, older, cover, rails, frame, facts=(), changing=None, ru
         out[i] = v
         if ok.sum() < 3:
             v["verdict"] = "fits"  # (nothing to compare: outside IPR)
-            if i in fact_of:  # (the user's verdict decides nothing here)
+            if i in fact_of:  # (the maintainer's verdict decides nothing here)
                 decided[i] = ("matches", "fits", "fits")
             continue
         off = float(np.median(d[ok]))
         v["offset"], v["spread"] = round(off, 2), round(float(np.percentile(np.abs(d[ok] - off), 80)), 2)
         if abs(off) < OFFSET:
             v["verdict"] = "fits"
-            if i in fact_of:  # the survey fits IPR now: the user's verdict decides nothing
+            if i in fact_of:  # the survey fits IPR now: the maintainer's verdict decides nothing
                 decided[i] = ("matches", "fits", "fits")
             continue
         kept = dict(v)
         verdict, by = by_sources(v, r, pin, inside, poly, E, N, g)
         if i in fact_of:
-            # the user's verdict holds; the sources' without it says whether it is still needed (#670)
+            # the maintainer's verdict holds; the sources' without it says whether it is still needed (#670)
             decided[i] = ("matches" if verdict == fact_of[i] and by in ("rails", "dmr5g") else "holds", verdict, by)
             v.clear()
             v.update(kept)

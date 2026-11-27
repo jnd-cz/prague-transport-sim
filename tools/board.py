@@ -2,7 +2,7 @@
 """Who works where, what clashes, what waits: the work in flight from git, GitHub and the heavy-job queue (#280).
 
     python -I tools/board.py               # the board
-    python -I tools/board.py --questions   # only what the open PRs ask the user
+    python -I tools/board.py --questions   # only what the open PRs ask the maintainer
     python -I tools/board.py --json        # the same, as JSON (for a page or another agent)
     python -I tools/board.py --no-fetch    # without fetching origin first
 
@@ -15,12 +15,12 @@ A row is a branch with a worktree or an open PR. Flags:
             ran against other code
   rebuilds  it changes a build step of tools/rebuild.py, data/MANIFEST.json or the snapshot: one such
             branch rebuilds and publishes at a time, the one whose issue holds the `rebuild` label
-  asks      its PR has questions for the user
+  asks      its PR has questions for the maintainer
   parked    its issue or PR is labelled `parked`: out of the clashes and the lane counts
-  ready     its PR is ready and waits for the user's merge
+  ready     its PR is ready and waits for the maintainer's merge
 Clashes are pairs of rows that change the same files, or that both rebuild data. Lanes are the issues'
 `lane:*` labels, with a limit of sessions each (LIMITS), counted over the rows a session works on now. Ready to start: open issues of a lane with no
-agent, not parked or waiting for the user, whose blockers (GitHub's blocked-by links) are all closed, in milestone
+agent, not parked or waiting for the maintainer, whose blockers (GitHub's blocked-by links) are all closed, in milestone
 order (W1, W2 … first, the Backlog last); a paused lane (PAUSED) shows only how many wait. Listed apart: issues
 with an agent's label but no branch, worktree or open PR (the label may be stale).
 Changes nothing but the remote refs the fetch updates.
@@ -326,7 +326,7 @@ def rows(prs_open, prs_all, issues, now=None, cache=None):
         if "parked" in labels(iss) or "parked" in labels(open_pr.get(b)):
             fl.append("parked")
         if b in open_pr and not open_pr[b].get("isDraft"):
-            fl.append("ready")  # (waits for the user's merge: no session works on it)
+            fl.append("ready")  # (waits for the maintainer's merge: no session works on it)
         r["flags"] = fl
     if cache is not None:  # (only what this call used: the cache does not grow)
         cache.clear()
@@ -369,7 +369,7 @@ def lanes(rs, now):
 
 
 def ready(issues, rs):
-    """{lane: [issues]} open, with no agent and not parked or waiting for the user, every blocker closed,
+    """{lane: [issues]} open, with no agent and not parked or waiting for the maintainer, every blocker closed,
     and no branch of their own yet; in milestone order, then by number."""
     busy = {r["issue"] for r in rs if r["issue"]}
     out = {}
@@ -433,7 +433,7 @@ def show(rs, issues, jobs, now):
                                       for j in baseline_store.schedule(jobs, now, free=baseline_store._free_gb(),
                                                                        parents=baseline_store.ticket_parents(jobs)))
                             if jobs else "none"))
-    if early := baseline_store.early_night(now):  # (#851: the night started early on the user's word)
+    if early := baseline_store.early_night(now):  # (#851: the night started early on the maintainer's word)
         print(f"Night started early on the user's word at {time.strftime('%H:%M', time.localtime(early['from']))}, "
               f"until {time.strftime('%H:%M', time.localtime(early['until']))} (heavy.py --night off ends it)")
     if ends := baseline_store.recent_ends(now):  # (#815: what a job's watch ended in the last hour, and why)

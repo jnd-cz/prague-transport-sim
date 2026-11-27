@@ -529,8 +529,8 @@ function surveyOf(hit) {
 
 // Every drawn track's rails against the ground over them, and the trough beside its bed (#548): every 2 m of every
 // track off our bridges, each rail head (the rail mesh, cast down) against the surfaces over it: the terrain, the
-// survey, roads, the track support and other tracks' beds. Over it by more than 1 mm buries it (the user, line 17
-// s 2366: "Canted tracked, lower rail disappears"). Beside each bed, the ground 1 m past its edge lower than both the
+// survey, roads, the track support and other tracks' beds. Over it by more than 1 mm buries it (line 17
+// s 2366: on a cant the lower rail disappeared). Beside each bed, the ground 1 m past its edge lower than both the
 // edge and the ground 4 m past it by more than SUNK m is a sunken ring (line 37 s 6315: "sunken ground around tram
 // tracks"); deeper than DEEP m it is another level (a retaining wall, an embankment). Counted per sample; places per
 // track and 20 m, the deepest.
@@ -693,7 +693,7 @@ function along(p) {
 // either side, at every point of the line's path, its opposite path and every track as the build drew them (its
 // points lie on the fitted curves; a circle through points interpolated on the game's 1.5 m resample read a 19 m
 // curve as 17.4 m: a 1 m chord sags 7 mm inside it). Flagged under 18 m (data/truth.json trackGeometry
-// `min-radius-network`, the user: "under 18m there shouldn't be anything like that"); 18-20 m are exceptions
+// `min-radius-network`, maintainer: nothing under 18 m); 18-20 m are exceptions
 // (`min-radius-passenger`), listed in `exceptions`. tools/track_curve.py holds 20 m within the points' accuracy
 // class and 18 m past it. Places per 10 m of each line, counted per class (our, opposite, the track's source).
 // (both radii read from data/truth.json, as tools/track_curve.py reads them: #224)
@@ -744,7 +744,7 @@ function trackRadius(g, MIN_RADIUS, EXCEPTION_RADIUS) {
 // Not in a reverse curve: where the two halves of the 25 m bend opposite ways, it reads as a wide curve over 25 m, its
 // bends cancelling; it is one where the bend over 5 m is no tighter than the tighter half, the curvature passing through
 // zero between them (#368: Královský letohrádek, line 23, a 65 m bend into a 20 m one the other way read 396 m in a
-// 1221 m curve; the user: "make sure the arrangement of curves in opposite direction is kept"). A kink between them is
+// 1221 m curve; the maintainer: such curves in opposite directions are kept). A kink between them is
 // tighter than both (Čechovo náměstí, line 22: 44 m over 5 m between halves of 125 and 250 m) and stays flagged.
 const STEP_SHORT = 2.5, STEP_LONG = 12.5, STEP_RATIO = 3, STEP_CURVE = 1500;
 const turn = (a, b, c) => Math.sign((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]));
@@ -773,8 +773,8 @@ export function steppedCurves(g) {
 // or more). The leg left over at a switch is the diverging track: its start angle against the through track is
 // listed, not flagged (data/truth.json `switch-start`: most switches start tangentially, some abruptly). The
 // direction at an end is the tangent of the parabola through the drawn track's first three points (a chord, or
-// points between them, read a smooth 20 m curve as a 2-4° break). The bar stays 1° (the user, 2026-11-03: "Keep
-// 1°, fix the nodes"): 71 breaks on line 17 were the game's drawing (a three-point average and a 1.5 m resample
+// points between them, read a smooth 20 m curve as a 2-4° break). The bar stays 1° and the nodes are fixed
+// (maintainer, 2026-11-03): 71 breaks on line 17 were the game's drawing (a three-point average and a 1.5 m resample
 // at short pieces' ends). Where at least two drawn points lie within JOIN_REACH of the end, the tangent is the
 // least-squares parabola's through them: three points whose first step was 0.17 m read a smooth 21 m curve's
 // joint at a crossing as a 1.2° break (0.2° fitted over 2-3 m).
@@ -1192,7 +1192,7 @@ function underpassClearance(g) {
   return check('underpass-clearance', cs.length, bad);
 }
 
-// The user's stop facts (data/truth.json `stops`) against the game's stop type: boarding across a car
+// The maintainer's stop facts (data/truth.json `stops`) against the game's stop type: boarding across a car
 // lane, a Vienna-type or street stop (`stop.vienna`, src/game.js _vienna), or at a kerb or island. A
 // fact names a stop and a direction: towards a stop further on, from one behind, or "*" both; facts for
 // other lines, unknown directions ("?", "centrum") and multi-platform stops are not counted. vienna-cycle

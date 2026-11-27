@@ -69,7 +69,7 @@ export function meetHeights(d, base) {
 
 // The line's track styles, as functions of the route position: `at(s)` the style ('panels' where nothing says
 // otherwise), `lift(s)` its top of rail over the surface, blended inside the section ends. The sections and the lift
-// are the build's (the line data's `styles` and `lift`, tools/track_styles.py, #479, #480: the user's marks in
+// are the build's (the line data's `styles` and `lift`, tools/track_styles.py, #479, #480: the maintainer's marks in
 // data/truth.json, the grassed-track list and the survey's grass track); how high the rails stand over each style
 // is truth.json's `railAboveDeck`. `atBack(s)`, `liftBack(s)`: the other direction's track beside the route, by
 // route s (`stylesBack`, `liftBack`, written where the two tracks differ: a platform paves only the track it serves,

@@ -556,8 +556,8 @@ def strip_lines(ln, root=ROOT, box=None, survey=(), lidar=None):
     """The survey's paved strips (strips) as wall lines, the runs off the survey's own walls (off_survey). A retaining
     wall's top is often such a strip and nothing else: along the tram's cutting north of Ohrada (line 37
     (3358..3403, -65..14), area 1847: 0.32 m across and 87 m long at 248.2-248.6 m) the track lies 4.7 m under it and
-    the paved ground beside it lay on the raster, a bank 2.5 m across where a concrete wall stands (the user's photos
-    from the footbridge, 2026-11-20, #770).
+    the paved ground beside it lay on the raster, a bank 2.5 m across where a concrete wall stands (the maintainer's
+    photos from the footbridge, #770).
     - A strip with the survey's heights: its outline with them. They are its level (_side: a strip under PAIR across),
       so the stretch runs along the edge the ground steps at.
     - A strip on the lidar's ground (the cutting's other wall, area 1818: 0.53 m across, 250 m long): its low side's

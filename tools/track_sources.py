@@ -6,12 +6,12 @@
     python -P -E tools/track_sources.py --line 17 --from-reviews reports/reviews/line17.json   # answers as truth entries
 
 Open the file with ?line=17&review=reports/review/track-sources-17.json. An answer "matches reality" recorded in
-data/truth.json trackSources.reviewAnswers (kind and place, with the user's quote) takes the finding off the list;
+data/truth.json trackSources.reviewAnswers (kind and place, with the maintainer's quote) takes the finding off the list;
 anything else goes in a note and stays held: the build does not change tracks from answers (#35, M4).
 
 Reads data/lineN.json (its trackSource ranges, track chains with `src`). Finding: a stretch of the route or of a drawn
 track within CORRIDOR of it longer than FILL metres taken from the archived DTMP axes or OSM instead of DI. (The
-user's orthophoto tracks are facts, not questions. A switch needs no finding since #237: the line's switches are
+maintainer's orthophoto tracks are facts, not questions. A switch needs no finding since #237: the line's switches are
 DI's forks, tools/di_network.py; tools/fork_review.py lists where the drawn track has trouble.)
 """
 import json
@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from track_moves import Route
 
 ROOT = Path(__file__).resolve().parent.parent
-OWN = ('di', 'ortho')   # DI, and the tracks the user measured on the orthophoto (data/truth.json photoTracks)
+OWN = ('di', 'ortho')   # DI, and the tracks the maintainer measured on the orthophoto (data/truth.json photoTracks)
 FILL = 10.0       # m: a fill stretch worth a finding (#20)
 CORRIDOR = 60.0   # m: drawn tracks the build takes (tools/build_line.py Q_TRACKS: around.w:60)
 GROUP = 30.0      # m: drawn fill tracks this near each other are one place
@@ -82,7 +82,7 @@ CONFIRM = 3.0   # m: a recorded answer covers the finding of its kind this near
 
 
 def review_items(found, line, confirmed=()):
-    """The findings as a ?review file's items, without those the user confirmed (kind and place)."""
+    """The findings as a ?review file's items, without those the maintainer confirmed (kind and place)."""
     items = []
     for f in found:
         if any(c['kind'] == f['kind'] and math.dist((c['x'], c['y']), (f['x'], f['y'])) <= CONFIRM for c in confirmed):

@@ -4,7 +4,7 @@ tools/headless.py (--baseline --publish, --compare) and tools/autodeploy.py (the
 use it.
 
 A baseline is named by what its counts depend on (MEASURED: the git trees of the game, the in-page
-checks, the data manifest and the user's facts in data/truth.json, which the game reads at run time),
+checks, the data manifest and the maintainer's facts in data/truth.json, which the game reads at run time),
 hashed: `baselines/<key>.json` and `<key>.places.json` in the store. A
 branch looks up the key of its merge base, so it gets main's numbers for exactly that code and data.
 
@@ -366,9 +366,9 @@ def _free_gb():
 
 ENDED = 86  # (the exit code of a job its own watch ended, #815)
 NOLIMIT = "TRAM_HEAVY_NOLIMIT"  # (=1: a job's watch warns but ends nothing; heavy.py --no-limit)
-DAY = "TRAM_HEAVY_DAY"  # (=1: a long job runs by day, on the user's word; heavy.py --day, #851)
-# (#851; the user, 2026-11-24: "I thought it will go faster and heavy testing will be left for night unattended runs")
-NIGHT = (23, 7)  # (the night's hours, from 23:00 to 07:00: AGENTS.md, the user, 2026-11-23)
+DAY = "TRAM_HEAVY_DAY"  # (=1: a long job runs by day, on the maintainer's word; heavy.py --day, #851)
+# (#851: heavy testing is left for the night's unattended runs)
+NIGHT = (23, 7)  # (the night's hours, from 23:00 to 07:00: AGENTS.md, maintainer, 2026-11-23)
 DAY_MAX = 1800.0  # (s: by day a job expected to run longer, or whose time is not known, waits for the night; the
 # full suite with the page tests, 24 min, runs by day)
 SHORT, PASS_MAX = 600.0, 7200.0  # (s: a waiting job this short goes before longer ones queued earlier, but not before
@@ -376,7 +376,7 @@ SHORT, PASS_MAX = 600.0, 7200.0  # (s: a waiting job this short goes before long
 
 
 def night(t=None):
-    """Whether `t` (epoch s, now when None) falls in the night's hours (NIGHT), or in a night the user started early
+    """Whether `t` (epoch s, now when None) falls in the night's hours (NIGHT), or in a night the maintainer started early
     (early_night())."""
     t = time.time() if t is None else t
     h = time.localtime(t).tm_hour
@@ -399,7 +399,7 @@ def morning(t=None):
 
 
 def early_night(t=None):
-    """The night the user started early (heavy.py --night, #851) as {"from", "until"} (epoch s) while `t` is in it,
+    """The night the maintainer started early (heavy.py --night, #851) as {"from", "until"} (epoch s) while `t` is in it,
     else None."""
     t = time.time() if t is None else t
     try:
@@ -411,7 +411,7 @@ def early_night(t=None):
 
 
 def start_night(now=None):
-    """The night from now until the morning, on the user's word (heavy.py --night): the jobs held for it take their
+    """The night from now until the morning, on the maintainer's word (heavy.py --night): the jobs held for it take their
     turns, as at NIGHT[0] o'clock. Returns its {"from", "until"}."""
     now = time.time() if now is None else now
     e = {"from": now, "until": morning(now)}
@@ -652,8 +652,8 @@ class Stuck(SystemExit):
 class HeavyJob:
     """with HeavyJob('frametime'): ... waits its turn among the machine's heavy jobs, then runs (#280).
 
-    Two kinds (#728; the user, 2026-11-19: count runs and builds may share the machine when memory allows, the rule of
-    2026-11-12 stays for timings):
+    Two kinds (#728: count runs and builds may share the machine when memory allows, the rule of #516 stays for
+    timings):
     - alone (no `share`): a timing, or a job of unknown size. It waits for every job queued before it and every job
       running, and every job queued after it waits for it: two side by side would spoil each other's times.
     - shared (`share={"gb": its peak memory, "cores": the cores it keeps busy}`): a count run or a build, which gives
@@ -669,8 +669,8 @@ class HeavyJob:
     ends with an error (Stuck) instead of waiting for good (#585: a night lost behind a job waiting for its own
     child).
 
-    A job in its own turn (not a step in another's) watches itself from the start of its run (#815; the user,
-    2026-11-22: "so that one misbehaving process doesn't hold up the queue"). Every EVERY s it reads its process tree
+    A job in its own turn (not a step in another's) watches itself from the start of its run, so that one
+    misbehaving process does not hold up the queue (#815). Every EVERY s it reads its process tree
     and the machine (verdict() has the rules: time against its expected time, memory against its share, idle,
     orphaned); a warning goes on its ticket and once to `out`, a breach ends it with one line saying what, how long
     and how much, and everything it started ends with it (contain(), end_tree(), exit ENDED). A request from
@@ -713,7 +713,7 @@ class HeavyJob:
         self.kind = kind or kind_of(sys.argv)
         self.expect_s = expect  # (s; None: from the history when the run starts)
         self.limits = os.environ.get(NOLIMIT) != "1" if limits is None else limits
-        self.day = os.environ.get(DAY) == "1" if day is None else day  # (may run long by day: the user's word, #851)
+        self.day = os.environ.get(DAY) == "1" if day is None else day  # (may run long by day: the maintainer's word, #851)
         self.parked = ""  # (why it waits for the night, "" when it does not)
         self.still, self.told_still = None, False  # (since when nothing ran while it waited; said once, #854)
         self.own = False  # (holds a turn of its own: watched, recorded)
@@ -896,7 +896,7 @@ class HeavyJob:
 
     def night_hold(self, now=None, records=None):
         """Why this job waits for the night, or "" (#851): by day (outside NIGHT) a job expected to run over DAY_MAX, or
-        whose time is not known, unless it has the user's word (day)."""
+        whose time is not known, unless it has the maintainer's word (day)."""
         now = time.time() if now is None else now
         if self.day or night(now):
             return ""

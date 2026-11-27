@@ -5,8 +5,8 @@ python -P -E tools/test_traction.py
 - a start on each drive step: the acceleration over 3 s once the current is up, against [rubook]'s 0.6 / 0.95 / 1.2 /
   1.5 / 1.8 m/s² (within 10 %), and the end of the resistors (accelerator position 75) at 26–37 km/h
   ([calc] t3-accelerator.md § 5.3, the forum's 30–35 km/h);
-- the top speed on the last step: ≈80 km/h by the motor chart (65 km/h is the legal limit, the user, #221,
-  2026-11-04: "The 65 km/h is only a legal limit, reaching top 80 km/h is fine.");
+- the top speed on the last step: ≈80 km/h by the motor chart (65 km/h is only the legal limit, a top of 80 km/h
+  is fine; maintainer, #221);
 - coasting: no more than 0.14 m/s² from the preparation current ([rubook]);
 - brake step 5 from 40 km/h after 3 s coasting: ≈1.2–1.5 m/s² ([ckd26] p. 5), the shoe brakes take over
   near 4 km/h and the car stops; straight from drive to step 5: the shoe brakes come in at speed (LO);
@@ -91,7 +91,7 @@ def main():
             fails.append(f"step {s['step']}: {s['a']} m/s², want {want} ±10 %")
         if not s["endRes"] or not 23 <= s["endRes"] <= 40:
             fails.append(f"step {s['step']}: end of the resistors at {s['endRes']} km/h, want 23–40")
-    # (65 km/h is the legal limit, not the balance: the user, #221, 2026-11-04)
+    # (65 km/h is the legal limit, not the balance: maintainer, #221)
     if not 72 <= r["top"] <= 88:
         fails.append(f"top speed {r['top']} km/h, want ≈80 (the motor chart)")
     if not 0 < r["coast"] <= 0.14:
