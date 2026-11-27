@@ -1241,6 +1241,14 @@ Chapter 7 is the tram's; the platform surface and the bus clauses in 6.2.2 apply
   wall may take 0.50 m of it.
 - **Height** (7.3.6): above the top of rail, to suit the fleet, at most 160 mm under a low floor (a bus edge
   stands 200 mm over the road, 160 mm in reconstructions, 6.2.2.4).
+- **Furniture on a Prague platform** (IPR to the maintainer, 2026-11-27, #252): no fixed obstacle (a bench, a
+  shelter or its side wall, a bin) stands where it would leave less than 1.70 m of free passage between itself and
+  the boarding edge. A narrow island therefore has no bench (IPR's example: Palackého náměstí). The benches at stops
+  are the four-legged bench with a backrest and no armrests, now and then the four-legged one without a backrest. IPR
+  knows of no orders of the bench with armrests so far.
+  - For placement: a platform narrower than 1.70 m + the object's depth gets no such object.
+  - IPR's bench is 0.658 m deep. IPR's bench rules (2022) put it 0.50 m off a kerb behind it (after ČSN 73 6110),
+    or 0.25 m off a wall or railing. A bench therefore needs a platform of about 2.9 m, or 2.6 m against a railing.
 
 ### Buildings and structures (Geoportál, Mosty 3D)
 
