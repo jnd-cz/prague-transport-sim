@@ -124,7 +124,7 @@ RULES = {
         "what": "IPR's pits under the survey's streets, filled from their rim in every reader of the raster (#867)",
         "code": ["ipr_pits.*", "ipr_dtm.IprDtm", "ipr_dtm.FILLS"],
         "places": ["taboritska-road-pit", "platnerska-road-pit", "belohorska-sidewalk-pit", "stairs-beside-a-building",
-                   "yard-at-a-sidewalk"],
+                   "yard-at-a-sidewalk", "na-vapence-garage-ramp"],
     },
 }
 

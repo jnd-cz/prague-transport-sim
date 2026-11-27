@@ -385,9 +385,10 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   pits the ground showed 0.5 m or more deep (Táboritská 3.7 m, Platnéřská 3.1 m); of the roads' and sidewalks' pits
   2 m or more deep, 30 of 34 are absent from DMR 5G, while the 'paved' areas (yards, forecourts) hold real sunken
   parts too (22 in both lidars). `tools/ipr_pits.py` fills those under the streets from their rim (its docstring has
-  the rule; paved ones and those 13-16 m long only where DMR 5G is level, the user's answer 1; those off the survey
-  stay, answer 2) into `data/ipr.fills.json`, which every `IprDtm` reads (`fill`; `city_terrain.read_ipr` too): 272
-  pits, 4,161 cells on the five lines' survey of 2026-11-23. `dtm.py` and `open_track.py` run before the fills in the
+  the rule; only where DMR 5G is level: the user's answer 1 for the paved ones, every street class since batch E,
+  whose first build filled the garage ramp on Na Vápence, one of 20 road, sidewalk and parking pits in both lidars;
+  those off the survey stay, answer 2) into `data/ipr.fills.json`, which every `IprDtm` reads (`fill`;
+  `city_terrain.read_ipr` too): 252 pits, 3,779 cells on the five lines' survey of 2026-11-27. `dtm.py` and `open_track.py` run before the fills in the
   build and read the raster as it is (`IprDtm(fills=None)`). `tools/bench/street_pits.py` counts what is left. Of the
   scan's 30 and the two at a kerb (Bělohorská 13.9 m, Škrétova 5 x 13 m), 26 fill and 6 stay: five mostly, or deep
   only, off the survey ((-5192, -1347) 12 x 9, (-592, -248) 48 % in the sidewalk, (1202, -8833), (-793, -8952),

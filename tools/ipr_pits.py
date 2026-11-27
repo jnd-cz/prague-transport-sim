@@ -5,7 +5,10 @@ IPR's 1 m raster (tools/ipr_dtm.py) holds pits a few metres across with vertical
 inside the survey's level-0 roads and sidewalks, where ČÚZK's DMR 5G (the 2009-2013 lidar) has level street: open
 excavations or shafts at the time of the 2023 flight, no street the player drives, walks or sees. The scan of
 2026-11-26 (#867: the five lines' tiles) found 30 road and sidewalk pits the published ground showed 0.5 m or more
-deep; 30 of the 34 roads' and sidewalks' pits 2 m or more deep are absent from DMR 5G.
+deep; 30 of the 34 roads' and sidewalks' pits 2 m or more deep are absent from DMR 5G. A pit in both lidars is a real
+sunken part: of the 133 road, sidewalk and parking pits the rule filled at first (batch E's first build, 2026-11-27,
+#757), DMR 5G has 20 too, among them the garage ramp on Na Vápence (3869, -18), 3.0 m deep, built flat (groundPlaces
+`na-vapence-garage-ramp`; the user, 2026-11-20, #779: "the road ramp from underground parking").
 
 A **pit** is a connected set of cells at least SKIRT under IPR's grey closing with a disc of radius R cells (the
 cells a 9 m disc cannot reach into), DEEP or more at its deepest, no side over LONG_SIDE (longer ones are trenches,
@@ -21,9 +24,9 @@ area of a STREET class; its class, the class most of them are in. It is **filled
   level) holds MIN_RIM cells or more and lies on a plane within RIM_ROUGH (p90);
 - the survey's own outline heights within SURVEY_NEAR (their plane, survey_level) stand at most SURVEY_OFF under that
   plane and SURVEY_OVER over it (the survey does not put the street down into the pit);
-- for 'paved' areas (yards and forecourts hold real sunken parts, 22 of them in both lidars) and pits longer than
-  MAX_SIDE, DMR 5G at the deepest street cell stands within DMR_LEVEL of the plane (the user, 2026-11-26, #867:
-  "1 - okay we can do that").
+- DMR 5G at the deepest street cell stands within DMR_LEVEL of the plane (for 'paved' areas, whose yards and
+  forecourts hold 22 sunken parts in both lidars, the user, 2026-11-26, #867: "1 - okay we can do that"; for every
+  street class since batch E, #757: a garage ramp, a light well; without DMR 5G there the pit stays).
 Its street cells under the plane take the plane's height; its cells off the survey stay.
 
 The fills are one file for the city, data/ipr.fills.json (FILLS), from every line's survey (data/line*.dtm.json),
@@ -52,11 +55,9 @@ from ipr_dtm import FILLS  # noqa: E402  (data/ipr.fills.json)
 STREET = ("road", "sidewalk", "tram", "platform", "island", "median", "cycle", "parking", "paved")
 KEEP = ("stairs", "wall")
 DEEP_UNDER = ("tunnel",)  # level -1 classes that say nothing of the street over them (and every level under -1: metro)
-DMR_ONLY = ("paved",)  # classes filled only where DMR 5G has level ground (#867, answer 1)
 R = 4  # cells: the closing disc's radius
 SKIRT = 0.3  # m under the closing: the pit's cells
 DEEP = 1.0  # m: the pit's depth at its deepest
-MAX_SIDE = 12  # cells (m): a longer component fills only where DMR 5G is level, as DMR_ONLY's (Škrétova 5 x 13)
 LONG_SIDE = 16  # cells (m): a longer one is a trench (most under the streets are in both lidars: real)
 MARGIN = 12  # cells read round a tile
 RIM = (1, 3)  # m outside the pit: the rim
@@ -66,7 +67,7 @@ SURVEY_OFF, SURVEY_OVER = 0.5, 1.5  # m: the survey's outline heights under the 
 SURVEY_NEAR = 15.0  # m: the outline heights read round the pit
 SHARE = 0.25  # the share of a pit's cells in stairs or walls, or under an area below ground, that keeps it
 ON_STREET = 0.5  # the share of a pit's cells in street areas, at least: most of it in the street
-DMR_LEVEL = 0.5  # m: DMR 5G under the plane at the deepest cell, at most, for a DMR_ONLY class
+DMR_LEVEL = 0.5  # m: DMR 5G under the plane at the deepest cell, at most (deeper: the pit is in both lidars)
 NO, KEPT, OTHER = 0, 254, 255  # class codes: none, a KEEP area, an area just below ground (an underpass)
 
 
@@ -141,12 +142,11 @@ def pits(a, cls, survey_z=None, dmr=None):
             if z != z or not -SURVEY_OFF <= z - coef[2] <= SURVEY_OVER:
                 p["kept"] = "not at the survey's level"
                 continue
-        if p["class"] in DMR_ONLY or side > MAX_SIDE:
-            z = dmr(dj, di) if dmr else float("nan")
-            p["dmr"] = None if z != z else round(float(z), 2)
-            if z != z or coef[2] - z > DMR_LEVEL:
-                p["kept"] = "in DMR 5G too"
-                continue
+        z = dmr(dj, di) if dmr else float("nan")
+        p["dmr"] = None if z != z else round(float(z), 2)
+        if z != z or coef[2] - z > DMR_LEVEL:
+            p["kept"] = "in DMR 5G too"
+            continue
         plane = coef[0] * (ii - di) + coef[1] * (jj - dj) + coef[2]
         low = (a[jj, ii] < plane) & st  # (the street's cells: those off the survey stay, #867 answer 2)
         p["cells"] = (jj[low], ii[low], plane[low].astype(np.float32))
@@ -286,8 +286,8 @@ def write(found, lines, path=FILLS):
     meta = ("x", "y", "class", "depth", "street", "rim", "rough", "survey", "dmr")
     out = {"about": "IPR's pits under the survey's streets, filled from their rim (tools/ipr_pits.py, #867): cells "
                     "[raster column, row, height in m]", "lines": lines,
-           "rule": {k: globals()[k] for k in ("R", "SKIRT", "DEEP", "MAX_SIDE", "LONG_SIDE", "RIM", "MIN_RIM", "RIM_ROUGH",
-                                              "SURVEY_OFF", "SURVEY_OVER", "SURVEY_NEAR", "SHARE", "ON_STREET", "DMR_LEVEL", "DMR_ONLY")},
+           "rule": {k: globals()[k] for k in ("R", "SKIRT", "DEEP", "LONG_SIDE", "RIM", "MIN_RIM", "RIM_ROUGH",
+                                              "SURVEY_OFF", "SURVEY_OVER", "SURVEY_NEAR", "SHARE", "ON_STREET", "DMR_LEVEL")},
            "filled": [{**{k: p[k] for k in meta},
                        "cells": [[int(i), int(j), round(float(z), 3)] for i, j, z in zip(*p["cells"])]} for p in fill],
            "kept": [{**{k: p[k] for k in meta}, "why": p["kept"]} for p in kept]}
