@@ -832,7 +832,8 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     percentile), plain kerbs;
   - the road's surface follows IPR, whose raster spreads a wall's face over 1-1.5 m: the ramp rose 0.76 m in its last
     metre before the door's wall and the road behind the wall fell 1.6 m towards it. A road's corner within 1.5 m of
-    a survey wall area up to 1 m across (101-231 a line, 7.5-22 km of outline), or of a kerb edge that is a wall's
+    a survey wall area up to 2.5 m across (`WALL_WIDE`, since #653; up to 1 m in #779: 101-231 a line, 7.5-22 km of
+    outline), or of a kerb edge that is a wall's
     top, takes the road's own surface 1.5 m out, carried on at its grade there (`ground_mesh.off_the_smear`), unless
     that surface lies 1 m or more off IPR there (under a deck the street surface has the deck's level). The
     raster is not asked whether it steps across the wall: read 2.5 m past a wall's end beside another wall it showed
@@ -907,6 +908,14 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     where the street surface runs smoothly from the cover down to the floor. Of the walls and structures rules' 25
     places 22 are the same as main's build; at Letná (276.8, 796.0) and above Mánes's bridgehead (-567.5, -49.7) a
     stairs' foot no longer drops into the raster 1.9-5 m under the stairs.
+  - *A road at the foot of a wall over 1 m across*: of the count's road corners over their road, 144 stood at walls
+    1-2.5 m across (90 on line 17, 27 on each of 22 and 23) and 2 at walls up to 1 m, the only ones `off_the_smear` read;
+    the raster smears a wall's face whatever its thickness. It reads every wall up to `WALL_WIDE` now. Along wall
+    1997 under Vyšehrad's rock, line 17 (-594.7, -2879.0), 67 → 0 corners off (place `road-at-a-walls-foot`: off the
+    chord square to the foot 1.09 → 0.01 m, steep faces 8.7 → 0 m²); along wall 857, line 23 (-2197.4, 767.0), 26 → 0,
+    the road level at 251.7 m to the foot where it had risen 3.1 m in 0.5 m. Of the walls and structures rules'
+    places 22 of 25 are the same; at lattice-cell, wall-end-in-a-path and vysehrad-tunnel-mouths only road corners
+    at such walls moved (up to 3.35 m); the locality set is 8 of 8 the same.
   - Tried and not taken: a corner on a wall's or stairs' outline at its own area's outline height where its street
     2 m in (past the smear) agrees within 0.3 m (`own_side` reads 0.75 m out, inside a tall wall's smear). The count
     fell (line 22 (-2197, 767) 20 → 0, line 17 (-1666, -9080) 13 → 0), but the sections along those two roads grew
@@ -914,8 +923,12 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     places, up to 6 m: a street's outline along a wall mixes the foot's heights and the top's.
   - Left: a sidewalk the survey draws down a quay wall's face as a sliver, its edge sloping from the top to the foot
     (Palackého most, line 17 (-725.3, -1255.0), sidewalk 843 from 194.84 to 188.48 m over 4.8 m): its corners take
-    the smeared street surface, a lip up the wall; stair wells to underpasses (line 37 (9260, 966)) and the
-    sidewalk round them (line 9 (-1035, -455)).
+    the smeared street surface, a ledge 0.2 m wide at 190.7 m between two steps (12 corners of the count in strips
+    under 0.5 m wide, 4 places); a sidewalk at the foot of a wall over 1 m across: `own_side` reads its surface
+    0.75 m out, still in the smear (Vyšehrad, line 17 (-576.1, -2318.0), wall 1097: 219.44 → 218.51 m, the ground
+    217.70 m 0.5 m in; 129 corners on line 17); a wall's end whose edge climbs from the foot to the top in 0.5 m,
+    the street past it sharing an outline with the one on the top (Smíchov, line 9 (-1035.2, -459.0), wall 325, up
+    to 6 m); stair wells to underpasses (line 37 (9260, 966)) and the sidewalk round them (line 9 (-1035, -455)).
 - **A paved strip is a wall for the sidewalk beside it** (#786, measured 2026-11-21). The survey has many a
   retaining wall and parapet as a paved area 0.2-0.5 m across and nothing else: no wall area, no `Zeď` line. What
   kept a sidewalk off IPR's smear at a wall (#653: the cells along a wall held at its level, a street corner on its

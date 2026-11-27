@@ -860,6 +860,23 @@ class BesideAThinWall(unittest.TestCase):
         self.assertFalse(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), lambda px, py: smeared(px, py) + 5.0, smeared)[1].any())
         self.assertEqual(gm.off_the_smear(walls, x, y, x, ty, smeared(x, y), smeared, smeared)[1].sum(), 4)
 
+    def test_a_road_beside_a_thicker_wall_keeps_its_surface_too(self):
+        # (#653: a wall 2 m across along y = 0..2, its foot on the road at 187.2 m south of it, the road's surface
+        # smeared up the face within 1.5 m; read beside walls up to WALL_WIDE, the corner on the foot takes the road's
+        # own level; an area 4 m across, a battered face (2.9 m by wall_width), is not read)
+        D = {"areas": [{"c": "wall", "l": 0, "r": [[0, 0, 187.3], [10, 0, 187.3], [10, 2, 193.3], [0, 2, 193.3]]},
+                       {"c": "wall", "l": 0, "r": [[0, 20, 187.3], [10, 20, 187.3], [10, 24, 193.3], [0, 24, 193.3]]}]}
+        self.assertEqual((len(gm.thin_walls(D)), len(gm.thin_walls(D, gm.WALL_WIDE))), (0, 4))
+
+        def smeared(px, py):
+            return 187.2 + 1.2 * np.clip(1 + np.asarray(py, float) / 1.5, 0, 1)
+        x, y, ty = np.array([5.0]), np.array([0.0]), np.array([-0.2])
+        z, held = gm.off_the_smear(gm.thin_walls(D, gm.WALL_WIDE), x, y, x, ty, smeared(x, y), smeared, smeared)
+        self.assertEqual(held.tolist(), [True])
+        self.assertAlmostEqual(float(z[0]), 187.2, places=6)
+        x, y, ty = np.array([5.0]), np.array([20.0]), np.array([19.8])
+        self.assertFalse(gm.off_the_smear(gm.thin_walls(D, gm.WALL_WIDE), x, y, x, ty, smeared(x, y - 20), smeared, smeared)[1].any())
+
     def test_a_sidewalks_edge_over_a_sunk_road_is_such_a_wall(self):
         # (a sidewalk north of y = 0 surveyed at 200.4 m, its kerb edge along a ramp falling east from 200.3 m: the
         # edge from where it stands 0.3 m over a kerb on the ramp, 20 m of 0.25 m pieces less the first 3 m; beside a

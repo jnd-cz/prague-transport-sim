@@ -1764,11 +1764,11 @@ SMEAR_MIN = 0.05  # m: a road's corner by a wall this near its surface carried o
 SMEAR_TRUST = 1.0  # m: the road's surface out there this far off IPR is not the ground's (a deck's level over it)
 
 
-def thin_walls(D):
-    """The outline edges of the survey's level-0 wall areas up to THIN_WALL across (wall_width): (n, 2, 2)."""
+def thin_walls(D, most=THIN_WALL):
+    """The outline edges of the survey's level-0 wall areas up to `most` across (wall_width): (n, 2, 2)."""
     segs = []
     for a in D["areas"]:
-        if a.get("c") != "wall" or a.get("l", 0) != 0 or len(a["r"]) < 3 or wall_width(a) > THIN_WALL:
+        if a.get("c") != "wall" or a.get("l", 0) != 0 or len(a["r"]) < 3 or wall_width(a) > most:
             continue
         for r in [a["r"]] + a.get("h", []):
             for i in range(len(r)):
@@ -1801,9 +1801,10 @@ def kerb_walls(D, road_at, lidar):
 
 def off_the_smear(walls, x, y, tx, ty, z, own, lidar=None):
     """Heights z of a road's corners (x, y), each in a triangle with centre (tx, ty), with those within WALL_HOLD of a
-    thin wall's outline (walls: thin_walls) set to the road's own surface WALL_HOLD out from the outline on their side
-    (own(px, py), NaN where the road has none there: the corner is left), run on to the corner at the surface's grade
-    between there and twice as far out (up to ROAD_GRADE; level where it has no surface that far, or a steeper one),
+    wall's outline (walls: thin_walls up to WALL_WIDE across, kerb_walls) set to the road's own surface WALL_HOLD out
+    from the outline on their side (own(px, py), NaN where the road has none there: the corner is left), run on to the
+    corner at the surface's grade between there and twice as far out (up to ROAD_GRADE; level where it has no surface
+    that far, or a steeper one),
     where that is SMEAR_MIN or more off its height: (z, which ones). (Whether the raster steps across the wall is not
     asked: read past the wall's end beside another wall, it showed none.) Where the surface out there lies SMEAR_TRUST
     or more off IPR (lidar(px, py)) the corner is left: the street surface follows the tracks onto a deck, and by the
@@ -1816,8 +1817,12 @@ def off_the_smear(walls, x, y, tx, ty, z, own, lidar=None):
     The generated road surface follows IPR, whose 1 m raster spreads a wall's face over 1-1.5 m, and nothing held it:
     at the foot of the wall over the garage ramp's door on Na Vápence, line 37 (3871, -18), wall area 1419 (0.26 m
     across, its top alone surveyed), the ramp rose from 258.00 m 1 m before the wall to 258.76 m at it, a toothed
-    foot, and the road behind the wall fell from 260.91 to 259.32 m towards it (#779). A sidewalk's edge on a wall is
-    held by the street surface itself (street_profile.sidewalks, #653)."""
+    foot, and the road behind the wall fell from 260.91 to 259.32 m towards it (#779). The raster smears a wall's face
+    so whatever the wall's thickness in plan: on batch E's ground 144 road corners on a wall's outline stood 0.3-2.3 m
+    over their road 0.5 m in at walls 1-2.5 m across (lines 17, 22 and 23), and 2 at walls up to 1 m, which this read
+    alone. Under Vyšehrad's rock, line 17 (-594.7, -2879.0), the road along wall 1997 (1.12 m across) rose from 187.2 m
+    0.5 m out to 188.43 m at the foot (#653). Past WALL_WIDE an area is a battered face, not a wall's thickness. A
+    sidewalk's edge on a wall is held by the street surface itself (street_profile.sidewalks, #653)."""
     z = np.array(z, float)
     held = np.zeros(len(z), bool)
     s = np.flatnonzero(np.isfinite(z))
@@ -2604,8 +2609,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         mm = np.isin(sc, list(cls)) & ~on_span & ~on_terrace
         if mm.any():
             zs[mm] = streets.at(kd, cx[m][mm], cy[m][mm])
-    # (a road beside a thin wall keeps its own surface from where the raster's smear of the wall ends: off_the_smear, #779)
-    tw = np.concatenate([thin_walls(D), kerb_walls(D, lambda px, py: streets.at("road", px, py), lidar_)])
+    # (a road beside a wall keeps its own surface from where the raster's smear of the wall ends: off_the_smear, #779, #653)
+    tw = np.concatenate([thin_walls(D, WALL_WIDE), kerb_walls(D, lambda px, py: streets.at("road", px, py), lidar_)])
     mm = np.isin(sc, list(STREETS_ROAD)) & ~on_span & ~on_terrace
     n_smear = 0
     if len(tw) and mm.any():
@@ -2818,7 +2823,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a deck on the lidar, {n_up:,} under a street's cover over a passage on it, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a deck on the lidar, {n_up:,} under a street's cover over a passage on it, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         zc[nan] = lidar_w(cx[nan], cy[nan])
 
