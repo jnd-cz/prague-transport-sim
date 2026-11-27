@@ -1,0 +1,480 @@
+{
+  "line": "17",
+  "voices": [
+    "Aoede",
+    "Algieba",
+    "Sulafat"
+  ],
+  "speakingRate": 0.85,
+  "source": {
+    "snapshot": "2026-11-18",
+    "gtfsSha256": "ee5ae6af310c12384c1f9de78c18a0975265c6353bec79c9f937453e2bf8e818",
+    "transferIcons": "https://pid.cz/en/opendata/",
+    "roadway": "data/truth.json stops (maintainer, 2026-10-23)"
+  },
+  "synthesis": "Google Cloud Czech Chirp 3 HD",
+  "outputTerms": "https://cloud.google.com/text-to-speech/docs/basics",
+  "stops": [
+    {
+      "id": "U945Z1P",
+      "name": "Levského",
+      "next": "Sídliště Modřany",
+      "clauses": [],
+      "text": "Levského. Příští zastávka... Sídliště Modřany.",
+      "clips": {
+        "Aoede": "aoede/U945Z1P.mp3",
+        "Algieba": "algieba/U945Z1P.mp3",
+        "Sulafat": "sulafat/U945Z1P.mp3"
+      }
+    },
+    {
+      "id": "U946Z1P",
+      "name": "Sídliště Modřany",
+      "next": "Modřanská rokle",
+      "clauses": [],
+      "text": "Sídliště Modřany. Příští zastávka... Modřanská rokle.",
+      "clips": {
+        "Aoede": "aoede/U946Z1P.mp3",
+        "Algieba": "algieba/U946Z1P.mp3",
+        "Sulafat": "sulafat/U946Z1P.mp3"
+      }
+    },
+    {
+      "id": "U947Z1P",
+      "name": "Modřanská rokle",
+      "next": "U Libušského potoka",
+      "clauses": [],
+      "text": "Modřanská rokle. Příští zastávka... U Libušského potoka.",
+      "clips": {
+        "Aoede": "aoede/U947Z1P.mp3",
+        "Algieba": "algieba/U947Z1P.mp3",
+        "Sulafat": "sulafat/U947Z1P.mp3"
+      }
+    },
+    {
+      "id": "U948Z1P",
+      "name": "U Libušského potoka",
+      "next": "Poliklinika Modřany",
+      "clauses": [],
+      "text": "U Libušského potoka. Příští zastávka... Poliklinika Modřany.",
+      "clips": {
+        "Aoede": "aoede/U948Z1P.mp3",
+        "Algieba": "algieba/U948Z1P.mp3",
+        "Sulafat": "sulafat/U948Z1P.mp3"
+      }
+    },
+    {
+      "id": "U929Z1P",
+      "name": "Poliklinika Modřany",
+      "next": "Čechova čtvrť",
+      "clauses": [],
+      "text": "Poliklinika Modřany. Příští zastávka... Čechova čtvrť.",
+      "clips": {
+        "Aoede": "aoede/U929Z1P.mp3",
+        "Algieba": "algieba/U929Z1P.mp3",
+        "Sulafat": "sulafat/U929Z1P.mp3"
+      }
+    },
+    {
+      "id": "U1006Z1P",
+      "name": "Čechova čtvrť",
+      "next": "Nádraží Modřany",
+      "clauses": [],
+      "text": "Čechova čtvrť. Příští zastávka... Nádraží Modřany.",
+      "clips": {
+        "Aoede": "aoede/U1006Z1P.mp3",
+        "Algieba": "algieba/U1006Z1P.mp3",
+        "Sulafat": "sulafat/U1006Z1P.mp3"
+      }
+    },
+    {
+      "id": "U388Z1P",
+      "name": "Nádraží Modřany",
+      "next": "Modřanská škola",
+      "clauses": [
+        "Přestup na vlak."
+      ],
+      "text": "Nádraží Modřany. Přestup na vlak. Příští zastávka... Modřanská škola.",
+      "clips": {
+        "Aoede": "aoede/U388Z1P.mp3",
+        "Algieba": "algieba/U388Z1P.mp3",
+        "Sulafat": "sulafat/U388Z1P.mp3"
+      }
+    },
+    {
+      "id": "U76Z1P",
+      "name": "Modřanská škola",
+      "next": "Belárie",
+      "clauses": [],
+      "text": "Modřanská škola. Příští zastávka... Belárie.",
+      "clips": {
+        "Aoede": "aoede/U76Z1P.mp3",
+        "Algieba": "algieba/U76Z1P.mp3",
+        "Sulafat": "sulafat/U76Z1P.mp3"
+      }
+    },
+    {
+      "id": "U19Z1P",
+      "name": "Belárie",
+      "next": "Hodkovičky",
+      "clauses": [],
+      "text": "Belárie. Příští zastávka... Hodkovičky.",
+      "clips": {
+        "Aoede": "aoede/U19Z1P.mp3",
+        "Algieba": "algieba/U19Z1P.mp3",
+        "Sulafat": "sulafat/U19Z1P.mp3"
+      }
+    },
+    {
+      "id": "U2731Z1P",
+      "name": "Hodkovičky",
+      "next": "Černý kůň",
+      "clauses": [],
+      "text": "Hodkovičky. Příští zastávka... Černý kůň.",
+      "clips": {
+        "Aoede": "aoede/U2731Z1P.mp3",
+        "Algieba": "algieba/U2731Z1P.mp3",
+        "Sulafat": "sulafat/U2731Z1P.mp3"
+      }
+    },
+    {
+      "id": "U71Z1P",
+      "name": "Černý kůň",
+      "next": "Nádraží Braník",
+      "clauses": [],
+      "text": "Černý kůň. Příští zastávka... Nádraží Braník.",
+      "clips": {
+        "Aoede": "aoede/U71Z1P.mp3",
+        "Algieba": "algieba/U71Z1P.mp3",
+        "Sulafat": "sulafat/U71Z1P.mp3"
+      }
+    },
+    {
+      "id": "U449Z1P",
+      "name": "Nádraží Braník",
+      "next": "Pobřežní cesta",
+      "clauses": [
+        "Přestup na vlak."
+      ],
+      "text": "Nádraží Braník. Přestup na vlak. Příští zastávka... Pobřežní cesta.",
+      "clips": {
+        "Aoede": "aoede/U449Z1P.mp3",
+        "Algieba": "algieba/U449Z1P.mp3",
+        "Sulafat": "sulafat/U449Z1P.mp3"
+      }
+    },
+    {
+      "id": "U387Z1P",
+      "name": "Pobřežní cesta",
+      "next": "Přístaviště",
+      "clauses": [],
+      "text": "Pobřežní cesta. Příští zastávka... Přístaviště.",
+      "clips": {
+        "Aoede": "aoede/U387Z1P.mp3",
+        "Algieba": "algieba/U387Z1P.mp3",
+        "Sulafat": "sulafat/U387Z1P.mp3"
+      }
+    },
+    {
+      "id": "U614Z1P",
+      "name": "Přístaviště",
+      "next": "Dvorce",
+      "clauses": [],
+      "text": "Přístaviště. Příští zastávka... Dvorce.",
+      "clips": {
+        "Aoede": "aoede/U614Z1P.mp3",
+        "Algieba": "algieba/U614Z1P.mp3",
+        "Sulafat": "sulafat/U614Z1P.mp3"
+      }
+    },
+    {
+      "id": "U110Z1P",
+      "name": "Dvorce",
+      "next": "Kublov",
+      "clauses": [],
+      "text": "Dvorce. Příští zastávka... Kublov.",
+      "clips": {
+        "Aoede": "aoede/U110Z1P.mp3",
+        "Algieba": "algieba/U110Z1P.mp3",
+        "Sulafat": "sulafat/U110Z1P.mp3"
+      }
+    },
+    {
+      "id": "U303Z1P",
+      "name": "Kublov",
+      "next": "Podolská vodárna",
+      "clauses": [],
+      "text": "Kublov. Příští zastávka... Podolská vodárna.",
+      "clips": {
+        "Aoede": "aoede/U303Z1P.mp3",
+        "Algieba": "algieba/U303Z1P.mp3",
+        "Sulafat": "sulafat/U303Z1P.mp3"
+      }
+    },
+    {
+      "id": "U583Z1P",
+      "name": "Podolská vodárna",
+      "next": "Výtoň",
+      "clauses": [],
+      "text": "Podolská vodárna. Příští zastávka... Výtoň.",
+      "clips": {
+        "Aoede": "aoede/U583Z1P.mp3",
+        "Algieba": "algieba/U583Z1P.mp3",
+        "Sulafat": "sulafat/U583Z1P.mp3"
+      }
+    },
+    {
+      "id": "U878Z1P",
+      "name": "Výtoň",
+      "next": "Palackého náměstí",
+      "clauses": [],
+      "text": "Výtoň. Příští zastávka... Palackého náměstí.",
+      "clips": {
+        "Aoede": "aoede/U878Z1P.mp3",
+        "Algieba": "algieba/U878Z1P.mp3",
+        "Sulafat": "sulafat/U878Z1P.mp3"
+      }
+    },
+    {
+      "id": "U237Z7P",
+      "name": "Palackého náměstí",
+      "next": "Jiráskovo náměstí",
+      "clauses": [
+        "Přestup na metro."
+      ],
+      "text": "Palackého náměstí. Přestup na metro. Příští zastávka... Jiráskovo náměstí.",
+      "clips": {
+        "Aoede": "aoede/U237Z7P.mp3",
+        "Algieba": "algieba/U237Z7P.mp3",
+        "Sulafat": "sulafat/U237Z7P.mp3"
+      }
+    },
+    {
+      "id": "U208Z1P",
+      "name": "Jiráskovo náměstí",
+      "next": "Národní divadlo",
+      "clauses": [],
+      "text": "Jiráskovo náměstí. Příští zastávka... Národní divadlo.",
+      "clips": {
+        "Aoede": "aoede/U208Z1P.mp3",
+        "Algieba": "algieba/U208Z1P.mp3",
+        "Sulafat": "sulafat/U208Z1P.mp3"
+      }
+    },
+    {
+      "id": "U483Z5P",
+      "name": "Národní divadlo",
+      "next": "Karlovy lázně",
+      "clauses": [],
+      "text": "Národní divadlo. Příští zastávka... Karlovy lázně.",
+      "clips": {
+        "Aoede": "aoede/U483Z5P.mp3",
+        "Algieba": "algieba/U483Z5P.mp3",
+        "Sulafat": "sulafat/U483Z5P.mp3"
+      }
+    },
+    {
+      "id": "U221Z2P",
+      "name": "Karlovy lázně",
+      "next": "Staroměstská",
+      "clauses": [],
+      "text": "Karlovy lázně. Příští zastávka... Staroměstská.",
+      "clips": {
+        "Aoede": "aoede/U221Z2P.mp3",
+        "Algieba": "algieba/U221Z2P.mp3",
+        "Sulafat": "sulafat/U221Z2P.mp3"
+      }
+    },
+    {
+      "id": "U703Z2P",
+      "name": "Staroměstská",
+      "next": "Právnická fakulta",
+      "clauses": [
+        "Přestup na metro."
+      ],
+      "text": "Staroměstská. Přestup na metro. Příští zastávka... Právnická fakulta.",
+      "clips": {
+        "Aoede": "aoede/U703Z2P.mp3",
+        "Algieba": "algieba/U703Z2P.mp3",
+        "Sulafat": "sulafat/U703Z2P.mp3"
+      }
+    },
+    {
+      "id": "U593Z2P",
+      "name": "Právnická fakulta",
+      "next": "Čechův most",
+      "clauses": [],
+      "text": "Právnická fakulta. Příští zastávka... Čechův most.",
+      "clips": {
+        "Aoede": "aoede/U593Z2P.mp3",
+        "Algieba": "algieba/U593Z2P.mp3",
+        "Sulafat": "sulafat/U593Z2P.mp3"
+      }
+    },
+    {
+      "id": "U68Z2P",
+      "name": "Čechův most",
+      "next": "Strossmayerovo náměstí",
+      "clauses": [],
+      "text": "Čechův most. Příští zastávka... Strossmayerovo náměstí.",
+      "clips": {
+        "Aoede": "aoede/U68Z2P.mp3",
+        "Algieba": "algieba/U68Z2P.mp3",
+        "Sulafat": "sulafat/U68Z2P.mp3"
+      }
+    },
+    {
+      "id": "U717Z4P",
+      "name": "Strossmayerovo náměstí",
+      "next": "Veletržní palác",
+      "clauses": [],
+      "text": "Strossmayerovo náměstí. Příští zastávka... Veletržní palác.",
+      "clips": {
+        "Aoede": "aoede/U717Z4P.mp3",
+        "Algieba": "algieba/U717Z4P.mp3",
+        "Sulafat": "sulafat/U717Z4P.mp3"
+      }
+    },
+    {
+      "id": "U841Z2P",
+      "name": "Veletržní palác",
+      "next": "Výstaviště",
+      "clauses": [],
+      "text": "Veletržní palác. Příští zastávka... Výstaviště.",
+      "clips": {
+        "Aoede": "aoede/U841Z2P.mp3",
+        "Algieba": "algieba/U841Z2P.mp3",
+        "Sulafat": "sulafat/U841Z2P.mp3"
+      }
+    },
+    {
+      "id": "U532Z2P",
+      "name": "Výstaviště",
+      "next": "Nádraží Holešovice",
+      "clauses": [
+        "Přestup na vlak."
+      ],
+      "text": "Výstaviště. Přestup na vlak. Příští zastávka... Nádraží Holešovice.",
+      "clips": {
+        "Aoede": "aoede/U532Z2P.mp3",
+        "Algieba": "algieba/U532Z2P.mp3",
+        "Sulafat": "sulafat/U532Z2P.mp3"
+      }
+    },
+    {
+      "id": "U115Z2P",
+      "name": "Nádraží Holešovice",
+      "next": "Trojská",
+      "clauses": [
+        "Přestup na metro.",
+        "Přestup na vlak."
+      ],
+      "text": "Nádraží Holešovice. Přestup na metro. Přestup na vlak. Příští zastávka... Trojská.",
+      "clips": {
+        "Aoede": "aoede/U115Z2P.mp3",
+        "Algieba": "algieba/U115Z2P.mp3",
+        "Sulafat": "sulafat/U115Z2P.mp3"
+      }
+    },
+    {
+      "id": "U765Z2P",
+      "name": "Trojská",
+      "next": "Nad Trojou",
+      "clauses": [],
+      "text": "Trojská. Příští zastávka... Nad Trojou.",
+      "clips": {
+        "Aoede": "aoede/U765Z2P.mp3",
+        "Algieba": "algieba/U765Z2P.mp3",
+        "Sulafat": "sulafat/U765Z2P.mp3"
+      }
+    },
+    {
+      "id": "U447Z2P",
+      "name": "Nad Trojou",
+      "next": "Hercovka",
+      "clauses": [],
+      "text": "Nad Trojou. Příští zastávka... Hercovka.",
+      "clips": {
+        "Aoede": "aoede/U447Z2P.mp3",
+        "Algieba": "algieba/U447Z2P.mp3",
+        "Sulafat": "sulafat/U447Z2P.mp3"
+      }
+    },
+    {
+      "id": "U139Z2P",
+      "name": "Hercovka",
+      "next": "Ke Stírce",
+      "clauses": [],
+      "text": "Hercovka. Příští zastávka... Ke Stírce.",
+      "clips": {
+        "Aoede": "aoede/U139Z2P.mp3",
+        "Algieba": "algieba/U139Z2P.mp3",
+        "Sulafat": "sulafat/U139Z2P.mp3"
+      }
+    },
+    {
+      "id": "U249Z2P",
+      "name": "Ke Stírce",
+      "next": "Kobylisy",
+      "clauses": [],
+      "text": "Ke Stírce. Příští zastávka... Kobylisy.",
+      "clips": {
+        "Aoede": "aoede/U249Z2P.mp3",
+        "Algieba": "algieba/U249Z2P.mp3",
+        "Sulafat": "sulafat/U249Z2P.mp3"
+      }
+    },
+    {
+      "id": "U675Z2P",
+      "name": "Kobylisy",
+      "next": "Březiněveská",
+      "clauses": [
+        "Přestup na metro."
+      ],
+      "text": "Kobylisy. Přestup na metro. Příští zastávka... Březiněveská.",
+      "clips": {
+        "Aoede": "aoede/U675Z2P.mp3",
+        "Algieba": "algieba/U675Z2P.mp3",
+        "Sulafat": "sulafat/U675Z2P.mp3"
+      }
+    },
+    {
+      "id": "U718Z2P",
+      "name": "Březiněveská",
+      "next": "Líbeznická",
+      "clauses": [
+        "Výstup do vozovky."
+      ],
+      "text": "Březiněveská. Výstup do vozovky. Příští zastávka... Líbeznická.",
+      "clips": {
+        "Aoede": "aoede/U718Z2P.mp3",
+        "Algieba": "algieba/U718Z2P.mp3",
+        "Sulafat": "sulafat/U718Z2P.mp3"
+      }
+    },
+    {
+      "id": "U333Z2P",
+      "name": "Líbeznická",
+      "next": "Vozovna Kobylisy",
+      "clauses": [],
+      "text": "Líbeznická. Příští zastávka... Vozovna Kobylisy.",
+      "clips": {
+        "Aoede": "aoede/U333Z2P.mp3",
+        "Algieba": "algieba/U333Z2P.mp3",
+        "Sulafat": "sulafat/U333Z2P.mp3"
+      }
+    },
+    {
+      "id": "U864Z2P",
+      "name": "Vozovna Kobylisy",
+      "next": null,
+      "clauses": [],
+      "text": "Vozovna Kobylisy. Konečná zastávka, prosíme vystupte.",
+      "clips": {
+        "Aoede": "aoede/U864Z2P.mp3",
+        "Algieba": "algieba/U864Z2P.mp3",
+        "Sulafat": "sulafat/U864Z2P.mp3"
+      }
+    }
+  ]
+}

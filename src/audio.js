@@ -92,9 +92,175 @@ function railImpactBuffer(ctx, noise, [body, rail, ring], offset) {
   return buffer;
 }
 
+// Recorded Czech announcements for the one-line pilot (#894).
+const LINE = '17';
+const PACK = new URL('../assets/announcements/17/manifest.json', import.meta.url);
+const VOICES = ['Aoede', 'Algieba', 'Sulafat', 'off'];
+const DISTANCES = [100, 50, 0];
+const options = { voice: VOICES[0], distance: DISTANCES[0] };
+try {
+  const voice = localStorage.getItem('tram.announcementVoice');
+  const distance = localStorage.getItem('tram.announcementDistance');
+  if (VOICES.includes(voice)) options.voice = voice;
+  if (distance !== null && DISTANCES.includes(+distance)) options.distance = +distance;
+} catch { /* storage unavailable */ }
+
+export function initAnnouncementMenu(getLang, onLangChange) {
+  const line = document.getElementById('selLine');
+  const voice = document.getElementById('optAnnouncementVoice');
+  const distance = document.getElementById('optAnnouncementDistance');
+  for (const value of VOICES) voice.add(new Option(value, value));
+  for (const value of DISTANCES) distance.add(new Option(String(value), String(value)));
+  voice.value = options.voice;
+  distance.value = String(options.distance);
+  const rows = [voice.closest('label'), distance.closest('label')];
+  const visibility = () => { for (const row of rows) row.hidden = line.value !== LINE; };
+  const translate = () => {
+    const cs = getLang() === 'cs';
+    rows[0].querySelector('span').textContent = cs ? 'Hlas hlášení' : 'Announcement voice';
+    rows[1].querySelector('span').textContent = cs ? 'Spuštění hlášení' : 'Announcement timing';
+    voice.options[VOICES.indexOf('off')].text = cs ? 'Vypnuto' : 'Off';
+    for (const opt of distance.options) opt.text = +opt.value ? `${opt.value} m` : cs ? 'Při zastavení' : 'On arrival';
+  };
+  voice.addEventListener('change', () => {
+    options.voice = voice.value;
+    try { localStorage.setItem('tram.announcementVoice', options.voice); } catch { /* storage unavailable */ }
+  });
+  distance.addEventListener('change', () => {
+    options.distance = +distance.value;
+    try { localStorage.setItem('tram.announcementDistance', distance.value); } catch { /* storage unavailable */ }
+  });
+  translate();
+  onLangChange(translate);
+  visibility();
+  // main populates the line menu after loading the world.
+  new MutationObserver(visibility).observe(line, { childList: true });
+  line.addEventListener('change', visibility);
+}
+
+export class StopAnnouncements {
+  constructor() {
+    this.run = null;
+    this.current = null;
+    this.source = null;
+    this.playing = false;
+  }
+
+  prepareRun(line, stops, startStop) {
+    this.stopSource();
+    this.current = null;
+    this.run = String(line) === LINE ? {
+      names: stops.map(stop => stop.name), startStop, queue: [], seen: new Set(),
+    } : null;
+  }
+
+  setAudio(ctx, active, finishing, muted) {
+    if (!ctx) return;
+    if (!this.output) {
+      this.ctx = ctx;
+      this.output = ctx.createGain();
+      this.output.connect(ctx.destination);
+    }
+    this.output.gain.value = muted ? 0 : 0.6;
+    this.active = active;
+    this.playing = active || finishing;
+    if (!this.playing) {
+      if (this.source) {
+        this.current.offset += this.ctx.currentTime - this.current.started;
+        this.stopSource();
+      }
+      return;
+    }
+    if (this.run) this.load(this.run);
+    this.play();
+  }
+
+  load(run) {
+    if (run.loading) return;
+    run.loading = true;
+    fetch(PACK).then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    }).then(pack => {
+      if (this.run !== run) return;
+      if (pack.line !== LINE || pack.stops.length !== run.names.length ||
+          pack.stops.some((stop, i) => stop.name !== run.names[i])) {
+        throw new Error('Announcement pack does not match this route');
+      }
+      run.pack = pack;
+      this.play();
+    }).catch(error => {
+      if (this.run === run) {
+        this.run = null;
+        console.warn('Could not load the stop announcements', error);
+      }
+    });
+  }
+
+  approach(i, ahead, at) {
+    const run = this.run;
+    if (!this.active || !run || i <= run.startStop || run.seen.has(i)) return;
+    if (!at && (options.distance === 0 || ahead < 0 || ahead > options.distance)) return;
+    run.seen.add(i);
+    if (options.voice === 'off') return;
+    run.queue.push({ i, voice: options.voice });
+    this.load(run);
+    this.play();
+  }
+
+  play() {
+    const run = this.run;
+    if (!this.playing || !run?.pack || this.source) return;
+    if (!this.current) {
+      const next = run.queue.shift();
+      if (!next) return;
+      const { i, voice } = next;
+      const path = run.pack.stops[i].clips[voice];
+      const clip = this.current = { i, voice, offset: 0 };
+      fetch(new URL(path, PACK)).then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.arrayBuffer();
+      }).then(bytes => this.ctx.decodeAudioData(bytes)).then(buffer => {
+        if (this.current !== clip) return;
+        clip.buffer = buffer;
+        this.play();
+      }).catch(error => {
+        if (this.current !== clip) return;
+        console.warn('Could not play the stop announcement', error);
+        this.current = null;
+        this.play();
+      });
+      return;
+    }
+    const clip = this.current;
+    if (!clip.buffer) return;
+    const source = this.source = this.ctx.createBufferSource();
+    source.buffer = clip.buffer;
+    source.connect(this.output);
+    clip.started = this.ctx.currentTime;
+    source.onended = () => {
+      if (this.source !== source) return;
+      source.disconnect();
+      this.source = null;
+      this.current = null;
+      this.play();
+    };
+    source.start(0, Math.min(clip.offset, clip.buffer.duration));
+  }
+
+  stopSource() {
+    if (!this.source) return;
+    const source = this.source;
+    this.source = null;
+    source.stop();
+    source.disconnect();
+  }
+}
+
 export class TramAudio {
   constructor() {
     this.ctx = null;
+    this.announcements = new StopAnnouncements();
     this.muted = false;
     this.active = false;
     this.finishing = false;
@@ -113,6 +279,7 @@ export class TramAudio {
     this.master = ctx.createGain();
     this.master.gain.value = this.active && !this.muted ? 0.6 : 0;
     this.master.connect(ctx.destination);
+    this.announcements.setAudio(ctx, this.active, this.finishing, this.muted);
 
     // noise buffer shared by several voices
     const len = ctx.sampleRate * 2;
@@ -212,6 +379,7 @@ export class TramAudio {
   setMuted(m) {
     if (this.muted === m) return;
     this.muted = m;
+    this.announcements.setAudio(this.ctx, this.active, this.finishing, this.muted);
     this._fade(this.active && !m ? 0.6 : 0, 0.05);
   }
 
@@ -222,6 +390,7 @@ export class TramAudio {
     if (this.active && !on) this.epoch++;
     this.active = on;
     this.finishing = finishing;
+    this.announcements.setAudio(this.ctx, on, finishing, this.muted);
     if (!on) this.contactorEvents.length = 0;
     this._fade(on && !this.muted ? 0.6 : 0, finishing && !this.muted ? 1.3 : 0.05);
   }

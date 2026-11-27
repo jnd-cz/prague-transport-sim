@@ -271,6 +271,8 @@ tram, dark glass is the game.
   hybrid, T2R 6004 – partial sounds: the bell, the door alert and the TR37 accelerator's contactors recorded in car
   T2R 6004; the other sounds stay built-in. The game remembers the choice for each model and plays it from the
   next shift's start.
+- Stop announcements on line 17 (pilot): choose Aoede, Algieba or Sulafat and start playback 100 m or
+  50 m before the stop sign, or on arrival. The driver can hear the announcements in the cab.
 - Vehicles…: packages made by others (a tram, a livery, sounds or a fleet), installed from a .zip, a folder or an
   address, a complete set in one archive too. The game checks each before it offers it (its files, its licence,
   the model's size and how heavy it is to draw) and shows a refused one with its reasons. Installed packages stay
