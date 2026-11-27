@@ -655,7 +655,8 @@
    {"decision": "radius-50.0990-14.4330", "place": [50.09896, 14.43296], "lines": [], "answer": "hold the radius", "quote": "this part rises up but perhaps not as much as DI says, ground under DI points looks better", "source": "radius review on the test host (reports/reviews/line17.json, #358)", "date": "2026-11-07", "note": "Strossmayerovo náměstí; page answer 'unsure'"},
    {"decision": "radius-50.0781-14.4676", "place": [50.07813, 14.46759], "lines": [9], "answer": "hold the radius", "ignore": "stretch", "sources": ["di"], "stretch": [[50.078168, 14.467388], [50.078166, 14.46746], [50.078156, 14.467523], [50.078135, 14.467586], [50.078105, 14.467637], [50.07806, 14.467681], [50.078023, 14.467699], [50.077979, 14.467704], [50.077945, 14.467697]], "quote": "For the Line 9, olšanské hřbitovy case if you discard di on the left half, left of the white marker, what best radius we can get?", "source": "Claude Code session, 2026-11-07 (#358), with the card's chart", "date": "2026-11-07", "note": "DI's dip 270.25 -> 269.56 -> 269.87 m left of the card's marker goes (the rest fits over 5 km within 5 cm); the user, on the proposal: \"Yes that sounds very promising\""},
    {"decision": "kralovka-arms-ground", "place": [50.084974, 14.37928], "lines": [22], "answer": "follow the ground", "radius_min": 250, "area": [[50.085005, 14.378635], [50.085076, 14.378619], [50.085108, 14.378838], [50.085194, 14.379251], [50.085162, 14.379375], [50.085059, 14.37945], [50.084832, 14.379499], [50.084767, 14.379477], [50.084737, 14.379313], [50.084751, 14.379238], [50.084937, 14.379197], [50.084977, 14.37899], [50.084989, 14.378761]], "quote": "Can you try fitting the tracks to ground in the highlighted areas, from the switch fork to the other switch forks plus the above ground red hump in malivanka branch to the loop? With smooth transition to the rest of tracks", "source": "Claude Code session, 2026-11-08 (#358), on the track-minus-lidar maps with the areas circled", "date": "2026-11-08", "note": "the loop's two arms from the main line's switches to where they meet, 15-78 cm above the lidar ground in the build of 08a187a; the area as circled, reaching west to the west arm's switch; the user, 2026-11-08, on keeping 500 m (Královka 11 cm, Malovanka 40 cm off the ground, the junctions still 338 and 355 m): \"I lean towards keeping them on the ground and accepting the tighter radius as real exceptions in the city network\", and on a 250 m limit against the lidar's noise (Malovanka's 131 m curve was a 2.4 cm bump over 5 m): \"Agree with 250m limit\""},
-   {"decision": "malovanka-ground", "place": [50.086162, 14.384605], "lines": [22, 23], "answer": "follow the ground", "radius_min": 250, "area": [[50.086371, 14.384414], [50.086332, 14.384568], [50.086322, 14.38494], [50.086281, 14.385049], [50.086234, 14.38502], [50.086182, 14.384939], [50.08611, 14.384801], [50.086038, 14.384662], [50.085966, 14.38457], [50.085965, 14.384416], [50.085992, 14.384272], [50.086084, 14.384168], [50.086169, 14.38418], [50.086259, 14.384245], [50.086336, 14.384336]], "quote": "Can you try fitting the tracks to ground in the highlighted areas, from the switch fork to the other switch forks plus the above ground red hump in malivanka branch to the loop? With smooth transition to the rest of tracks", "source": "Claude Code session, 2026-11-08 (#358), on the track-minus-lidar maps with the areas circled", "date": "2026-11-08", "note": "the junction between its switches: the curves 19-24 cm below and up to 49 cm above the lidar ground in the build of 08a187a (the cards radius-50.0862-14.3849 and radius-50.0863-14.3845); the user, 2026-11-08, on keeping 500 m (Královka 11 cm, Malovanka 40 cm off the ground, the junctions still 338 and 355 m): \"I lean towards keeping them on the ground and accepting the tighter radius as real exceptions in the city network\", and on a 250 m limit against the lidar's noise (Malovanka's 131 m curve was a 2.4 cm bump over 5 m): \"Agree with 250m limit\""}
+   {"decision": "malovanka-ground", "place": [50.086162, 14.384605], "lines": [22, 23], "answer": "follow the ground", "radius_min": 250, "area": [[50.086371, 14.384414], [50.086332, 14.384568], [50.086322, 14.38494], [50.086281, 14.385049], [50.086234, 14.38502], [50.086182, 14.384939], [50.08611, 14.384801], [50.086038, 14.384662], [50.085966, 14.38457], [50.085965, 14.384416], [50.085992, 14.384272], [50.086084, 14.384168], [50.086169, 14.38418], [50.086259, 14.384245], [50.086336, 14.384336]], "quote": "Can you try fitting the tracks to ground in the highlighted areas, from the switch fork to the other switch forks plus the above ground red hump in malivanka branch to the loop? With smooth transition to the rest of tracks", "source": "Claude Code session, 2026-11-08 (#358), on the track-minus-lidar maps with the areas circled", "date": "2026-11-08", "note": "the junction between its switches: the curves 19-24 cm below and up to 49 cm above the lidar ground in the build of 08a187a (the cards radius-50.0862-14.3849 and radius-50.0863-14.3845); the user, 2026-11-08, on keeping 500 m (Královka 11 cm, Malovanka 40 cm off the ground, the junctions still 338 and 355 m): \"I lean towards keeping them on the ground and accepting the tighter radius as real exceptions in the city network\", and on a 250 m limit against the lidar's noise (Malovanka's 131 m curve was a 2.4 cm bump over 5 m): \"Agree with 250m limit\""},
+   {"decision": "vinohradska-corridor-ground", "place": [50.07819, 14.46817], "lines": [9], "answer": "follow the ground", "radius_min": 250, "area": [[50.078363, 14.472417], [50.077923, 14.463801], [50.077977, 14.463793], [50.078004, 14.463796], [50.078098, 14.465458], [50.078457, 14.472563], [50.078403, 14.47257]], "quote": "the slope is much smoother with the height moved to lidar, so I accept the move", "source": "maintainer, #876 (PR #887's question 1), on the rail profiles before and after", "date": "2026-11-27", "note": "Vinohradská's corridor from the Želivského junction to short of Flora (line 9 s 15090-15750, both tracks): numeric DI, and the archive's record of 2018 with the same heights, stands 0.30 m over the 2023 lidar in three stretches (113-162 m each: the Želivského stop on panels, two on grass) and within 0.02 m of it between them, stepping at the joins of DI's records on both tracks at the same places; built, three humps with ramps of 30-50 m, up to 2.7 % against the street. In the third stretch's paved crossing the survey lies on the lidar, DI 0.30 m over both; Street View of August 2024 (looked at, nothing stored) has the lawn at the rail heads behind a kerb. The limit of 250 m as on the areas of 2026-11-08, against the lidar's noise"}
   ]
  },
  "trackGeometry": {
@@ -5767,7 +5768,7 @@
    ],
    "reach": 60,
    "issue": 606,
-   "what": "Vinohradská between Olšanské hřbitovy and Flora: the tram's corridor stands about 0.3 m over the carriageways either side behind a kerb; a road or a footpath across it comes up to the rail top",
+   "what": "Vinohradská between Olšanské hřbitovy and Flora: the tram's corridor stands a kerb's height over the carriageways either side (IPR's lidar: 0.12 m; until #876 it was drawn 0.37 m over them, on DI's heights 0.30 m over the lidar); a road or a footpath across it comes up to the rail top",
    "source": "the user, 2026-11-18 (#606): \"yes it's raised\"; 2026-11-21 (session): \"Vinohradská between Želivského and Flora is mostly placed on corridor with kerb. Where roads or footpaths cross it's level crossing like usual, so the surface comes up to the rail top.\"",
    "sections": [
     {
@@ -5781,10 +5782,9 @@
       -1467.63
      ],
      "expect": {
-      "rise m at least": 0.2,
-      "largest step m at least": 0.15
+      "rise m at least": 0.05
      },
-     "why": "IPR's raster is older than the corridor and has the street level across, 0.3-0.45 m under the rails; the road's corner on the corridor's edge took the tram area's height and the road ramped up over its last face"
+     "why": "the kerb stands: IPR has the corridor 0.12 m over the roads (269.94 m by 269.82 m at (3208.8, -1470)), and the tracks follow it (trackHeights radiusAnswers vinohradska-corridor-ground, #876). Before, the road's corner on the corridor's edge took the tram area's height and the road ramped up over its last face (#606)"
     },
     {
      "name": "from the north carriageway across the kerb onto the corridor, s 15359, 1.6 m",
@@ -5797,8 +5797,7 @@
       -1473.12
      ],
      "expect": {
-      "rise m at least": 0.2,
-      "largest step m at least": 0.15
+      "rise m at least": 0.05
      },
      "why": "as the south kerb"
     },
@@ -5813,8 +5812,7 @@
       -1468.8
      ],
      "expect": {
-      "rise m at least": 0.2,
-      "largest step m at least": 0.15
+      "rise m at least": 0.05
      },
      "why": "as at s 15359, 20 m on: the kerb runs on, not only where a lattice line falls near the edge"
     },
