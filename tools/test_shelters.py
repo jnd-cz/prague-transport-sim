@@ -22,9 +22,10 @@ CHECK = """async () => {
   const { makeIprShelter } = await import('/src/shelters.js');
   const variants = ['P.5', 'P.6', 'P.7', 'P.11'];
   const levels = ['near', 'middle', 'far'];
+  const name = 'Palackého náměstí\\n(nábřeží)';
   const width = 376, height = 180;
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-  renderer.setSize(width * 3, height * 4);
+  renderer.setSize(width * 3, height * 5);
   renderer.setScissorTest(true);
   const sheet = document.createElement('main');
   sheet.append(renderer.domElement);
@@ -56,9 +57,10 @@ CHECK = """async () => {
     new THREE.MeshStandardMaterial({ color: 0xbec2c0, roughness: 1 }));
   wall.position.set(0, 1.52, -.929 - .075);
   const probe = new THREE.Raycaster(new THREE.Vector3(.25, 1.35, 0), new THREE.Vector3(0, 0, -1));
+  const fasciaProbe = new THREE.Raycaster(new THREE.Vector3(.25, 2.13, 0), new THREE.Vector3(0, 0, -1));
 
-  return variants.map((variant, row) => levels.map((level, col) => {
-    const model = makeIprShelter(variant, level, 'Zkušební zastávka');
+  const results = variants.map((variant, row) => levels.map((level, col) => {
+    const model = makeIprShelter(variant, level, name);
     model.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(model);
     const size = bounds.getSize(new THREE.Vector3()).toArray();
@@ -66,26 +68,57 @@ CHECK = """async () => {
     const types = model.children.map(mesh => mesh.name);
     const endPanes = model.children.filter(mesh => mesh.name === 'end-glass').map(mesh => mesh.geometry.parameters.width);
     const rearWall = probe.intersectObject(model, true).some(hit => hit.object.name === 'rear-glass');
+    const openingUnderFascia = fasciaProbe.intersectObject(model, true).length === 0;
     const seat = model.getObjectByName('seats');
     const seatXs = seat ? Array.from(seat.geometry.attributes.position.array).filter((x, i) => i % 3 === 0) : [];
     const twoBays = seatXs.some(x => x < -.65) && seatXs.some(x => x > .65) && seatXs.every(x => Math.abs(x) > .1);
-    const stopLabel = model.getObjectByName('stop-name').material.map;
-    const ctx = stopLabel.image.getContext('2d');
-    const labelHasInk = ctx.getImageData(0, 0, stopLabel.image.width, stopLabel.image.height).data.some(Boolean);
+    const sign = model.getObjectByName('stop-name');
+    const signBounds = new THREE.Box3().setFromObject(sign);
+    const centre = signBounds.getCenter(new THREE.Vector3());
+    const faces = [1, -1].map(side => new THREE.Raycaster(
+      centre.clone().add(new THREE.Vector3(0, 0, side * .5)), new THREE.Vector3(0, 0, -side))
+      .intersectObject(sign).length > 0);
+    const { width: w, height: h } = sign.material.map.image;
+    const ctx = sign.material.map.image.getContext('2d');
+    const inkRows = [];
+    for (let y = 0; y < h; y++) {
+      if (ctx.getImageData(0, y, w, 1).data.some((v, i) => i % 4 === 3 && v > 80)) inkRows.push(y);
+    }
+    const twoLinesFit = inkRows[0] > 6 && inkRows[0] < h / 2 - 12
+      && inkRows.at(-1) > h / 2 + 12 && inkRows.at(-1) < h - 6
+      && !inkRows.some(y => Math.abs(y - h / 2) < 3);
     const plain = makeIprShelter(variant, level);
     const labelOptional = !plain.getObjectByName('stop-name');
 
     scene.add(model);
     const backing = variant === 'P.11' ? wall : floor;
     scene.add(backing);
-    renderer.setViewport(width * col, height * (3 - row), width, height);
-    renderer.setScissor(width * col + 2, height * (3 - row) + 2, width - 4, height - 4);
+    renderer.setViewport(width * col, height * (4 - row), width, height);
+    renderer.setScissor(width * col + 2, height * (4 - row) + 2, width - 4, height - 4);
     renderer.render(scene, camera);
     const calls = renderer.info.render.calls - 1;  // one backing surface
     scene.remove(model, backing);
     return { variant, level, size, min: bounds.min.toArray(), max: bounds.max.toArray(),
-      triangles, calls, types, rearWall, endPanes, twoBays, labelHasInk, labelOptional };
+      triangles, calls, types, rearWall, endPanes, twoBays, twoLinesFit, faces, labelOptional, openingUnderFascia };
   }));
+
+  const detail = new THREE.OrthographicCamera(-1.25, 1.25, .59, -.59, .1, 20);
+  for (const [col, [variant, side, caption]] of [
+    ['P.5', 1, 'P.5 · front'], ['P.5', -1, 'P.5 · street side'], ['P.11', 1, 'P.11 · outward face'],
+  ].entries()) {
+    const model = makeIprShelter(variant, 'near', name);
+    const sign = new THREE.Box3().setFromObject(model.getObjectByName('stop-name')).getCenter(new THREE.Vector3());
+    detail.position.set(sign.x, sign.y + .03, side * 5);
+    detail.lookAt(sign);
+    scene.add(model);
+    if (variant === 'P.11') scene.add(wall);
+    renderer.setViewport(width * col, 18, width, height - 18);
+    renderer.setScissor(width * col + 2, 18, width - 4, height - 20);
+    renderer.render(scene, detail);
+    scene.remove(model, wall);
+    label(caption, width * (col + .5), height * 5 - 8);
+  }
+  return results;
 }"""
 
 HTML = """<!doctype html><style>
@@ -111,7 +144,7 @@ def main():
         threading.Thread(target=server.serve_forever, daemon=True).start()
         url = f"http://127.0.0.1:{server.server_port}/__shelters.html"
         browser, _ = gpu.launch(p)
-        page = browser.new_page(viewport={"width": 1202, "height": 766})
+        page = browser.new_page(viewport={"width": 1202, "height": 946})
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         importmap = re.search(r'<script type="importmap">.*?</script>',
@@ -142,7 +175,9 @@ def main():
             assert ("citylight" in model["types"]) == (variant in {"P.5", "P.6"}), model
             assert model["rearWall"] == (variant in {"P.6", "P.7"}), model
             assert model["endPanes"] == ([] if wall else [.58, .58] if variant == "P.7" else [1.08]), model
-            assert model["labelHasInk"] and model["labelOptional"], model
+            assert model["twoLinesFit"] and model["labelOptional"] and model["faces"] == [True, not wall], model
+            if variant == "P.5":
+                assert model["openingUnderFascia"], model
         print(f"{variant}: {counts} triangles, {calls} draw calls with a stop label")
 
 

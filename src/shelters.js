@@ -8,9 +8,9 @@ const DEPTH = 1.858;
 const WALL = -DEPTH / 2;
 const BACK = WALL + .14;
 const GLASS_BOTTOM = .23, GLASS_TOP = 2.245;
-const NAME_Y = 2.321;
+const FASCIA_Y = 2.13, FASCIA_HEIGHT = .36, FASCIA_DEPTH = .15;
 const LAYOUTS = {
-  'P.5': { length: 7.080, supports: [-3.35, -.28, .82, 3.35], bays: [[0, 1], [2, 3]], side: 1.08, citylight: true },
+  'P.5': { length: 7.080, supports: [-3.35, -.28, .82, 3.35], bays: [[0, 1], [2, 3]], side: 1.08, citylight: true, passage: true },
   'P.6': { length: 7.080, supports: [-3.35, 0, 3.35], bays: [[0, 1], [1, 2]], side: 1.08, citylight: true },
   'P.7': { length: 7.080, supports: [-3.35, 0, 3.35], bays: [[0, 1], [1, 2]], side: .58, citylight: false },
   'P.11': { length: 4.040, supports: [-1.83, 1.83] },
@@ -93,7 +93,7 @@ function canopy(group, frame, length, level) {
   roof.position.y = HEIGHT;
   group.add(roof);
 
-  box(frame, length - .08, .139, .125, 0, NAME_Y, BACK);
+  box(frame, length - .08, .139, .125, 0, 2.321, BACK);
   box(frame, length - .23, .042, .05, 0, HEIGHT - .021, front - .044);
   box(frame, length, .033, .048, 0, HEIGHT - .0165, WALL + .024);
   const ribs = level === 'near' ? (length > 5 ? 7 : 4) : level === 'middle' ? 3 : 2;
@@ -161,28 +161,49 @@ function wallMounts(frame, positions, near) {
   }
 }
 
-function namePlate(name, length) {
-  const width = Math.min(3.6, length - .45), height = .142;
+function namePlate(name, width, x, twoSided) {
+  const height = FASCIA_HEIGHT - .02;
   const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = Math.round(canvas.width * height / width);
+  canvas.width = Math.round(width * 512);
+  canvas.height = Math.round(height * 512);
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#f3f5f0';
-  ctx.font = `600 ${Math.round(canvas.height * .75)}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(name, canvas.width / 2, canvas.height / 2, canvas.width - 50);
+  const lines = String(name).trim().split(/\s*[\r\n]+\s*/);
+  const step = canvas.height / Math.max(2.15, lines.length + .35);
+  let font = Math.round(lines.length === 1 ? canvas.height * .55 : step * .88);
+  ctx.font = `600 ${font}px sans-serif`;
+  const longest = Math.max(1, ...lines.map(line => ctx.measureText(line).width));
+  font = Math.max(1, Math.floor(font * Math.min(1, (canvas.width - 48) / longest)));
+  ctx.font = `600 ${font}px sans-serif`;
+  for (const [i, line] of lines.entries()) {
+    ctx.fillText(line, canvas.width / 2, canvas.height / 2 + (i - (lines.length - 1) / 2) * step);
+  }
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height),
-    new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false }));
+  const offset = FASCIA_DEPTH / 2 + .002;
+  const faces = [new THREE.PlaneGeometry(width, height).translate(x, FASCIA_Y, BACK + offset)];
+  // Rotate the rear face so the street-facing name reads left to right as well.
+  if (twoSided) faces.push(new THREE.PlaneGeometry(width, height)
+    .rotateY(Math.PI).translate(x, FASCIA_Y, BACK - offset));
+  const mesh = batch(faces, new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false }));
   mesh.name = 'stop-name';
-  mesh.position.set(0, NAME_Y, BACK + .065);
   return mesh;
 }
 
+function fascia(group, frame, { supports, bays, passage }, stopName) {
+  // A separate panel above each bay leaves the P.5 rear opening clear up to the header.
+  const spans = passage ? bays : [[0, supports.length - 1]];
+  for (const [i, [a, b]] of spans.entries()) {
+    const x = (supports[a] + supports[b]) / 2, width = supports[b] - supports[a] - .034;
+    box(frame, width, FASCIA_HEIGHT, FASCIA_DEPTH, x, FASCIA_Y, BACK);
+    if (i === 0 && stopName) group.add(namePlate(stopName, Math.min(3.25, width - .14), x, Boolean(bays)));
+  }
+}
+
 // Length is on X, front is +Z and placement height is Y = 0. The back wall plane
-// for P.11 is Z = -0.929. Use only the needed stop label so the frame can be reused.
+// for P.11 is Z = -0.929. A newline in the stop label separates the name and its qualifier.
 export function makeIprShelter(variant, level = 'near', stopName = '') {
   if (!Object.hasOwn(LAYOUTS, variant)) throw new RangeError(`Unknown shelter variant: ${variant}`);
   if (!['near', 'middle', 'far'].includes(level)) throw new RangeError(`Unknown shelter detail: ${level}`);
@@ -192,7 +213,7 @@ export function makeIprShelter(variant, level = 'near', stopName = '') {
   canopy(group, frame, layout.length, level);
   if (layout.bays) freestanding(group, frame, layout, level);
   else wallMounts(frame, layout.supports, level === 'near');
+  fascia(group, frame, layout, stopName);
   group.add(batch(frame, metal));
-  if (stopName) group.add(namePlate(stopName, layout.length));
   return group;
 }
