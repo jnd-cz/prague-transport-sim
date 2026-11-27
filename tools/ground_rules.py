@@ -53,7 +53,7 @@ RULES = {
     "walls": {
         "what": "walls: the survey's lines, faces and strips, a wall's sides and its foot and top (#697, #765, #770, #786)",
         "code": ["wall_lines.*", "ground_mesh.hold_at_walls", "ground_mesh.wall_areas", "ground_mesh.outline_edges",
-                 "ground_mesh.turning", "ground_mesh.out_of", "ground_mesh.own_side", "ground_mesh._sides",
+                 "ground_mesh.turning", "ground_mesh.out_of", "ground_mesh.own_side", "ground_mesh.own_outline", "ground_mesh._sides",
                  "ground_mesh.across_outline", "ground_mesh.wall_width", "ground_mesh.two_sided", "ground_mesh.wall_like",
                  "ground_mesh.wall_face", "ground_mesh.standing", "ground_mesh.thin_walls", "ground_mesh.off_the_smear",
                  "ground_mesh.ring_segments", "ground_mesh.snap_to_walls", "ground_mesh.step_walls", "ground_mesh.is_wall",

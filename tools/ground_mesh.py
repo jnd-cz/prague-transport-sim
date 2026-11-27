@@ -1538,6 +1538,72 @@ def own_side(walls, x, y, tx, ty, z, own):
     return z, held
 
 
+WALL_FAR = 2.0  # m into a street from a wall's outline: past IPR's smear of the wall (1-2 m), the street at its own level
+
+
+def own_outline(D, sa, kinds, x, y, tx, ty, z, street, walls=None):
+    """Heights z of street corners (x, y), each of survey area sa[i] (its class's surface kinds[i], 'road' or
+    'sidewalk') in a triangle with centre (tx, ty), with those on a level-0 wall's or stairs' outline (wall_areas, or
+    `walls`: their indexes) set to their own area's outline height there, where their street WALL_FAR in on their side
+    (street(kind, px, py)) is within WALL_SNAP of that height: (z, which ones).
+    The street surface reads IPR, whose raster spreads a wall's face over 1-2 m, and what read it at the wall (own_side,
+    WALL_SIDE out) read the smear: by Palackého most, line 17 (-725.29, -1255.0), the quay's lower walkway (sidewalk 171)
+    and sidewalk 843 have the quay wall's foot in their outlines at 188.48 m, wall 1110 its top at 195.19 m, and their
+    corner on it stood at 190.66 m, a lip up the wall. The survey's own height wins where the street past the smear
+    says the same; where it does not, the outline is no level of the street there: by Hořejší nábřeží, line 9 (-1029,
+    -533), the street's outline runs along the wall's top line at 193.8 m and the street lies at its foot, 187.5 m (#653)."""
+    z = np.array(z, float)
+    took = np.zeros(len(z), bool)
+    ids = wall_areas(D) if walls is None else walls
+    we = outline_edges(D, ids)
+    s = np.flatnonzero(np.isfinite(z))
+    if not len(we) or not len(s):
+        return z, took
+    a, b = we[:, 0], we[:, 1]
+    pi, si = shapely.STRtree(shapely.linestrings(we)).query(shapely.points(x[s], y[s]), predicate="dwithin", distance=WALL_ON)
+    if not len(pi):
+        return z, took
+    c = s[pi]
+    e = b[si] - a[si]
+    t = np.clip(((x[c] - a[si, 0]) * e[:, 0] + (y[c] - a[si, 1]) * e[:, 1]) / np.maximum((e ** 2).sum(1), 1e-12), 0, 1)
+    ta, tb = turning(a, b)
+    fx, fy, ux, uy = out_of(a[si], b[si], t, x[c], y[c], tx[c], ty[c], ta[si], tb[si])
+    # (per corner, its nearest wall edge; of edges as near, the first by where they lie, ties.py)
+    d = np.hypot(x[c] - fx, y[c] - fy)
+    o = np.lexsort((ties.segments(a, b)[si], d, pi))
+    o = o[np.r_[True, pi[o][1:] != pi[o][:-1]]]
+    c, ux, uy = c[o], ux[o], uy[o]
+    # (its own area's outline height there: the nearest of its edges within WALL_ON)
+    zo = np.full(len(c), np.nan)
+    for ar in np.unique(sa[c]).tolist():
+        k = np.flatnonzero(sa[c] == ar)
+        segs = ring_segments(D["areas"][ar])
+        if not len(segs):
+            continue
+        qi, ei = shapely.STRtree(shapely.linestrings(segs[:, :, :2])).query(shapely.points(x[c[k]], y[c[k]]), predicate="dwithin",
+                                                                              distance=WALL_ON)
+        if not len(qi):
+            continue
+        p0, p1 = segs[ei, 0], segs[ei, 1]
+        ee = p1[:, :2] - p0[:, :2]
+        tt = np.clip(((x[c[k[qi]]] - p0[:, 0]) * ee[:, 0] + (y[c[k[qi]]] - p0[:, 1]) * ee[:, 1]) / np.maximum((ee ** 2).sum(1), 1e-12), 0, 1)
+        h = p0[:, 2] + (p1[:, 2] - p0[:, 2]) * tt
+        dd = np.hypot(x[c[k[qi]]] - (p0[:, 0] + ee[:, 0] * tt), y[c[k[qi]]] - (p0[:, 1] + ee[:, 1] * tt))
+        oo = np.lexsort((ties.segments(segs[:, 0], segs[:, 1])[ei], dd, qi))
+        oo = oo[np.r_[True, qi[oo][1:] != qi[oo][:-1]]]
+        zo[k[qi[oo]]] = h[oo]
+    zf = np.full(len(c), np.nan)
+    for kd in ("road", "sidewalk"):
+        k = np.flatnonzero(kinds[c] == kd)
+        if len(k):
+            zf[k] = street(kd, x[c[k]] + ux[k] * WALL_FAR, y[c[k]] + uy[k] * WALL_FAR)
+    with np.errstate(invalid="ignore"):
+        ok = np.isfinite(zo) & np.isfinite(zf) & (np.abs(zo - zf) <= WALL_SNAP) & (np.abs(z[c] - zo) > 0.005)
+    z[c[ok]] = zo[ok]
+    took[c[ok]] = True
+    return z, took
+
+
 def _sides(ring_segs, x, y):
     """Per point inside a survey area: (z1, d1, z2, d2), the outline's height at the nearest point on it and its distance,
     and the same of the nearest point on its other side (the direction from the point turned past 90 degrees; d2 inf
@@ -2558,6 +2624,16 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
         c3 = fc[m[mm] // 3].mean(1)
         zs[mm], sided = own_side(we, cx[m][mm], cy[m][mm], c3[:, 0], c3[:, 1], zs[mm], lambda px, py: streets.at("sidewalk", px, py))
         n_side = int(sided.sum())
+    # (a street corner on a wall's or stairs' outline at its own area's outline height there, where its street past the
+    # raster's smear of the wall agrees: own_outline, #653)
+    mm = np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span & ~on_terrace
+    n_outline = 0
+    if wall_ids and mm.any():
+        c3 = fc[m[mm] // 3].mean(1)
+        kinds = np.where(np.isin(sc[mm], list(STREETS_WALK)), "sidewalk", "road")
+        zs[mm], took = own_outline(D, sa[mm], kinds, cx[m][mm], cy[m][mm], c3[:, 0], c3[:, 1], zs[mm],
+                                   lambda kd, px, py: streets.at(kd, px, py), wall_ids)
+        n_outline = int(took.sum())
     # (a tree pit or a small bed in a sidewalk lies flush with it, on the sidewalk's street surface: pits, #696)
     in_pit = np.isnan(zs) & ~on_terrace & ~on_span & np.isin(sa, sorted(pits(D, np.unique(sa).tolist())))
     if in_pit.any():
@@ -2750,7 +2826,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a deck on the lidar, {n_up:,} under a street's cover over a passage on it, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a deck on the lidar, {n_up:,} under a street's cover over a passage on it, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {n_outline:,} street corners on a wall's outline at their own, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         zc[nan] = lidar_w(cx[nan], cy[nan])
 
