@@ -9,9 +9,25 @@
 import * as THREE from 'three';
 import { GFX } from './gfx.js';
 
+// ?gfx=snowif (src/gfx.js, #705): the snow's code is in a material's shader only while it snows. Without it the
+// two octaves of noise run for every fragment in every weather, with uSnow 0 scaling the result away. A material is
+// compiled anew when the snow comes or goes (a shift's start), not branched on uSnow in the shader: a weak GPU may
+// compute both sides of such a branch, and this GPU's compiler worked the noise's hash out differently inside
+// one, which moved the snow's patches (line 22, s 6330: 7.2 % of a picture's pixels, 2026-11-27).
+let snowNow = 0;
+const snowMats = new Set(); // the weatherized materials, to compile anew when the snow comes or goes
+const snowCode = () => !GFX.snowBranch || snowNow > 0;
+
 export const WEATHER_UNIFORMS = {
   uWet: { value: 0 },
-  uSnow: { value: 0 },
+  uSnow: {
+    get value() { return snowNow; },
+    set value(v) {
+      const was = snowCode();
+      snowNow = v;
+      if (was !== snowCode()) for (const m of snowMats) m.needsUpdate = true;
+    },
+  },
   uAutumn: { value: 0 },
 };
 
@@ -40,10 +56,15 @@ const NOISE = /* glsl */ `
 //   veg:   the terrain: per-vertex land class (attribute landCls: 0 ground, 1 grass, 2 wood, 3 water):
 //          only the bare ground gets wet, grass and woods turn in autumn, water takes no snow
 export function weatherize(material, { wet = 1, snow = 0, slush = false, veg = false } = {}) {
-  const key = `w${wet.toFixed(2)}s${snow}${slush ? 'l' : ''}${veg ? 'v' : ''}${GFX.snowBranch ? 'b' : ''}`;
-  material.customProgramCacheKey = () => key;
+  const key = `w${wet.toFixed(2)}s${snow}${slush ? 'l' : ''}${veg ? 'v' : ''}`;
+  material.customProgramCacheKey = () => (snowCode() ? key : `${key}n`); // (n: without the snow's code)
   material.userData.weather = { wet, snow, slush, veg };
+  if (GFX.snowBranch) {
+    snowMats.add(material);
+    material.addEventListener('dispose', () => snowMats.delete(material));
+  }
   material.onBeforeCompile = (sh) => {
+    const snowy = snowCode();
     Object.assign(sh.uniforms, WEATHER_UNIFORMS);
     if (veg) {
       sh.uniforms.uAutumnGrass = { value: new THREE.Color('#7f8a4c') };
@@ -68,7 +89,7 @@ export function weatherize(material, { wet = 1, snow = 0, slush = false, veg = f
         uniform float uWet; uniform float uSnow; uniform float uAutumn;
         ${veg ? 'uniform vec3 uAutumnGrass; uniform vec3 uAutumnWood; varying float vCls;' : ''}
         varying vec3 vWPos; varying vec3 vWNor;
-        ${NOISE}`)
+        ${snowy ? NOISE : ''}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         {
           float wetF = ${wet.toFixed(3)}, cover = ${snow.toFixed(3)};
@@ -79,15 +100,13 @@ export function weatherize(material, { wet = 1, snow = 0, slush = false, veg = f
           if (vCls > 0.5) wetF = 1.0;
           if (vCls > 2.5) cover = 0.0;` : ''}
           diffuseColor.rgb *= mix(1.0, wetF, uWet);
+          ${snowy ? `
           // snow: on faces pointing up, in patches (two octaves of noise), thinner on driven streets
-          // (?gfx=snowif: the noise only while it snows; without it, for every fragment in every weather, #705)
-          ${GFX.snowBranch ? 'if (uSnow > 0.0) {' : '{'}
-            float up = smoothstep(0.45, 0.8, vWNor.y);
-            float n = 0.6 * wNoise(vWPos.xz * 0.23) + 0.4 * wNoise(vWPos.xz * 1.9);
-            float c = uSnow * up * smoothstep(0.75 - cover, 0.95 - cover, n);
-            vec3 snowCol = ${slush ? 'mix(vec3(0.38, 0.39, 0.40), vec3(0.72, 0.74, 0.77), n)' : 'vec3(0.82, 0.85, 0.89)'};
-            diffuseColor.rgb = mix(diffuseColor.rgb, snowCol, c);
-          }
+          float up = smoothstep(0.45, 0.8, vWNor.y);
+          float n = 0.6 * wNoise(vWPos.xz * 0.23) + 0.4 * wNoise(vWPos.xz * 1.9);
+          float c = uSnow * up * smoothstep(0.75 - cover, 0.95 - cover, n);
+          vec3 snowCol = ${slush ? 'mix(vec3(0.38, 0.39, 0.40), vec3(0.72, 0.74, 0.77), n)' : 'vec3(0.82, 0.85, 0.89)'};
+          diffuseColor.rgb = mix(diffuseColor.rgb, snowCol, c);` : ''}
         }`);
   };
   material.needsUpdate = true;

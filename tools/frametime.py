@@ -2,7 +2,7 @@
 """The frame time and the draw calls with each tram model (tools/bench/frametime.js), in a headed Chromium.
 
 Usage: python -P -E tools/frametime.py [--line 17] [--models t3h,t3,t3simple] [--fov 62,22.75] [--frames 600] [--headless]
-                                        [--traffic 60] [--stop 3] [--params boxcars] [--ratio 1,1.75,4]
+                                        [--traffic 60] [--stop 3] [--params boxcars] [--ratio 1,1.75,6]
        python -P -E tools/frametime.py --models t3h,t3h:sample.t3h-blue   # a model wearing a livery (#529)
 
 Its own server on a free port; for each model a fresh page at 1280 x 720 loads the line, starts the first
@@ -16,7 +16,8 @@ Prints a table and writes reports/frametime.json. `--traffic` steps the traffic 
 streets, #250), `--stop` measures at that stop of the trip, `--params` adds to the page's address (`boxcars`: the box
 cars instead of the street vehicles' models, to measure the models against them; `gfx=nolog`: a drawing switch of
 src/gfx.js). `--ratio` measures at each of these pixel ratios of the renderer, set by the bench: 1 is the triangles'
-and the draw calls' cost, 1.75 the page's cap (2240 x 1260 drawn), 4 (5120 x 2880) sixteen times the fragments.
+and the draw calls' cost, 1.75 the page's cap (2240 x 1260 drawn), 6 (7680 x 4320) 36 times the fragments; without
+it the page's own ratio.
 A weak GPU is short of fragments, not triangles (#705), and a fast one shows their cost only where they are the
 limit: on the Arc A770 a frame at 1 and at 1.75 takes the same 3 ms, the CPU's (2026-11-27). With two or more
 ratios the fill cost is printed too: the GPU's ms per megapixel drawn, between the lowest ratio and the highest
@@ -51,7 +52,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 OLD = {"detailed": "t3h", "classic": "t3", "simple": "t3simple"}  # (the models' names before #455)
 
 
-def measure(line, models, frames, headless, warm=120, fovs=(None,), traffic=0, stop=0, params="", ratios=(1,)):
+def measure(line, models, frames, headless, warm=120, fovs=(None,), traffic=0, stop=0, params="", ratios=(None,)):
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=ROOT))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_port}"
@@ -129,7 +130,7 @@ def main():
     ap.add_argument("--traffic", type=float, default=0, help="seconds the traffic steps before the measurement (its cars in the streets)")
     ap.add_argument("--stop", type=int, default=0, help="the stop of the trip to measure at (its index in the menu)")
     ap.add_argument("--params", default="", help="added to the page's address, e.g. boxcars or gfx=nolog")
-    ap.add_argument("--ratio", default="1", help="the renderer's pixel ratios to measure each model at, e.g. 1,1.75,4 (the page's cap is 1.75; 4 makes the fragments the limit on a fast GPU)")
+    ap.add_argument("--ratio", default="", help="the renderer's pixel ratios to measure each model at, e.g. 1,1.75,6 (default: the page's own, the display's up to 1.75; 6 makes the fragments the limit on a fast GPU)")
     args = ap.parse_args()
     if not os.path.exists(os.path.join(ROOT, "data", f"line{args.line}.json")):
         sys.exit(f"no data/line{args.line}.json: python -I tools/snapshot.py data-fetch")
@@ -139,7 +140,7 @@ def main():
         faulthandler.dump_traceback_later(1800, exit=True)  # page.evaluate has no time limit
         fovs = [float(f) for f in args.fov.split(",") if f] or [None]
         rows = measure(args.line, [OLD.get(m, m) for m in args.models.split(",")], args.frames, args.headless, fovs=fovs,
-                       traffic=args.traffic, stop=args.stop, params=args.params, ratios=[float(r) for r in args.ratio.split(",") if r])
+                       traffic=args.traffic, stop=args.stop, params=args.params, ratios=[float(r) for r in args.ratio.split(",") if r] or [None])
         faulthandler.cancel_dump_traceback_later()
     os.makedirs(os.path.join(ROOT, "reports"), exist_ok=True)
     with open(os.path.join(ROOT, "reports", "frametime.json"), "w", encoding="utf-8", newline="") as f:

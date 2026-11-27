@@ -3,8 +3,9 @@
 // alone or several together: ?gfx=nolog,pr1
 //   nolog   no logarithmic depth buffer: with it three.js writes every fragment's depth (gl_FragDepth), so the GPU
 //           cannot reject a hidden fragment before shading it
-//   snowif  the snow's noise only while it snows (src/weather.js)
-//   front   front faces only on the ground and the buildings (src/groundDraw.js, src/buildings.js)
+//   snowif  the snow's noise in a material's shader only while it snows (src/weather.js)
+//   front   front faces only on the ground and the buildings (src/groundDraw.js, src/buildings.js). For timing
+//           only: roofs are wound inwards, so some vanish and others show their dark insides (2026-11-27)
 //   pr<n>   the pixel ratio at most n (pr1, pr0.75; without it the display's, at most 1.75)
 //   noaa    no antialiasing (the canvas's multisampling)
 // A performance test's result and a note carry the list (src/perf.js machine), so a number says what it ran with.
