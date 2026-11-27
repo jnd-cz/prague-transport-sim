@@ -181,6 +181,17 @@ function queue(T, road, dir, s, cars, next = null) {
   return out;
 }
 
+// a car going south over our track at y 0: its least clearance of the track's centre while it stands (its box's nearer end,
+// car.clear; Infinity: it never stood near it) and when it is 20 m past it (car.through); the queue's head `A` goes at `until`
+function clearance(car, clock, until, A) {
+  car.clear ??= Infinity;
+  if (A && clock >= until) A.v = 10;
+  if (!car.active) return;
+  const p = car.path.at(car.s);
+  if ((car.vNow ?? 1) < 0.3 && Math.abs(p.y) < 20) car.clear = Math.min(car.clear, r1(Math.abs(p.y) - car.half));
+  if (car.through === undefined && p.y < -20) car.through = r1(clock);
+}
+
 // when each car first stands on its goal road (off a junction's connector): { id: clock }
 function arrivals(goal) {
   const at = {};
@@ -285,6 +296,77 @@ export const SCENES = {
       if (crossedAt === null && p && car.lane.k === 1 && p.y + car.half < -1.5) crossedAt = r1(clock); // (its rear off the far rail)
       if (tailPast === null && tr.s - tr.length > 160 + 2.5) tailPast = r1(clock); // (route s 160: x 60)
     }, report: () => ({ yielded, tramVMin: r1(vMin), crossedAt, tailPast }) };
+  },
+
+  // A one-way street south over our track (along x at y 0) into a junction 14 m past it, a queue standing 20 m on beyond it
+  // until `until` s, and two cars coming, the first moving: the second waits before the track, not behind the first on it
+  // where the queue would stop them (#602). Reports car 1's least clearance of the track's centre while it stands: its box's
+  // nearest end to y 0 (the band is 2.6 m), and when every car is past the junction.
+  queuePastTrack({ until = 20 } = {}) {
+    const T = build({ roads: [{ p: [[0, 60], [0, -14]], o: 1 }, { p: [[0, -14], [0, -80]], o: 1 }], track: [[-150, 0], [150, 0]] });
+    const A = addCar(T, { road: 1, dir: 1, s: 9, v: 0, vNow: 0, id: 10 });
+    addCar(T, { road: 0, dir: 1, s: 37, vNow: 6, v: 6, next: 1, id: 2 });
+    const car = addCar(T, { road: 0, dir: 1, s: 24, vNow: 6, v: 6, next: 1, id: 1 });
+    return { T, t: 45, each: (T, clock) => clearance(car, clock, until, A), report: () => ({ clear: car.clear, through: car.through }) };
+  },
+
+  // The same street, and a one-way street east over it 8 m past the track with no junction there (as short lanes inside a
+  // junction in the data): a car on it from car 1's right gets to where their ways cross with car 1. Car 1 waits before
+  // the track, not on it for that car (line 23 s 329, seed 31, the user's picture, #602). Reports also car 1's clearance of
+  // the track's centre as car 3 crosses its way (x 0).
+  crossPastTrack() {
+    const T = build({ roads: [{ p: [[0, 60], [0, -60]], o: 1 }, { p: [[-60, -8], [60, -8]], o: 1 }], track: [[-150, 0], [150, 0]] });
+    const x = addCar(T, { road: 1, dir: 1, s: 15, vNow: 8, v: 8, id: 3 });
+    const car = addCar(T, { road: 0, dir: 1, s: 30, vNow: 6, v: 6, id: 1 });
+    addCar(T, { road: 0, dir: 1, s: 16, vNow: 6, v: 6, id: 4 }); // (one behind it)
+    let atCross = null;
+    return { T, t: 30, each: (T, clock) => {
+      clearance(car, clock, Infinity, null);
+      if (atCross === null && x.path.at(x.s).x > 0) atCross = r1(Math.abs(car.path.at(car.s).y) - car.half);
+    }, report: () => ({ clear: car.clear, through: car.through, atCross }) };
+  },
+
+  // A one-way street south over the opposite track (y 3.4) and ours (y 0), a short lane over both, its exit full by a
+  // standing queue; the car on that lane, its front on the opposite track's band. The queue moves off at 0.2 s as our tram
+  // comes at 12 m/s, 85 m off: the car, past the group's first band, waits for it there and crosses after its tail (#602,
+  // line 17 s 9950, seed 14 on #833: such a car pulled out across ours and was hit).
+  heldOnOpposite() {
+    const T = build({ roads: [{ p: [[0, 40], [0, 9]], o: 1 }, { p: [[0, 9], [0, -6]], o: 1 }, { p: [[0, -6], [0, -70]], o: 1 }],
+      track: [[-200, 0], [200, 0]], back: [[200, 3.4], [-200, 3.4]], tram: { s: 115, v: 12 } });
+    const q = [addCar(T, { road: 2, dir: 1, s: 6.5, v: 0, vNow: 0, id: 10 })];
+    q.push(addCar(T, { road: 2, dir: 1, s: 0, v: 10, vNow: 0, id: 11 }));
+    q[1].s = q[0].s - q[0].half - 1.5 - q[1].half;
+    const car = addCar(T, { road: 1, dir: 1, s: 0.3, v: 10, vNow: 0, next: 2, id: 1 });
+    let crossedAt = null, tailPast = null;
+    return { T, t: 20, tram: 12, each: (T, clock) => {
+      if (clock >= 0.2) q[0].v = 10;
+      const p = car.active && car.path.at(car.s), tr = T.game.tram;
+      if (crossedAt === null && p && p.y + car.half < -1.5) crossedAt = r1(clock); // (its rear off our far rail)
+      if (tailPast === null && tr.s - tr.length > 200 + 2.5) tailPast = r1(clock); // (route s 200: x 0)
+    }, report: () => ({ crossedAt, tailPast }) };
+  },
+
+  // A street our route takes out and back: east along y 0, round, west along y 3. A one-way street north over both at x 0,
+  // a car on it standing with its middle on the outbound rails and its front 0.65 m into the return track's path, held by
+  // a standing car 8 m ahead until `until` s; our tram comes on the return part at 10 m/s, 80 m off. It stops for the car
+  // (#602, line 9 s 24330, seed 2 on 1e23f0b: the car was reported only on the outbound part, nearest its middle, and our
+  // tram on the return part drove into it). Reports how far short of x 0 the tram's front stood, and when its tail was past.
+  outAndBack({ until = 10 } = {}) {
+    const round = Array.from({ length: 9 }, (_, i) => [200 + 1.5 * Math.sin(Math.PI * (i + 1) / 10), 1.5 - 1.5 * Math.cos(Math.PI * (i + 1) / 10)]);
+    const T = build({ roads: [{ p: [[0, -40], [0, 9]], o: 1 }, { p: [[0, 9], [0, 60]], o: 1 }], track: [[-200, 0], [200, 0], ...round, [200, 3], [-200, 3]] });
+    const sX = T.route.nearestOnHeading(0, 3, -1, 0).s;
+    T.game.tram.s = sX - 80; T.game.tram.v = 10;
+    const car = addCar(T, { road: 0, dir: 1, s: 0, v: 10, vNow: 0, next: 1, id: 1 });
+    car.s = 2.4 - car.half - car.path.at(0).y; // (its front at y 2.4: the return track's body from y 1.75)
+    const B = addCar(T, { road: 1, dir: 1, s: 0, v: 0, vNow: 0, id: 10 });
+    B.s = 2.4 + 7.6 + B.half - B.path.at(0).y; // (its rear 7.6 m past the car's front: following() stands 8 m short)
+    let short = null, tailPast = null;
+    return { T, t: 30, tram: 10, each: (T, clock) => {
+      if (clock >= until) B.v = 10;
+      const tr = T.game.tram;
+      if (short === null && clock > 1 && tr.v < 0.05) short = r1(sX - tr.s);
+      if (tailPast === null && tr.s - tr.length > sX + 2.5) tailPast = r1(clock);
+    }, report: () => ({ short, tailPast }) };
   },
 
   // #496 (line 23 s 3349, seed 1): walk A's end links 1 m back to a link crossing a car lane to walk B, 1 m before B's

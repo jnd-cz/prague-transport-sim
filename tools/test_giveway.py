@@ -53,11 +53,14 @@ LOOP = r"""async () => {
   const read = (T, pts, d = 0) => {
     const xs = T._wayCrossings([[new Route(pts), -d, false]], Infinity);
     return xs.map((x) => ({ rt: x.rt === T.route ? 'ours' : 'back', kind: x.kind, along: x.along, against: x.against, lo: r(x.spans[0].lo), hi: r(x.spans[0].hi), spans: x.spans.map((o) => [r(o.lo), r(o.hi), o.along, o.against]),
+      ways: x.spans.map((o) => [r(o.lo), r(o.wa), r(o.wb)]),
       dC: r(x.dC), gdC: r(x.g.dC), group: xs.indexOf(xs.find((o) => o.g === x.g)), goesOn: T._goesOn(x, xs) }));
   };
   return {
     // onto our rails with our trams, and against them
     railsWith: read(traffic(ours, null), [[100, 8], [110, 0.3], [199, 0.3]]),
+    // the same coming in shallow: into the band at x 129.8, on the rails (1.6 m) at 138.6
+    railsShallow: read(traffic(ours, null), [[100, 6], [150, 0.3], [199, 0.3]]),
     railsAgainst: read(traffic(ours, null), [[100, 8], [90, 0.3], [10, 0.3]]),
     // on the opposite track's rails with its trams, then across ours at 25° (towards our trams): the car on those rails
     groupRails: read(traffic(ours, back), [[150, 12], [140, 3.5], [115, 3.5], [95, -6], [80, -12]], Math.hypot(10, 8.5) + 15),
@@ -120,10 +123,18 @@ class GiveWay(unittest.TestCase):
         finally:
             stop_server(server)
             faulthandler.cancel_dump_traceback_later()
-        # (turned onto the rails with the trams: the tram can stop behind it, so only the point where it turns in counts)
+        # (turned onto the rails with the trams: the tram can stop behind it, so only where it turns in counts, from where
+        # it comes into the band, x 107.0, to where it is on the rails, x 108.3; the way is read every metre)
         [w] = r['railsWith']
         self.assertEqual((w['kind'], w['along'], w['against']), ('rails', True, False))
-        self.assertEqual(w['lo'], w['hi'])
+        self.assertAlmostEqual(w['lo'], 107.0, delta=1)
+        self.assertAlmostEqual(w['hi'], 108.3, delta=1)
+        # (coming in shallow, that stretch is long: held at its first point only, a car was let go with the tram's body
+        # beside the rest; line 22 s 13078, seed 1 on #850, #602)
+        [w] = r['railsShallow']
+        self.assertEqual((w['kind'], w['along']), ('rails', True))
+        self.assertAlmostEqual(w['lo'], 129.8, delta=1.2)
+        self.assertAlmostEqual(w['hi'], 138.6, delta=1.2)
         # (along the rails towards the trams: the whole stretch, about 80 m, as a crossing)
         [a] = r['railsAgainst']
         self.assertEqual((a['kind'], a['along'], a['against']), ('rails', False, True))
@@ -150,13 +161,22 @@ class GiveWay(unittest.TestCase):
         self.assertLess(back_[1] - back_[0], 6)
         self.assertLess(abs(out_[0] - 60), 3)
         self.assertLess(abs(out_[1] - 60), 3)
-        # (onto the rails with the trams, then across the same route's other track: the first part is along the rails, its
-        # turn-in point only; the other is against the trams, whole. Each part's own direction sets the time the car takes
-        # to clear it, not the place's: line 9 s 27291, seed 4)
+        # (where along the way each part is, from the car's middle at y 15: the return track's band from y 6.1 to the line
+        # midway between the tracks, y 1.75; the outbound one's from there to y -2.6. The car is reported on each part it
+        # is on, line 9 s 24330, seed 2 on 1e23f0b)
+        wb_, wo_ = sorted(t['ways'], reverse=True)
+        self.assertLess(abs(wb_[1] - 8.9), 1.1)
+        self.assertLess(abs(wb_[2] - 13.25), 1.1)
+        self.assertLess(abs(wo_[1] - wb_[2]), 1.1)
+        self.assertLess(abs(wo_[2] - 17.6), 1.1)
+        # (onto the rails with the trams, then across the same route's other track: the first part is along the rails, where
+        # it turns in only (band at x 106.5, rails at 107.7); the other is against the trams, whole. Each part's own direction
+        # sets the time the car takes to clear it, not the place's: line 9 s 27291, seed 4)
         [w] = r['twiceRails']
         self.assertEqual((w['rt'], w['kind'], w['along'], w['against']), ('ours', 'rails', True, True))
         first, other = sorted(w['spans'])
-        self.assertEqual(first[0], first[1])
+        self.assertLess(first[1] - first[0], 2)
+        self.assertGreater(first[1], first[0])
         self.assertEqual(first[2:], [True, False])
         self.assertGreater(other[0], 240)
         self.assertEqual(other[2:], [False, True])
