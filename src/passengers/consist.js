@@ -11,6 +11,8 @@
 // - above the places shown, up to the car's declared capacity (the crush load), passengers are counted only: they climb the steps
 //   like the others and join the count at their head, and leave first, from the doorways, through the doors in turn.
 // - (2026-11-26) those alighting at a stop get ready as the tram comes near it: to their doors' doorway places (ready).
+// - (2026-11-26, Dveře I: "only the 1st door in car where driver sits"; those waiting walk to it and get on there, those to alight
+//   leave through it) with the front door alone open, everyone bound for another door goes to it: onlyDoor, gather.
 // A passenger is aboard from the head of the entry steps in to their foot out (a.aboard): the counts change there, which is where
 // the game's crossings are (update's list) and what the autopilot waits for.
 import { createBoardingController } from './boarding-state.js';
@@ -78,16 +80,36 @@ export function createConsist(layout, { cars, crush, rand }) {
     return out;
   }
 
+  // (#249, Dveře I: the one door open, { car, door, spacing: m between the cars' middles }, else null: all of them)
+  let only = null;
+
   // the boarders not yet given a car go to the one with the most room (the fewest coming, then the front first); one who walked or
-  // ran in while the tram stood to the door they came to (src/game.js _spawnWalker)
+  // ran in while the tram stood to the door they came to (src/game.js _spawnWalker); with one door open, to it
   function assign() {
     for (let i = 0; i < platform.length;) {
       const b = platform[i];
-      const car = b.car != null ? (room(set[b.car]) > 0 ? set[b.car] : null)
+      const car = only ? (room(set[only.car]) > 0 ? set[only.car] : null) : b.car != null ? (room(set[b.car]) > 0 ? set[b.car] : null)
         : set.filter((c) => room(c) > 0).sort((x, y) => room(y) - room(x) || incoming(x) - incoming(y) || x.k - y.k)[0];
       if (!car) { i++; continue; }
-      car.c.enqueue(1, null, b.door, { waitForPlace: true, extra: { tag: b.tag, stands: b.stands, runner: b.car != null, who: b.who } });
+      car.c.enqueue(1, null, only ? only.door : b.door, { waitForPlace: true, extra: { tag: b.tag, stands: b.stands, runner: b.car != null, who: b.who } });
       platform.splice(i, 1);
+    }
+  }
+
+  // (#249, Dveře I) with one door open, those bound for the others go to it: in its car the boarders not yet on the steps and the
+  // alighters not yet set off (boarding-state.js redirect); the boarders of the other cars leave them and queue at it, from where
+  // they stand (in its car's frame: the cars' middles `spacing` apart, on a straight platform), with who they were (`from`: their
+  // figure walks on, src/passengerView.js). The alighters of the other cars stay aboard: no way through to it
+  function gather() {
+    const to = set[only.car];
+    to.c.redirect(() => true, only.door);
+    for (const car of set) {
+      if (car === to) continue;
+      for (const a of car.c.abandon()) {
+        if (a.counted) car.flight--;
+        to.c.enqueue(1, null, only.door, { waitForPlace: true, extra: { tag: a.tag, stands: a.stands, runner: a.runner, who: a.who, from: a.id,
+          x: a.x - (car.k - to.k) * only.spacing, y: a.y, z: a.z, heading: a.heading, distanceMetres: a.distanceMetres } });
+      }
     }
   }
 
@@ -152,20 +174,26 @@ export function createConsist(layout, { cars, crush, rand }) {
     // the boarders of a stop at the doors and not yet on the steps, left where they are (the doors closed on them: they wait at
     // them and get on when they open again, #249); the passengers
     outside(tag) { return set.flatMap((car) => car.c.outside((a) => a.tag === tag)); },
-    // boarders waiting on the platform with no room in any car and nobody left to alight
-    get full() { return platform.length > 0 && set.every((c) => room(c) <= 0 && outgoing(c) === 0); },
+    // boarders waiting on the platform with no room in any car they can get into and nobody left to alight there
+    get full() { return platform.length > 0 && (only ? [set[only.car]] : set).every((c) => room(c) <= 0 && outgoing(c) === 0); },
+    // (#249, Dveře I) the first car's door `door` alone open (the others shut; spacing: m between the cars' middles), or with null all
+    // of them: those bound for the others go to it (gather), from now until all open
+    onlyDoor(door, spacing = 0) { only = door ? { car: 0, door, spacing } : null; },
+    get only() { return only; },
     // those of a stop still on the platform stay there (the set is full); the number
     leaveFull(tag) {
       let n = 0;
       for (let i = platform.length - 1; i >= 0; i--) if (platform[i].tag === tag) { platform.splice(i, 1); n++; }
       return n;
     },
-    // a step of dt s; open: the doors are open with the tram standing at the stop (new crossings only then). The crossings in it:
+    // a step of dt s; open: the doors are open with the tram standing at the stop (new crossings only then): true, false, or per car
+    // its doors' ({ Front: true }: that one alone; a car left out: none). The crossings in it:
     // [{ dir: 'in' | 'out', tag, car, lane (the door's stream, as 'Front:1') }]
     update(dt, open) {
       crossings.length = 0;
+      if (only) gather();
       assign();
-      for (const car of set) car.c.update(dt, { doorsOpen: open });
+      for (const car of set) car.c.update(dt, { doorsOpen: typeof open === 'boolean' ? open : open[car.k] ?? false });
       if ((reseatT += dt) >= RESEAT_EVERY) {
         reseatT = 0;
         for (const car of set) car.c.reseat({ speed: RESEAT_SPEED, tries: RESEAT_TRIES });

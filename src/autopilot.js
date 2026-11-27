@@ -95,6 +95,8 @@ export class Autopilot {
     if (st) {
       const atStop = tr.v < 0.05 && g._atStop(st);
       if (atStop && !st.served && g.doorState === 'closed') g.toggleDoors();
+      // (the front door alone open, Dveře I, as the driver left it: all of them, so that everyone can get off; #249)
+      else if (atStop && g.frontOnly && g.doorState === 'open') g.toggleDoors();
       // (and nobody is still running for it)
       if (atStop && st.served && st.waiting === 0 && st.alight === 0 && !g.runnersFor?.(st) && g.doorState === 'open' && g.clock >= st.sched) g.toggleDoors();
     }

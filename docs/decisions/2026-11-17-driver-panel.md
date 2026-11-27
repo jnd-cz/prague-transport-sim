@@ -17,7 +17,12 @@ questions; the answers:
    issue for it." Drawn and inert, a hover says so; the list is #640.
 3. **Labels:** "we can have english labels when player chooses that language. Make sure the czech accented letters
    display correctly". The plates follow the game's language (src/panel.js `C`); a plate's letters shrink where its
-   words don't fit (the system's fonts differ).
+   words don't fit (the system's fonts differ). (2026-11-26, #249: the user's Firefox at 3840 x 2008, "příliš velký text na
+   popiskách ovládacího panelu", "only the text labels on it were overflowing in my browser and screen combination": the
+   panel lays its letters out at 6-14 px and scales the band up whole, and a browser's minimum font size, its fonts setting,
+   holds them larger, past their plates; reproduced in Firefox with 12 and 16 px. `fit` measures that minimum (`minFont`)
+   and scales the labels' words, the helper lamps', the keys' hints, the knobs' marks, the info screen's and the
+   timetable's back to the size they should have; `tools/test_panel.py` checks it in Firefox with 16 px.)
 4. **The info screen as 6921's onboard computer:** "yes let's keep it for now".
 5. **Tab folds the desktop panel to the compact strip:** "let's do this and I will try it when testing. Make sure the
    panel scales up on larger resolution displays." The band is 240 px high at a 900 px high window and scales with
@@ -73,6 +78,7 @@ After trying the merged build (same day, with a photo of 6921's cab):
   request: at a request stop somebody gets off at, from a point 20 m to 60 % of the way from the last stop until the
   doors open (src/panel.js `requested`; it was lit within 400 m of such a stop). "The arrows for left and right should
   be green leds I think, can be a bit shorter": green, a third shorter. "The first red brzda I would label 'Brzda I'."
+  (2026-11-26, #249: "BRZDA I should be BRZDY I, like we have BRZDY II".)
   "the led symbol parts of |O| can be alongside each other": the brake lamps' bars stand beside the ring.
 - **The knobs:** "the heater rotary switches (and other rotary ones) should be aligned to the position labels, not turn
   to another angle". The heaters' labels stand round their knobs where the pointer stops (0–3 and 0 – ½ – 1 from

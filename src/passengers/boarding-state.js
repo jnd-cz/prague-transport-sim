@@ -13,6 +13,7 @@
 // #249 step 4: changed, likewise: ready (before a stop, those to alight there go to their doors' doorway places) and alight's ids (the
 // ones chosen then alight, one still on the way from where they get to).
 // #249 (2026-11-26): outside (the boarders abandon would take, left where they are: those the doors close on wait at them).
+// #249 (2026-11-26, Dveře I): redirect (boarders and alighters not yet through their door sent to the one door open).
 import {createPassengerCore,doorIsOpen} from './passenger-core.js';
 import {createExitFlow} from './exit-flow.js';
 import {planExitDoors} from './exit-routing.js';
@@ -217,9 +218,18 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
  function outside(test=()=>true){return [...actors.values()].filter(a=>!a.aboard&&!a.exiting&&(a.stage==='queue'||a.actions&&(a.actionIndex<3||a.actionIndex===3&&!a.actionTime))&&test(a));}
  function abandon(test=()=>true){const gone=outside(test);
   for(const a of gone){core.releasePlace(a);for(const c of channels){const i=c.queue.indexOf(a);if(i>=0)c.queue.splice(i,1);}actors.delete(a.id);}return gone;}
+ // (#249, Dveře I: the front door alone) those of test(a) bound for another door than doorId and not yet through theirs go to it:
+ // boarders not yet on the entry steps join its queue, their places kept (they walk there as a queue moves up); alighters not yet
+ // set off are planned out through it (exit-flow.js drop; one still on the way to a doorway place is when they get there). The number
+ function redirect(test,doorId){if(!doors.some(d=>d.id===doorId))throw new Error('Unknown door');const away=a=>a.doorId!==doorId&&test(a);let n=0;
+  for(const a of outside(away)){for(const c of channels){const i=c.queue.indexOf(a);if(i>=0)c.queue.splice(i,1);}
+   if(a.actions)Object.assign(a,{actions:null,actionIndex:0,actionTime:0,actionStart:null,stage:'queue',legPose:null,poseBlend:null});
+   const c=chooseChannel(null,doorId);Object.assign(a,{channel:c.id,doorId,boardedDoorId:doorId});c.queue.push(a);n++;}
+  const out=exitFlow.drop(away);for(const a of out)Object.assign(a,{doorId,channel:`${doorId}:0`});if(out.length)exitFlow.schedule(out);
+  return n+out.length;}
  // (#249: nothing moving, queued or planned: a step only counts the time)
  const idle=()=>!exitFlow.preparing&&channels.every(c=>!c.queue.length)&&![...actors.values()].some(a=>a.actions||a.exiting||a.yielding||a.stage==='exit queue'||a.readyAt!=null);
- return {setExitPolicy(value){if(!['balanced','boarding'].includes(value))throw new Error('Unknown exit policy');exitPolicy=value;},layout,ledger,standingLedger,actors,channels,events,enqueue,preload,alight,seatAboard,reseat,ready,abandon,outside,doorDistance,quietDoor,get time(){return time;},get active(){return [...actors.values()].find(a=>a.actions||a.exiting||a.yielding)||null;},get message(){return message;},
+ return {setExitPolicy(value){if(!['balanced','boarding'].includes(value))throw new Error('Unknown exit policy');exitPolicy=value;},layout,ledger,standingLedger,actors,channels,events,enqueue,preload,alight,seatAboard,reseat,ready,abandon,outside,redirect,doorDistance,quietDoor,get time(){return time;},get active(){return [...actors.values()].find(a=>a.actions||a.exiting||a.yielding)||null;},get message(){return message;},
  update(dt,{doorsOpen=true}={}){if(!Number.isFinite(dt)||dt<0)throw new Error('Non-negative finite dt required');if(dt===0){tick(0,doorsOpen);return;}if(!prepareStops&&idle()){time+=dt;return;}for(let left=dt;left>1e-8;left-=.025)tick(Math.min(left,.025),doorsOpen);},
  snapshot(){const active=[...actors.values()].filter(a=>a.actions||a.exiting||a.yielding),st=standingLedger.snapshot();return {waitingAvoidance:exitFlow.diagnostics,planningExits:exitFlow.preparing,scheduledExits:exitFlow.pending.length,exitPolicy,exitPlan,vehicleId,simulationTime:time,boarded,lastBoardDoorAt,lastExitDoorAt,lastExitRouteAt,...ledger.snapshot(),standing:st.seated,standingReserved:st.reserved,studyStandingPlaces:st.mappedSeats,queued:channels.reduce((n,c)=>n+c.queue.length,0),waitingForPlace:[...actors.values()].filter(a=>a.stage==='queue'&&!a.seatId&&!a.standingId).length,exited,active:active[0]?{id:active[0].id,stage:active[0].stage,seatId:active[0].seatId}:null,moving:active.length,doorStreams:channels.map(c=>({id:c.id,queued:c.queue.length,alighted:c.alighted,entry:c.entry??entryActors(c)[0]?.id??null,climbing:entryActors(c).filter(a=>a.legPose).length,descending:[...actors.values()].filter(a=>a.channel===c.id&&a.exiting&&a.legPose).length,direction:[...actors.values()].some(a=>a.doorId===c.door.id&&(a.stage==='exit queue'||a.exiting&&a.egressClearAt==null))?'out':'in'})),message};}};
 }

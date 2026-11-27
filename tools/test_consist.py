@@ -18,6 +18,9 @@ passengers (src/passengers/consist.js) on two cars, by the user's rules (2026-11
   opens") the stop near, those to alight there go to their doors' doorway places while the tram drives, nobody else moving;
   the same ones alight, sooner after the doors open than from their places, the boarders after them; one whose stop comes
   while they are on the way alights from where they get to.
+- (Dveře I, the user, 2026-11-26: "only the 1st door in car where driver sits") with the first car's front door alone open,
+  the boarders queued at both cars' shut doors all get on through it, the second car's handed to the first where they stand;
+  the first car's alighters leave through it, the second car's stay aboard until all the doors open; the counts right.
 And tools/cabin.py's game_cabin keeps one packing and what the passenger modules read.
 """
 import faulthandler
@@ -188,6 +191,37 @@ PAGE = """async () => {
     for (let t = 0; t < 60 && p.toAlight; t += H) count(p.update(H, true));
     out.closed = { n, ...closed, toAlightAfter: p.toAlight, insAfter: ins, outsAfter: outs, aboard: p.aboard, check2: p.check() };
   }
+  // (#249, Dveře I, the user, 2026-11-26: "only the 1st door in car where driver sits"; those waiting walk to it, those to alight
+  // leave through it) 60 aboard, 20 to alight and 24 queued at the shut doors of both cars; the first car's front door alone opens:
+  // everyone boards through it, the second car's boarders handed to the first car where they stand (in its frame), the first car's
+  // alighters out through it, the second car's stay aboard; then all the doors: they get off. The counts right throughout
+  {
+    const p = set(60, 6), spacing = 15.04, lanes = {}, bad = [];
+    p.board(24, 7);
+    const n = p.alight(20);
+    const ofCar = p.cars.map((car) => [...car.c.actors.values()].filter((a) => a.stage === 'exit queue').length);
+    for (let t = 0; t < 2; t += H) p.update(H, false);
+    const queued = p.cars.map((car) => [...car.c.actors.values()].filter((a) => !a.aboard).length);
+    const was = new Map([...p.cars[1].c.actors.values()].filter((a) => !a.aboard).map((a) => [a.id, { x: a.x - spacing, z: a.z }]));
+    p.onlyDoor('Front', spacing);
+    let t = 0, handed = 0, moved = 0;
+    const count = (xs) => { for (const x of xs) { const k = `${x.car} ${x.lane.split(':')[0]} ${x.dir}`; lanes[k] = (lanes[k] || 0) + 1; } };
+    count(p.update(H, [{ Front: true }]));
+    for (const a of p.cars[0].c.actors.values()) {
+      const w = a.from && was.get(a.from);
+      if (w) { handed++; moved = Math.max(moved, Math.hypot(a.x - w.x, a.z - w.z)); }
+    }
+    for (; t < 150; t += H) {
+      count(p.update(H, [{ Front: true }]));
+      if (Math.round(t / H) % 30 === 0) bad.push(...p.check());
+      if (p.waiting(7) === 0 && p.toAlight === ofCar[1]) break;
+    }
+    for (let i = 0; i < 2 / H; i++) count(p.update(H, [{ Front: true }]));
+    const stuck = p.toAlight, aboard1 = p.aboard;
+    p.onlyDoor(null);
+    for (let i = 0; i < 60 / H && p.toAlight; i++) count(p.update(H, true));
+    out.only = { n, ofCar, queued, was: was.size, handed, moved: +moved.toFixed(3), lanes, t: +t.toFixed(1), stuck, aboard1, after: p.toAlight, aboard: p.aboard, bad, check: p.check() };
+  }
   return out;
 }"""
 
@@ -254,6 +288,8 @@ def main():
     c, h, s, w, k, d, f, y = r["cabin"], r["half"], r["stand"], r["reseat"], r["crush"], r["closed"], r["front"], r["ready"]
     yl = y["late"]
     fl = f["lanes"]
+    o = r["only"]
+    ol = o["lanes"]
     share = s["standers"] / s["boarders"]
     want = {
         "the cabin: the model's, 24 seats + 81 standing = 105, no outline overlapping another, none in the cab":
@@ -283,6 +319,14 @@ def main():
             yl["n"] == 15 and yl["outs"] == 15 and yl["ins"] == 20 and yl["aboard"] == 55 and not yl["check"],
         f"the doors closed: {d['steps0']} on the steps finish ({d['steps1']} left), {d['gone']} stay behind, nobody waits": d["steps0"] > 0 and d["steps1"] == 0 and d["waiting"] == 0 and not d["check"],
         f"the doors open again: the {d['toAlight']} left to alight get off ({d['toAlightAfter']} left), the counts right": d["toAlight"] > 0 and d["toAlightAfter"] == 0 and d["outsAfter"] == d["n"] and not d["check2"] and d["aboard"] == 60 - d["n"] + d["insAfter"],
+        f"Doors I: {o['queued']} queued at the shut doors, the second car's {o['was']} handed to the first car where they stood "
+        f"({o['handed']}, {o['moved']} m on), all {ol.get('0 Front in', 0)} on through its front door in {o['t']} s ({ol})":
+            o["queued"][1] > 0 and o["handed"] == o["was"] and o["moved"] < 0.1 and ol.get("0 Front in", 0) == 24
+            and all(k.startswith("0 Front") for k in ol if k.endswith(" in")),
+        f"Doors I: the first car's {o['ofCar'][0]} alighters out through it, the second car's {o['ofCar'][1]} stay aboard ({o['stuck']}); "
+        f"then all the doors: they get off ({o['after']} left), the counts right ({(o['bad'] + o['check'])[:1]})":
+            min(o["ofCar"]) > 0 and o["ofCar"][0] + o["ofCar"][1] == o["n"] == 20 and ol.get("0 Front out", 0) == o["ofCar"][0]
+            and o["stuck"] == o["ofCar"][1] and o["after"] == 0 and o["aboard"] == 64 and not o["bad"] and not o["check"],
         "tools/cabin.py game_cabin: one packing and what is read; off_floor finds a place over a fixture": game_cabin_keeps(),
     }
     fails += [k for k, ok in want.items() if not ok]

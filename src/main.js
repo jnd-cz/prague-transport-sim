@@ -883,7 +883,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   // touching the controller or the doors takes over from the autopilot
-  if (pilot && (['w', 's', 'arrowup', 'arrowdown', ' ', 'n', 'd', 'r'].includes(k) || /^Digit[0-5]$/.test(e.code))) {
+  if (pilot && (['w', 's', 'arrowup', 'arrowdown', ' ', 'n', 'd', 'u', 'r'].includes(k) || /^Digit[0-5]$/.test(e.code))) {
     pilot = null;
     game.autopilot = false;
     takeOver();
@@ -913,6 +913,7 @@ window.addEventListener('keydown', (e) => {
     case 'n': setStep(0); break;
     case 'r': if (!arcade()) tram.eq.park(); break; // the brake pedal's ratchet (arcade parks by itself)
     case 'd': game.toggleDoors(); break;
+    case 'u': game.toggleFrontDoor(); break; // (Dveře I, the front door alone; not Shift+D: the dead-man pedal is a held Shift)
     case 'b': game.ringBell(); break;
     case 'x': game.crowbar(); break;
     case 'q': case 'arrowleft': lookTarget = lookMax().left; break;    // look out of the left window
@@ -1053,7 +1054,7 @@ function placeTram(s) {
   // the rail everywhere in the data, src/world.js); the indicators and the high beams
   const braking = tram.brake > 500, clock = game.clock;
   if (pilot) lamps.indicate = indicating(lamps.turns, lamps.kerb, tram.s, tram.v, braking);
-  poseT3(tramModel, { doors: game.doorOpenness, braking, track: tram.trackMagnets, collector: CONTACT_WIRE - RAIL_TOP,
+  poseT3(tramModel, { doors: game.otherDoorsOpenness, front: game.frontDoorOpenness, braking, track: tram.trackMagnets, collector: CONTACT_WIRE - RAIL_TOP,
     indicate: lamps.indicate, clock, highBeam: lamps.high || lamps.held });
   // the indicators' relay ticks in the cab as they go on and off
   const sig = signalsAt(lamps.indicate, clock), lit = sig.left || sig.right;
@@ -1112,7 +1113,7 @@ function updateCamera(dt, t) {
   // sway, and the lean into a canted curve
   camera.rotation.z = Math.sin(t * 1.3) * 0.002 * Math.min(1, tram.v / 8) + route.rollAt(s - 3);
   // the cab's frame where the eye sees it, the panel's band turned with the head
-  cabFrame.draw(camera, lead, leadFront(), game ? game.doorOpenness : 0, mirrorShown() ? $('mirror') : null);
+  cabFrame.draw(camera, lead, leadFront(), game ? game.frontDoorOpenness : 0, mirrorShown() ? $('mirror') : null);
   hud.panel.setLook(look, lookMax());
 }
 

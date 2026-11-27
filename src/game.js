@@ -4,7 +4,7 @@
 // and stops (src/platformRules.js), each signal's aspect (sig.show, a gauntlet's G.their), each switch indicator's
 // (sw.shown), the signs where the rules want them (signPlan, diagSigns), the obstacles, the late passengers, the cross
 // streets' cars, the driver with the switch iron and the leaf mash (leafSmears). Every rand() draw stays here.
-import { ADHESION, PANTO_FROM_FRONT, T3 } from './tram.js';
+import { ADHESION, CAR_PITCH, PANTO_FROM_FRONT, T3 } from './tram.js';
 import { Route } from './route.js';
 import { DERAIL, FROG, derailRisk, placeStretches, stopPassPoints, trackworkStretches, withoutOwnPieces } from './speedRules.js';
 import { locateGradients, planSigns, smallRadiusCurves, withArrows } from './speedSigns.js';
@@ -12,6 +12,7 @@ import { toLatLon } from './geo.js';
 import { t } from './i18n.js';
 
 const DOOR_OPEN_TIME = 2.0, DOOR_CLOSE_TIME = 3.0;
+const FRONT_ONLY = [{ Front: true }]; // (the passengers' doors with Dveře I: the first car's front door alone, src/passengers/consist.js)
 const STOP_AHEAD = 6;          // without a stop sign in the data: the front stops this far past the GTFS point
 // Without a platform (_stopZone): any front position this far either side of the sign counts.
 // Stopping within 3 m of the sign earns a bonus; overshooting > 4 m is served but penalised.
@@ -73,6 +74,11 @@ export class Game {
     this.clock = this.trip[opts.startStop] - (opts.lead ?? 40);
     this.doorState = 'open';
     this.doorTimer = 0;
+    // (Dveře I, #249: the doors doorState works are the first car's front door alone, the others shut; frontAhead: the others
+    // opening after it, it open meanwhile)
+    this.frontOnly = false;
+    this.frontAhead = false;
+    this.ironWait = null; // (the driver with the switch iron waiting for the front door, crowbar)
     this.doorsMovingFlag = false;
     this.overspeedAcc = 0;
     this.comfortAcc = 0;
@@ -841,41 +847,87 @@ export class Game {
   }
 
   get doorsClosed() { return this.doorState === 'closed'; }
-  // how far the doors are open, 0..1 (the drawn doors follow it)
+  // how far the doors are open, 0..1 (the drawn doors follow it): those doorState works
   get doorOpenness() {
     const d = this.doorState;
     return d === 'open' ? 1 : d === 'closed' ? 0 : d === 'opening' ? 1 - this.doorTimer / DOOR_OPEN_TIME : this.doorTimer / DOOR_CLOSE_TIME;
   }
+  // (Dveře I, #249) the first car's front door, by the driver (the cab's view of it, the switch iron), and the others, 0..1
+  get frontDoorOpenness() { return this.frontAhead ? 1 : this.doorOpenness; }
+  get otherDoorsOpenness() { return this.frontOnly ? 0 : this.doorOpenness; }
+
+  // the doors the passengers may cross now (src/passengers/consist.js update), the tram standing at the stop (at): all (true), none,
+  // or with the front door alone per car its doors
+  _paxDoors(at) {
+    if (!at) return false;
+    if (this.doorState === 'open') return this.frontOnly ? FRONT_ONLY : true;
+    return this.frontAhead ? FRONT_ONLY : false;
+  }
 
   // ------------------------------------------------------------------ input
+  // Dveře II (D): all the doors: open them (with the front door alone open, the others), or close them
   toggleDoors() {
     if (this.finished) return;
-    if (this.doorState === 'closed' || this.doorState === 'closing') {
-      if (Math.abs(this.tram.v) > 0.3) { this.audio.emit('warning'); this.msg(t('msg.noOpenMoving'), 'warn'); return; }
-      // tell the driver why nothing happens when the doors open away from the platform
-      const st = this.stops[this.nextStop];
-      if (st && !this._atStop(st)) {
-        const d = st.target - this.tram.s;
-        if (d > 0 && d < 200) this.msg(t('msg.notAtPlatform', { go: Math.round(st.zone[0] - this.tram.s), d: Math.round(d) }), 'warn', 5);
-        else if (d >= 200) this.msg(t('msg.noPlatform'), 'warn');
-      }
+    if (this.doorState === 'closed' || this.doorState === 'closing' || this.frontOnly) this._openDoors(false);
+    else this._closeDoors();
+  }
+
+  // Dveře I (U): the first car's front door alone, by the driver (the user, 2026-11-26: "only the 1st door in car where driver
+  // sits"; "first door opening is usually used only for driver (like for switch) or is someone runs from the front side of tram"):
+  // open it, the others shut, or close it. With all of them open it does nothing (Dveře II closes them). Those waiting for the tram
+  // walk to it and get on there, those to alight in the first car leave through it ("yes", the user, the same day; src/passengers/
+  // consist.js onlyDoor); whether to use it is the player's choice, no points either way
+  toggleFrontDoor() {
+    if (this.finished) return;
+    if (this.doorState === 'closed' || this.doorState === 'closing') this._openDoors(true);
+    else if (this.frontOnly) this._closeDoors();
+  }
+
+  _openDoors(front) {
+    if (Math.abs(this.tram.v) > 0.3) { this.audio.emit('warning'); this.msg(t('msg.noOpenMoving'), 'warn'); return; }
+    // tell the driver why nothing happens when the doors open away from the platform (the front door alone opens for the driver too)
+    const st = this.stops[this.nextStop];
+    if (!front && st && !this._atStop(st)) {
+      const d = st.target - this.tram.s;
+      if (d > 0 && d < 200) this.msg(t('msg.notAtPlatform', { go: Math.round(st.zone[0] - this.tram.s), d: Math.round(d) }), 'warn', 5);
+      else if (d >= 200) this.msg(t('msg.noPlatform'), 'warn');
+    }
+    // (from the front door alone to all of them: the others open, it stays open; one still opening goes on with them)
+    this.frontAhead = !front && this.frontOnly && this.doorState === 'open';
+    if (this.doorState !== 'opening') {
       this.doorState = 'opening';
       this.doorTimer = DOOR_OPEN_TIME;
-      this.audio.emit('door.open');
-    } else {
-      this.doorState = 'closing';
-      this.doorTimer = DOOR_CLOSE_TIME;
-      this.audio.emit('door.buzzer');
-      this.audio.emit('door.close');
-      // (those on the entry steps finish the climb; those at the doors not yet on them wait there and get on when the doors open
-      // again, the lab's door predicate; they go home if the tram leaves, _finishStop. Closing on them costs 15 each, once a person;
-      // #249, the user, 2026-11-26: "If player closes door and then opens again at the same stop, do people come inside again?")
-      const st = this.stops[this.nextStop];
-      if (st && st.arrived && st.waiting > 0 && this._atStop(st)) {
-        const shut = this.pax.outside(st.i).filter((a) => !a.shutOn);
-        for (const a of shut) a.shutOn = true;
-        if (shut.length) this.penalty('leftBehind', shut.length * 15, t('msg.closedOn', { n: shut.length }));
+    }
+    this.pax.onlyDoor(front ? 'Front' : null, CAR_PITCH); // (the cars' middles as drawn, src/models.js placeConsist)
+    if (front !== this.frontOnly) {
+      this.frontOnly = front;
+      // (those walking in to a door, or at one: to the one open, or with all open the nearest)
+      for (const r of this.runners) {
+        if (r.state !== 'walk' && r.state !== 'door') continue;
+        const [car, door] = front ? [0, 'Front'] : this._nearestDoor(r.s);
+        if (car !== r.car || door !== r.door) Object.assign(r, { car, door, state: 'walk' });
       }
+    }
+    this.audio.emit('door.open');
+  }
+
+  _closeDoors() {
+    this.frontAhead = false;
+    // (the front door alone shut: nobody goes to it any more; those at it wait there. frontOnly stays until the next opening, which
+    // door is drawn closing and where those walking in go meanwhile)
+    if (this.frontOnly) this.pax.onlyDoor(null);
+    this.doorState = 'closing';
+    this.doorTimer = DOOR_CLOSE_TIME;
+    this.audio.emit('door.buzzer');
+    this.audio.emit('door.close');
+    // (those on the entry steps finish the climb; those at the doors not yet on them wait there and get on when the doors open
+    // again, the lab's door predicate; they go home if the tram leaves, _finishStop. Closing on them costs 15 each, once a person;
+    // #249, the user, 2026-11-26: "If player closes door and then opens again at the same stop, do people come inside again?")
+    const st = this.stops[this.nextStop];
+    if (st && st.arrived && st.waiting > 0 && this._atStop(st)) {
+      const shut = this.pax.outside(st.i).filter((a) => !a.shutOn);
+      for (const a of shut) a.shutOn = true;
+      if (shut.length) this.penalty('leftBehind', shut.length * 15, t('msg.closedOn', { n: shut.length }));
     }
   }
 
@@ -890,11 +942,21 @@ export class Game {
   // The driver gets out with the switch iron (stavěcí klíč; C14; the code keeps the name crowbar): walks
   // from the cab door along the tram's right side to
   // the switch (1.6 m/s), throws it (2 s crouched over the points) and walks back; at least 9 s.
+  // Out by the front door: shut, it opens by itself (alone, Dveře I), the driver sets off once it is open, and it shuts behind them
+  // on the way back unless somebody waits at it (#249, the user, 2026-11-26: "first door opening is usually used only for driver (like for
+  // switch)", "I would auto open and close front door for the switch iron operation")
   crowbar() {
-    if (this.action) return;
+    if (this.action || this.ironWait) return;
     const sw = this.switches.find((w) => !w.passed && w.s - this.tram.s > 0 && w.s - this.tram.s < 40);
     if (!sw) { this.msg(t('msg.noSwitch'), 'warn'); return; }
     if (this.tram.v > 0.05) { this.msg(t('msg.stopFirst'), 'warn'); return; }
+    if (this.frontDoorOpenness >= 1) { this._ironOut(sw, false); return; }
+    const auto = this.doorState === 'closed' || this.doorState === 'closing';
+    if (auto) this._openDoors(true);
+    this.ironWait = { sw, auto }; // (out once the front door is open: _updateDoors)
+  }
+
+  _ironOut(sw, auto) {
     const door = this.tram.s - 1.5, walk = (sw.s - 0.6 - door) / 1.6, total = Math.max(9, 2 * walk + 2);
     // (driver: out of the cab while the action lasts, drawn by src/gameView.js)
     this.action = {
@@ -904,6 +966,9 @@ export class Game {
         this._showSwitch(sw);
         this.audio.emit('switch.iron');
         this.msg(t('msg.switchManual', { dir: t(`dirShort.${sw.pos === 'straight' ? 'straight' : sw.divSide}`) }), 'info');
+        // (back in: the front door opened for the driver shuts behind them, unless somebody waits at it to get on)
+        const st = this.stops[this.nextStop], waiting = st?.arrived && this._atStop(st) && this.pax.outside(st.i).length > 0;
+        if (auto && this.frontOnly && this.doorState === 'open' && !waiting) this._closeDoors();
       },
     };
   }
@@ -934,20 +999,27 @@ export class Game {
     return tr.s - (tr.length / tr.cars) * (k + 0.5) + (d?.x ?? 0);
   }
 
-  // one coming to the stop (_comeTo): in from the platform's back or front end, at a walk, to the door nearest that end, along the
-  // platform's edge (the stop crowd stands further from it). With the doors open they join its queue and board. Each with a look
-  // of their own (look: src/people.js's person number; model: the box figure's shirt), kept into the tram (the passenger core's
-  // boarder is `who` them, src/passengerView.js). (from: 'back' or 'front' for the tests, tools/test_people.py; drawn the same)
-  _spawnWalker(st, from = null) {
-    const r = this.comeRand, tr = this.tram, [lo, hi] = this.platformEnds(st), u = r();
-    const s = (from ? from === 'back' : u < 0.5) ? lo - 1 : hi + 1;
+  // the door of our set nearest s along the track: [car, its id]
+  _nearestDoor(s) {
     let car = 0, door = null, best = Infinity;
-    for (let k = 0; k < tr.cars; k++) {
+    for (let k = 0; k < this.tram.cars; k++) {
       for (const d of this.pax.cars[0].c.layout.doors) {
         const e = Math.abs(this.doorS(k, d.id) - s);
         if (e < best) { best = e; car = k; door = d.id; }
       }
     }
+    return [car, door];
+  }
+
+  // one coming to the stop (_comeTo): in from the platform's back or front end, at a walk, to the door nearest that end (with the
+  // front door alone open, to it), along the platform's edge (the stop crowd stands further from it). With the doors open they join
+  // its queue and board. Each with a look of their own (look: src/people.js's person number; model: the box figure's shirt), kept
+  // into the tram (the passenger core's boarder is `who` them, src/passengerView.js). (from: 'back' or 'front' for the tests,
+  // tools/test_people.py; drawn the same)
+  _spawnWalker(st, from = null) {
+    const r = this.comeRand, [lo, hi] = this.platformEnds(st), u = r();
+    const s = (from ? from === 'back' : u < 0.5) ? lo - 1 : hi + 1;
+    const [car, door] = this.frontOnly ? [0, 'Front'] : this._nearestDoor(s);
     const look = (r() * 4294967296) >>> 0;
     this.runners.push({ walk: true, st, car, door, look, model: look % 10, s, lat: -1.9 - r() * 0.4, v: WALK_V[0] + r() * WALK_V[1],
       vRun: RUN_V[0] + r() * RUN_V[1], ran: false, target: this.doorS(car, door), state: 'walk' });
@@ -1104,7 +1176,13 @@ export class Game {
   _updateDoors(dt) {
     if (this.doorState === 'opening' || this.doorState === 'closing') {
       this.doorTimer -= dt;
-      if (this.doorTimer <= 0) this.doorState = this.doorState === 'opening' ? 'open' : 'closed';
+      if (this.doorTimer <= 0) { this.doorState = this.doorState === 'opening' ? 'open' : 'closed'; this.frontAhead = false; }
+    }
+    // (the driver with the switch iron waiting for the front door: out once it is open; it shut again, or the tram moving: not)
+    const w = this.ironWait;
+    if (w && !this.action) {
+      if (this.frontDoorOpenness >= 1) { this.ironWait = null; this._ironOut(w.sw, w.auto); }
+      else if (this.doorState === 'closing' || this.doorState === 'closed' || Math.abs(this.tram.v) > 0.05) this.ironWait = null;
     }
     if (this.doorState !== 'closed' && Math.abs(this.tram.v) > 0.4) {
       if (!this.doorsMovingFlag) { this.doorsMovingFlag = true; this.penalty('doors', 100, t('msg.doorsMoving')); }
@@ -1117,8 +1195,8 @@ export class Game {
     const at = !!st && this._atStop(st) && Math.abs(tram.v) < 0.05;
     // the passengers (#249): through the doors only while they are open with the tram standing at the stop (one on the steps
     // finishes the way); inside, the freed seats taken also while it drives. A crossing is the head of the entry steps in, their
-    // foot out: the counts change there, and the autopilot waits for the last one
-    for (const x of this.pax.update(dt, at && this.doorState === 'open')) {
+    // foot out: the counts change there, and the autopilot waits for the last one (with Dveře I, the front door's alone)
+    for (const x of this.pax.update(dt, this._paxDoors(at))) {
       this.score += 1;
       if (x.dir === 'in') this.stops[x.tag].waiting--;
       else if (st?.alight > 0) st.alight--;

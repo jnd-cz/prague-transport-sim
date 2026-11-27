@@ -456,9 +456,10 @@ export function makeRiggedSet(id, root, line, cars, dest, run, collector, fleet 
       if (!clip) continue;
       const a = mixer.clipAction(clip); a.play(); a.paused = true; act[name] = a;
     }
-    for (const d of rig.doors || []) if (act[d.clip]) doorClips.push(act[d.clip]);
+    const doorNames = []; // (each clip's door: Front, Middle, Rear on the hybrid T3, as the passengers' cabin names them)
+    for (const d of rig.doors || []) if (act[d.clip]) { doorClips.push(act[d.clip]); doorNames.push(d.name); }
     car.userData.rig = {
-      mixer, act, doorClips, collectorClip: act[rig.pantograph?.clip], doors: -1, collector: -1, braking: null, track: -1,
+      mixer, act, doorClips, doorNames, collectorClip: act[rig.pantograph?.clip], doors: -1, collector: -1, braking: null, track: -1,
       bogies: proto.bogies.map((b) => ({ node: n(b.name), front: b.front, shoes: [] })),
       wheels: (rig.wheels || []).map((w) => ({ node: n(w.name), r: w.radius })),
       couplers: [n('R_coupler_front'), n('R_coupler_rear')],
@@ -517,17 +518,19 @@ export function setRiggedLine(model, line, dest = model.userData.dest, run = mod
   Object.assign(u, { line, dest, run });
 }
 
-// The mechanisms from the game's state, each only when it changes: doors (0 closed .. 1 open), the
-// collector's contact height over the rail, the brake lamps, the track-brake magnets (0 off, 1 the rear
-// bogies', 2 all), the indicators' sides lit now (`signals`: { left, right }), the high beams.
-export function poseRigged(model, { doors, collector, braking, track, signals, highBeam } = {}) {
+// The mechanisms from the game's state, each only when it changes: doors (0 closed .. 1 open; `front`: the first car's front
+// door, if apart from them: Dveře I, #249), the collector's contact height over the rail, the brake lamps, the track-brake
+// magnets (0 off, 1 the rear bogies', 2 all), the indicators' sides lit now (`signals`: { left, right }), the high beams.
+export function poseRigged(model, { doors, front, collector, braking, track, signals, highBeam } = {}) {
   const { rig } = model.userData.proto;
-  model.userData.cars.forEach((car) => {
+  model.userData.cars.forEach((car, k) => {
     const r = car.userData.rig;
     let scrub = false;
-    if (doors !== undefined && Math.abs(doors - r.doors) > 1e-3) {
+    const f = k === 0 && front !== undefined ? front : doors;
+    if (doors !== undefined && (Math.abs(doors - r.doors) > 1e-3 || Math.abs(f - (r.front ?? doors)) > 1e-3)) {
       r.doors = doors;
-      for (const a of r.doorClips) a.time = THREE.MathUtils.clamp(doors, 0, 1) * a.getClip().duration;
+      r.front = f;
+      r.doorClips.forEach((a, i) => { a.time = THREE.MathUtils.clamp(r.doorNames[i] === 'Front' ? f : doors, 0, 1) * a.getClip().duration; });
       scrub = true;
     }
     if (collector !== undefined && Math.abs(collector - r.collector) > 1e-3 && r.collectorClip) {

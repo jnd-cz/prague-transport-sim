@@ -8,7 +8,10 @@ port, 1600 x 900). Checks:
 - the cab frame leaves the mirror's picture out while it is shown, and covers it when the mirror is off (src/cabframe.js);
 - with the head turned all the way left, the cab's rear wall stands at the screen's left edge (src/cabframe.js REAR);
 - every figure of every meter, the panel's and the compact strips', lies inside its plate and off its unit letter, in the
-  page's font and in Arial, as wide as a phone's Roboto (src/panel.js meter(), #691)."""
+  page's font and in Arial, as wide as a phone's Roboto (src/panel.js meter(), #691);
+- (#249, the user's Firefox at 3840 x 2008: labels larger than their plates) in Firefox with a 16 px minimum font size (its fonts
+  settings), every plate's and lamp's label drawn as large as without one (within 1 px, 5 % wide) and none past its plate
+  (src/panel.js fit, minFont); skipped without Playwright's Firefox."""
 import argparse
 import faulthandler
 import functools
@@ -96,9 +99,39 @@ PIXELS = """(rect) => {
 }"""
 
 
+# (#249) every label's words as drawn: the plates' and the lamp strip's, their drawn boxes against their plates'
+LABELS = """() => [...document.querySelectorAll('#dash .plate, #dash .lstrip .lab')].filter((p) => p.offsetParent).map((p) => {
+  const t = p.firstElementChild.getBoundingClientRect(), b = p.getBoundingClientRect();
+  return { id: p.closest('[data-c]').dataset.c + (p.dataset.strip || ''), w: +t.width.toFixed(1), h: +t.height.toFixed(1),
+    over: p.classList.contains('plate') ? +(t.width - b.width).toFixed(1) : 0 };
+})"""
+
+
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
+
+
+def labels_in_firefox(p, base, line):
+    """(#249, the user's Firefox at 3840 x 2008, 2026-11-25: "příliš velký text na popiskách ovládacího panelu") the panel's labels
+    in Firefox without a minimum font size and with one of 16 px (its fonts settings): {minimum: labels} (None: no Firefox)."""
+    out = {}
+    for mins in (0, 16):
+        try:
+            browser = p.firefox.launch(headless=True, firefox_user_prefs={f"font.minimum-size.{g}": mins for g in ("x-western", "x-unicode")})
+        except Exception as e:  # (Playwright's Firefox not installed: python -m playwright install firefox)
+            print(f"(the labels in Firefox skipped: {str(e).splitlines()[0]})")
+            return None
+        page = browser.new_page(viewport={"width": 1600, "height": 900})
+        page.goto(f"{base}/?line={line}", timeout=180000)
+        page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=180000)
+        page.evaluate("document.getElementById('optAuto').checked = false")
+        page.click("#btnStart")
+        page.wait_for_function("window.game && document.body.classList.contains('shift')", timeout=120000)
+        page.wait_for_timeout(1500)
+        out[mins] = page.evaluate(LABELS)
+        browser.close()
+    return out
 
 
 def main():
@@ -137,6 +170,7 @@ def main():
             page.keyboard.up("q")
             r["errors"] = errors[:3]
             browser.close()
+            r["firefox"] = labels_in_firefox(p, f"http://127.0.0.1:{server.server_port}", args.line)
     finally:
         server.shutdown()
     print(json.dumps(r))
@@ -165,6 +199,15 @@ def main():
         fails.append(f"with the mirror off (Z), the cab frame leaves its place out: {n['mirror']}")
     if m["edge"][3] < 255 or abs(m["edge"][0] - 0x5f) > 3:
         fails.append(f"no rear wall at the left edge with the head turned all the way left: {m['edge']}")
+    ff = r["firefox"]
+    if ff:
+        plain, held = ({x["id"]: x for x in ff[m]} for m in (0, 16))
+        if set(plain) != set(held) or not plain:
+            fails.append(f"Firefox: other labels with a minimum font size ({sorted(set(plain) ^ set(held))})")
+        for k, a in plain.items():
+            b = held.get(k)
+            if b and (b["over"] > 0.5 or abs(b["h"] - a["h"]) > 1 or b["w"] > a["w"] * 1.05 + 1):
+                fails.append(f"Firefox, a 16 px minimum font size: {k} drawn {b['w']} x {b['h']}, past its plate by {b['over']} (without: {a['w']} x {a['h']})")
     if r["errors"]:
         fails.append(f"page errors: {r['errors']}")
     for f in fails:

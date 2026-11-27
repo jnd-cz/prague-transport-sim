@@ -57,6 +57,9 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
   Whoever is on the steps when you close the doors gets through; the others wait at the doors and get on when you open
   them again (closing on them costs 15 points each); if you leave, they stay at the stop. Anyone who could not get off
   gets off at the next one.
+  `U` (Dveře I) opens the front door by the driver alone: the driver gets out there with the switch iron, and you let in
+  someone running up from the front. Those waiting walk to it and get on; the first car's passengers get off through it,
+  the second car's can't until you open all the doors with `D`.
   With the detailed tram model (the default) you see them: sitting and standing through the windows, getting off and
   on by the steps, those waiting walking from the platform to the doors, and in the right mirror who is still
   boarding. Those above the 105 a car only counts are seen on the steps and outside only.
@@ -75,11 +78,12 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 | `1`–`5` | a drive step; with `Shift` a brake step |
 | `R` | park and unpark the brake pedal (advanced controls) |
 | `A` | sand (held) |
-| `D` | doors |
+| `D` | doors (Dveře II: all of them) |
+| `U` | the front door by the driver alone (Dveře I) |
 | `B` | bell |
 | `Y` | the **Výhybka** button: current through the contact (held) |
 | `C` | heating cut-out (held under a contact, to coast through) |
-| `X` | set a switch with the switch iron (tram stopped) |
+| `X` | set a switch with the switch iron (tram stopped; the front door opens and shuts for the driver by itself) |
 | `H` / `K` / `F` | saloon seat heaters / cab heater / waste-heat flap |
 | `Q` / `E` or `←` / `→` | look out of the left / right window (held) |
 | `G` | zoom the cab view three times, as a driver looks into the distance: a sign reads at 75 m (held, also while paused) |
@@ -190,7 +194,7 @@ tram, dark glass is the game.
   battery voltmeter 0–40 V and the glow lamp NAPĚTÍ V TROLEJI (line voltage: a T3 has no line voltmeter). With the
   assist option a red mark on the speedometer shows the speed limit.
 - **Lamps** as on the car: the indicators (green), V (EXIT, green: a passenger pressed the stop request to get off
-  at the next request stop; lit until the doors open), DOORS (green when **all are closed**), BRAKE I, BRAKES II and
+  at the next request stop; lit until the doors open), DOORS (green when **all are closed**), BRAKES I, BRAKES II and
   TRAIN (red while the shoe brakes are on, TRAIN the second car's), ACCELERATOR (orange while its resistors are in),
   MIRROR HEATING.
 - **Controls** can be pressed with the mouse or a finger and send the game's key (with the assist option the key is
