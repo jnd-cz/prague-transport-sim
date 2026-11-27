@@ -1,0 +1,198 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Prague IPR shelters, catalogue pp. 7–9 (#252). See ASSETS.md for the design and source credits.
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const HEIGHT = 2.455;
+const DEPTH = 1.858;
+const WALL = -DEPTH / 2;
+const BACK = WALL + .14;
+const GLASS_BOTTOM = .23, GLASS_TOP = 2.245;
+const NAME_Y = 2.321;
+const LAYOUTS = {
+  'P.5': { length: 7.080, supports: [-3.35, -.28, .82, 3.35], bays: [[0, 1], [2, 3]], side: 1.08, citylight: true },
+  'P.6': { length: 7.080, supports: [-3.35, 0, 3.35], bays: [[0, 1], [1, 2]], side: 1.08, citylight: true },
+  'P.7': { length: 7.080, supports: [-3.35, 0, 3.35], bays: [[0, 1], [1, 2]], side: .58, citylight: false },
+  'P.11': { length: 4.040, supports: [-1.83, 1.83] },
+};
+
+const metal = new THREE.MeshStandardMaterial({ name: 'frame', color: 0x35383a, metalness: .23, roughness: .72 });
+const wood = new THREE.MeshStandardMaterial({ name: 'seats', color: 0x584434, roughness: .87 });
+const poster = new THREE.MeshBasicMaterial({ name: 'citylight', color: 0xd9d9d2 });
+const glassSurface = { transparent: true, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true };
+const glass = new THREE.MeshBasicMaterial({ name: 'glass', color: 0xa2bfc3, opacity: .24, ...glassSurface });
+const roofGlass = new THREE.MeshBasicMaterial({ name: 'roof-glass', color: 0x82999d, opacity: .42, ...glassSurface });
+
+let markedGlass;
+function markings() {
+  if (markedGlass) return markedGlass;
+  // One metre horizontally. The window has two denser bands at 0.8–1.0 and 1.4–1.6 m above grade.
+  const canvas = document.createElement('canvas');
+  canvas.width = 200;
+  canvas.height = 400;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(162,191,195,.24)';
+  ctx.fillRect(0, 0, 200, 400);
+  for (let row = 0; row < 26; row++) {
+    const y = row * 15 + 4, height = GLASS_TOP - y / 400 * (GLASS_TOP - GLASS_BOTTOM);
+    const band = (height >= .8 && height <= 1) || (height >= 1.4 && height <= 1.6);
+    ctx.fillStyle = band ? 'rgba(67,71,75,.66)' : 'rgba(67,71,75,.38)';
+    for (let x = row % 2 ? 10 : 0; x <= 200; x += 20) {
+      ctx.beginPath();
+      ctx.arc(x, y, band ? 4.4 : 2.2, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = THREE.RepeatWrapping;
+  markedGlass = new THREE.MeshBasicMaterial({ name: 'marked-glass', map, ...glassSurface });
+  return markedGlass;
+}
+
+function box(parts, w, h, d, x, y, z) {
+  parts.push(new THREE.BoxGeometry(w, h, d).translate(x, y, z));
+}
+
+function batch(parts, material) {
+  const mesh = new THREE.Mesh(mergeGeometries(parts), material);
+  for (const part of parts) part.dispose();
+  mesh.name = material.name;
+  mesh.castShadow = material === metal || material === wood;
+  mesh.receiveShadow = mesh.castShadow;
+  return mesh;
+}
+
+function pane(group, name, width, x, z, side, near) {
+  const geometry = new THREE.PlaneGeometry(width, GLASS_TOP - GLASS_BOTTOM);
+  if (near) {
+    const uv = geometry.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * width);
+  }
+  // Separate planes keep their own sort centres when seen through another pane.
+  const mesh = new THREE.Mesh(geometry, near ? markings() : glass);
+  mesh.name = name;
+  mesh.position.set(x, (GLASS_TOP + GLASS_BOTTOM) / 2, z);
+  if (side) mesh.rotation.y = Math.PI / 2;
+  group.add(mesh);
+}
+
+function canopy(group, frame, length, level) {
+  const half = length / 2, front = DEPTH / 2, radius = .13;
+  const outline = new THREE.Shape();
+  outline.moveTo(-half, -WALL);
+  outline.lineTo(half, -WALL);
+  outline.lineTo(half, -front + radius);
+  outline.quadraticCurveTo(half, -front, half - radius, -front);
+  outline.lineTo(-half + radius, -front);
+  outline.quadraticCurveTo(-half, -front, -half, -front + radius);
+  outline.closePath();
+  const curves = level === 'near' ? 4 : 1;
+  const roof = new THREE.Mesh(new THREE.ShapeGeometry(outline, curves).rotateX(-Math.PI / 2), roofGlass);
+  roof.name = 'canopy';
+  roof.position.y = HEIGHT;
+  group.add(roof);
+
+  box(frame, length - .08, .139, .125, 0, NAME_Y, BACK);
+  box(frame, length - .23, .042, .05, 0, HEIGHT - .021, front - .044);
+  box(frame, length, .033, .048, 0, HEIGHT - .0165, WALL + .024);
+  const ribs = level === 'near' ? (length > 5 ? 7 : 4) : level === 'middle' ? 3 : 2;
+  for (let i = 0; i < ribs; i++) {
+    const x = (length - .24) * (i / (ribs - 1) - .5);
+    box(frame, .048, .069, 1.710, x, HEIGHT - .048, .014);
+  }
+}
+
+function freestanding(group, frame, layout, level) {
+  const { supports, bays, side, citylight } = layout, near = level === 'near', far = level === 'far';
+  const seats = [];
+  for (const x of supports) {
+    box(frame, .105, 2.32, .135, x, 1.16, BACK);
+    if (near) box(frame, .216, .018, .212, x, .009, BACK);
+  }
+  for (const [first, last] of bays) {
+    const lo = supports[first] + .055, hi = supports[last] - .055;
+    box(frame, hi - lo, .07, .085, (lo + hi) / 2, .233, BACK);
+    const panes = far ? 1 : Math.round((hi - lo) / 1.06);
+    const span = (hi - lo) / panes;
+    for (let i = 0; i < panes; i++) {
+      const x = lo + span * (i + .5);
+      pane(group, 'rear-glass', span - .009, x, BACK + .012, false, near);
+      if (near && i) {
+        box(frame, .048, .028, .05, x - span / 2, 1.26, BACK + .012);
+      }
+    }
+    const seat = hi - 1.05;
+    const slats = near ? 8 : far ? 1 : 4;
+    for (let i = 0; i < slats; i++) {
+      box(seats, 1.800, .035, .31 / slats - (slats > 1 ? .004 : 0), seat, .485,
+        BACK + .072 + (i + .5) * .31 / slats);
+    }
+    for (const x of [seat - .64, seat + .64]) {
+      box(frame, .049, .043, .36, x, .447, BACK + .186);
+      if (!far) box(frame, .046, .23, .045, x, .335, BACK + .038);
+    }
+  }
+  group.add(batch(seats, wood));
+
+  for (const x of [supports[0], supports.at(-1)]) {
+    if (citylight && x < 0) continue;
+    const z = BACK + side / 2;
+    pane(group, 'end-glass', side, x, z, true, near);
+    for (const y of [GLASS_BOTTOM, GLASS_TOP]) box(frame, .06, .045, side, x, y, z);
+    if (near) box(frame, .036, GLASS_TOP - GLASS_BOTTOM, .028, x, (GLASS_BOTTOM + GLASS_TOP) / 2, BACK + side);
+  }
+  if (citylight) {
+    const x = supports[0], z = BACK + 1.35 / 2;
+    box(frame, .123, GLASS_TOP - GLASS_BOTTOM + .06, 1.35, x, (GLASS_TOP + GLASS_BOTTOM) / 2, z);
+    const faces = [];
+    for (const sign of [-1, 1]) box(faces, .002, 1.76, 1.18, x + sign * .062, 1.27, z);
+    group.add(batch(faces, poster));
+  }
+}
+
+function wallMounts(frame, positions, near) {
+  for (const x of positions) {
+    box(frame, .14, .700, .068, x, 2.105, WALL + .034);
+    box(frame, .112, .657, .120, x, 2.089, WALL + .100);
+    if (near) {
+      for (const y of [1.84, 2.19]) box(frame, .165, .045, .058, x, y, WALL + .036);
+    }
+  }
+}
+
+function namePlate(name, length) {
+  const width = Math.min(3.6, length - .45), height = .142;
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = Math.round(canvas.width * height / width);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f3f5f0';
+  ctx.font = `600 ${Math.round(canvas.height * .75)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(name, canvas.width / 2, canvas.height / 2, canvas.width - 50);
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false }));
+  mesh.name = 'stop-name';
+  mesh.position.set(0, NAME_Y, BACK + .065);
+  return mesh;
+}
+
+// Length is on X, front is +Z and placement height is Y = 0. The back wall plane
+// for P.11 is Z = -0.929. Use only the needed stop label so the frame can be reused.
+export function makeIprShelter(variant, level = 'near', stopName = '') {
+  if (!Object.hasOwn(LAYOUTS, variant)) throw new RangeError(`Unknown shelter variant: ${variant}`);
+  if (!['near', 'middle', 'far'].includes(level)) throw new RangeError(`Unknown shelter detail: ${level}`);
+  const layout = LAYOUTS[variant];
+  const group = new THREE.Group(), frame = [];
+  group.name = variant;
+  canopy(group, frame, layout.length, level);
+  if (layout.bays) freestanding(group, frame, layout, level);
+  else wallMounts(frame, layout.supports, level === 'near');
+  group.add(batch(frame, metal));
+  if (stopName) group.add(namePlate(stopName, layout.length));
+  return group;
+}
