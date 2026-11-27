@@ -1281,7 +1281,10 @@ Chapter 7 is the tram's; the platform surface and the bus clauses in 6.2.2 apply
   672 bridges, 7.7 MB): the height import reads it city-wide (`tools/mosty3d.py`). Its top at a tram bridge's
   end is within 1.05 m of the rail (p50 0.13 m); a bridge over a tram is 3.3 m or more above it (#192). Its
 footprints include abutments on land (top within 1.5 m of the lidar terrain): 10 % of the tram bridges' track. Spans
-  are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. It has gaps: no bridge between the Libeň
+  are flat blocks: Libeňský most's 1.1 % approach is 0.3–1.2 m steps. Where a track climbs onto a viaduct its top
+  parts from the rails: at Krejcárek's north end (line 37 s 3470-3496) the track climbs 6.2 % (numeric DI of 2023 and
+  the archive alike) and the model's top falls 2 %, 0.06-0.19 m into the ballast; `src/buildings.js` brings the
+  model's corners in the trams' sweep, both tracks', under the bed top (#742). It has gaps: no bridge between the Libeň
   river bridge and its viaduct (14.4624–14.4660 E).
 - **A building's ground height** (#507, `ground_partition.py --calibrate`): the survey's 3D building outlines (ZPS KR
   `Hranice_budovy`) against IPR's ground 0.5 m outside the OSM footprint, 17,240 buildings on the five lines: IPR's
