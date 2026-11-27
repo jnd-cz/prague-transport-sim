@@ -16,7 +16,12 @@ and the count did not fall with batch D. Why the own outline too: where a ramp c
 corner at the end has the survey's height and the ramp 0.5 m in is higher already: Krejcárek's sidewalk 284 at wall
 1442's foot, line 37 (3926.76, 327.18), 228.56 m in both outlines, its ramp 0.5 m in at 229.7 m.
 
-Batch E's ground (main 9c98999), the five lines: 4,421-15,292 corners on such outlines, 32-439 off (#653's comment).
+What it cannot see: a step that a street's own outline heights make between its corners. A corner at its own outline's
+height counts as right, and a street's outline along a wall mixes the foot's heights and the top's: a rule that set
+such corners to their outline's height took the count at two places from 20 and 13 to 0 while the sections along those
+roads grew worse (#653, not taken). A rule is judged on places' sections too (tools/ground_place.py).
+
+Batch E's ground (main 9c98999), the five lines: 4,940-16,406 corners on such outlines, 32-345 off (#653).
 --ground: the folder of the ground file (a place's overlay/data, tools/ground_place.py --overlay); --box: only the
 corners in a box. Exit 0.
 """

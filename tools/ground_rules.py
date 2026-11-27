@@ -63,7 +63,7 @@ RULES = {
                    "wall-end-in-a-path", "sidewalk-under-a-road-wall", "sidewalk-on-a-quay-wall", "branik-platform-ramps",
                    "cerny-kun-platform-wall", "modranska-skola-ramp", "na-vapence-garage-ramp", "modrany-viaduct-ramps",
                    "garden-beds", "zizkov-wall-at-the-kerb", "motol-wall-at-the-kerb", "wall-above-a-lower-walkway",
-                   "hlavni-nadrazi-under-the-magistrala", "motol-bridge-parapets", "road-at-a-walls-foot", "road-beside-stairs"],
+                   "hlavni-nadrazi-under-the-magistrala", "motol-bridge-parapets"],
     },
     "kerbs": {
         "what": "kerbs: raised edges, lowered kerbs, belts, parking bays (#606, #638, #800)",
