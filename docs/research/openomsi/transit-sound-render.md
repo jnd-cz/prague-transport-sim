@@ -70,7 +70,7 @@ sounds in [vehicles-and-wire.md](vehicles-and-wire.md).
 7. **Times from length, speed and dwell; a service as headway + from / to / days** → not for GTFS lines; the form
    for hand-added timetables of the historic lines 4x (#26). The depot gate and yard pace → #35.
 8. **Career ratings** → not taken: ours suit a tram with standing riders (1.5 m/s² against 5) and count early
-   from 5 s (its 120 s). A record across shifts is the user's call (questions).
+   from 5 s (its 120 s). A record across shifts is the maintainer's call (questions).
 9. **Stop announcements** → only if our T3s have them (questions).
 
 ## Sound
@@ -168,8 +168,8 @@ antialias: `src/main.js` l. 142–143); frame time by `tools/frametime.py` and o
 4. **LOD by screen size** → #31: one rule for buildings, vehicles and people instead of a distance per kind.
 5. **ORM packing** → #308: three.js reads occlusion from red, roughness from green, metalness from blue, the same
    order, so ambientCG's three maps make one file per material. Normal maps stay uncompressed.
-6. **Modes, presets, an optimiser** → idea only for #350 / #485; the user (2026-11-06, #350): "not to
-   prematurely optimize".
+6. **Modes, presets, an optimiser** → idea only for #350 / #485; not to optimise prematurely
+   (maintainer, #350).
 
 ## Weather
 

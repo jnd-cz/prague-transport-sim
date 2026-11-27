@@ -26,7 +26,7 @@ const C = {
   myci: { cs: 'Mycí stroj', en: 'Washing plant', sim: false, src: 'ČKD ckd03 p. 14',
     en_: 'Washing-plant passage: the contactors close with no line voltage, and the drive pedal releases the shoe brakes.',
     cs_: 'Průjezd mycím strojem: stykače sepnou bez napětí v troleji, jízdní pedál uvolní čelisťové brzdy.' },
-  // (named as the drivers call it: the user, 2026-11-18, "rename the 'Bezpečnostní spínač' to 'Záchranná brzda'")
+  // (named as the drivers call it, not 'Bezpečnostní spínač': maintainer, 2026-11-18)
   bezp: { cs: 'Záchranná<br>brzda', en: 'Emergency<br>brake', sim: true, src: 'ckd24 § 5.3; DPP',
     en_: 'Emergency brake: drops the safety relay; all track brakes and full shoe brakes, the bell rings.',
     cs_: 'Záchranná brzda: odpadne bezpečnostní relé, všechny kolejnicové a plné čelisťové brzdy, zvoní zvonek.' },
@@ -41,7 +41,7 @@ const C = {
   nevyst: { cs: 'Nevystu-<br>povat', en: 'Do not<br>alight', sim: true, src: 'ckd03 p. 10',
     en_: 'Buzzers at all doors while held; closing all doors needs it first. In the game D does both.',
     cs_: 'Bzučáky u všech dveří, dokud je stisknuto; zavření všech dveří jej vyžaduje. Ve hře obojí udělá D.' },
-  // (#249, the user, 2026-11-26: "only the 1st door in car where driver sits")
+  // (#249: only the first car's front door, by the driver)
   dvere1: { cs: 'Dveře I', en: 'Doors I', sim: true, src: 'ckd24 § 7.1',
     en_: "The front door alone, by the driver: open, or close. Those waiting walk to it; those in the second car can't get off.",
     cs_: 'Jen přední dveře u řidiče: otevřít, nebo zavřít. Čekající k nim dojdou; z druhého vozu se vystoupit nedá.' },
@@ -114,9 +114,7 @@ const KEYS = { bezp: ['Space', ' ', true], nevyst: ['D', 'd'], dvere1: ['U', 'u'
   svetl: ['⇧L', 'L'], smer: [', .'], vyhybka: ['Y', 'y', true], vystr: ['/', '/'], kalor: ['K', 'k'], salon: ['H', 'h'],
   vyptop: ['C', 'c', true], pisek: ['A', 'a', true] };
 // the lamp strip, left to right (6921's "ED – OPRAVNY" plate): [lamp, cs, en, the LED's shape]. V is the stop request,
-// labelled as some cars have it, the first brake lamp too (the user, 2026-11-17: "the V led sign is for Výstup, some
-// trams have this labeled and we can have it too", "The first red brzda I would label 'Brzda I'"; 2026-11-26: "BRZDA I should be
-// BRZDY I, like we have BRZDY II")
+// labelled as some cars have it, the first brake lamp too, Brzdy I as Brzdy II (maintainer, 2026-11-17 and 2026-11-26)
 const STRIP = [['L', 'Směr vlevo', 'Left', 'arrowL'], ['V', 'Výstup', 'Exit', 'V'], ['D', 'Dveře', 'Doors', 'doors'], ['B1', 'Brzdy I', 'Brakes I', 'brake'],
   ['B2', 'Brzdy II', 'Brakes II', 'brake'], ['BV', 'Vlak', 'Train', 'brake'], ['Z', 'Zrychlovač', 'Accelerator', 'dice5'],
   ['T', 'Topení zrcátka', 'Mirror heat', 'T'], ['R', 'Směr vpravo', 'Right', 'arrowR']];
@@ -139,8 +137,7 @@ function ctl(id, x, y, kind, o = {}) {
   return `<div class="${cls}" data-c="${id}" style="left:${px(x)};top:${px(y)}${o.fs ? `;font-size:${o.fs}px` : ''}">` +
     `<span class="plate ${o.plate || ''}" data-lab="${id}"><span class="t">${lab(id)}</span></span>${inner}${k && c.sim === true ? `<i class="kb">${k[0]}</i>` : ''}${c.q ? '<i class="q">?</i>' : ''}</div>`;
 }
-// 6921's edgewise meters, flat as from straight above (the user's photo, 2026-11-17: "draw them as rectangles rather
-// than curved surface from perspective ... the needle comes from the right side"): a black frame, the scale plate under
+// 6921's edgewise meters, flat as from straight above (the maintainer's photo, 2026-11-17): a black frame, the scale plate under
 // the strip with the calibration stamp, the figures left of the ticks (on a narrow plate in their place), the pointer's
 // blade coming in from the right.
 // The scales are the photo's: a tick every 20 A, a long one every 100 A, figures every 200 A; a tick every 2 V, figures
@@ -151,8 +148,7 @@ function meter(id, x, y, w, h, fig = 9, dense = true) {
   const b = Math.max(3, Math.round(w * 0.07)), wx = b + 2.5, wy = b + 2.5, ww = w - 2 * wx, wh = h - 2 * wy;
   const xr = wx + ww * (dense ? 0.66 : 0.74), xl = xr - ww * 0.27;
   // a figure stands left of its mark where the plate has room for the widest, else over its mark, in its place (the phone's
-  // strips: their ammeter's 600 ran onto the frame, the user, 2026-11-18, "perhaps put it on top of the mark when running
-  // short on space", #691; above its mark it touched the next one). Its width at 0.6 em a digit: --f-label's Barlow
+  // strips: their ammeter's 600 ran onto the frame, #691; above its mark it touched the next one). Its width at 0.6 em a digit: --f-label's Barlow
   // Condensed is not loaded, so a phone draws Roboto, 0.56 em.
   const fw = String(max).length * fig * 0.6, over = fw > xl - wx - 0.5, fx = over ? Math.min(xr - ww * 0.105, wx + ww - fw / 2 - 0.5) : xl;
   const sh = dense ? wh * 0.1 : 0, y0 = wy + wh - fig * 0.6 - 1.5, y1 = wy + sh + fig * 0.5 + 1.5, at = (v) => y0 - (v / max) * (y0 - y1);
@@ -176,17 +172,15 @@ function meter(id, x, y, w, h, fig = 9, dense = true) {
     `<rect x="${f(xr + ww * 0.05)}" y="${f(y0 - 1)}" width="${f(wx + ww - xr - ww * 0.05)}" height="2" rx=".4"/></g></svg>`;
   return `<div class="meter" data-c="${id}" style="left:${px(x)};top:${px(y)};width:${px(w)};height:${px(h)}">${s}</div>`;
 }
-// (the arrows green and shorter, the brake lamp's bars beside its ring as on 6921: the user, 2026-11-17, "The arrows for
-// left and right should be green leds I think, can be a bit shorter", "the led symbol parts of |O| can be alongside each
-// other"). V is the open door, two strokes apart, green (the user, 2026-11-18, after a photo of a T3P's panel: "the V (or
-// open door symbol, the two lines are not touching) ... It's green").
+// (the arrows green and shorter, the brake lamp's bars beside its ring as on 6921: maintainer, 2026-11-17). V is the open
+// door, two strokes apart, green (maintainer, 2026-11-18, after a photo of a T3P's panel).
 const LED = {
   arrowL: (l) => `<svg viewBox="0 0 24 14"><path class="off" data-l="${l}" d="M1 7 L9 1 L9 4.5 L23 4.5 L23 9.5 L9 9.5 L9 13 Z"/></svg>`,
   arrowR: (l) => `<svg viewBox="0 0 24 14"><path class="off" data-l="${l}" d="M23 7 L15 1 L15 4.5 L1 4.5 L1 9.5 L15 9.5 L15 13 Z"/></svg>`,
   V: (l) => `<svg viewBox="0 0 16 14"><path class="off" data-l="${l}" d="M1 1 H4.4 L7.2 13 H3.8 Z M15 1 H11.6 L8.8 13 H12.2 Z"/></svg>`,
   doors: (l) => `<svg viewBox="0 0 16 14"><rect class="off" data-l="${l}" x="2" y="1" width="4.5" height="12"/><rect class="off" data-l="${l}" x="9.5" y="1" width="4.5" height="12"/></svg>`,
   brake: (l) => `<svg viewBox="0 0 20 14"><rect class="off" data-l="${l}" x="1" y="2" width="3.4" height="10" rx=".8"/><circle class="off" data-l="${l}" cx="10" cy="7" r="4.6"/><rect class="off" data-l="${l}" x="15.6" y="2" width="3.4" height="10" rx=".8"/></svg>`,
-  // the accelerator lamp: five LEDs as a die's five (the user, 2026-11-17)
+  // the accelerator lamp: five LEDs as a die's five (maintainer, 2026-11-17)
   dice5: (l) => `<svg viewBox="0 0 14 14">${[[2.6, 2.6], [11.4, 2.6], [7, 7], [2.6, 11.4], [11.4, 11.4]].map(([x, y]) => `<circle class="off" data-l="${l}" cx="${x}" cy="${y}" r="2.1"/>`).join('')}</svg>`,
   T: (l) => `<svg viewBox="0 0 14 14"><path class="off" data-l="${l}" d="M1 1 H13 V4 H8.6 V13 H5.4 V4 H1 Z"/></svg>`,
 };
@@ -215,10 +209,8 @@ const crank = (w) => `<svg viewBox="0 0 120 110" width="${w}" height="${(w * 110
   '<text x="60" y="22" class="fig2">VPŘED</text><text x="22" y="62" class="fig2">0</text><text x="60" y="99" class="fig2">VZAD</text>' +
   '<circle cx="60" cy="58" r="15" fill="#2a2d2c"/><rect x="56" y="32" width="8" height="28" rx="3" fill="#1a1c1b"/><circle cx="60" cy="33" r="5.5" fill="#3a3e3c"/></svg>';
 // A rotary switch's positions: the label and the knob's angle there (degrees from 3 o'clock, clockwise as CSS turns it),
-// the labels round the knob where its pointer stops (the user, 2026-11-17: "the heater rotary switches (and other rotary
-// ones) should be aligned to the position labels, not turn to another angle"). Those without labels on the car stand as
-// on the user's photos of 6921 (the user, 2026-11-18: "position the unlabeled knobs according to the reference photos"):
-// up off and right on (OFF, ON), as its door switches show: DVEŘE II up with the doors closed, DVEŘE I turned right with
+// the labels round the knob where its pointer stops, not at another angle (maintainer, 2026-11-17). Those without labels
+// on the car stand as on the maintainer's photos of 6921 (2026-11-18): up off and right on (OFF, ON), as its door switches show: DVEŘE II up with the doors closed, DVEŘE I turned right with
 // the front door open and the doors' lamp dark. OSVĚTLENÍ, the outside lights, at DAY, 45° left (DPP textbook, the T3R.P
 // pages: "zapnuté vnější osvětlení na „den“ - to je vlevo"; the photos, taken in the evening, have it 45° right; the game
 // has no night yet); the saloon's fluorescent lighting at the left, "předvolba" (ibid.). The cams: VYPÍNAČ ŘÍZENÍ's marks
@@ -359,8 +351,7 @@ function drawPedals(cv, eq, S) {
 }
 
 // The stop request (V): a passenger presses "znamení řidiči" in the saloon some way after the last stop, and the lamp
-// stays lit until the doors open (the user, 2026-11-17: "It should be connected to request stop button (znamení
-// řidiči)"). At a request stop where somebody gets off (src/game.js: alightFrac, which also makes the stop needed); the
+// stays lit until the doors open (maintainer, 2026-11-17). At a request stop where somebody gets off (src/game.js: alightFrac, which also makes the stop needed); the
 // press 20 m to 60 % of the way from the last stop, the same for a stop on every run (no draw from the game's random).
 function requested(game, st, s) {
   if (!st || !st.request || !(st.alightFrac > 0) || st.served) return false;
@@ -510,8 +501,8 @@ export class Panel {
 
   // shrinks a plate's letters where its words don't fit its width (the fonts differ by system). The panel lays its letters out
   // at 6-14 px and is scaled up whole: where the browser keeps letters from getting smaller than a minimum size (its fonts
-  // setting), they would stand larger than their plates (the user's Firefox at 3840 x 2008, 2026-11-25: "příliš velký text na
-  // popiskách ovládacího panelu"; reproduced with a 12 px minimum), so the words are scaled back to the size they should have and
+  // setting), they would stand larger than their plates (the maintainer's Firefox at 3840 x 2008, 2026-11-25: the panel's
+  // labels too large; reproduced with a 12 px minimum), so the words are scaled back to the size they should have and
   // into their plate
   fit() {
     const min = this.minFont();
@@ -656,7 +647,7 @@ export class Panel {
     set('spd', Math.round(tram.kmh), (v) => { e.spd.textContent = v; });
     const lim = opts.assist ? game.currentLimit : null;
     set('lim', lim, (v) => { for (const n of e.lim) { n.setAttribute('visibility', v === null ? 'hidden' : 'visible'); if (v !== null) n.setAttribute('transform', `rotate(${ang(v)})`); } });
-    // (6921's reading on the user's photo, and the shift's kilometres on it)
+    // (6921's reading on the maintainer's photo, and the shift's kilometres on it)
     if (this.shift !== game) { this.shift = game; this.s0 = tram.s; this.ttKey = ''; }
     set('odo', Math.floor(405143 + Math.max(0, tram.s - this.s0) / 1000), (v) => { for (const n of e.odo) n.textContent = String(v).padStart(6, '0'); });
     const amp = Math.round(Math.min(1.03, Math.abs(tram.current) / 600) * 400), volt = Math.round(Math.min(1.03, eq.aux ? eq.aux.U / 40 : 0) * 400);
@@ -707,8 +698,8 @@ export class Panel {
   }
 
   // the band follows the head (each frame, src/main.js); lim: the head's turn at its most each way (src/cabframe.js
-  // lookLimits). With the head turned all the way, the side's last control ends before the game's block (the user,
-  // 2026-11-17: "in the side views, the info overlay hides the panel features"): the band slides that much further
+  // lookLimits). With the head turned all the way, the side's last control ends before the game's block, which
+  // hid it (maintainer, 2026-11-17): the band slides that much further
   // left, in step with the turn.
   setLook(look, lim) { this.look = look; this.lim = lim; this.slide(); }
   slide() {

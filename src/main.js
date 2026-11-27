@@ -22,6 +22,7 @@ import { Inspect } from './inspect.js';
 import { Review, parseAt } from './review.js';
 import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
 import { PerfLog, machine, gpuTimer } from './perf.js';
+import { GFX, gfxQuery } from './gfx.js';
 import { TouchControls } from './touch.js';
 import { Gamepad } from './gamepad.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
@@ -176,8 +177,9 @@ route.ground = ground;
 
 // ------------------------------------------------------------------ renderer & scene
 const canvas = $('gl');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+// (GFX: the address's drawing switches, each of these alone for a measurement, src/gfx.js, #705)
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.antialias, logarithmicDepthBuffer: GFX.logDepth });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, GFX.maxPixelRatio));
 window.renderer = renderer; // (from the start, also in the menu: performance checks, tools/test_idle.py)
 // Out of GPU memory (or the GPU reset), the browser drops the WebGL context. The world's geometry is no
 // longer kept in JS after upload (uploadWorld), so it cannot be rebuilt here: say so and offer a reload
@@ -777,7 +779,7 @@ async function startPerfTest(reference = false) {
 $('btnPerfTest').addEventListener('click', () => startPerfTest(false));
 $('btnPerfRef').addEventListener('click', () => {
   if (String(data.line) === REF_LINE) startPerfTest(true);
-  else location.search = `?line=${REF_LINE}&reftest=${encodeURIComponent(data.line)}`;
+  else location.search = `?line=${REF_LINE}&reftest=${encodeURIComponent(data.line)}${gfxQuery}`;
 });
 function perfTestStep(now) {
   if (!perfTest || !game || game.finished) { perfTest = null; return; }
@@ -793,7 +795,8 @@ function finishPerfTest() {
   perfTest = null;
   game.paused = true;
   hud.show(false);
-  const sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null, driven: Math.round(tram.s - pt.s0) }, m = machine(renderer);
+  const sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null, driven: Math.round(tram.s - pt.s0),
+    pixelRatio: renderer.getPixelRatio(), ...(GFX.key ? { gfx: GFX.key } : {}) }, m = machine(renderer);
   // (frames over 20 ms: below a 60 Hz display's rate; a steady 30 fps has nearly all of them there and few over 50:
   // playable, not smooth. The first remote run, Intel HD Graphics 400 in Firefox: 34 fps, 74 % over 20 ms, 0.6 % over 33)
   const verdict = sum.over[20] < 5 ? 'good' : sum.over[50] < 5 ? 'ok' : 'slow';
@@ -805,7 +808,7 @@ function finishPerfTest() {
     <table class="res">
       ${row('pt.fps', sum.fps)}${row('pt.slow20', `${sum.over[20]} %`)}${row('pt.slow33', `${sum.over[33]} %`)}${row('pt.p90', `${sum.ms.p90} ms`)}
       ${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
-      ${row('pt.tris', `${(sum.triangles.mean / 1e6).toFixed(2)} M`)}${row('pt.gpuName', m.gpu || '?')}${row('pt.screen', `${m.viewport} @${m.dpr}`)}
+      ${row('pt.tris', `${(sum.triangles.mean / 1e6).toFixed(2)} M`)}${row('pt.gpuName', m.gpu || '?')}${row('pt.screen', `${m.viewport} @${m.dpr}${m.pixelRatio !== m.dpr ? ` (${m.pixelRatio})` : ''}${GFX.key ? ` · gfx ${GFX.key}` : ''}`)}
     </table>
     <div class="sub">${t('pt.note')}</div>
     <button class="primary" id="ptSend">${t('pt.send')}</button> <button id="ptMenu">${t('pt.menu')}</button>`;
@@ -816,7 +819,7 @@ function finishPerfTest() {
   };
   $('ptMenu').onclick = () => {
     // (a reference run started from another line goes back to it)
-    if (params.get('reftest')) { location.search = `?line=${encodeURIComponent(params.get('reftest'))}`; return; }
+    if (params.get('reftest')) { location.search = `?line=${encodeURIComponent(params.get('reftest'))}${gfxQuery}`; return; }
     $('results').classList.add('hidden');
     $('menu').classList.remove('hidden');
   };

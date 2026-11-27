@@ -44,7 +44,7 @@ export class GameView {
       const mesh = makeTramSignal();
       // (at a platform end: on its own pole at the island's tip, a few metres past the post and further from
       // the track, so the post does not hide it from the driver; the same pole carries the crossing's
-      // pedestrian heads; user's street view, Palackého náměstí. Hung from a span it hung 20 m back)
+      // pedestrian heads; the maintainer's street view, Palackého náměstí. Hung from a span it hung 20 m back)
       if (sig.head && !sig.head.vienna) {
         const s = Math.min(sig.s, (sig.head.p1 ?? sig.s) - 0.5);
         place(mesh, route, s, -3.5, 0.18, true);
@@ -181,7 +181,7 @@ export class GameView {
     // a signal that must hang (its place is on a platform) takes a span up to 30 m away
     const reach = hang ? 30 : 16;
     // (a cross-span; one that must hang may also use a pole's bracket arm over the track. Not one
-    // after s: the nearest span was often over the junction, the signal hung in its middle (user,
+    // after s: the nearest span was often over the junction, the signal hung in its middle (maintainer,
     // 2026-10-24); one that must hang takes such a span only when there is none before s)
     const spans = C.filter((c) => (hang ? c.L || c.R : c.L && c.R) && Math.abs(c.s - s) <= reach).sort((a, b) => Math.abs(a.s - s) - Math.abs(b.s - s));
     const span = spans.find((c) => (after ? c.s >= s - 2 : c.s <= s + 2)) || (hang ? spans[0] : null);

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Open ballast track from the lidar (#591): where the rails stand over IPR's bare earth, the lidar sees ballast.
 
-    python -P -E tools/open_track.py --calibrate          # the measure against the user's marks, every line
+    python -P -E tools/open_track.py --calibrate          # the measure against the maintainer's marks, every line
     python -P -E tools/open_track.py --runs 9,17          # the runs it finds, per line
     python -P -E tools/open_track.py --cards              # reports/review/open-track-N.json: the runs not sure
     python -P -E tools/open_track.py --import             # the answers into data/truth.json openTrackReview
@@ -11,17 +11,17 @@ numeric height where DI's track matches the route (tools/dtmp_tracks.py `Segment
 match is unambiguous. IPR's 2023 lidar (tools/ipr_dtm.py, 1 m, bare earth) is read at the axis and 0.5 m to either
 side. Every STEP m: the rail top minus the lidar; its median over WINDOW m.
 
-Calibrated 2026-11-14 on the user's marks and answers (lines 9, 17, 22, 23, 37, `--calibrate`), rails from DI / the
-archive, outside bridges and tunnels:
+Calibrated 2026-11-14 on the maintainer's marks and answers (lines 9, 17, 22, 23, 37, `--calibrate`), rails from DI /
+the archive, outside bridges and tunnels:
 
-| what the user says | median gap | flagged at THRESHOLD over WINDOW |
+| what the maintainer says | median gap | flagged at THRESHOLD over WINDOW |
 |---|---|---|
 | ballast | +0.13 m (DI) / +0.18 m (archive) | 87 % |
 | paved: embedded, panels, setts | -0.01 m | 0 % of the marks; 3 % with the junctions and road crossings |
 | grass | +0.02 / -0.03 m | 13 % (the lidar sees the grass at rail level) |
 
-So the measure finds ballast, not grass; grass comes first from the user's marks, the grassed-track list and the
-survey's green, and the measure only fills what they leave. A run is MIN_RUN m or longer, its samples less than JOIN m
+So the measure finds ballast, not grass; grass comes first from the maintainer's marks, the grassed-track list and
+the survey's green, and the measure only fills what they leave. A run is MIN_RUN m or longer, its samples less than JOIN m
 apart; one whose median stands over SURE m is not sure (a cutting or a ditch beside the track reads as deep: Bertramka
 +0.38 to +0.43 m, Pražský hrad +0.31 m) and goes to a review card instead (tools/open_track.py --cards, #591).
 """
@@ -148,7 +148,7 @@ def found(data):
 
 
 def calibrate(lines):
-    """The measure against what the user's marks and answers say the track is (the line's built `styles`, sources
+    """The measure against what the maintainer's marks and answers say the track is (the line's built `styles`, sources
     user, review, list and surface), and against the junctions and road crossings (#546's paved rule)."""
     TRUTH = {"user", "review", "list", "surface"}
     rails = Rails()

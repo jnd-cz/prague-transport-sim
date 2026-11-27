@@ -17,8 +17,8 @@ TERRAIN = 1.0
 TERRAIN_EXTEND = 0.5
 # On paved track, the survey's surface (plus the style's offset) standing more than SURVEY_OVER m over the archive, with
 # the 2023 lidar at it or above (within LIDAR_AT m under it), is the track's height: two measurements against one (#539;
-# the user, 2026-11-14: on Bělohorská the track "doesn't sit lower", on Plzeňská it lies "embedded in asphalt on about
-# the same level as the road nearby"). Measured on main 030b48f (tools/bench/paved_ipr.py): the archive 0.21-0.33 m under
+# maintainer: on Bělohorská the track does not sit lower, on Plzeňská it lies embedded in asphalt at about the level
+# of the road beside it). Measured on main 030b48f (tools/bench/paved_ipr.py): the archive 0.21-0.33 m under
 # the lidar there, the survey 0.02-0.16 m under it. Where the survey and the archive agree (within SURVEY_OVER), the
 # archive stays, the lidar 10-30 cm higher reading a crown or a kerb; numeric DI is never replaced.
 SURVEY_OVER = 0.10

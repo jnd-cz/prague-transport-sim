@@ -196,8 +196,7 @@ SCENE = """async () => {
     out.who.push({ ...start[i], ran: r.ran, seen: first >= 0, gaps, looks: [...looks], jump: +jump.toFixed(3), boxThenPax: box && pax, aboard: aboard[i] !== null });
   });
   // the doors closed on four at them, opened and at once closed again, then opened: they wait at the doors, cost 15 each once,
-  // and all get on (the user, 2026-11-26: "If player closes door and then opens again at the same stop, do people come inside
-  // again?"); the tram held by the input of a standing step, the autopilot not asked meanwhile
+  // and all get on (maintainer, #249); the tram held by the input of a standing step, the autopilot not asked meanwhile
   g.pax.board(4, st.i); st.waiting += 4;
   step();
   const hold = { ...ap.input }, pen0 = g.penalties.leftBehind || 0, out0 = g.pax.outside(st.i).length, w0 = st.waiting;
@@ -209,8 +208,8 @@ SCENE = """async () => {
   g.toggleDoors();
   for (let t = 0; t < 40 && st.waiting > 0; t += dt) still(dt);
   out.shut = { out0, w0, closed, again, after: st.waiting, aboard: g.pax.aboard };
-  // (Dveře I, the user, 2026-11-26: "only the 1st door in car where driver sits"; the driver gets out by it, "like for switch")
-  // the doors shut, the switch iron ("I would auto open and close front door for the switch iron operation"): the front door alone
+  // (Dveře I, #249: only the first car's front door, by the driver; the driver gets out by it, as for a switch)
+  // the doors shut, the switch iron (the front door opens and shuts by itself for it): the front door alone
   // opens by itself, the driver gets out once it is open, throws the switch and is back, and it shuts; six more queued at the shut
   // doors of both cars and the front door alone opened (U): they walk to it, each one figure, and get on there, as does one walking
   // in from the back end; nobody gets into the second car; the drawn doors: that one open, the others shut; then Dveře II (D): all

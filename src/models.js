@@ -68,7 +68,7 @@ function canvasTexture(w, h, draw) {
 // a texture cached for the whole page (signs, plates): marked shared, so disposeModel keeps it
 const keptTexture = (w, h, draw) => { const tex = canvasTexture(w, h, draw); tex.userData.shared = true; return tex; };
 
-// The T3's number plates and cards (user photos, 2026-10-23): the route number on the roof box at
+// The T3's number plates and cards (the maintainer's photos, 2026-10-23): the route number on the roof box at
 // the front and on the mirror arm (white digits on DPP blue, no border; the mirror one smaller and
 // taller than wide), on the rear at the bottom of the rear window inverted (blue digits on white),
 // and behind the windscreen the destination card (blue capitals on white with a blue frame, two
@@ -90,8 +90,8 @@ function numberTexture(line, w, h, fg, bg, fill = 0.85) {
     g.fillText(text, w / 2, h / 2 + h * 0.04);
   });
 }
-// A T3M's displays are green dot-matrix LEDs (the user's photos of 8015 and 8080, 2026-11-09: "green top number plate",
-// "Green dot led panel with destination and next stop"): the text drawn in white on black, then sampled into round
+// A T3M's displays are green dot-matrix LEDs (the maintainer's photos of 8015 and 8080, 2026-11-09: the top number plate
+// and the panel with the destination and the next stop): the text drawn in white on black, then sampled into round
 // diodes on a pitch, lit where the text covers their centre, dim where not.
 function ledDots(g, w, h, pitch, draw) {
   const src = document.createElement('canvas');
@@ -109,9 +109,8 @@ function ledDots(g, w, h, pitch, draw) {
 }
 const ledFace = (w, h, pitch, draw) => canvasTexture(w, h, (g) => ledDots(g, w, h, pitch, draw));
 // The route box on the built-in car's front cap (src/t3simple.js ROUTE_BOX): in a dark rim, white digits on DPP
-// blue, or a T3M's green display; the corners square on a T3, rounded on a T3SUCS and a T3M (the user,
-// 2026-11-10: "T3SUCS have the top line plate behind window with rounded corners, the same shape as T3M which has
-// digital display there instead"), clear outside them (the plate's material tests the alpha). The digits 0.8 of
+// blue, or a T3M's green display; the corners square on a T3, rounded on a T3SUCS and a T3M (maintainer,
+// 2026-11-10: a T3SUCS's plate sits behind a window of the shape of a T3M's display), clear outside them (the plate's material tests the alpha). The digits 0.8 of
 // the box's height, bold and wide as on 6892 and 7290. No variant: conflig's classic, over the box in its texture.
 function routeBoxTexture(line, variant) {
   if (!variant) return numberTexture(line, 160, 128, '#ffffff', DPP_BLUE, 0.9);
@@ -927,8 +926,7 @@ const signTex = new Map();
 const cached = (key, make) => { if (!signTex.has(key)) { const tex = make(); tex.userData.shared = true; signTex.set(key, tex); } return signTex.get(key); };
 
 // The old board, black number on white with a black border: now only a diagnostic, where a limit comes from a curve
-// alone and no real sign stands (the user, 2026-11-08: "keep them for now for diagnostic purposes, we can drop them
-// later with more stable release"), shown with the debug overlay (F8) only (#389).
+// alone and no real sign stands (kept for diagnosis until a more stable release, maintainer, 2026-11-08), shown with the debug overlay (F8) only (#389).
 export function makeSpeedSign(v) {
   const tex = cached(`v${v}`, () => canvasTexture(128, 160, (g, w, h) => {
     g.fillStyle = '#111'; g.fillRect(0, 0, w, h);

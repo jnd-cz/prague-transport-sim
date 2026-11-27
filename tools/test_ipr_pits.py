@@ -131,6 +131,34 @@ class Pits(unittest.TestCase):
         dig(a, 10, 10, 4, 4, 0.8)
         self.assertEqual(ip.pits(a, cls), [])
 
+    def test_a_street_pit_carries_the_cells_round_it(self):
+        a, cls = street()
+        dig(a, 10, 10, 4, 5, 4.0)
+        dig(a, 40, 52, 4, 4, 2.0)
+        cls[:, 50:] = ip.NO  # (the second off the survey: no street pit)
+        got = {p["class"]: p["round"] for p in ip.pits(a, cls, survey_z=lambda j, i: 240.1, dmr=level)}
+        self.assertIsNone(got[None])
+        rr, cc = got["road"]
+        self.assertGreater(len(rr), 30)
+        self.assertFalse(((rr >= 9) & (rr <= 14) & (cc >= 10) & (cc <= 14)).any())  # (none in the pit, none beside it)
+        self.assertTrue(((rr >= 7) & (rr <= 16) & (cc >= 7) & (cc <= 17)).all())  # (within 3 m of it)
+
+
+class Shown(unittest.TestCase):
+    def test_a_hole_is_judged_against_the_ground_round_it(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bench"))
+        import street_pits as sp
+        # (Táboritská before the fill: the road round it at 241.1 m, the pit's floor at 237.4)
+        self.assertAlmostEqual(sp.hole(237.4, [241.1] * 30, 241.1), 3.7)
+        # (line 9 (-3326.3, -1457.4), a wall's foot: the sidewalk at 222.08 m under a rim's plane of 222.92, the wall's
+        # top on one side, the same sidewalk at 221.9 on the other: no hole)
+        self.assertLess(sp.hole(222.08, [223.3] * 12 + [221.9] * 8 + [222.4] * 6, 222.92), 0.2)
+        # (line 9 (-7378.3, -1291.4), a ramp's foot: the ramp beside it 0.5 m over it, its rim's plane at its own height)
+        self.assertLess(sp.hole(321.12, [321.64] * 20 + [323.9] * 20, 320.93), 0.0)
+        # (no ground round it in the line's file: under its rim)
+        self.assertAlmostEqual(sp.hole(222.08, [], 222.92), 0.84)
+        self.assertAlmostEqual(sp.hole(222.08, [float("nan")] * 3, 222.92), 0.84)
+
 
 class Fills(unittest.TestCase):
     def test_the_file_fills_the_tiles_a_reader_decodes(self):

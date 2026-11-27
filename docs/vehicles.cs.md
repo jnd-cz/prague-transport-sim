@@ -16,7 +16,7 @@ Volba *Model tramvaje* v menu vybírá jeden ze tří, uvedených v `assets/vehi
 |---|---|---|---|---|
 | podrobný, pohyblivý (výchozí) | `assets/t3h/`, loader `src/rigged.js` | glTF (`.glb`) a `rig.json` s názvy pohyblivých dílů | CC BY-NC 4.0 | dveře, sběrač, podvozky, kola, spřáhla, čelisti kolejnicových brzd, brzdová světla, směrovky, dálková světla; lehčí úroveň pro vzdálené cizí tramvaje |
 | podrobný, klasický | `src/models.js` (`loadDetailedT3`), `assets/t3/` | glTF s jednou texturou; stáhne se při výběru | CC BY-NC 4.0 | nic |
-| jednoduchý (vestavěný) | `src/t3simple.js` | kód: tvary změřené na výkresech T3 a na fotkách uživatele, nátěr malovaný na plátno | AGPL-3.0 | podvozky, kola, spřáhla, sběrač; světla podle stavu (brzdová, směrovky, dálková) |
+| jednoduchý (vestavěný) | `src/t3simple.js` | kód: tvary změřené na výkresech T3 a na fotkách správce projektu, nátěr malovaný na plátno | AGPL-3.0 | podvozky, kola, spřáhla, sběrač; světla podle stavu (brzdová, směrovky, dálková) |
 
 `makeT3({ line, cars, vehicle, dest, run, variant })` v `src/models.js` postaví soupravu jako vozidlo s tímto id. Naši tramvaj vytváří `src/main.js`, cizí tramvaje `src/traffic.js`.
 
@@ -71,8 +71,7 @@ cizím tramvajím; cizím tramvajím se přiděluje (`src/vehicles.js` `liveryOf
 
 Sloty, které vynechá, si nechají vzhled vozidla. Nátěr, který jmenuje slot nebo typ, jejž vozidlo nemá, je vynechán se
 jménem slotu (`livery x left out: texture slot roof: t3h has no such slot`). Hra zatím žádný nemá, řádek menu je
-skrytý (uživatel, 2026-11-13: „For now I would keep only the default liveries, with future possibility to add more
-variety“); `tools/test_liveries.py` podává dva vlastní ukázkové, texturu a barvu na hybridu a tři barvy vestavěného vozu.
+skrytý: zatím jen výchozí nátěry, další možná později (správce, 2026-11-13); `tools/test_liveries.py` podává dva vlastní ukázkové, texturu a barvu na hybridu a tři barvy vestavěného vozu.
 
 ## Zvukové balíčky
 
@@ -114,7 +113,7 @@ kontroluje znovu. Pole, kontrola a jak balíček přihlásit do seznamu `assets/
 
 Autor balíček přihlásí v *Vozidla…*, oddíl *Přihlásit balíček do projektu* (#580): soubor .zip nebo jeho adresu,
 nepovinný kontakt pro výsledek (e-mail nebo jméno na Discordu) a poznámku. Zaškrtnutím dovolí projektu soubory umístit
-na jeho server a nabídnout je všem z menu; jinak zůstanou na autorově serveru a seznam na ně odkazuje (uživatel,
+na jeho server a nabídnout je všem z menu; jinak zůstanou na autorově serveru a seznam na ně odkazuje (správce,
 2026-11-15). Stránka balíček zkontroluje jako při instalaci, nic si neponechá, a pošle jen takový, který projde.
 
 ## Soubor pohyblivých dílů (rig)
@@ -140,9 +139,8 @@ vše kromě interiéru sloučené podle materiálu. `tools/test_rigged.py` vyrob
 že se každý hýbe. Rig rozhraní 1.0 smí dál dát středy světlometů jako `beams` (body), koncová světla jako kvádry
 (`tailLamps`: `size`, `at`) a interiér jako `materials` a kvádr `within`: zavaděč čte obě podoby (#525).
 
-Podrobný model se udržuje v repozitáři: projektová dílna na modely, ze které pochází, už se nepoužívá (uživatel,
-12. 11. 2026: dílna je jen web na prohlížení modelu a jeho animací, sama nic neexportuje a nejspíš se už používat
-nebude). Jeho rig generuje [`tools/export_t3h_rig.py`](../tools/export_t3h_rig.py) z
+Podrobný model se udržuje v repozitáři: projektová dílna na modely, ze které pochází, už se nepoužívá (správce,
+12. 11. 2026: dílna jen ukazuje model a jeho animace a nic neexportuje). Jeho rig generuje [`tools/export_t3h_rig.py`](../tools/export_t3h_rig.py) z
 [`tools/t3h_rig_roles.json`](../tools/t3h_rig_roles.json) a základního rigu s kontrolou vazeb proti
 GLB (#471). Při změně modelu uprav přiřazení částí v souboru rolí a podle potřeby základní rig.
 Pak znovu vygeneruj `assets/t3h/rig.json` a aktualizuj jeho velikost v bajtech v `vehicle.json`.
@@ -210,9 +208,8 @@ soupravu toho typu, ať je nakreslená jakýmkoli modelem, takže jízda se stej
 vybere cokoli: kabina T3 je `assets/passengers/t3-cabin.json` (24 sedadel a 81 míst k stání, 105 vidět na vůz; nad ně
 se až do nejvyššího obsazení cestující jen počítají), fronty u jejích dveří určují čas v zastávce (`src/passengers/`,
 [knowledge.md](knowledge.md), *The passengers at a stop*). **Kreslí** se jen u modelu s funkčními dveřmi a interiérem
-(uživatel, 25. 11. 2026: „I would offer passenger simulation to vehicles which have functional door and interior"):
-jeho dveře se hýbou (`moves`), jeho rig jmenuje salon a jeho manifest v `passengers` jmenuje kabinu změřenou z právě
-tohoto modelu (`assetSha256` kabiny je soubor modelu), kterou uživatel přijal. Všechny čtyři věci kontroluje
+(správce, 25. 11. 2026): jeho dveře se hýbou (`moves`), jeho rig jmenuje salon a jeho manifest v `passengers` jmenuje
+kabinu změřenou z právě tohoto modelu (`assetSha256` kabiny je soubor modelu), kterou správce projektu přijal. Všechny čtyři věci kontroluje
 `tools/test_vehicles.py`. Dnes je ukazuje podrobný model; klasický a vestavěný ne.
 
 Jak model k cestujícím přijde:
@@ -226,7 +223,7 @@ Jak model k cestujícím přijde:
 3. **Kontroly:** `tools/cabin.py --timing` a `--alight` (každé rozmístění naplněné a vyprázdněné, 10 ven / 10 dovnitř,
    oba proudy všech dveří, žádné místo dvakrát, počty sedí; plný vůz se s tempem hry vyprázdní dřív, než se naplní),
    `tools/test_passengers.py`.
-4. **Uživatel přijme** ukázaná místa (k sezení a k stání); `tools/cabin.py --game` zapíše kabinu a manifest ji jmenuje
+4. **Správce projektu přijme** ukázaná místa (k sezení a k stání); `tools/cabin.py --game` zapíše kabinu a manifest ji jmenuje
    v `passengers` s přijetím.
 
 **Jiný typ vozidla** začíná také krokem 1: znovu změřit a rozhodnout jeho místa k sezení a stání; pro simulaci
@@ -266,5 +263,5 @@ přinese svou vlastní kabinu.
   v repozitáři a uvede ji v `assets/t3h/LICENSE.txt`, jak licence CC BY-NC 4.0 žádá; změna přiřazení dílů jde do rolí
   jeho rigu (čelisti, spřáhla, interiér, světlomety, koncová světla a velikost evidenčních čísel, #467, #471).
 - **Fakta:** rozměr, barva nebo detail skutečného vozu uvádí zdroj (výkres, fotka s evidenčním číslem,
-  uživatel) v komentáři nebo v [docs/knowledge.md](knowledge.md). Fakta od uživatele, znalce pražských
-  tramvají, mají přednost před výkresem i odhadem.
+  správce projektu) v komentáři nebo v [docs/knowledge.md](knowledge.md). Fakta od správce projektu, znalce
+  pražských tramvají, mají přednost před výkresem i odhadem.

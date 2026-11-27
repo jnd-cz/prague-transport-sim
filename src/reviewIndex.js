@@ -101,7 +101,7 @@ export async function main() {
   const sets = await Promise.all(index.sets.map(async (s) => {
     try { return { ...s, c: await count(s, items) }; } catch (e) { return { ...s, error: e.message }; }
   }));
-  // (a set whose issue is closed while findings wait is out of date and is deleted: the user, 2026-11-05)
+  // (a set whose issue is closed while findings wait is out of date and is deleted: maintainer, 2026-11-05)
   const stale = (s) => !s.error && s.c.waiting > 0 && s.waitsForInfo?.state === 'CLOSED';
   const old = sets.filter(stale);
   const waiting = sets.filter((s) => !stale(s) && (s.error || s.c.waiting > 0)), answered = sets.filter((s) => !s.error && s.c.waiting === 0);

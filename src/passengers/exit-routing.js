@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), dist/traffic/exit-routing.js, as it was (sha256 6caa0fada4afea2b);
-// accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
+// accepted by the maintainer as good enough for now (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
 // #249: changed: each door's service time and the walk speed options (the lab's 2 s and 0.95 m/s by default).
 // Bounded stationary-cabin routing policy, independent of presentation.
 // Contiguous X groups avoid sending opposing streams through one another.

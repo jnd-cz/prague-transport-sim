@@ -29,8 +29,8 @@ DTM = {
 }
 # Lines whose survey is fetched but not built into the game yet, {line: why}: tools/rebuild.py skips their dtm
 # step and says so. Lines 9, 23 and 37 were held until the track heights were staged (#119) and line 9's
-# deadlock was traced (#152); both closed, they take their survey since #125 (the user, 2026-11-09: "22 and
-# (W2 in general I think) needs to download and apply the survey first").
+# deadlock was traced (#152); both closed, they take their survey since #125 (maintainer: 22, and W2 in general,
+# downloads and applies the survey first).
 HOLD = {}
 INDEX = "https://geoportalpraha.cz/api/get-dtm-download-metadata?code={}"  # sets 02 OPL, 03 KR (DATA.md)
 BASE = "https://isdtmk.dtm-praha-sck.cz/api/istem/vydej/download/path/"

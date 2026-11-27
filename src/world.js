@@ -164,7 +164,7 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   // a track's height where something stands on it (the oncoming trams, platforms, the gauntlet): the nearest drawn track's
   // own, as its rails are drawn. (terrain.js trackAt took the route's profile across the street within 6 m of our route
   // and the street's surface past it: an oncoming tram stepped 0.27 m where the opposite track leaves ours at Ohrada, 0.1 m
-  // at Palmovka, the user, 2026-11-17, #655.) Past TRACK_REACH of every track, that answer still.
+  // at Palmovka, #655.) Past TRACK_REACH of every track, that answer still.
   if (!ground.trackOwn) {
     const own = new SegmentIndex(10);
     for (const t of data.tracks) for (let i = 1; i < t.smooth.length; i++) own.add(t.smooth[i - 1], t.smooth[i], 0, t.z[i - 1], t.z[i]);

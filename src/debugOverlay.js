@@ -8,7 +8,7 @@
 //   white bar            conflict on the route (street, footway or crossing): its near edge
 //   green bars / ball    platform start and end / where the tram front stops for passengers
 //   orange / olive line  track not from the current DTM (DI): OpenStreetMap / the archived DTMP axes (#20)
-//   cyan / blue / yellow route height not measured on it (#197): the curve across a short hold / the user's reviewed
+//   cyan / blue / yellow route height not measured on it (#197): the curve across a short hold / the maintainer's reviewed
 //     / red line,         span / the lidar where nothing else had a height (#202) / the game's surface profile (no
 //     0.6 m up            assembled height: fill, a hold over 60 m)
 //   cyan / green / blue  kerb lowered at a crossing (tools/kerbs.py, #303): an untagged crossing end (the norm's 2 cm) /

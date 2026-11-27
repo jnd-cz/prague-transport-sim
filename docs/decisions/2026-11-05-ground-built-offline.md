@@ -1,6 +1,6 @@
 # The ground built offline: the terrain mesher, the profile in Python, the format (#276)
 
-Status: accepted by the user, 2026-11-06 ("Pydelatin it is"; the mesher, the profile in Python, 10 cm); the format: [integer differences](2026-11-06-tile-container.md), #307.
+Status: accepted by the maintainer, 2026-11-06 (the mesher, the profile in Python, 10 cm); the format: [integer differences](2026-11-06-tile-container.md), #307.
 
 ## Why
 
@@ -57,7 +57,7 @@ One tile of 1,024 × 1,024 m beside the track at line 17's middle ((-749, -2299)
 | quadric collapse | 129,380 | 2.9 s | 2.6 / 34 / 188 | 1.7 / 16 / 159 | 2.1 / 15 / 247 | 1.8 / 11 / 52 | 1.1 % |
 
 The corridor tolerance sets the count (greedy, the same tile): 5 cm 239,709 triangles, **10 cm 129,380 (the
-user's pick, 2026-11-06: "10cm sounds good enough now")**, 20 cm 65,983.
+maintainer's pick, 2026-11-06)**, 20 cm 65,983.
 
 **Tiles from one mesh.** Tiles meshed on their own pick their own vertices along a shared edge, so neighbours
 crack. Meshing the line's box once and cutting it along the tile lines avoids that: both tiles cut the same
@@ -66,7 +66,7 @@ tiles, 28,435 triangles cross a tile line and become 81,764 (+53,329, **+1.4 % o
 vertices are needed, so no mesher of our own.
 
 **The whole city, measured** (`tools/bench/terrain_city.py`; IPR's raster, 35,001 × 26,001 cells, 660 km² with data;
-the tolerance from the 355 km of tram track in OSM; the user, 2026-11-06: "My only concern is hardware resources"):
+the tolerance from the 355 km of tram track in OSM; hardware resources were the maintainer's concern, 2026-11-06):
 
 | | |
 |---|---|
@@ -91,7 +91,7 @@ tolerance follows the tracks: when buses and trains get their corridors, the sam
 (~200 k triangles per km²) all 660 km² would be 130 M triangles at most, which needs a coarser tolerance off the routes.
 
 **The decision: greedy insertion with `pydelatin`** (MIT; a wheel for Windows / Python 3.12; numpy only), a new
-build dependency (the user's pick), over the whole city once, cut into tiles afterwards.
+build dependency (the maintainer's pick), over the whole city once, cut into tiles afterwards.
 
 **Our own compiled mesher, weighed and not taken:** its gain would be fixed border vertices and an exact per-point
 tolerance (no division trick, no second pass). The cut above makes the first unnecessary, the second pass costs
@@ -141,9 +141,8 @@ The two paths:
 - **The decision:** the rules move to Python, one at a time, each with a parity check against the page's result
   on every line (a headless export used by that check only, removed with the page's code). The page then loads
   `z`, `grades`, the cant and the bed from the line's data and keeps no profile rule.
-- **The route geometry moves too, and the page reads it as it is** (the user, 2026-11-06: "I want to prebuilt as
-  accurate and smooth as possible, so no further smoothing should be needed. Ideally the server prepared data
-  should closely match the browser running version"). The page already draws surveyed track and the build's
+- **The route geometry moves too, and the page reads it as it is** (maintainer, 2026-11-06:
+  built as accurate and smooth as possible, the build's data matching what the browser runs). The page already draws surveyed track and the build's
   curves (`trackCurve`, #204) unsmoothed, resampled only (`src/route.js:94-110`); what it still smooths is OSM
   fill without the build's curves. After #237 (the track from DI) the build draws all of it, the cant is
   computed from the built geometry, and the page smooths nothing. A check holds it: the page's resampling of the
@@ -188,9 +187,8 @@ the machine cache by `tools/city_terrain.py` (#428; nothing in the game reads it
 | 1-2 km | 477,763 | 28.8 / 104.3 / 166.0 |
 | over 2 km | 268,344 | 65.4 / 219.4 / 300.0 |
 
-**No passages rule in the city mesh** (the user, 2026-11-10: "I would lean towards keeping IPR lidar everywhere to keep
-the actual lowest points. Then bridge the gaps on streets and track/rail passes with other data including dmr5g showing
-the deck height. But we can keep the culvert passing under", then "point 1 yes"). IPR's ground stays everywhere: the
+**No passages rule in the city mesh** (maintainer, 2026-11-10: IPR's lidar everywhere, for the actual lowest points;
+the gaps under streets and tracks bridged with other data). IPR's ground stays everywhere: the
 floors of underpasses and culverts, and the streets through building passages. A street or track over a passage becomes
 a deck in #276's partition (step 3). Measured by `tools/bench/terrain_compare.py --passages` on the snapshot's 263 DMR 5G
 tiles, the rule (`fine_terrain.py`'s) took 161,164 cells inside the city:
@@ -203,19 +201,18 @@ tiles, the rule (`fine_terrain.py`'s) took 161,164 cells inside the city:
 The first build above still had the rule. Without it, the city has 16,566,821 triangles (79,292 fewer). The bands'
 errors are the same to 0.1 cm, and the build took 807 s with a 14.8 GB peak.
 
-**Fields keep IPR** (the user, 2026-11-10: "5 yes"). Where the 2023 lidar read crops as ground (0.79 km² of the 198 km²
+**Fields keep IPR** (maintainer, 2026-11-10). Where the 2023 lidar read crops as ground (0.79 km² of the 198 km²
 of fields, over 1 m above DMR 5G), the city mesh keeps IPR: the fields lie far from the tracks, where the mesh's
 tolerance grows to 0.4-3 m.
 
-**Bridges and decks stand on the ground, they are not part of it** (the user, 2026-11-10: "Agree with the base layer and
-building decks and bridges on top of it, makes sense"). The fused ground stays one surface per point: the bare earth
+**Bridges and decks stand on the ground, they are not part of it** (maintainer, 2026-11-10). The fused ground stays one surface per point: the bare earth
 and what lies on it at grade. Anything with something under it (a bridge, the deck over an underpass such as
 Divadelní's, a culvert's deck) is a structure on top of it:
 - **Its top:** the survey's level 1, checked against Mosty 3D or the surveyed rails, flat over the opening (#445). The
   check runs in `tools/dtm.py` (`tools/zps_decks.py`), so the partition reads level-1 heights already validated.
 - **Its body:** Mosty 3D's model where there is one (#13, #54, W4). Elsewhere a slab 1 m thick, thinner where the way
-  under it carries `maxheight`: the gap − `maxheight` − 0.1 m (the user: "0.1 margin is fine. Good point about using
-  the osm height for tunnel/covered features"). Divadelní: `maxheight=4.4`, gap 5.26 m, slab 0.76 m.
+  under it carries `maxheight`: the gap − `maxheight` − 0.1 m (the maintainer's
+  margin). Divadelní: `maxheight=4.4`, gap 5.26 m, slab 0.76 m.
 - **Its ends:** they meet the ground's streets at the abutments (T4's weld); the ramps up to them are IPR's ground.
 - **When:** W3 carries the deck tops and the slab, since the trams cross them and the city mesh keeps the floor under
   them; W4 the models.

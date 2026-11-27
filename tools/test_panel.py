@@ -9,7 +9,7 @@ port, 1600 x 900). Checks:
 - with the head turned all the way left, the cab's rear wall stands at the screen's left edge (src/cabframe.js REAR);
 - every figure of every meter, the panel's and the compact strips', lies inside its plate and off its unit letter, in the
   page's font and in Arial, as wide as a phone's Roboto (src/panel.js meter(), #691);
-- (#249, the user's Firefox at 3840 x 2008: labels larger than their plates) in Firefox with a 16 px minimum font size (its fonts
+- (#249, the maintainer's Firefox at 3840 x 2008: labels larger than their plates) in Firefox with a 16 px minimum font size (its fonts
   settings), every plate's and lamp's label drawn as large as without one (within 1 px, 5 % wide) and none past its plate
   (src/panel.js fit, minFont); skipped without Playwright's Firefox."""
 import argparse
@@ -113,7 +113,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 
 
 def labels_in_firefox(p, base, line):
-    """(#249, the user's Firefox at 3840 x 2008, 2026-11-25: "příliš velký text na popiskách ovládacího panelu") the panel's labels
+    """(#249, the maintainer's Firefox at 3840 x 2008: the panel's labels' text too large) the panel's labels
     in Firefox without a minimum font size and with one of 16 px (its fonts settings): {minimum: labels} (None: no Firefox)."""
     out = {}
     for mins in (0, 16):

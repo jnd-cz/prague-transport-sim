@@ -3,8 +3,8 @@
 python -P -E tools/test_drives.py [--report FILE] [-k NAME]
 (its own server on a free port; a blank page imports the modules through sync_playwright; --report saves each drive's time series).
 The real Autopilot and Tram, with a small stand-in for the game: a stop or signal is a place on the line, a tram ahead a script.
-What must hold, from the user (2026-11-06, #351: "smooth braking towards stop sign without any jums to jízda unless you're following
-tram in front of you") and the ČKD manuals (T3SU-03 p. 4-6): one approach to a stop with no drive pedal after the first brake,
+What must hold, from the maintainer (#351: smooth braking towards a stop sign, no jump back to drive unless following a
+tram in front) and the ČKD manuals (T3SU-03 p. 4-6): one approach to a stop with no drive pedal after the first brake,
 no shoes at speed, the stop within ±2.4 m of the point, and a pedal that does not hunt."""
 import faulthandler
 import functools

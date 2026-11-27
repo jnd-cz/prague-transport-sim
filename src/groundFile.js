@@ -14,8 +14,8 @@
 export const LOOKUP_CELL = 16; // m: a tile's lookup grid
 export const WINDOW_NEAR = 400; // m: the detail round the camera and the route ahead; past it the far ground (#30)
 export const COARSE_STEP = 20; // m: the far ground's grid (it divides the tile: its border points are the neighbour's)
-export const WINDOW_AHEAD = 1000; // m of route ahead of the tram held, as round the camera (the user, 2026-11-17: "The
-// window in front of the planned route can be loaded larger than around but I wouldn't be too greedy")
+export const WINDOW_AHEAD = 1000; // m of route ahead of the tram held, as round the camera (larger, not too greedy:
+// maintainer, 2026-11-17)
 export const WINDOW_STEP = 100; // m: the route ahead read this often
 export const WINDOW_KEEP = 250; // m past the window a tile is dropped (so a tile at its edge is not loaded and dropped in turn)
 export const WINDOW_EVERY = 250; // ms: the window looked at this often

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The whole city's terrain as one greedy mesh of IPR's 1 m raster, 10 cm at the track (#428, #276's step 1).
 
-The decisions (docs/decisions/2026-11-05-ground-built-offline.md, the user's): greedy insertion with pydelatin; the
+The decisions (docs/decisions/2026-11-05-ground-built-offline.md, the maintainer's): greedy insertion with pydelatin; the
 error tolerance tol(d) = TOL up to D0 from a tram track, TOL * d / D0 beyond, at most TOL_MAX (tools/bench/
 terrain_mesh.py), d the distance to DI's track network (tools/di_network.py); the city is meshed once and cut into
 tiles afterwards (#276's later steps).
@@ -13,9 +13,9 @@ The ground of each cell of IPR's raster (35,001 x 26,001 cells of 1 m, rows nort
   2 inside it still: the lines' 10 m grids (raw/line*/terrain5514.tif, build_line.py);
   else no ground, and no triangles. Outside the boundary, IPR's own cells only.
 No passages rule (fine_terrain.py's, gone with it, #510): IPR's ground stays where it has ground, the floors of underpasses and culverts and
-the streets through building passages included; a street or track over a passage becomes a deck in #276's partition (the
-user, 2026-11-10: "keeping IPR lidar everywhere to keep the actual lowest points. Then bridge the gaps on streets and
-track/rail passes with other data"; tools/bench/terrain_compare.py --passages measured what the rule took and why).
+the streets through building passages included; a street or track over a passage becomes a deck in #276's partition
+(IPR's lidar everywhere keeps the actual lowest points, other data bridges the gaps for streets and tracks: maintainer,
+2026-11-10; tools/bench/terrain_compare.py --passages measured what the rule took and why).
 
 The mesh, in three steps:
   1. pydelatin over s = (z - base) / tol(d) with one max error of 1, which is exact where tol is constant. The base is
@@ -59,7 +59,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P lea
 from sources import TERRAIN_FLOOR  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOL, D0, TOL_MAX = 0.10, 120.0, 3.0  # m: the user's 10 cm at the track (2026-11-06), growing beyond D0, at most 3 m
+TOL, D0, TOL_MAX = 0.10, 120.0, 3.0  # m: the maintainer's 10 cm at the track (2026-11-06), growing beyond D0, at most 3 m
 LAT = 8  # cells: the distance to the tracks is exact on this lattice, bilinear between (the bench's)
 CAP = 3700.0  # m: tol is TOL_MAX from D0 * TOL_MAX / TOL = 3,600 m on: farther distances are held at this
 SMOOTH_SIGMA, SMOOTH_NEAR = 1.5, (15.0, 30.0)  # m: the raster's Gaussian, blended in between these distances from a track
@@ -207,7 +207,7 @@ def smooth(Z, lev, dl, sigma=None, near=None, band=256):
     """The ground's cells (IPR's and the fills') smoothed by a Gaussian of `sigma` m, the ground's own cells weighted
     (no ground does not pull it down), blended in from near[0] to near[1] m from a track: the mesh drew IPR's 1 m detail
     to 10 cm, a terrace's edge, a crest and the ground under trees as zigzags of steep facets (line 37 by the Krejcarek
-    viaduct, line 17 at Modrany s 2352; #632, the user, 2026-11-16: "I'd like to solve the issues first"). In place,
+    viaduct, line 17 at Modrany s 2352; #632). In place,
     band by band; the count of cells changed."""
     from scipy.ndimage import gaussian_filter
     sigma = sigma or SMOOTH_SIGMA

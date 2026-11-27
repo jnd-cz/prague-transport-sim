@@ -370,4 +370,7 @@ Code and the project's own models (the built-in tram, the pedestrians): GNU AGPL
 Data © OpenStreetMap contributors (ODbL); timetable PID GTFS, data.pid.cz (CC BY 4.0);
 terrain ČÚZK DMR 5G (CC BY 4.0); 3D buildings, retaining walls and trees: data base © IPR Praha (CC BY 4.0).
 
+For the planned models of Prague's stop shelters, benches and litter bins, the design credit is
+**studio Olgoj Chorchoj, spolupráce Aleš Boem** and the data credit is **Datový podklad © IPR Praha**.
+
 <!-- /help -->

@@ -14,11 +14,11 @@ import { CELL, GROUND_SNOW, SegmentIndex, pointInRing, signedArea } from './worl
 // - a tree inside a building is dropped (courtyard trees are not under a roof);
 // - a tree under TRACK_MIN from a track centre is dropped (the tram's body and its swing); further out a
 //   crown that reaches over the tram's band starts above the wire on a bare trunk and grows taller and wider
-//   than the others, an oval that arches over the track as the limes and chestnuts on Mariánské hradby do (the
-//   user, 2026-11-17: "make them taller over track"; their photos of 2026-11-18: trunks bare to the wire,
+//   than the others, an oval that arches over the track as the limes and chestnuts on Mariánské hradby do
+//   (maintainer, 2026-11-17; the maintainer's photos of 2026-11-18: trunks bare to the wire,
 //   crowns half as tall again as wide, meeting over the track);
 // - a crown next to a facade is narrowed, not shrunk, and the tree dropped only when a crown CROWN_MIN wide
-//   does not clear it (the user: "narrower next to buildings");
+//   does not clear it (maintainer);
 // - a row sample near a register tree is that tree again; a sample on a carriageway or a parking lot moves
 //   off it to the nearest other ground within ROW_SNAP (the row lines lie up to 5 m off their trees: the
 //   castle's row south of Mariánské hradby runs 2.5 m into the carriageway, its trunks 2.5 m behind the

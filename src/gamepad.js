@@ -13,7 +13,7 @@ const BUTTONS = {
   2: ['a', 'KeyA'],          // X / □: sand
   3: ['r', 'KeyR'],          // Y / △: the parking brake on and off (advanced controls), away from the brake trigger
   4: [' ', 'Space'],         // LB / L1: emergency and track brakes, beside the brake trigger for a finger that brakes
-                             // on it (the user, 2026-11-14)
+                             // on it (maintainer, 2026-11-14)
   5: ['g', 'KeyG'],          // RB / R1: look closer
   8: ['v', 'KeyV'],          // Back / Share: cab or outside view
   9: ['p', 'KeyP'],          // Start / Options: pause
@@ -97,8 +97,7 @@ export class Gamepad {
       this.send('keydown', String(n), `Digit${n}`, ev, true);
       this.send('keyup', String(n), `Digit${n}`, ev);
     }
-    // the right stick across: the head turned in proportion (the user, 2026-11-14: "make the right stick movement
-    // proportional to the sideways camera movement"), nothing in a dead zone of 0.15 (a stick at rest drifts)
+    // the right stick across: the head turned in proportion (maintainer, 2026-11-14), nothing in a dead zone of 0.15 (a stick at rest drifts)
     const raw = g.axes[2] ?? 0, x = Math.abs(raw) < 0.15 ? 0 : Math.sign(raw) * (Math.abs(raw) - 0.15) / 0.85;
     if (x !== p.look) { p.look = x; this.onLook?.(x); }
   }

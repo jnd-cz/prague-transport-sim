@@ -15,9 +15,8 @@
 //             (a KT4 driver's account: the mechanism takes hold late, only at a larger turn of the bogies, so the car
 //             runs straight and calm on straight track; k-report.net, 2023-10-11, docs/research/articulated-trams.md)
 // Positions are along the vehicle in m from its front coupler face, on straight track. A bogie turns 'free' (a pivot),
-// 'limited' (springs or stops: to maxAngle against its section) or 'fixed' (not at all). The user, 2026-11-13 (PR #577):
-// "The sections are usually coupled freely but it can be pivoted at different places, and some bogies can have smaller
-// freedom of movement or be completely fixed relative to the chassis."
+// 'limited' (springs or stops: to maxAngle against its section) or 'fixed' (not at all). The sections are usually
+// coupled freely, pivoted at different places, and some bogies turn less or not at all against the chassis (PR #577).
 //
 // placeUnit() puts a unit on the track. It starts at the first section that stands on its own:
 // - on two supports on the track (its bogies' pivots, a joint's bogie, an axle of a bogie with a pivot over each), the

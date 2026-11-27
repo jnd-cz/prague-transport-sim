@@ -121,7 +121,7 @@ class Rules(unittest.TestCase):
 
     def test_two_paths_over_the_same_track_both_get_the_platform(self):
         # (line 9's round trip, Řepy to Motol: float noise had given each platform to one path only; it belongs to the
-        # track, the user 2026-11-14: the back path draws it, the route has it too, along its own s)
+        # track (maintainer, 2026-11-14): the back path draws it, the route has it too, along its own s)
         RB = pl.Route([[-50, 0], [1000, 0]])
         at = pl.place_platform({'p': [[100, -3], [160, -3]]}, self.R, RB)
         self.assertEqual((at['path'], [round(at['s0']), round(at['s1'])]), ('back', [150, 210]))

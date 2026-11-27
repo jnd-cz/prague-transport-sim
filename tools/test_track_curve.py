@@ -34,7 +34,7 @@ def arc(cx, cy, r, a0, a1, step):
 
 class Fit(unittest.TestCase):
     def test_a_noisy_straight_comes_out_straight(self):
-        # "even straight direction isn't really straight" (the user, 2026-11-03): DI's points scatter a centimetre
+        # even a straight is not quite straight in DI (maintainer, 2026-11-03): its points scatter a centimetre
         random.seed(1)
         pts = [(x, random.uniform(-0.01, 0.01)) for x in range(0, 101, 2)]
         samples, at, tol, rad = tc.fit(pts, [tc.TOL] * len(pts))
@@ -63,8 +63,8 @@ class Fit(unittest.TestCase):
         self.assertLessEqual(max(tol), errors['3'] + 1e-9)
 
     def test_a_curve_under_18_m_moves_past_its_class(self):
-        # a 30° corner: within class 1 it bends under 18 m (`min-radius-network`, the user: "under 18m there
-        # shouldn't be anything like that"), so its points move further, at most HOLD_LIMIT
+        # a 30° corner: within class 1 it bends under 18 m (`min-radius-network`, maintainer: no track curves under
+        # 18 m), so its points move further, at most HOLD_LIMIT
         pts = [(x / 2, 0.0) for x in range(0, 61)] + [(30 + x / 2 * math.cos(math.radians(30)), x / 2 * math.sin(math.radians(30))) for x in range(1, 61)]
         errors = tc.class_errors()
         samples, at, tol, rad = tc.fit(pts, [tc.TOL] * len(pts), limit=[errors['1']] * len(pts))

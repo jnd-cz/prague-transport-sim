@@ -120,6 +120,13 @@ RULES = {
                    "verge-by-a-car-park-no-wall", "vystaviste-flush-parking", "wall-end-in-a-path", "stairs-beside-a-building",
                    "kralovka-lawn-at-a-sidewalk"],
     },
+    "outlines": {
+        "what": "areas on their own outline's surface: a median, an island, a parking strip, a cycle path; a long edge follows the lidar's shape (#638)",
+        "code": ["ground_mesh.SurveySurface", "ground_mesh.bent", "ground_mesh.BEND*"],
+        "places": ["marianske-hradby-median", "marianske-hradby-upper-track", "belohorska-median", "vinohradska-parking-bay",
+                   "repy-parking-kerb", "vystaviste-flush-parking", "belohorska-plain-kerb", "krejcarek-ramp",
+                   "stairs-beside-a-building"],
+    },
     "lidar-pits": {
         "what": "IPR's pits under the survey's streets, filled from their rim in every reader of the raster (#867)",
         "code": ["ipr_pits.*", "ipr_dtm.IprDtm", "ipr_dtm.FILLS"],

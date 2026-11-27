@@ -116,7 +116,7 @@ export class Game {
     this._initObstacles();
     this._initAdhesion();
     // restrictions: switches and crossings (D 1/2 § 25.4-5), and a local rule where OSM tags no speed. A slope itself sets
-    // none (`gradient-no-speed`; the user, 2026-11-07: the steep descents are tagged in OSM)
+    // none (`gradient-no-speed`; maintainer, 2026-11-07: the steep descents are tagged in OSM)
     const facts = opts.speedFacts, trackwork = data.trackwork || null;
     // (the opposite track's too: the oncoming trams take its curves by the same rule, #451)
     for (const r of [route, this.backRoute]) if (r) Object.assign(r, { speedTop: T3.vMax * 3.6, curveFloor: facts.smallRadius, curveAccel: facts.curveAccel });
@@ -148,9 +148,8 @@ export class Game {
     // (#249) those coming to a stop while the tram stands there (_comeTo): a stream of their own, so the passengers', the rules'
     // and the traffic's draws stay as they were
     this.comeRand = rng((opts.seed ?? 12345) ^ 0x249c);
-    // a run from the line's first stop, its terminus, starts empty and nobody alights there (the user, 2026-11-26, #249: "The
-    // first stop off any line should always start with empty car and people are only going inside", "The rule should apply
-    // only at first terminus stop"); from any other stop, the one where the run takes its next line too, with those aboard
+    // a run from the line's first stop, its terminus, starts empty and nobody alights there, at that first terminus only
+    // (#249); from any other stop, the one where the run takes its next line too, with those aboard
     // already (drawn either way: the stream after it stays)
     const first = opts.startStop === 0;
     const load = Math.min(tram.crushCapacity, Math.floor((10 + this.rand() * 25) * demandAt(this.clock)));
@@ -195,15 +194,14 @@ export class Game {
       stop.come = i === n - 1 ? 0 : (4 + central * 7) * (request ? 0.45 : 1);
       this._stopZone(stop);
       // those waiting for other lines (drawn only: src/gameView.js), who stay when we leave: only where other lines stop (the
-      // platform's day tram lines, tools/build_line.py; the user, 2026-11-26, #249: "some of them left waiting even if the stop
-      // is served only by single line, our tram"), more with more lines and at busier times. Without the lines, two others.
+      // platform's day tram lines, tools/build_line.py; #249: none left waiting where our line alone
+      // stops), more with more lines and at busier times. Without the lines, two others.
       // (one draw either way: the stream after it stays)
       const others = s.lines ? s.lines.filter((l) => !oursAt(i).has(l)).length : 2, u = r();
       stop.ambient = others === 0 ? 0 : request ? Math.floor(u * 2) : Math.floor(u * others * (3 + central * 3) * demand);
       stop.otherLines = others;
       if (i === n - 1) { stop.waiting = 0; stop.alightFrac = 1; }
-      // the run continues as its next line here: those aboard may stay (the user, 2026-11-26, #249: "if the run continues as
-      // different line then people can stay aboard"), the stop's share alights as anywhere
+      // the run continues as its next line here: those aboard may stay (#249), the stop's share alights as anywhere
       const change = this.segments.find((g) => g.from === i && g.from > 0);
       if (change) stop.lineChange = change.line;
       this._buildStop(stop);
@@ -295,7 +293,7 @@ export class Game {
   }
 
   // A signal hung with its stop line before its stop's sign: listed, the stop point stays at the sign (before #694 it
-  // moved to 3 m before the signal: 7.6 m short of the user's sign at Čechův most, where the user says no tram signal
+  // moved to 3 m before the signal: 7.6 m short of the maintainer's sign at Čechův most, where per the maintainer no tram signal
   // stands after the stop, only at the bridge junction; the signals' placement is #406's)
   _beforeSign(st, d) {
     const by = st.target - d.s;
@@ -392,8 +390,8 @@ export class Game {
     }
     // (not a crossing that starts inside our platform with no OSM crossing over the tracks there: a zebra
     // from the island platform across the road beside it, which the line data projected onto the track;
-    // the signal at Palackého náměstí stopped the tram 15 m short of the platform end for one, user's
-    // orthophoto 2026-10-24; also Jiráskovo nám., Strossmayerovo nám., Veletržní palác)
+    // the signal at Palackého náměstí stopped the tram 15 m short of the platform end for one, the maintainer's
+    // orthophoto reading 2026-10-24; also Jiráskovo nám., Strossmayerovo nám., Veletržní palác)
     const osmTram = (this.data.osmSignals?.tram || []).map((c) => R.nearest(c.x, c.y)).filter((n) => n && n.d < 4).map((n) => n.s);
     const inPlatform = (s) => this.data.osmSignals && this.stops?.some((st) => st.p0 !== undefined && s > st.p0 + 2 && s < st.p1 - 0.5) && !osmTram.some((t) => Math.abs(t - s) < 5);
     for (const s of this.data.crossings) if (!inPlatform(s)) out.push({ s, start: s - 2, car: false });
@@ -402,7 +400,7 @@ export class Game {
     return out.sort((a, b) => a.s - b.s);
   }
 
-  // Where each signal stands (user, 2026-10-24: one after the junction at Kobylisy, some in the
+  // Where each signal stands (maintainer, 2026-10-24: one after the junction at Kobylisy, some in the
   // middle of nowhere, some far before their junction). The conflicts come in clusters (gaps under
   // 20 m: a wide junction has 18 m between its streets' centre lines): a junction. A signal standing after a street junction (car crossings within 45 m before
   // it) that has no signal of its own belongs to it; if the junction has one, it is the junction's
@@ -704,10 +702,10 @@ export class Game {
     const gradients = locateGradients(this.opts.signFacts?.gradients || [], this.data.stops, (s) => this.profile.height(s));
     const plan = withArrows(planSigns({ posted, step: pstep, top, trackwork, smallRadius, gradients }), this.switches);
     this.signPlan = plan;
-    // Diagnostic boards: a curve's limit with no real sign (R 25 m and more; the user, 2026-11-08: "keep them for now for
-    // diagnostic purposes, we can drop them later with more stable release"). Where the limit lies under both the posted
+    // Diagnostic boards: a curve's limit with no real sign (R 25 m and more; kept for diagnosis until a more stable
+    // release, maintainer, 2026-11-08). Where the limit lies under both the posted
     // speed and the restrictions for 25 m or more: the lowest at the start, 12 m before it, and the speed after it.
-    // They show only with the debug overlay (F8, src/debugOverlay.js; the user, 2026-11-08, #389: "Only with F8"): in the
+    // They show only with the debug overlay (F8, src/debugOverlay.js; #389): in the
     // old design they read as real signs, three to one against those. None within 20 m of a real sign, which stands there
     // (src/gameView.js, where they are mounted).
     this.diagSigns = [];
@@ -872,11 +870,10 @@ export class Game {
     else this._closeDoors();
   }
 
-  // Dveře I (U): the first car's front door alone, by the driver (the user, 2026-11-26: "only the 1st door in car where driver
-  // sits"; "first door opening is usually used only for driver (like for switch) or is someone runs from the front side of tram"):
-  // open it, the others shut, or close it. With all of them open it does nothing (Dveře II closes them). Those waiting for the tram
-  // walk to it and get on there, those to alight in the first car leave through it ("yes", the user, the same day; src/passengers/
-  // consist.js onlyDoor); whether to use it is the player's choice, no points either way
+  // Dveře I (U): the first car's front door alone, by the driver (#249; in service it opens for the driver, as to work
+  // a switch, or for someone running up from the front of the tram): open it, the others shut, or close it. With all of them open
+  // it does nothing (Dveře II closes them). Those waiting for the tram walk to it and get on there, those to alight in the first car
+  // leave through it (#249; src/passengers/consist.js onlyDoor); whether to use it is the player's choice, no points either way
   toggleFrontDoor() {
     if (this.finished) return;
     if (this.doorState === 'closed' || this.doorState === 'closing') this._openDoors(true);
@@ -922,7 +919,7 @@ export class Game {
     this.audio.emit('door.close');
     // (those on the entry steps finish the climb; those at the doors not yet on them wait there and get on when the doors open
     // again, the lab's door predicate; they go home if the tram leaves, _finishStop. Closing on them costs 15 each, once a person;
-    // #249, the user, 2026-11-26: "If player closes door and then opens again at the same stop, do people come inside again?")
+    // #249)
     const st = this.stops[this.nextStop];
     if (st && st.arrived && st.waiting > 0 && this._atStop(st)) {
       const shut = this.pax.outside(st.i).filter((a) => !a.shutOn);
@@ -943,8 +940,7 @@ export class Game {
   // from the cab door along the tram's right side to
   // the switch (1.6 m/s), throws it (2 s crouched over the points) and walks back; at least 9 s.
   // Out by the front door: shut, it opens by itself (alone, Dveře I), the driver sets off once it is open, and it shuts behind them
-  // on the way back unless somebody waits at it (#249, the user, 2026-11-26: "first door opening is usually used only for driver (like for
-  // switch)", "I would auto open and close front door for the switch iron operation")
+  // on the way back unless somebody waits at it (#249)
   crowbar() {
     if (this.action || this.ironWait) return;
     const sw = this.switches.find((w) => !w.passed && w.s - this.tram.s > 0 && w.s - this.tram.s < 40);
@@ -973,8 +969,7 @@ export class Game {
     };
   }
 
-  // (#249, the user, 2026-11-26: "This will also allow showing more people getting into tram as they keep coming, so waiting for
-  // departure time makes sense") People come to the stop while the tram stands there: as many in a headway as wait for a tram on
+  // (#249: more people keep getting in as they come, so waiting for the departure time makes sense) People come to the stop while the tram stands there: as many in a headway as wait for a tram on
   // the mean (stop.come, by the time of day), the headway the timetable's (the trip before this one at this stop, else the one
   // after; 3 to 30 min). Their times a Poisson stream from the tram's arrival on, drawn from their own stream (comeRand)
   _comeTo(st) {
@@ -1026,19 +1021,17 @@ export class Game {
   }
 
   // is anybody running for the tram at this stop whom the driver waits for (the autopilot keeps its doors open): until the tram is
-  // ready to leave (st.readyAt) anybody running, then those who were running then; not those walking (the user, 2026-11-26:
-  // "Driver should not wait for walkers past the departure time"), nor those who set off running after it
+  // ready to leave (st.readyAt) anybody running, then those who were running then; not those walking (maintainer, 2026-11-26),
+  // nor those who set off running after it
   runnersFor(st) {
     return this.runners.some((r) => r.st === st && r.ran && (r.state === 'walk' || r.state === 'door') && (st.readyAt == null || r.waitedFor));
   }
 
   // those coming to the stop (#249): in at a walk; one who sees that a walk would not reach the door by the departure time (RUN_IF s
-  // to spare; the tram past it, now) but a run would by RUN_HOPE s after it, runs (the user, 2026-11-26: "people who would see the
-  // tram, have time to catch it and start running towards it rather than randomly appearing runners out of nowhere"). The tram ready
-  // to leave (st.readyAt: its time come, nobody at the doors, the doors open), those running then are waited for, WAITED_FOR points
-  // each who gets on (_finishStop; "give extra points for waiting for passenger trying to board which the player has to trade off
-  // against running late"). Those the tram leaves walk on to where their door was and wait there, without a penalty ("Some people
-  // really will run towards to tram but miss it and the driver would be right to leave")
+  // to spare; the tram past it, now) but a run would by RUN_HOPE s after it, runs, not a runner out of nowhere
+  // (maintainer, 2026-11-26). The tram ready to leave (st.readyAt: its time come, nobody at the doors, the doors open), those running
+  // then are waited for, WAITED_FOR points each who gets on (_finishStop; the player trades them off against running late). Those
+  // the tram leaves walk on to where their door was and wait there, without a penalty (a driver is right to leave one who misses it)
   _updateRunners(dt) {
     const tr = this.tram, now = this.stops[this.nextStop];
     const here = now?.arrived && now.departClock === null && this._atStop(now);
@@ -1156,9 +1149,8 @@ export class Game {
     return this.tram.s >= st.zone[0] && this.tram.s <= st.zone[1];
   }
 
-  // Where the tram front may stand to serve a stop. The stop point is the sign for every set (D 1/2 § 27.6; the
-  // user, 2026-11-18, #694: "The stop sign will be the stop point by definition ... OSM platform will define the
-  // boarding area"; a longer set's rear stands wherever it can and its doors along the platform board). With the OSM
+  // Where the tram front may stand to serve a stop. The stop point is the sign for every set (D 1/2 § 27.6;
+  // #694: the OSM platform is the boarding area; a longer set's rear stands wherever it can and its doors along the platform board). With the OSM
   // platform known, the zone keeps the whole set alongside it where it fits (rear at most 3 m short of its start, front
   // at most 4 m past its end), so on a long platform a second tram can stop behind the first one, and it always reaches
   // 2.5 m before and 3 m past the sign. Otherwise 20 m behind to 12 m past the stop sign.
@@ -1218,7 +1210,7 @@ export class Game {
       if (Math.abs(err) < 3) this.bonus(15, t('msg.precise'));
       else if (err > 4) this.penalty('precision', 20, t('msg.overshot', { d: Math.round(err) }));
     }
-    // on arrival the share of those aboard to alight here, the nearest to the doors (the user's rule, #249), with any who could
+    // on arrival the share of those aboard to alight here, the nearest to the doors (the maintainer's rule, #249), with any who could
     // not get off at the stop before; the waiting queue at the doors
     if (st.arrived && !st.alightSet) {
       st.alightSet = true;
@@ -1475,7 +1467,7 @@ export class Game {
     const near = Math.abs(sig.cross - tram.s) < 400;
     const tramOnCrossing = sig.cross > tram.s - tram.length - 1 && sig.cross < tram.s + 4;
     // drivers also see a tram about to enter, and give way to one standing in the junction past its
-    // signal, whatever the lights show them (the user, #268: "cars should give way"; a tram stopped
+    // signal, whatever the lights show them (#268; a tram stopped
     // there behind a car, the cross street's green came, and its cars drove on, line 9 s 8852)
     const inJunction = sig.s <= tram.s && sig.cross > tram.s;
     const tramComing = tramOnCrossing || inJunction || (sig.cross > tram.s && sig.cross < tram.s + 6 + tram.v * 2.5 && tram.v > 0.1);

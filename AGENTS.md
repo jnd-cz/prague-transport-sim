@@ -44,8 +44,9 @@ things are done, and why a rule exists, is in the files it points to:
 - **Order between issues:** GitHub's blocked-by links. A step that reads another step's output waits for it.
 - **Fix rules, not spots.** Measure on every line, change the rule that produced it, measure again on all lines. A
   local special case is a fact in `data/truth.json`, not a coordinate in code.
-- **Realism over convenience.** Keep the driver's real skills (contacts, coasting, signals). Facts from the user
-  (a Prague tram expert) win over heuristics, and each cites where it was said (the quote and the issue, PR or date).
+- **Realism over convenience.** Keep the driver's real skills (contacts, coasting, signals). Facts from the
+  maintainer (a Prague tram expert) win over heuristics, and each cites where it was said: "(maintainer, #N)", the
+  date only when there is no issue or PR. Docs don't quote chat; a short quote only where the words are the evidence.
 - **Calibrate a check before it holds or overrules data,** against an independent source, split by its cases. A
   heuristic standing in for missing data logs what it decided (F8 overlay, `window.game`).
 
@@ -62,7 +63,7 @@ things are done, and why a rule exists, is in the files it points to:
 - **Review findings** go in a PR comment; the author answers point by point. **Stacked work** opens its PR with
   `--base` on the branch it needs, and merges main in after the base merges (no force-push).
 - **Commits** say what changed and why, with numbers where something was measured.
-- **A security hole is not written up in public** (the user, 2026-11-19: "fix and file privately"): fix it under a
+- **A security hole is not written up in public** (maintainer, 2026-11-19): fix it under a
   plain title; the details go in a draft security advisory, not an issue, a PR or a commit message.
 
 ## Questions for the user
@@ -82,9 +83,9 @@ things are done, and why a rule exists, is in the files it points to:
 - **One rebuild at a time:** only the branch whose issue holds the `rebuild` label rebuilds every line and
   publishes (`snapshot.py data-publish`, then commit `data/MANIFEST.json`). Others test on a local rebuild and
   wait. `main`'s manifest always names data that is in the store (`snapshot.py verify`).
-- **Ground changes are proven on places, rebuilt in batches** (the user, 2026-11-19, #757): a ground rule's PR
-  carries the tool, its test and the numbers of the locality set and its rules' places (`tiers.py` names them; the
-  user, 2026-11-26, #865); `--all --rings` and every line's rebuild are the batch's, by the holder of `rebuild`.
+- **Ground changes are proven on places, rebuilt in batches** (#757): a ground rule's PR carries the tool, its
+  test and the numbers of the locality set and its rules' places (`tiers.py` names them, #865); `--all --rings` and every
+  line's rebuild are the batch's, by the holder of `rebuild`.
 - **Sources** come only from the pinned snapshot in `raw/` (`snapshot.py fetch`), OSM only from its local extract,
   never the public Overpass API. A new source goes into a snapshot with its URL, licence and date, and into
   `tools/sources.py`. A provider that refuses scripted requests is waited out, never fooled.
@@ -100,14 +101,14 @@ things are done, and why a rule exists, is in the files it points to:
   runs its `tools/test_<tool>.py`; a new tool gets one; a test that drives a page has a time limit.
 - **Which checks a change needs:** `python -I tools/tiers.py` picks them from the diff (the table is in it); a
   change of two kinds runs both; `/regress` runs them. A world checkpoint (W1, W2 …) runs every check on every line.
-- **Heavy jobs take turns** (the user, 2026-11-12, #516; DEVELOPING.md, Heavy jobs, lists the tools that take
+- **Heavy jobs take turns** (#516; DEVELOPING.md, Heavy jobs, lists the tools that take
   theirs): anything else heavy runs through `python -I tools/heavy.py "what" -- CMD ...`. Start one in the
   background and let it wait; never run one around the queue. **A batch is queued at its start, its shared steps
   (counts, builds: `--shared GB,CORES`) apart from its alone ones (timings)**, so that they run beside other jobs
-  (the user, 2026-11-24; DEVELOPING.md, Heavy jobs). **Never start a job detached** (`Start-Process`,
-  `start`, `nohup … &`): it ends as orphaned (the user, 2026-11-22, #815). End a background command with something
+  (maintainer, 2026-11-24; DEVELOPING.md, Heavy jobs). **Never start a job detached** (`Start-Process`,
+  `start`, `nohup … &`): it ends as orphaned (#815). End a background command with something
   after its last program (`; echo "exit $?"`), so that a stop reaches it.
-- **The heaviest work runs at night** (23:00 to 07:00) or on the user's word (the user, 2026-11-21; from 23:00 since 2026-11-23): a rebuild of
+- **The heaviest work runs at night** (23:00 to 07:00) or on the user's word (maintainer, 2026-11-21; from 23:00 since 2026-11-23): a rebuild of
   every line, a seeded compare of every line, a checkpoint's run. By day: the place loop, tests, one-line runs. The
   queue holds it to that (#851): by day a job expected over 30 min, or of unknown time (`--expect` states it), waits
   for 23:00 and holds no one up; the user's word runs it by day (`heavy.py --day`, `TRAM_HEAVY_DAY=1`) or starts
@@ -133,6 +134,7 @@ things are done, and why a rule exists, is in the files it points to:
 | check | line | symptom | issue |
 |---|---|---|---|
 | stops, load10 | 9 seed 2; 17 `load10` seed 5 | one brake-to-drive change with nothing in front, 1.7 m before the stop point (Klamovka s 6087; Strossmayerovo náměstí s 16329) | #756 |
+| u3 | 9 seed 4 | one collision at s 20286, on main since at least 9c98999 | #884 |
 | page load | lines without them | console 404s for optional sidecars (`line9.dtm.json`, `.signals`) | (expected) |
 
 ## Code and docs

@@ -6,11 +6,14 @@
 // sets of the same model on the track ahead (fronts AI m ahead of ours: the nearest at its full level, the
 // two others at the lighter one, as traffic sets them), the camera fixed 14 m off the platform side. The
 // game runs (a paused one draws 4 frames a second, #149) with the run's seeded traffic.
-// Returns the frame interval (median, p95; vsync off in the runner), the CPU time of renderer.render,
-// the draw calls and triangles of a frame, and each set's level. `fov`: the camera's vertical field in degrees
+// Returns the frame interval (median, p95; vsync off in the runner), the CPU time of renderer.render, the GPU's own
+// time for a frame's draws where the browser has a timer (src/perf.js gpuTimer: on a fast GPU the interval is the
+// CPU's, and only this shows what the fragments cost, #705), the draw calls and triangles of a frame, and each
+// set's level. `fov`: the camera's vertical field in degrees
 // (the cab's 62 unless given; the zoom key's 22.75, #382). `traffic`: seconds the traffic steps before the measurement,
 // our tram standing, so that its cars fill the streets (#250: the street vehicles drawn; the page's ?boxcars draws the
-// box cars instead); `stop`: the stop of the trip (its index in the menu).
+// box cars instead); `stop`: the stop of the trip (its index in the menu); `ratio`: the renderer's pixel ratio (the
+// page's own unless given: the display's, at most 1.75; a higher one makes the fragments the limit on a fast GPU).
 import { startShift } from './shift.js';
 
 const AI = [45, 110, 180];
@@ -27,7 +30,7 @@ const count = (o) => { let n = 0; o.traverse(() => n++); return n; };
 const frame = () => new Promise((r) => requestAnimationFrame(r));
 
 // livery: a livery id (#529) our set and the sets ahead wear; none, the vehicle's own
-export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fov = null, livery = null, traffic = 0, stop = 0 } = {}) {
+export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fov = null, livery = null, traffic = 0, stop = 0, ratio = null } = {}) {
   const $ = (id) => document.getElementById(id);
   window.runSeed = 1; // (the run's seeded stream: the same traffic for every model)
   $('selStop').value = String(stop); $('selStop').dispatchEvent(new Event('change'));
@@ -40,6 +43,7 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
   await until(() => window.tramModel?.userData.vehicle === model && window.camera);
   const { makeT3, placeConsist } = await import('/src/models.js');
   const { setRiggedLevel, FULL_OUT } = await import('/src/rigged.js');
+  const { gpuTimer } = await import('/src/perf.js');
   const g = window.game, route = g.route, s0 = g.tram.s;
   const at = (q) => { const p = route.at(q); return [p.x, p.y, g.profile.height(q), route.rollAt(q)]; };
   // the camera: 14 m off the platform (right) side of our set's middle, 3 m up, looking 40 m ahead
@@ -48,6 +52,7 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
   window.camera.position.set(c.x, g.profile.height(s0 - 15) + 3, -c.y);
   window.camera.lookAt(l.x, g.profile.height(s0 + 40) + 1.5, -l.y);
   if (fov) { window.camera.fov = fov; window.camera.updateProjectionMatrix(); }
+  if (ratio) { window.renderer.setPixelRatio(ratio); window.dispatchEvent(new Event('resize')); } // (the page's resize sets the size)
   window.camera.updateMatrixWorld();
   const sets = ai.map((d) => {
     const m = makeT3({ line: g.line, cars: 2, vehicle: model, run: '899', variant: livery ? 'T3SUCS' : null, livery });
@@ -64,18 +69,23 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
   // (split: the scene's matrix update, which render does first, and the rest of render)
   const cpu = [], umw = [];
   let info = null;
+  // (a query around every render of a frame: the landmarks' pass, the world, the mirror's picture when it is drawn)
+  const timer = gpuTimer(r.getContext()), gaps = [];
+  let timed = 0;
   r.render = function (scene, cam) {
     const t = performance.now();
     scene.updateMatrixWorld();
     const t1 = performance.now(), auto = scene.matrixWorldAutoUpdate;
     scene.matrixWorldAutoUpdate = false;
+    const measured = timer && gaps.length > 0;
+    if (measured) { timer.begin(); timed++; }
     orig.call(this, scene, cam);
+    if (measured) timer.end();
     scene.matrixWorldAutoUpdate = auto;
     cpu.push(performance.now() - t); umw.push(t1 - t);
     // (the game's scene only: the landmarks' pass renders its own scene first, 1 call, src/landmarks.js)
     if (!info && cpu.length > warm && scene === window.scene) info = { calls: r.info.render.calls, triangles: r.info.render.triangles };
   };
-  const gaps = [];
   try {
     let t = performance.now();
     for (let i = 0; i < warm + frames; i++) {
@@ -83,10 +93,14 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
       const now = performance.now();
       if (i >= warm) gaps.push(now - t);
       t = now;
+      timer?.poll();
     }
   } finally {
     r.render = orig;
   }
+  // (a query answers a few frames later: the last ones are waited for, at most a second)
+  for (let i = 0; timer && timer.times.length < timed && i < 60; i++) { await frame(); timer.poll(); }
+  const gpuMs = timer?.times.length ? timer.times.reduce((a, b) => a + b, 0) / (timer.times.length / (timed / gaps.length)) : null;
   const c2 = cpu.slice(warm), setNodes = sets.length ? count(sets[0].m) : 0, nodes = count(window.scene);
   for (const { m } of sets) window.scene.remove(m);
   const ms = (x) => +x.toFixed(2);
@@ -94,9 +108,15 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
     model, kind: window.tramModel.userData.kind, fov: +window.camera.fov.toFixed(2), frames: gaps.length,
     frameMedian: ms(median(gaps)), frameP95: ms(pct(gaps, 0.95)), fps: +(1000 / median(gaps)).toFixed(1),
     renderMedian: ms(median(c2)), renderP95: ms(pct(c2, 0.95)), matrixMedian: ms(median(umw.slice(warm))), ...info,
+    // (the GPU's time for a frame's draws, the mean over the measured frames; null where the browser has no timer)
+    gpuMs: gpuMs === null ? null : ms(gpuMs),
     nodes, tramNodes: count(window.tramModel), setNodes,
     sets: sets.map(({ m, far }) => ({ far, level: m.userData.level ?? m.userData.kind })),
     viewport: [innerWidth, innerHeight, devicePixelRatio],
+    // (what the renderer draws at: the page caps the display's ratio, and ?gfx=pr1 lowers it, src/gfx.js; the
+    // drawing buffer's own size, which a browser makes smaller than the canvas asks when it is too large)
+    pixelRatio: window.renderer.getPixelRatio(), drawn: [r.getContext().drawingBufferWidth, r.getContext().drawingBufferHeight],
+    canvas: [r.domElement.width, r.domElement.height],
     // the traffic's cars in the streets, and as drawn (src/cars.js: near and far models; none with ?boxcars)
     trafficCars: window.traffic.cars.filter((c) => c.active).length, cars: window.cars ? { ...window.cars.stats } : null,
     // the people as drawn (src/people.js: animated figures, full and middle, each its own skinned copy; the far batch)

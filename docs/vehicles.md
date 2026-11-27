@@ -16,7 +16,7 @@ a model that does not load falls back to the first loaded one in that list.
 |---|---|---|---|---|
 | detailed, animated (the default) | `assets/t3h/`, the rigged loader `src/rigged.js` | a glTF (`.glb`) and `rig.json` naming its moving parts | CC BY-NC 4.0 | doors, collector, bogies, wheels, couplers, track-brake shoes, brake lamps, indicators, high beams; a lighter level for AI trams far away |
 | detailed, classic | `src/models.js` (`loadDetailedT3`), `assets/t3/` | a glTF, one texture; loaded when picked | CC BY-NC 4.0 | none |
-| simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the user's photos, the livery painted on a canvas | AGPL-3.0 | bogies, wheels, couplers, collector; the lamps by state (brake lamps, indicators, high beams) |
+| simple (built in) | `src/t3simple.js` | code: shapes measured on the T3's drawings and the maintainer's photos, the livery painted on a canvas | AGPL-3.0 | bogies, wheels, couplers, collector; the lamps by state (brake lamps, indicators, high beams) |
 
 `makeT3({ line, cars, vehicle, dest, run, variant })` in `src/models.js` builds a set as the vehicle with that id. Our tram is made in `src/main.js`, AI trams in `src/traffic.js`.
 
@@ -71,8 +71,8 @@ tram's; AI trams are dealt one (`src/vehicles.js` `liveryOf`). `tools/test_vehic
 
 Every slot it leaves out keeps the vehicle's own. A livery naming a slot or a type its vehicle lacks is left out with
 the slot's name (`livery x left out: texture slot roof: t3h has no such slot`). The game ships none yet, so the menu
-row stays hidden (the user, 2026-11-13: "For now I would keep only the default liveries, with future possibility to
-add more variety"); `tools/test_liveries.py` serves two samples of its own, a texture and a colour on the hybrid and
+row stays hidden: only the default liveries for now, more variety possible later (maintainer, 2026-11-13);
+`tools/test_liveries.py` serves two samples of its own, a texture and a colour on the hybrid and
 the built-in car's three colours.
 
 ## Sound packs
@@ -229,7 +229,7 @@ A player installs packages in the menu's *Vehicles…* (#530; the decision recor
 folder with `package.json` at its root, of one of four kinds: a `vehicle`, a `livery`, a `sounds` pack or a `fleet`.
 The page installs from a .zip, a folder or an address (a `package.json`, whose files are fetched from beside it, or a
 `.zip`). One archive may hold several packages, each in its own folder with its own `package.json` (a complete
-vehicle pack: the user, 2026-11-11, "separate with possibility to bundle them together in a single archive"). Each is
+vehicle pack: separate packages that can be bundled in one archive; maintainer, 2026-11-11). Each is
 checked, installed, switched off and removed on its own.
 
 `package.json` holds the fields every kind has, then its kind's own:
@@ -268,7 +268,7 @@ above; its `loader` `gltf` or `gltf-rigged`), a `livery` `livery.json`'s (*Liver
   (`src/rigged.js` `rigProblems`), and one car as the game draws it (`src/models.js` `vehicleFit`): at most `fit`'s
   `maxLength` (33 m) long, at most its type's width (`VEHICLE_TYPES` in `src/tram.js`) plus `widthOver` wide, its
   lowest point on the rail plane, within the budget (`budget`: 100,000 triangles and 100 draw calls a car at its full
-  level, wide for now to see what authors bring: the user, 2026-11-13). A car longer than its type's length over the
+  level, wide for now to see what authors bring: maintainer, 2026-11-13). A car longer than its type's length over the
   coupler faces is offered with a warning: it runs on its type's two pivots until it has a type of its own
   (articulated vehicles: #579). The model is measured at install; at a start the hashes stand for it;
 - a model's links: every `uri` in a `.gltf` or `.glb` is data inside the file or one of the package's listed files
@@ -285,17 +285,17 @@ ones join the registry after the repository's (`src/packages.js` `loadInstalled`
 `packages/<id>/<path>` through blob URLs (`src/localFiles.js`), so every loader reads them as it reads `assets/`. A
 package installed from a `package.json` address offers *Update* when a newer version is there.
 
-**The curated list** (the user, 2026-11-11: "perhaps some curated list of what others officially submitted"):
+**The curated list** of what others submitted (maintainer, 2026-11-11):
 `assets/catalogue.json`, shown under the installed ones with an *Install* button. An entry: `id`, `names` (cs, en),
 `author`, `licence`, `url`, `home` (its page), `packages` (a bundle's), `submission`. `tools/test_vehicles.py` checks
 the entries.
 
-**Submitting a package** (#580; the user, 2026-11-13: "submit the pack or link to the asset through our website where
-we can pick it up and review"): the Vehicles… page's *Submit a package to the project* takes a .zip or its address
+**Submitting a package** through the project's website, for the project to pick up and review (maintainer, #580):
+the Vehicles… page's *Submit a package to the project* takes a .zip or its address
 (an https `package.json` or `.zip` on the author's host, which must let the game's page fetch it: CORS), an optional
 contact for the verdict (an email or a Discord name) and a note. A box says whether the project may host the files on
 its server and offer them to everyone from the menu; unticked, they stay on the author's host and the list links
-them (the user, 2026-11-15). The page checks the package as an install does, keeping nothing (`src/packages.js`
+them (maintainer, 2026-11-15). The page checks the package as an install does, keeping nothing (`src/packages.js`
 `dryCheck`), and sends only one that passes, with the check's report, to the host's `submit.php`
 (`tools/submit.php`: 10 an hour from everyone together, 64 MB each, 2 GB kept until a pull; only the file types of
 `src/packageRules.json`; no IP address stored). The review (DEVELOPING.md, Deploy) adds an accepted one to the list.
@@ -328,9 +328,8 @@ sample vehicle with every part and checks each of them moves. A rig of interface
 centres as `beams` (points), the tail lamps as boxes (`tailLamps`: `size`, `at`) and the saloon as `materials` and a box
 `within`: the loader reads both forms (#525).
 
-The hybrid is maintained in the repo: the asset lab it came from is retired (the user, 2026-11-12: the lab "is
-just website for viewing the model and it's animations, it doesn't export anything on its own and most likely won't
-be used anymore"). Its rig is generated by [`tools/export_t3h_rig.py`](../tools/export_t3h_rig.py) from
+The hybrid is maintained in the repo: the asset lab it came from is retired (maintainer, 2026-11-12: the lab only
+shows the model and its animations and exports nothing). Its rig is generated by [`tools/export_t3h_rig.py`](../tools/export_t3h_rig.py) from
 [`tools/t3h_rig_roles.json`](../tools/t3h_rig_roles.json) and the base rig, with its bindings checked
 against the GLB (#471). The model names its own parts: the shoes, couplers, headlights, tail lamps and the
 saloon were named in it by [`tools/edit_t3h_glb.py`](../tools/edit_t3h_glb.py) (#525), so the roles file holds names
@@ -400,9 +399,9 @@ every set of that type, whichever model is drawn, so a seeded run counts the sam
 is `assets/passengers/t3-cabin.json` (24 seats and 81 standing places, 105 shown a car; above them, up to the crush
 load, passengers are counted only), the queues at its doors set the time at a stop (`src/passengers/`,
 [knowledge.md](knowledge.md), *The passengers at a stop*). **The drawing** shows them only on a model with working doors
-and an interior (the user, 2026-11-25: "I would offer passenger simulation to vehicles which have functional door and
-interior"): its doors move (`moves`), its rig names its saloon, and its manifest's `passengers` names a cabin measured
-from this very model (the cabin's `assetSha256` is the model file's), which the user has accepted. `tools/test_vehicles.py`
+and an interior (maintainer, 2026-11-25): its doors move (`moves`), its rig names its saloon, and its manifest's
+`passengers` names a cabin measured from this very model (the cabin's `assetSha256` is the model file's), which the
+maintainer has accepted. `tools/test_vehicles.py`
 checks all four. Today the hybrid shows them; the classic model and the built-in one do not.
 
 How a model comes to show them:
@@ -417,7 +416,7 @@ How a model comes to show them:
 3. **The checks:** `tools/cabin.py --timing` and `--alight` (every packing filled and emptied, 10 out / 10 in, both
    streams of every door used, no place taken twice, the counts conserved; a full car empties before it fills with
    the game's pace), `tools/test_passengers.py`.
-4. **The user accepts** the places shown (seated and standing); `tools/cabin.py --game` writes the cabin, the
+4. **The maintainer accepts** the places shown (seated and standing); `tools/cabin.py --game` writes the cabin, the
    manifest names it in `passengers` with the acceptance.
 
 **Another vehicle type** starts from step 1 too, its seat and standing capacity measured and decided anew, and brings
@@ -457,5 +456,5 @@ its own cabin for the simulation.
   listed in `assets/t3h/LICENSE.txt`, as CC BY-NC 4.0 asks; a change to its part assignments goes into its rig's roles
   (its shoes, couplers, saloon, headlights, tail lamps and the fleet numbers' size, #467, #471).
 - **Facts:** a dimension, colour or detail of the real car cites its source (a drawing, a photo with its
-  fleet number, the user) in a comment or in [docs/knowledge.md](knowledge.md). The user's facts as a Prague
-  tram expert win over a drawing or a guess.
+  fleet number, the maintainer) in a comment or in [docs/knowledge.md](knowledge.md). The maintainer's facts as a
+  Prague tram expert win over a drawing or a guess.

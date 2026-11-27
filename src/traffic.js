@@ -94,8 +94,8 @@ function timeTo(d, v, vEnd) {
 // reached on a braking curve (0.7 m/s2, as our tram's nextLimitChange). With only the limit where it
 // stood it ran into a slow section at full speed, braked inside it and crawled on a held blinking GO
 // until it turned red (line 17 s 10826).
-// AI trams run AI_UNDER m/s under it, as our autopilot catching up (#242; the user, 2026-11-10: "keep them simply driving swiftly up
-// under the given speed limit"); the oncoming trams ran at 0.85 of it.
+// AI trams run AI_UNDER m/s under it, as our autopilot catching up, swiftly up to the
+// limit (#242); the oncoming trams ran at 0.85 of it.
 const AI_UNDER = 0.2;
 function limitSpeed(lim, s, len) {
   let v = Math.min(lim.at(s), lim.at(s - len)) / 3.6;
@@ -138,8 +138,8 @@ const CAR_ALIGN = 0.3;
 // of it runs on the rails (a car's middle there: its body over the tram's); the rest is judged by the body's reach: a car
 // on it against a T3's body (BODY_L x BODY_W half sizes, placed by its bogies, swung out in curves) passing there.
 // (Before, a way coming in at 45° or less was taken for driving along the track and given way at nowhere: one crossed at
-// 41° through the tram, and others waited with their noses in its body; the user's reports from Újezd and Malovanka,
-// 2026-11-22, tools/bench/giveway.js)
+// 41° through the tram, and others waited with their noses in its body; the maintainer's reports from Újezd and
+// Malovanka, #602, tools/bench/giveway.js)
 const BAND = 2.6, CROSSES = 0.3, RAILS = 1.6, RAILS_RUN = 12;
 // a way's approach to a track: within NEAR of its centre. One that comes no nearer than BAND may still bring a car's
 // corner into the body (turned 26° to the track, its middle 2.57 m from the centre, 0.6 m into it; line 23 s 6532)
@@ -287,12 +287,11 @@ export class Traffic {
 
     // where oncoming trams stop: the front at the far end of their own platform (game.platforms of the
     // back route: OSM shapes, GTFS positions). Mapped from our stop point they stopped 8 m into theirs:
-    // our platform's far end is near the start of theirs (user: "they stop just before the stop instead
-    // of running to its end"). Only there: our stop mapped across, the fallback where they had no platform within
+    // our platform's far end is near the start of theirs (the maintainer's report: short of the stop, not
+    // run to its end). Only there: our stop mapped across, the fallback where they had no platform within
     // 30 m, stopped them opposite our stop sign with doors open, a second stop where theirs is staggered 27-141 m
-    // away (42 of the 49 such points on the five lines) and one where PID has none for them (the user, 2026-11-09:
-    // "ai trams from other direction still seem to stop and open door at our direction's stops but a bit past the
-    // stop sign"). Our stops with no platform of the same name for them: noOppositeStop (lint).
+    // away (42 of the 49 such points on the five lines) and one where PID has none for them (the maintainer's
+    // report, 2026-11-09). Our stops with no platform of the same name for them: noOppositeStop (lint).
     // (on their right: the T3's doors; not at a platform no tram stops at, `unused`, #407)
     // (overlapping platforms of one stop, OSM and GTFS, are one stretch: two stop points in one platform
     // stopped the tram twice, Kobylisy 951 and 1012)
@@ -492,8 +491,8 @@ export class Traffic {
   // (returned: that car -> the circle's cars). It replaces three walks: what the cars saw (three cars in a junction each
   // waited for the next, line 9 s 13284), the car ahead through what they saw (line 17 s 21178), and holds at a junction
   // (line 17 seed 5 s 17693, #607). Which one goes: of those a rule holds (a junction's, or a car crossing its way, not
-  // the one in front of it on its way), else of all, the one with none of the circle coming from its right (the user,
-  // 2026-11-24: "the traffic rule that car on the right should go first"); of several, or where each has one there
+  // the one in front of it on its way), else of all, the one with none of the circle coming from its right (the car on
+  // the right goes first, #560); of several, or where each has one there
   // (every arm taken), the one that has stood longest; then the lower id. Counted once a spell (5 s) by class:
   // this.circlesLetGo.rules (every car held by a rule), followers (none), tangled.
   _letGo(live) {
@@ -757,14 +756,13 @@ export class Traffic {
         // lane. The car waits with its front YIELD_GAP before the track while the tram's body stands on
         // the crossing, or while the tram is moving and would reach it before the car is across with a
         // margin (2.5 s; a bold driver, one in eight: 0.5 s). A tram standing clear of it (at a stop
-        // before the junction) does not hold the cars: they go with their green (user, 2026-10-23).
+        // before the junction) does not hold the cars: they go with their green (maintainer, 2026-10-23).
         // A car too close to stop is committed and crosses: the tram's driver sees it
         // (game.carsCrossing: the bell, braking). Not where the car is on another level.
         // (every crossing within 45 m, nearest first, not only the first one: where the route loops
         // around, a car path crosses it twice; the car went by the first, the tram far off there, and
         // met the tram at the second already on the track, line 17 s 21530)
-        // (#602, the user, 2026-11-14: "they dont stop in front of the opposite direction's track when yielding to oncoming
-        // trams": both tracks, each with its trams, ours and the AI trams ahead of it on ours, the oncoming ones on the other;
+        // (#602: a car yielding to oncoming trams stops before the opposite track too: both tracks, each with its trams, ours and the AI trams ahead of it on ours, the oncoming ones on the other;
         // and a car waits before the first track it reaches: tracks with no room for a car between them are crossed as one)
         let xGap = null, keepClear = false, kcFor = null, yieldAi = null;
         // (dC: the car's middle to where the band begins; a band entered on the path before, the next one starting
@@ -1010,8 +1008,8 @@ export class Traffic {
   // Cars on our track and on the opposite one, as route positions: trams stop behind them (shared lanes, a car queuing on
   // the tracks). On it: its middle within RAILS of a track centre, or its body within SIDE_BY_SIDE of a T3's body passing
   // there (placed by its bogies, swung out in curves): where a lane runs beside the track too close for a car and a tram
-  // side by side, the tram waits for the car as the car waits for the tram (the user, 2026-11-23, #602: "both trams should
-  // wait for cars and vice versa in places where they can't fit side by side"; Karmelitská, lanes 1.63-1.74 m from the
+  // side by side, the tram waits for the car as the car waits for the tram (#602;
+  // Karmelitská, lanes 1.63-1.74 m from the
   // centre, a car in the tram's body in 4 of 5 runs). this.game.carsOnTrack: [{s, v, car}] along our route, carsOnBack
   // along the opposite one.
   _carsOnTracks() {
@@ -1245,7 +1243,7 @@ export class Traffic {
   // place's bands and past them a car's length and the 8 m it halts short of what is in its way), and which is there first:
   // c would drive on and stand in the place for it. Line 23 s 329, seed 31: a car on the connector over our track stopped
   // 3.4 m short of one that came off a short lane in the junction at 5 m/s, its middle 2.4 m from our track's centre, for
-  // 1.4 s; the user's picture of a car in the tram's side there, 2026-11-26 (#602). Lanes inside a junction have no turns
+  // 1.4 s; the maintainer's picture of a car in the tram's side there (#602). Lanes inside a junction have no turns
   // there: the first to get to where the ways cross goes, the other waits before the tracks. A car standing on that stretch
   // of c's way, not one ahead of c on it (the queue, _queueRoom), holds c too; one standing short of it does not.
   _crossedBy(c, seq, from, to, live) {
@@ -1285,8 +1283,8 @@ export class Traffic {
       // by first was held at its own junction meanwhile, and the car went in and stood on the rails for it, line 9 s 24330,
       // seed 2; waiting for one that is there first costs little, it would follow it anyway)
       if (tCout + 2 < tO) continue;
-      // (who goes: one that could not stop short of it any more; else the one from the right, as the circles (the user,
-      // 2026-11-24); else the first there. Each decides the same of the other, so one waits: by the times alone, both
+      // (who goes: one that could not stop short of it any more; else the one from the right, as the circles (#560);
+      // else the first there. Each decides the same of the other, so one waits: by the times alone, both
       // nearly alike and changing with each one's speed, the two cars took turns to wait, and both went, seed 31)
       if (hit.d - o.half < (vo * vo) / 8) return o;
       const pc = c.path.at(c.s);
@@ -1743,7 +1741,7 @@ export class Traffic {
 
   // Trams of other lines ahead of us: they stop at stops and at signals not showing GO. They keep their
   // head start as a dispatcher would have them: at the speed limit, and with our tram within 300 m they
-  // only let people on and off (6-8 s) instead of a full dwell (user: catching up with them kept
+  // only let people on and off (6-8 s) instead of a full dwell (maintainer: catching up with them kept
   // delaying the tram; line 17: 173 s behind them over the line at 85 % of the limit, 12-24 s dwells,
   // spawned 450-900 m ahead).
   _updateAhead(dt, tram) {

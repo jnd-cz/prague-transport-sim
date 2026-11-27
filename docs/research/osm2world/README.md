@@ -24,7 +24,7 @@ side at `main` 595514a. Prague counts are from our extract `raw/osm/praha.osm.pb
 | widths, kerbs, positions | guessed from tags and class defaults | measured where the survey has them (lines 17, 22); OSM ribbons elsewhere |
 | heights | declared constraints, mostly not enforced at this commit; buildings stand at their lowest point | track profile from survey and lidar with held structures (`docs/decisions/2026-11-02-vertical-profile.md`) |
 | ground | a partition: each area minus the footprints of higher-priority ones, nothing drawn under anything | layers drawn over each other (survey over terrain, ribbons over terrain) |
-| facts | none beyond tags | `data/truth.json`, the user's answers |
+| facts | none beyond tags | `data/truth.json`, the maintainer's answers |
 
 So OSM2World's guesses lose wherever we have measured data; what it offers is method: the ground as a
 priority partition, junction areas, attaching objects to the nearest wall or pole, texture coordinates fitted
@@ -47,30 +47,30 @@ to whole window bays, and the tile encoding.
 
 Decision record: [2026-11-05-osm2world-ideas-not-the-tool.md](../../decisions/2026-11-05-osm2world-ideas-not-the-tool.md).
 
-## Candidates and the user's picks
+## Candidates and the maintainer's picks
 
-Picked by the user in the OSM2World Picks page (2026-11-05), with their notes; each taken one is an issue or a
-comment on the issue named.
+Picked by the maintainer in the OSM2World Picks page (2026-11-05), with their notes; each taken one is an issue or
+a comment on the issue named.
 
-| # | candidate | pick | where now | the user's note |
+| # | candidate | pick | where now | the maintainer's note |
 |---|---|---|---|---|
-| 1 | The ground as a priority partition, shapely's constrained Delaunay along the lidar grid, buildings as holes | take | #276 (decision comment) | "does this mean the fused ground model?" (yes: its method) |
+| 1 | The ground as a priority partition, shapely's constrained Delaunay along the lidar grid, buildings as holes | take | #276 (decision comment) | asked whether this is the fused ground model (yes: its method) |
 | 2 | Streets outside the survey: junction areas, cut-back ribbons with kerb fillets, widths calibrated on the survey | take | #301 | |
 | 3 | Sidewalks outside the survey joined to the kerb line | take | #302 (blocked by #301) | |
-| 4 | Lowered kerbs at crossings | take | #303 | "Take if not in zps layer" (the ZPS has no kerb type; its heights first, OSM as fallback) |
-| 5 | Car lane graph from `lanes` / `turn:lanes` | take | #304 | "Check where available" (11-16 % of car ways along our lines carry `turn:lanes`) |
-| 6 | Lane markings from OSM's lane layout where the orthophoto has none | later | fallback in #309 | "which lane layout is meant by that?" (OSM2World's cross-section from `lanes`, `divider`) |
-| 7 | OSM street furniture into the feature layer, the DTM first | take | #305 (blocked by #14) | "Osm as fallback for lamps" |
-| 8 | Orientation and mounting of placed objects | take | #14 (comment) | "Please explain orientation of what" |
-| 9 | Trees | take | #306 | "Our current trees (source?), then newly found tree holes in dtm, osm as fallback" |
-| 10 | Ballast with sleepers | take | #65 (comment) | "We already have different types of track styles, ballasted track is one of them, remains to be visualized for each" |
-| 11 | OSM catenary masts as a check on poles | take | #277 (comment) | "Yes only as a check, DTM should have the data more precisely" |
-| 12 | No contact wire on `electrified=no` tram ways | later | – | "Explore where it exists": all 37 are depot and yard tracks (Pankrác ~25, Hostivař workshops 8, Hloubětín 1, 2 short), none on our lines |
+| 4 | Lowered kerbs at crossings | take | #303 | take if not in the ZPS layer (the ZPS has no kerb type; its heights first, OSM as fallback) |
+| 5 | Car lane graph from `lanes` / `turn:lanes` | take | #304 | check where available (11-16 % of car ways along our lines carry `turn:lanes`) |
+| 6 | Lane markings from OSM's lane layout where the orthophoto has none | later | fallback in #309 | asked which lane layout is meant (OSM2World's cross-section from `lanes`, `divider`) |
+| 7 | OSM street furniture into the feature layer, the DTM first | take | #305 (blocked by #14) | OSM as fallback for lamps |
+| 8 | Orientation and mounting of placed objects | take | #14 (comment) | asked what the orientation is of |
+| 9 | Trees | take | #306 | our current trees (their source asked), then tree holes newly found in the DTM, OSM as fallback |
+| 10 | Ballast with sleepers | take | #65 (comment) | the track styles exist, ballasted track among them; each remains to be drawn |
+| 11 | OSM catenary masts as a check on poles | take | #277 (comment) | only as a check: the DTM's data is more precise |
+| 12 | No contact wire on `electrified=no` tram ways | later | – | explore where it exists: all 37 are depot and yard tracks (Pankrác ~25, Hostivař workshops 8, Hloubětín 1, 2 short), none on our lines |
 | 13 | Facades: RÚIAN joined to LOD2, bays per storey, roof textures down the slope | take | #55 (comment) | |
-| 14 | Tile container: GLB + `KHR_mesh_quantization` against #276's format | take | #307 | "Try and see what's better" |
-| 15 | Tile levels as content filters, clipping, rebuild only what changed | take | #30, #31 (comments) | "Please explain what it means" |
-| 16 | ambientCG textures | take | #308 | "If we don't find or generate anything better" |
-| 17 | Road paint from the orthophoto: stop lines, zebras, arrows, lane lines | take | #309 | "Evaluate compute resources needed to scan ortophotos at highest detail across the whole city" (7 cm: 1.5 s and 2.3 MB per ha; the city 116 GB / ~21 h, our lines' streets ~2 GB / 20 min) |
+| 14 | Tile container: GLB + `KHR_mesh_quantization` against #276's format | take | #307 | try both and see which is better |
+| 15 | Tile levels as content filters, clipping, rebuild only what changed | take | #30, #31 (comments) | asked what it means |
+| 16 | ambientCG textures | take | #308 | unless something better is found or generated |
+| 17 | Road paint from the orthophoto: stop lines, zebras, arrows, lane lines | take | #309 | evaluate the compute needed to scan the orthophotos at the highest detail across the whole city (7 cm: 1.5 s and 2.3 MB per ha; the city 116 GB / ~21 h, our lines' streets ~2 GB / 20 min) |
 
 The decision record is accepted.
 

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), dist/traffic/boarding-state.js, as it was (sha256 9f980a96b335581d);
-// accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
+// accepted by the maintainer as good enough for now (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
 // #249: changed: exitPace passed to the exit flow (its PACE by default).
 // #249 step 2: changed, for the game (src/passengers/consist.js), each an option or a function the lab's scenarios do not call, so its
 // times hold: prepareStops (false: the exits prepared while the clock runs), keepEvents and onEvent (the events to a callback, not kept),
 // a.aboard (on the floor: from the top of the entry steps in to the bottom out), enqueue's extra (merged into each boarder: stands, the
 // wish to stand though seats are free, and the game's tag), overflow (a boarder with no place left boards as counted: up the steps and
-// into the count), alight's nearest (the nearest to a door by walking first, the user's rule) and counted (that many counted passengers
+// into the count), alight's nearest (the nearest to a door by walking first, the maintainer's rule) and counted (that many counted passengers
 // out first through the doors in turn), seatAboard (passengers on board at the start), reseat (a free seat to the nearest standing
 // passenger who does not wish to stand, round the others: cabin-navigation.js), abandon (boarders not yet on the steps leave the
 // queues), a walk's own speed, a boarder on the steps finishing the climb when the doors close, and an idle step that only counts time.
@@ -169,7 +169,7 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
  // (#249: a door's exchange is over: nobody waits or climbs there, nobody is to leave or leaving through it)
  const quietDoor=d=>!channels.some(c=>c.door.id===d.id&&(c.queue.length||entryActors(c).length))&&![...actors.values()].some(a=>a.doorId===d.id&&(a.stage==='exit queue'||a.alightOnArrive||a.exiting||a.actions&&!a.aboard));
  let navigator=sharedNavigator; // (#249: one for the set's cars, built before the run: about 20 ms)
- // (#249, the user's rule 3: a free seat by a door whose exchange is over goes to the nearest standing passenger who does not wish to
+ // (#249, the maintainer's rule 3: a free seat by a door whose exchange is over goes to the nearest standing passenger who does not wish to
  // stand (of the three nearest, the first with a way round the others), walking at speed m/s; the seat reserved first, the standing
  // place freed on arrival. The seats with the nearest such passenger first; at most limit moves begun and tries ways looked for a
  // call; the number begun)
@@ -182,8 +182,8 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
     a.seatId=s.id;a.reseatFrom=a.standingId;a.actions=[...route.path.slice(1).map(p=>({type:'walk',x:p.x,y:layout.floorY,z:p.z,speed,free:true})),{type:'turn',heading:s.heading},{type:'sit',seat:s}];a.actionIndex=0;a.actionTime=0;a.actionStart=null;a.stage='walking';record('reseat-admitted',a);n++;break;}}
   return n;
  }
- // (#249 step 4, the user, 2026-11-26: "those getting off at the stop needs to be prepared often, to be ready to go once door
- // opens". The stop near, the passengers chosen to alight there (ids) go to the free doorway places of the doors they will leave by
+ // (#249 step 4: those getting off at the stop made ready to go once the doors open.
+ // The stop near, the passengers chosen to alight there (ids) go to the free doorway places of the doors they will leave by
  // (planExitDoors, as alight assigns them), the nearest to the door first, one a door every gap s: from a seat they stand up first,
  // then walk at speed m/s round the others to the free place nearest the door that has a way (of the three nearest). A doorway
  // place is a door's (doorBufferId): alight sends them through it, and first. Those already in one, or with none free or no way,

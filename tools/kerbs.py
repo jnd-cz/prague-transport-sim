@@ -17,14 +17,14 @@ island, platform) that shares vertices with a carriageway:
 The terrain is only a decision and a check, never a surface point: areas where it disagrees with the
 result by more than CHECK over a kerb of CHECK_LEN or more are listed for review.
 
-The terrain is the wrong reference in most of what that finds: in the user's review of line 17's 19 largest (#136,
+The terrain is the wrong reference in most of what that finds: in the maintainer's review of line 17's 19 largest (#136,
 #142) 18 were not the kerb's fault. So it decides a side only where it lies within AGREE of the line on one side, and
 what it disagrees with leaves the list, counted by why (`notKerb`):
   level: an OSM tunnel, bridge or other layer, or a survey area off level 0, along the kerb (the terrain is an
     underpass floor or an embankment under a bridge);
   wall: a survey wall or terrain edge along the kerb;
   terrain: off by more than AGREE with neither (greenery, terrain older than the street).
-A place the user said is a real ramp stays on the list (data/truth.json kerbFacts).
+A place the maintainer said is a real ramp stays on the list (data/truth.json kerbFacts).
 
 OSM's lowered and flush kerbs are also named on a listed area's card (`osmKerb`).
 
@@ -55,7 +55,7 @@ CHECK, CHECK_LEN = 0.05, 10.0  # m: terrain disagreeing by more than this, along
 CARR = {"road", "tram", "parking"}
 RAISED = {"sidewalk", "island", "median", "platform"}
 SIDE = 1.0  # m: where the terrain is read on either side of the kerb line
-# m: the terrain agrees with a kerb line within this (a platform's largest step, PLATFORM). On the user's
+# m: the terrain agrees with a kerb line within this (a platform's largest step, PLATFORM). On the maintainer's
 # 19 answers (#142) the five cases where the terrain was the wrong reference and nothing stands near are off by
 # 0.61-1.42 m
 AGREE = 0.40
@@ -313,7 +313,7 @@ def lowered_stretches(areas, carr, crossings=(), kerb_nodes=()):
 
 def apply(areas, terrain, why=None, facts=(), low_kerbs=(), crossings=(), kerb_nodes=()):
     """Kerbs into the ground-level areas, in place. terrain(x, y): IPR height in the city frame (NaN
-    outside). why: surroundings(...). facts: the user's places (x, y, kind) that stay on the review list.
+    outside). why: surroundings(...). facts: the maintainer's places (x, y, kind) that stay on the review list.
     low_kerbs: OSM's lowered and flush kerb nodes (x, y, value), named on the list's items. crossings, kerb_nodes:
     OSM's crossing ways and kerb=* nodes, the lowered stretches' places (lowered_stretches).
     Returns the report for the provenance checks."""

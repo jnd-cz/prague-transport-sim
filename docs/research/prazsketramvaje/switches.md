@@ -82,7 +82,7 @@ would be line 9's s 23460 (straight; no OSM switch within 5 m) and line 17's s 9
 **R07, a later source:** the press of October 2023 (Pražská strojírna, in [Technický týdeník](https://technickytydenik.cz/rubriky/denni-zpravodajstvi/v-praze-pribyla-dalsi-vysokorychlostni-vyhybka-prazska-strojirna-zrychlila-tramvaje-na-kotlarce_58880.html)
 and Ekonomický deník) gives the Kotlářka switch **50 straight and 35 diverging**, in service since August 2023. The register
 says 50 / 15. Conditions it names: its own track bed, deep flangeways and a raised frog, heating, SIL 3. **The game takes
-the press release's 35** (the user, 2026-11-08: "I will go with the press release"); `data/truth.json` `speed-switches` keeps
+the press release's 35** (maintainer, 2026-11-08); `data/truth.json` `speed-switches` keeps
 the register's 15 beside it under `register`, with a `check` to confirm later.
 
 **The signal (photo on the speed-sign page, 2016):** two black boxes one above the other on a bracket of a traction pole,
@@ -110,15 +110,15 @@ Speed switches in the register (speeds straight / diverging, km/h):
 | SW-C2 | The register lists every radio-controlled switch with its trolley contact as **"no / removed on <date>"** (most in April–August 2007, e.g. Výtoň 614–616, Strossmayerovo náměstí 529–532, Palmovka 617–622, Ohrada 626–628) or **"no / never fitted"**. | register 2006041262 | – |
 | SW-C3 | A remote-controlled switch may still have a **working trolley contact**, marked by SW-S12. | PPS Q102 | the game's contact sign |
 | SW-C5 | Two switches in a row: a black plate with a white **L** or **P** under the contact sign says which branches that contact serves; a contact out of use is covered by a **black plate with a yellow cross**. | website 2006041276 | – |
-| SW-C6 | Blocking is released when the **pantograph** passes the release contact; in a 2×T3 set the **second car's pantograph** is up too (the user, 2026-11-03: both cars' pantographs, as in real operation), so the switch is released only after the whole set has passed. | website 2006041394; user | only the first car's pantograph counts (`src/tram.js:34`) |
+| SW-C6 | Blocking is released when the **pantograph** passes the release contact; in a 2×T3 set the **second car's pantograph** is up too (maintainer, 2026-11-03: both cars' pantographs, as in real operation), so the switch is released only after the whole set has passed. | website 2006041394; maintainer | only the first car's pantograph counts (`src/tram.js:34`) |
 | SW-C7 | Why switches are blocked: with 2×T3 sets the **second car's pantograph sometimes threw the switch** under the set and tore it apart. The blocking system: a **blocking contact** right after the working contact, an **auxiliary contact about 15 m** (a car length) past the switch, an **unblocking contact about 30 m** past it; the switch unblocks when a pantograph closes the unblocking contact **while the auxiliary contact is not closed**. Modern switches block by resonant track circuits and ultrasonic detectors instead. | student club slides *Technika pražských tramvají* (undated; [PDF](https://k5.sh.cvut.cz/~oskar/stah/technika_tramvaji_darkblue.pdf)) | the game sets a switch at the contact and has no second pantograph |
 | SW-C8 | On the T3SUCS the switch button (TV) draws line current through a ≈3.5 Ω resistor so the working contact sees current; it works only with **drive off** (M1 out) and the accelerator at positions **1–30**, i.e. coasting or braking below roughly 12 km/h. | ČKD wiring diagram 1-38-370 444 F ([t3-accelerator.md](t3-accelerator.md) 8.2) | the game's contact: power or not |
 | SW-C4 | With work going on at a switch, the driver must not enter its circuit (PPS Q90 offers "must not stop before the working contact" as a wrong answer). | PPS Q90; § 20.3 | – |
 
-**Finding for the user:** the register says the switches on our lines are radio-controlled without
+**Finding for the maintainer:** the register says the switches on our lines are radio-controlled without
 trolley contacts, while the game makes every facing switch contact-worked. AGENTS.md lists contacts
 among the driver's real skills. Whether to keep contacts, switch to radio control (the T3's
-direction buttons, [t3.md](t3.md)), or mark each switch by the register, is the user's decision.
+direction buttons, [t3.md](t3.md)), or mark each switch by the register, is the maintainer's decision.
 Electrically controlled switches with contacts have their own register on the site
 ([2006041261](https://www.prazsketramvaje.cz/view.php?cisloclanku=2006041261), see
 [web-notes.md](web-notes.md)).

@@ -8,7 +8,7 @@ tram and 4.0-5.1 % of sidewalk lies over 8 cm off its 21 m mean. IPR's 1 m raste
 better a source: against DI's rails the noise left in each is alike (median 1.5 cm, 90th percentile 5-10 cm); over
 15 cm off their mean on straight road outline, 0.4-0.7 % of the samples are the survey's alone (IPR within 8 cm there),
 as many IPR's alone and 0.1 % both; on paved areas IPR's alone are 11-17 % (yards, steps, walls by buildings). So
-neither replaces the other (the user, 2026-11-12: "yes lets go with the consensus based on your measurements"):
+neither replaces the other, and the consensus of the two decides (maintainer, 2026-11-12):
 - at each vertex of a road, tram or sidewalk outline at level 0, survey - IPR (IPR read INNER m inside the area) against
   its local offset: the median of survey - IPR over the vertices within WIN m along the outline (widened up to WIDE m to
   reach a vertex on each side and MIN_AGREE agreeing ones) that agree with IPR within AGREE;

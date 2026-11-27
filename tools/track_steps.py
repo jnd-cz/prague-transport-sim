@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The places where the rail as built steps, for the user's review (#344): reports/review/track-steps.json.
+"""The places where the rail as built steps, for the maintainer's review (#344): reports/review/track-steps.json.
 
     python -P -E tools/track_steps.py [--checkpoint W1]
 
@@ -9,7 +9,7 @@ A place is where one of these holds, and places within REACH m of each other are
 - numeric DI jumps (`di_jumps`): a record's segment of at least JUMP_LENGTH m climbing over JUMP_GRADE and JUMP_RISE m,
   steeper than any track (the rule of #202's comment of 2026-11-06), where the rail as built still steps near it;
 - with --checkpoint, the lint's places of that checkpoint's run (`trackLevels`, `railSupport`, `verticalCurves`).
-A place the user answered (`stepAnswers`, or an area where the tracks follow the ground: `radiusAnswers` with `area`;
+A place the maintainer answered (`stepAnswers`, or an area where the tracks follow the ground: `radiusAnswers` with `area`;
 within ANSWERED m) is left out; one that still steps is printed.
 
 Each card holds the heights of every line and direction through the place: numeric DI, the archive's records, the
@@ -32,7 +32,7 @@ REACH = 60.0         # m: findings this near each other are one card
 AROUND = 70.0        # m: the heights shown either side of the place
 CAR_BOGIE, CAR_PITCH = 3.2, 15.04  # m: a car's centre to its bogie pivots, between coupled cars' centres (src/tram.js)
 ROUTE_NEAR = 8.0     # m: a DI jump this near a line's route is on it
-ANSWERED = 15.0      # m: a place this near one the user answered (data/truth.json stepAnswers) is that place
+ANSWERED = 15.0      # m: a place this near one the maintainer answered (data/truth.json stepAnswers) is that place
 
 
 def interp(xs, ys, x):
@@ -235,10 +235,10 @@ def main():
     for r in staged['route_samples']:
         samples.setdefault((r['line'], r['direction']), []).append(r)
     frame, terrain = Frame(), IprDtm()
-    # (a place the user answered is not asked again: its answer is in the build; one that still steps is printed)
+    # (a place the maintainer answered is not asked again: its answer is in the build; one that still steps is printed)
     answered = [(tuple(float(v) for v in frame.xy(*s['place'])), s.get('decision'))
                 for s in (truth.get('trackHeights') or {}).get('stepAnswers', [])]
-    # (and an area where the user had the tracks follow the ground, steps of the ground and all: radiusAnswers `area`)
+    # (and an area where the maintainer had the tracks follow the ground, steps of the ground and all: radiusAnswers `area`)
     from shapely.geometry import Polygon
     areas = [(Polygon([tuple(float(v) for v in frame.xy(*p)) for p in a['area']]), a.get('decision'))
              for a in (truth.get('trackHeights') or {}).get('radiusAnswers', []) if a.get('area')]

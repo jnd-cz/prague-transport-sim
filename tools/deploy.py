@@ -62,8 +62,7 @@ from make_dist import ROOT, files  # noqa: E402
 
 CONFIG = os.path.join(ROOT, "deploy.local.json")
 MANIFEST = ".deploy-manifest.json"
-# the data heavy packs, kept on the host only compressed (the user, 2026-11-06, #275: "just the data heavy packs
-# should be compressed to smallest size"; docs/knowledge.md, The test host)
+# the data heavy packs, kept on the host only compressed, to the smallest size (#275; docs/knowledge.md, The test host)
 PACKED_DIRS, PACKED_TYPES = ("data/", "assets/"), (".json", ".bin", ".glb", ".gltf")
 PACKED_SUFFIX = ".brotli"  # (not .br: the host's Apache takes that for the Breton language)
 HTACCESS = """# tools/deploy.py: the data and models exist here only as <name>.brotli, and every request for <name> gets that file;

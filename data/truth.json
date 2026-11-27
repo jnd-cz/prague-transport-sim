@@ -6479,6 +6479,34 @@
     }
    ]
   },
+  "marianske-hradby-median": {
+   "line": "22",
+   "at": [
+    -1040.0,
+    921.0
+   ],
+   "reach": 30,
+   "issue": 638,
+   "what": "Mariánské hradby (lines 22 and 23, s 2404-2432 on line 23): the median between the two tracks at the upper track's edge, over the hill's crest",
+   "source": "measured 2026-11-27 on ground batch E: the survey's median (area 509 of line 23's survey) has its south edge as two points 27.6 m apart, 243.92 and 242.35 m, over the crest; IPR's lidar stands 0.25 m over its own chord between them at 9 m. Built, the median lay 0.17-0.22 m under the upper track's bed beside it (243.36 against 243.58 m at x = -1040), where IPR has the median 0.02-0.08 m over the track: 13 sunk kerb samples (median|tram) at s 2384-2432",
+   "sections": [
+    {
+     "name": "from the upper track across its edge onto the median, x = -1040, 3 m",
+     "from": [
+      -1040.0,
+      919.0
+     ],
+     "to": [
+      -1040.0,
+      922.0
+     ],
+     "expect": {
+      "largest step m": 0.1
+     },
+     "why": "IPR runs from 243.62 m on the track to 243.64-243.70 m on the median: no step down from the track's bed onto it"
+    }
+   ]
+  },
   "stairs-reversed-ramp": {
    "line": "9",
    "at": [

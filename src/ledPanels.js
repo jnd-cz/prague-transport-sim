@@ -8,8 +8,7 @@ const dot = (g, x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.f
 // ------------------------------------------------------------------ the call signal (výzvové návěstidlo, § 42.3, 46.2)
 // Three strips of 7 LED pairs, \ | /. D 1/2 draws them 2 LEDs wide and 7 long (p. 37, 45). The photos (two from
 // Wikimedia, 2026-11-08) put the vertical strip in the middle, spanning 0.63 of the panel's height; each leaning strip is
-// the same strip turned 24° about its middle (the user: "the same led strip rectangular design for left and right, just
-// rotated, not stretched and shifted"), its bottom end beside the vertical one's without touching. Measured on a photo, in
+// the same strip turned 24° about its middle, not stretched or shifted (maintainer), its bottom end beside the vertical one's without touching. Measured on a photo, in
 // steps along a strip: a pair's LEDs 0.69 apart, a leaning strip's bottom pair 1.14 from the middle, LEDs 0.38 wide.
 const CALL = { rows: 7, step: 0.105, pair: 0.69, lean: 24 * Math.PI / 180, foot: 1.14, r: 0.19 };
 export const CALL_LIT = '#ffb81c';      // the photos' amber; D 1/2 draws pure yellow

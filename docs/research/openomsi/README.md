@@ -17,7 +17,7 @@ commit `b2dc640b` (2026-11-12): about 500,000 lines in 47 crates. Our side at `m
 | [traffic-and-people.md](traffic-and-people.md) | paths, junctions and their right of way, light programs, car following, deadlocks, walkers | #33, #450, #496, #304, #16, #367 |
 | [vehicles-and-wire.md](vehicles-and-wire.md) | scripted vehicle systems, rail dynamics, the body on its springs, the pantograph, sections and insulators, trolleybus gear | #71, #277, #500, #528, #456 |
 | [transit-sound-render.md](transit-sound-render.md) | duties and passengers, the sound engine and city ambience, rendering and frame time, weather, multiplayer | #40, #249, #550, #251, #308, #31 |
-| [trolleybus-wires.md](trolleybus-wires.md) | how its trolleybus wires are authored, built and drawn; Prague's trolleybus wires in OSM (asked by the user) | #572, #39 |
+| [trolleybus-wires.md](trolleybus-wires.md) | how its trolleybus wires are authored, built and drawn; Prague's trolleybus wires in OSM (asked by the maintainer) | #572, #39 |
 
 ## Answers to #520's questions
 
@@ -84,7 +84,7 @@ commit `b2dc640b` (2026-11-12): about 500,000 lines in 47 crates. Our side at `m
 4. **How to take what is useful.** Ideas and numbers only, written anew in our code: none of the takes above needs
    openOMSI's code.
    - **A port changes the licence.** A file translated from it would have to stay AGPL-3.0-only, against our
-     `-or-later` SPDX header rule (#518): a decision for the user before any port.
+     `-or-later` SPDX header rule (#518): a decision for the maintainer before any port.
    - **Published models are cited directly.** Where a model is published (the Intelligent Driver Model, Tarjan's
      strongly connected parts, Curtius–Kniffler), the paper is cited, not openOMSI.
    - **Numbers name their source.** A number taken from openOMSI names its file and commit in a comment.
@@ -105,7 +105,7 @@ bears on our check tiers:
 For us, a golden set over all lines would make the drawing tier's "screenshots main vs branch" one command
 (proposal 11). The layer guard is a check for #422's split of `world.js`.
 
-## Issues opened (the user, 2026-11-13: "Open issues as proposed and comment on the existing ones")
+## Issues opened (maintainer, 2026-11-13: as proposed, with comments on the existing ones)
 
 | # | issue | lane | milestone | blocked by |
 |---|---|---|---|---|
@@ -124,25 +124,24 @@ For us, a golden set over all lines would make the drawing tier's "screenshots m
 The points for existing issues went to them as comments: #31, #71, #301, #309, #16, #500, #528, #456, #550, #40,
 #249, #251, #308, #367, #33, #450.
 
-From the user's answers and the trolleybus note:
+From the maintainer's answers and the trolleybus note:
 - #558 Stop announcements (research);
 - #559 A driver's record across shifts;
 - #572 Trolleybus wires drawn from OSM `trolley_wire`;
 - #571 The tram span wire drawn at 6.34 m while its comment says 6.74 m (found in passing).
-- #573 The tram overhead line as built: zigzag, sag, delta suspensions, the cited height, droppers that reach the wire (the user's plan,
+- #573 The tram overhead line as built: zigzag, sag, delta suspensions, the cited height, droppers that reach the wire (the maintainer's plan,
   with figures from DPP, Yarra Trams' standard, Elektroline and Elzel; the height under structures is #71, the
   trolleybus figures are on #572).
 
-## The user's answers (2026-11-13)
+## The maintainer's answers (2026-11-13)
 
-1. "Open issues as proposed and comment on the existing ones."
-2. **Right of way:** the user asked whether we use it at junctions without signs. We don't. At a signal the cars
-   obey it. Elsewhere a car waits for one already on a crossing connector, and between two approaching, the
+1. Open issues as proposed and comment on the existing ones.
+2. **Right of way:** the maintainer asked whether we use it at junctions without signs. We don't. At a signal the
+   cars obey it. Elsewhere a car waits for one already on a crossing connector, and between two approaching, the
    nearer to the junction goes first (`src/traffic.js` :867-890): no signs, no road class, no right-before-left.
-   #561 brings all three, with the tram's rules at unmarked junctions from the user.
-3. **Stop announcements:** "Out trams don't have yet stop announcements, my idea would also require some research
-   and preparation if synthesized voice is feasible besides player loading pre recorded set for some line". The
-   playback "should come from recording, not microphone", the driver hears it too, "plus couple more system
-   recording like warning 1 minute before departure from the starting stop". This is #558.
-4. **The driver's record:** "yes eventually we should keep driver's record, not sure when it can be implemented but
-   I would like to have it". This is #559.
+   #561 brings all three, with the tram's rules at unmarked junctions from the maintainer.
+3. **Stop announcements:** our trams have none yet. Wanted: research on whether a synthesised voice is feasible,
+   beside a recorded set a player loads for a line. The playback comes from a recording, not a microphone, the
+   driver hears it too, and a few system recordings join it, such as a warning 1 minute before departure from the
+   first stop. This is #558.
+4. **The driver's record:** wanted eventually, with no date yet. This is #559.

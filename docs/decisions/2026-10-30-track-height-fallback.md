@@ -1,6 +1,6 @@
 # Archived DTMP track heights: coverage and fallback assessment
 
-**Date:** 2026-10-30. **Scope:** acquisition and comparison for #61, following the user's request;
+**Date:** 2026-10-30. **Scope:** acquisition and comparison for #61, following the maintainer's request;
 no world import or generated line-data changes. Import and source selection remain #20.
 
 ## Result
@@ -164,7 +164,7 @@ raw source Z from the selected height, height source, confidence, evidence IDs a
 Geometry records retain DI attributes and source package hashes/state dates; archive IDs retain their
 attributes, acquisition dates and batch hashes. Archived-only geometry is never added by this stage.
 
-The user's revised selection order (2026-10-30) is:
+The maintainer's revised selection order (2026-10-30) is:
 
 1. Use numeric DI Z as supplied. Archived Z and the optional review file cannot override it; a
    disagreement remains flagged. This selects DI's deck-level height on the Trojský most regression.
@@ -199,9 +199,9 @@ Nearby polygons within 1.5 m remain diagnostic; only a containing surface can su
 The eligible paved classes are defined in `tools/track_heights.py`. Records retain the compiled file hash,
 area index and available source-state
 date. The four style offsets approved for staging are facts in `data/truth.json`, rather than constants
-in the importer or the game. The user's reply, “Use the proposed offsets for all four styles”, is recorded
+in the importer or the game. The maintainer's approval of the proposed offsets for all four styles is recorded
 at `trackHeights.offsetApproval`; approval adopts design values, not a new survey measurement.
-User `trackStyles` marks are applied to their line sections; unmarked track uses the
+The maintainer's `trackStyles` marks are applied to their line sections; unmarked track uses the
 documented panel **drawing** default and carries a `track_style_defaulted_panels` flag. That default
 does not prove paved construction for a height check.
 
@@ -228,7 +228,7 @@ it separates raw DI-minus-survey from the approved drawing-offset residual.
 Of the green samples, **219** form one site, Koh-i-noor – Slavia – Nádraží Eden; none overlaps the
 explicit Hradčany grass marks. The other **5** are ground beneath Trojský most, more than 8 m below
 the rails. The 219-site length-weighted median is +0.222 m, p10 +0.075 m, p90 +0.428 m. Its survey class establishes
-green ground, not whether its Z is vegetation or track bed. The user's section assessment is recorded
+green ground, not whether its Z is vegetation or track bed. The maintainer's section assessment is recorded
 at `data/truth.json` `trackHeights.surveyCalibrationSites`; exact grass boundaries and individual
 sample construction remain unverified. No +0.22 m
 survey-to-rail fact is adopted. The approved grass drawing offset remains a separate design fact.
@@ -266,7 +266,7 @@ Brusnice, Čechova čtvrť: a gradual drop and one steep climb) and on 3 for a d
 Hodkovičky, Černý kůň), and the survey answer is offered on 4, Palackého most among them, where the
 archive measured the river bed.
 
-**Fallback order of the 2026-11-02 review (#184).** The user's answers, one per decision, are facts in
+**Fallback order of the 2026-11-02 review (#184).** The maintainer's answers, one per decision, are facts in
 `data/truth.json` (`trackHeights.reviewAnswers`, keyed by decision id, scoped by its lines, each with the
 quote it rests on); `python -P -E tools/track_span_evidence.py` imports them (27 of 27). The order agreed
 in the walkthrough: DI, then the archive where it is smooth, then:
@@ -318,7 +318,7 @@ the old archive alignment winding ±4 m around the new Trojský most's approach,
 50.0727 N 14.4099 E (Palackého most's Smíchov abutment, on land: the archive dives 5.4 m below the street), two
 5–8 m dips at Brusnice on lines 22/23, Modřany's dip on line 17 (its reviewed answer still wins). Mosty 3D decks
 (below) took 159 m of it off the game lines. A held stretch is bridged by the vertical profile's curve from
-both sides ([vertical profile](2026-11-02-vertical-profile.md), #20), as the user asked for dips on #184.
+both sides ([vertical profile](2026-11-02-vertical-profile.md), #20), as asked for dips on #184.
 
 **A tram's structure stays one while OSM maps the track disused or under construction (#190).** The
 structure mask (`tools/dtmp_tracks.py` `structure_mask`) takes `railway=tram` and the tram values of
@@ -326,7 +326,7 @@ structure mask (`tools/dtmp_tracks.py` `structure_mask`) takes `railway=tram` an
 `disused:railway=tram` on `bridge=yes` during its rebuild while the 2026 DI has the track. Disused heavy rail
 and the metro D construction tunnels stay out (a tram above them is not on them).
 
-**The user's structures (#190).** A structure no source maps is a fact from the user in `data/truth.json`
+**The maintainer's structures (#190).** A structure no source maps is a fact from the maintainer in `data/truth.json`
 `trackHeights.structures`, keyed by place (from / to along the track), added to the structure mask as a 6 m
 corridor (`truth_structures`). The first: Libeňský most from the end of the river bridge (50.1034 N, 14.4645 E)
 to the street towards Palmovka (14.4693 E). The old viaduct there is demolished (OSM `railway=razed`), the
@@ -346,7 +346,7 @@ the archive, may be the ground under the deck (the Libeň river-bridge end; the 
 falls to the river). Of an "on" piece only the deck over open space joins the structure mask (a 5 m corridor):
 where the model's top is within `ABUTMENT` = 1.5 m of the lidar terrain the bridge stands on land or the bare
 earth spans a short gap, the track is at grade and the terrain check holds there (Palackého most's Smíchov
-abutment: top 197.5 m, terrain 197.2–197.5 m, the archive 5 m below; the user's answer for that bridge stays in
+abutment: top 197.5 m, terrain 197.2–197.5 m, the archive 5 m below; the maintainer's answer for that bridge stays in
 scope). The model never supplies a height.
 
 Calibrated against OSM 2026-11-02 (`python -P -E tools/track_bridges.py`, `reports/track-bridges.json`):
@@ -361,7 +361,7 @@ The untagged decks over open space: Libeňský most's viaduct (14.4661–14.4691
 at the river end, 3.0–3.4 m from the archive's dip at the street end), the Petřín funicular's viaduct (DI maps
 the funicular as tram track) and short bridges of 6–18 m (among them 50.0549 N 14.4723 E, whose 5.5 m and
 4.2 m archive dips were #190's `dip` steps). Between the Libeň river bridge and the viaduct (14.4645–14.4661 E)
-the model has no bridge: there the user's fact is the only source. Network effect: `structure_hint`
+the model has no bridge: there the maintainer's fact is the only source. Network effect: `structure_hint`
 17,029 → 17,382 m (of the game lines only line 37, +29 m: the rest lies on OSM bridges already), selected
 heights −44 m, none newly selected; the review queue stays 27 decisions, 120 spans. The review lists a decision's Mosty features.
 
@@ -372,7 +372,7 @@ conflict, bridge, underpass or tunnel receives this fallback. Structures require
 earth under a bridge is never substituted for its rail level. Profile assembly and applying these
 proposals to the game remain #20.
 
-**Tunnel decision (user, 2026-10-30):** hold archive heights for review until independent evidence is
+**Tunnel decision (maintainer, 2026-10-30):** hold archive heights for review until independent evidence is
 available. Pinned OSM tunnel, covered and negative-layer tram ways retain a `tunnel_unverified` flag.
 Numeric DI still wins; local reviewed tunnel evidence can resolve a fallback. Surface survey above a
 tunnel cannot validate its archive height. No portal-profile heuristic is applied in this stage.

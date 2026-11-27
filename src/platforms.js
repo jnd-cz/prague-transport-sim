@@ -111,7 +111,7 @@ export function buildPlatforms({ data, route, platforms, group, log }) {
   // their driving direction is along the back route), shelter where OSM has one. Not on our own platforms (`ours`:
   // our stop's sign and shelter stand there). One sign per platform: where OSM draws a platform as several ways, the
   // others (`twin`, tools/platforms.py) got a blank sign beside its own (Flora, Malostranská). A platform no tram stops
-  // at (`unused`) has its sign without the lines' plate (the user, 2026-11-09, #407)
+  // at (`unused`) has its sign without the lines' plate (#407)
   for (const p of platforms) {
     if (!p.back || p.ours || p.shared) continue;
     if (!p.twin) {
@@ -149,7 +149,7 @@ export function buildStop({ stop, data, route, group, log }) {
     if (pos.length) g.add(platformMesh(pos, col));
   }
   // the classic red Prague stop sign (zastávkový označník) where the tram front stops: at its pole where the build
-  // knows it on our side, the user's placed sign or the DTM's (#685), else half a metre past the stop point (a
+  // knows it on our side, the maintainer's placed sign or the DTM's (#685), else half a metre past the stop point (a
   // Vienna-type stop's at the kerb, on the sidewalk's height)
   const sign = makeStopSign(stop.name, stop.request, data.stops[stop.i].lines || [String(data.line)]);
   const { sign: at, signOff: off } = data.stops[stop.i];

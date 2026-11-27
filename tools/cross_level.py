@@ -6,8 +6,8 @@ lie in the road and tilt with it, one rail above the other.
     python -P -E tools/cross_level.py --cards        # the review cards, reports/review/cross-level-N.json
     python -P -E tools/cross_level.py --import       # the answers (tools/deploy.py --pull-reviews) into truth.json
 
-The user, 2026-11-13 (#538), on the Sokolovská junction at Palmovka: "it's noticeable in real ride and I know this as
-famous, albeit extreme example where single straight track in junction tilts sideways".
+The maintainer (#538), on the Sokolovská junction at Palmovka: a known, if extreme, example of a single straight track
+tilting sideways in a junction, "noticeable in real ride".
 
 Every STEP m along our route (`path`, s from 0 as tools/route.py and the page count it):
 - **Where:** paved track (the line's `styles`: not grass or ballast; not within NEAR_SPAN of a span or a tunnel), with
@@ -24,28 +24,25 @@ Every STEP m along our route (`path`, s from 0 as tools/route.py and the page co
   22). FUSE "median" (the default, calibrated below) takes the middle one, so one wrong source is outvoted
   (Sokolovská: tracks 2.7 %, survey 2.7 %, IPR 5.2 % make 2.7 %; DI's crossing tracks there say 2.5-2.9 %);
   "weighted" their mean weighted by 1/spread², the spreads from the three pairs' differences on the line (the
-  three-cornered hat, `hat`; robust: MAD). The user, 2026-11-13: "if we should pick compromise between available data
-  rather than trusting one more than the others". Where the tracks' slope differs from the compromise by DISAGREE or
-  more a track's height is off: listed in `disagree` (#539).
+  three-cornered hat, `hat`; robust: MAD). A compromise, not one source trusted more than the others (maintainer,
+  #538). Where the tracks' slope differs from the compromise by DISAGREE or more a track's height is off: listed in
+  `disagree` (#539).
 - **One plane:** the rails tilt by the compromise; the street between the two tracks is linear between their tops
   (the page's `heightAt`), past the outer track it continues the rails' tilt to TRACK_ZONE m, and beyond that it keeps
-  the survey's own shape (its fall to the gutter, its kerbs) shifted to meet it (src/groundDraw.js flushDtm). The user,
-  2026-11-13: "the tracks should lie on single plane with the road/street".
+  the survey's own shape (its fall to the gutter, its kerbs) shifted to meet it (src/groundDraw.js flushDtm): the
+  tracks lie on one plane with the street (maintainer, #538).
 - **Level** where the fall is less than LEVEL. A stretch that reaches LEVEL keeps its flanks down to FLANK.
 - **Only at junctions and in curves** (`where`): within JUNCTION m of a DI crossing, a switch or a road crossing, and
   where the radius is under CURVE_R; straight track outside them stays level, the ramps running out of them. Measured
   before: of 14.9 km tilted on the five lines, 4.8 km was straight track outside junctions (up to 43 mm); levelled,
   a rail head stands 8-11 mm (median) off the street between the two tracks, as on main. In a curve away from
-  junctions the tilt falls only to the curve's centre (the user, 2026-11-13: "I would allow the outward tilt only near
-  crossings and junctions, elsewhere like throughout a street I would forbid outward tilt"); within a junction the
-  street decides (DI sets half of those places). `places` say whether a tilt falls to a curve's outside
-  (`against the curve`).
+  junctions the tilt falls only to the curve's centre (maintainer, #538: an outward tilt only near crossings and
+  junctions, never along a street); within a junction the street decides (DI sets half of those places). `places`
+  say whether a tilt falls to a curve's outside (`against the curve`).
 - **Where a DI track crosses ours** (`crossings`: the other lines' tracks surveyed by DI, at the rails of our track
   or of the opposite one), its heights at our two rails set the cross level there (`anchor`), whatever the rule says:
-  the track network is the fixed base the surfaces meet (the user, 2026-11-13: "where there is a junction with
-  existing DI track we should focus on the DI, after all currently the track network is considered a fixed base so
-  the rest of surfaces should connect towards it"). Crossings within JOIN m make one plane between them; the rule's
-  value elsewhere keeps within the ramps from them. At Sokolovská the crossing tracks say 37-43 mm.
+  the track network is the fixed base the surfaces meet (maintainer, #538). Crossings within JOIN m make one plane
+  between them; the rule's value elsewhere keeps within the ramps from them. At Sokolovská the crossing tracks say 37-43 mm.
 - **Calibrated on those crossings** (120 places on paved double track on the five lines, DI tilting 12 mm median, 39
   p90; error = the rule's value minus DI's, before the anchors): FUSE "median" with LEVEL 1 % errs 6 mm (median), 18
   (p90), 11 RMS; "weighted" (IPR leads) 9 / 26 / 16; IPR alone 10 / 35 / 19; the tracks alone 6 / 24 / 16; level
@@ -251,8 +248,7 @@ def cross_level(fall, res, street, pair, allow=None, inward=None):
 
 def extend(c, d):
     """Ramps of at most d per sample that keep every value: where the road tilts faster than the ramp allows, the
-    ramp starts earlier and ends later instead (the user, 2026-11-13, #538: "If the road tilts faster then extend the
-    start/end of twist back/forward"). Each sign's stretches on their own."""
+    ramp starts earlier and ends later instead (maintainer, #538). Each sign's stretches on their own."""
     out = []
     for part in (np.maximum(c, 0), np.maximum(-c, 0)):
         x = part.copy()
@@ -307,7 +303,7 @@ def between(xy, a, b, r=ACROSS[1]):
 
 
 def answered(c, xy, truth):
-    """The user's answers (truth.json `crossLevelReview`): level between a "level" card's pins."""
+    """The maintainer's answers (truth.json `crossLevelReview`): level between a "level" card's pins."""
     from geo import Frame
     F = Frame()
     for a in (truth.get("crossLevelReview") or {}).get("answers", []):
@@ -416,8 +412,8 @@ def anchor(c, ks, vals, d):
 def where(data, s, rt, di):
     """Where the rails may tilt: junctions (within JUNCTION m of a DI crossing `di`, a switch to its frog, or a road
     crossing, the line's `crossings`) and curves (a radius under CURVE_R within ±5 m, the line's `curvature`). And
-    each sample's turn: +1 left, -1 right, 0 straight. The user, 2026-11-13: "I would limit the track tilt to junctions
-    and curves, there shouldn't be a reason to have tilted straight track outside of junction"."""
+    each sample's turn: +1 left, -1 right, 0 straight. Only there: straight track outside a junction has no reason to
+    tilt (maintainer, #538)."""
     junc = np.zeros(len(s), bool)
     for q in di:
         junc |= np.abs(s - s[q["k"]]) <= JUNCTION
@@ -457,8 +453,7 @@ def build(data, sample, truth=None, survey=None, method=FUSE):
     # the fixed base the surfaces meet)
     di = [q for q in crossings(data, rt, s, z, zb, off) if street[q["k"]]]
     junc, curve, turn = where(data, s, rt, di)
-    # (in a curve away from junctions only to its centre: the user, 2026-11-13, "I would allow the outward tilt only
-    # near crossings and junctions, elsewhere like throughout a street I would forbid outward tilt")
+    # (in a curve away from junctions only to its centre: an outward tilt only near crossings and junctions, #538)
     c, ok = cross_level(fused, res, street, pair, junc | curve, np.where(curve & ~junc, turn, 0))
     # (the tracks' slope off the compromise by LEVEL or more: a track's height is off, #539)
     disagree = ok & np.isfinite(fall) & (np.abs(fall - fused) >= DISAGREE)
@@ -637,7 +632,7 @@ def cards(lines):
     for old in pics.glob("*.svg"):
         old.unlink()
     truth = json.loads((ROOT / "data" / "truth.json").read_text(encoding="utf-8"))
-    # (a place answered, or a fact from the user, by its two points: its card is not asked again)
+    # (a place answered, or a fact from the maintainer, by its two points: its card is not asked again)
     done = [[F.xy(*ll) for ll in a["between"]] for a in (truth.get("crossLevelReview") or {}).get("answers", [])]
     per = {}
     for line in lines:

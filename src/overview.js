@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The project's overview (overview.html, #826): overview.json from tools/overview.py (the board, the agents'
-// sessions, what waits for the user, the heavy queue with its estimated times), and the review sets' unanswered
+// sessions, what waits for the maintainer, the heavy queue with its estimated times), and the review sets' unanswered
 // findings counted live as reviews.html counts them (src/reviewIndex.js). Every text from the data goes in as text.
 import { answers, count } from './reviewIndex.js';
 

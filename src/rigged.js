@@ -332,7 +332,7 @@ function collectorU(rig, h) {
 }
 
 // ------------------------------------------------------------------------------------------- cards
-// The plates and cards as the user described them (src/models.js, "The T3's number plates and cards"),
+// The plates and cards as the maintainer described them (src/models.js, "The T3's number plates and cards"),
 // drawn over the asset's own plates (the hybrid's have cream on navy and no frame).
 function canvas(w, h, bg) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -399,8 +399,8 @@ function runTexture(run) {
   x.fillStyle = '#fffdf4'; x.font = 'bold 390px Arial, sans-serif'; x.fillText(String(run ?? ''), 192, 234, 344);
   return texture(c);
 }
-// The fleet numbers' digits `h` m tall on every side (the rig's `fleetDigits`; the hybrid's 0.14 m: the user,
-// 2026-11-10, "fix the hybrid's fleet number size"; src/t3simple.js FLEET has the photos' measurements). The texture's
+// The fleet numbers' digits `h` m tall on every side (the rig's `fleetDigits`; the hybrid's 0.14 m: maintainer,
+// 2026-11-10; src/t3simple.js FLEET has the photos' measurements). The texture's
 // digits fill FLEET_FILL of its height whatever the font, and each quad is scaled about its centre to h / FLEET_FILL
 // (the hybrid's quads were 0.19 m tall on the ends and 0.23 m on the sides, its digits 0.106 and 0.13 m).
 const FLEET_FILL = 132 / 192;

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Vehicle packages a player installs (#530; docs/decisions/2026-11-10-vehicle-packages.md, sections 1, 6 and 7;
 // docs/vehicles.md, Packages). A package is a folder with `package.json` at its root: a vehicle, a livery, a sound pack
-// or a fleet for a vehicle. A .zip, a folder or a URL may hold several (a bundle: "a complete vehicle pack", the
-// user, 2026-11-11); each is checked, installed, switched off and removed on its own. Installed ones live in the
+// or a fleet for a vehicle. A .zip, a folder or a URL may hold several (a bundle, a complete vehicle pack:
+// maintainer, 2026-11-11); each is checked, installed, switched off and removed on its own. Installed ones live in the
 // browser's origin private file system (OPFS) under packages/<id>/, with packages/index.json, and answer at
 // `packages/<id>/<path>` (src/localFiles.js), so the game's loaders read them as they read assets/. Nothing leaves the
 // browser. What a package may hold: src/packageRules.json, shared with tools/test_vehicles.py.
@@ -507,7 +507,7 @@ export async function remove(id) {
   await saveIndex();
 }
 
-// the curated list (the user, 2026-11-11: "perhaps some curated list of what others officially submitted"):
+// the curated list (maintainer, 2026-11-11):
 // assets/catalogue.json, packages their authors submitted and the project reviewed, installed by URL
 export async function catalogue() {
   try { return (await (await fetch('assets/catalogue.json')).json()).packages || []; } catch { return []; }

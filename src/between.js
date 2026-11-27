@@ -2,8 +2,8 @@
 // What the game's steps move, drawn between the last two steps (#722). The page steps the game at a fixed 1/30 s
 // (src/main.js fixedSteps) and draws our tram between its place before the last step and after it (drawnS); the
 // cars, the other trams and the game's own movers are drawn the same way here, so that at 60 frames a second they
-// glide beside our tram instead of standing still every other frame (the user, 2026-11-22, the question on PR #809:
-// "go with option a"). After a step the page draws from, their poses are recorded; before a draw each is put between
+// glide beside our tram instead of standing still every other frame (maintainer, PR #809).
+// After a step the page draws from, their poses are recorded; before a draw each is put between
 // its last two; after the draw it is put back where the step left it, so a drawn pose never outlives its draw: the
 // traffic's steps read none of these (src/traffic.js keeps its own poses, #228), and the game's movers are posed by
 // its steps, which may read them back (src/game.js until #228's second half). A run stays the same at any frame rate

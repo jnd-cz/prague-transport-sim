@@ -3,7 +3,7 @@
 **Date:** 2026-10-29
 **Status:** agreed and implemented (issue #9, PR #84, 2026-10-29). The four per-style offsets were approved for the guarded height
 staging tool on 2026-10-30; their values and provenance are in `data/truth.json` `trackHeights.railAboveDeck`.
-The user's approval, “Use the proposed offsets for all four styles”, is recorded at
+The maintainer's approval of the proposed offsets for all four styles is recorded at
 `trackHeights.offsetApproval`. Both the game and the staging tool read these facts.
 
 ## Measured (line 17, city frame, every 5 m of route off bridges)
@@ -19,7 +19,7 @@ The user's approval, “Use the proposed offsets for all four styles”, is reco
   - the tram's wheels at the rail heads, so the tram rides +0.26 m too.
 
   On a street with embedded rails, the whole track zone stands 14–26 cm proud of the real road (the
-  user's "track ribbon lifted above the survey").
+  maintainer's report of a track ribbon lifted above the survey).
 - **Street beside the track, track centre and terrain agree.** The surveyed street 5 m beside the axis is
   level with the axis (median 0.00 m, 10–90 % within ±0.03 m). The archived technical map's tram-axis
   heights are 0.036 m (median) over IPR's 1 m terrain at Výtoň, and 0.046 m at the Hostivař loop
@@ -69,11 +69,11 @@ The user's approval, “Use the proposed offsets for all four styles”, is reco
    values: grass from ČVUT's green-track study (two variants:
    [Zelená trať](https://projects.fd.cvut.cz/k612x1rk/soubory/Zelena_trat.pdf)); ballast from standard
    track build-up (no Prague source found). They are recorded as truth facts, so a measurement replaces
-   them: the DTM track axes where they have heights (#61), or the user's photos of the example stretches.
+   them: the DTM track axes where they have heights (#61), or the maintainer's photos of the example stretches.
    The staging importer reads the adopted values from the truth facts; grass and ballast remain design
    values rather than new survey measurements.
 
-   **Example stretches** (the user, line 22, in `data/truth.json` `trackStyles` by stops, so they survive
+   **Example stretches** (the maintainer, line 22, in `data/truth.json` `trackStyles` by stops, so they survive
    frame changes): ballast Malý Břevnov – Obora Hvězda; grass Pohořelec – Brusnice – Pražský hrad;
    embedded Újezd – Národní divadlo – Národní třída; panels Karlovo náměstí – Štěpánská – I. P. Pavlova.
    Marking whole lines or the network needs the orthophoto and an editor (#28), and styles change as

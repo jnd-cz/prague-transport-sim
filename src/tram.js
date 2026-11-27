@@ -25,8 +25,8 @@ export const T3 = {
   capacity: 110,             // 24 seated + 86 standing (crush load 160)
   crushCapacity: 160,
   vMax: 65 / 3.6,            // empty, on the level ([ckd03] p. 4)
-  // s of sanding in the box, full from the depot and refilled at each terminus (src/game.js, the user, 2026-11-04, #265): "on the level of
-  // minutes if not more" (the user, 2026-11-07, PR #363). A tram's
+  // s of sanding in the box, full from the depot and refilled at each terminus (src/game.js, #265): minutes of it if
+  // not more (PR #363). A tram's
   // box holds at least 17 dm³ (ČSN 28 1300), 25-27 kg, and a sander gives 400-500 g per 30 s (TSI; tram dosers 410-590 g measured):
   // 25-33 min of sanding (Matečka 2015, VUT Brno, pp. 14, 16, 66-69: raw/reference/adhesion/, #266). The T3's own box is not known.
   // 90 s ran dry on every line 9 run in autumn
@@ -41,7 +41,7 @@ export const VEHICLE_TYPES = { T3 };
 
 // Wheel/rail adhesion (peak, at a standstill) by weather: the game's values, which the checks were set on. The research
 // (docs/research/rail-adhesion.md, #266) has rain 0.18, autumn rail between the leaf patches 0.22 (an estimate) and light
-// snow 0.10; the user, 2026-11-11, kept these ("Keep the main values"). game.js: leaf patches and the icy pedestrian crossings.
+// snow 0.10; the maintainer kept these (2026-11-11). game.js: leaf patches and the icy pedestrian crossings.
 export const ADHESION = { dry: 0.30, rain: 0.17, leaves: 0.15, snow: 0.12 };
 
 // Adhesion falls with speed: Curtius–Kniffler, μ = 0.161 + 7.5 / (v + 44) with v in km/h, as a factor of
@@ -66,8 +66,8 @@ const SAND_LIFE = 60;
 
 // Prague ran the T3 mostly as two-car multiple-unit sets (both cars motored, one driver).
 // Everything that scales with the cars lives here.
-// coupled cars stand 15.04 m apart: 15.2 m over couplers less the heads' overlap (the user, 2026-11-04: "length
-// over couplers minus body length minus shortening because how the couplers fit together"), the bodies 1.04 m
+// coupled cars stand 15.04 m apart: 15.2 m over couplers less the heads' overlap (maintainer, 2026-11-04),
+// the bodies 1.04 m
 export const COUPLING_GAP = -T3.couplerOverlap;
 export const CAR_PITCH = T3.length + COUPLING_GAP;
 export const PANTO_FROM_FRONT = 4.5; // the (first car's) pantograph, which works the overhead contacts

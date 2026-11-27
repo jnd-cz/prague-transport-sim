@@ -1,6 +1,6 @@
 # Terrain and street rebuild: Výtoň study and handoff
 
-> Moved 2026-10-29 into docs/decisions/. Other documents it names: TRACK-DATA-DECISION → [2026-10-27-track-source.md](2026-10-27-track-source.md); PLAN, BUILD-TOOLS-HANDOFF, REMOTE-CHANGES → [../history/](../history/).
+> Moved 2026-10-29 into docs/decisions/. Other documents it names: TRACK-DATA-DECISION → [2026-10-27-track-source.md](2026-10-27-track-source.md); PLAN, BUILD-TOOLS-HANDOFF, REMOTE-CHANGES → [docs/history at 35133a2](https://github.com/jnd-cz/prague-transport-sim/tree/35133a2/docs/history).
 
 **Date:** 2026-10-29  
 **Status:** research and source preparation, not implemented as such. The "original development checkout" it waited for is this repository; the terrain source chosen since is IPR's 1 m terrain ([2026-10-30-source-per-layer.md](2026-10-30-source-per-layer.md)), the Výtoň sample archive is #60.  

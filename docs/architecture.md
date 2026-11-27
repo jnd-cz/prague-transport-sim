@@ -1,14 +1,17 @@
 # Architecture proposal: from one line to a city network
 
 > Moved 2026-10-29 from the root (was ARCHITECTURE-PROPOSAL.md); the companions it names are in
-> [history/](history/). §§0–8 and 10 are the current design; its tasks are GitHub issues (see
+> [docs/history/ at 35133a2](https://github.com/jnd-cz/prague-transport-sim/tree/35133a2/docs/history), the last
+> commit that has them. §§0–8 and 10 are the current design; its tasks are GitHub issues (see
 > [ROADMAP.md](../ROADMAP.md)). §9 is done and now says what replaced its proposal. §11 is done and kept
 > as history.
 
 Written in the remote session (2026-10-24) for the original project, after a long stretch of work on
 line 17: performance, signals, traffic, pedestrians, weather and OSM data. The companions are
 `REMOTE-CHANGES.md` (what changed, by section), `BUILD-TOOLS-HANDOFF.md` (build-side to-do list and
-test procedure) and `PERF-ANALYSIS.md` (numbers).
+test procedure; "handoff §n" below) and `PERF-ANALYSIS.md` (numbers), in
+[docs/history/ at 35133a2](https://github.com/jnd-cz/prague-transport-sim/tree/35133a2/docs/history), the last
+commit that has them.
 
 ## 0. Where the project stands
 
@@ -183,7 +186,7 @@ and a `VERSION` file. What replaced them (2026-11-09):
   [DATA.md](../DATA.md) has the details.
 - **Deployment:** `tools/autodeploy.py` deploys `main` after a merge, and `version.json` carries the
   commit ([DEVELOPING.md](../DEVELOPING.md)).
-- **Branches and agents:** one issue, one branch, one worktree. PRs are squash-merged on the user's word.
+- **Branches and agents:** one issue, one branch, one worktree. PRs are squash-merged on the maintainer's word.
   `tools/board.py` shows who works where and which files clash. The hotspots are measured at each
   checkpoint's review (#291).
 - **CI:** `.github/workflows/tests.yml` runs the tests that need no data, plus `ruff`. The headless

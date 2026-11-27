@@ -1,6 +1,6 @@
 # Speed limits from D 1/2's facts, OSM's posted speeds and the signs (#211)
 
-Status: **decided; the signs in the game** (PR #362 for the limits and faces, #364 for the boards in the game). The user answered PR 362's questions 1, 2, 3 and 9 on 2026-11-07 (applied in 78fd584). On 2026-11-08 the user answered questions 4–8: 200 % for testing, as a parameter (`SIGN_SCALE`); R07 and R09 at the places marked; `restriction-past` 0 m; and R07's diverging speed 35 km/h, the press release, the register's 15 kept to confirm. Night zones, held with the simulation work, are #380.
+Status: **decided; the signs in the game** (PR #362 for the limits and faces, #364 for the boards in the game). The maintainer answered PR 362's questions 1, 2, 3 and 9 (applied in 78fd584), then questions 4–8: 200 % for testing, as a parameter (`SIGN_SCALE`); R07 and R09 at the places marked; `restriction-past` 0 m; and R07's diverging speed 35 km/h, the press release, the register's 15 kept to confirm. Night zones, held with the simulation work, are #380.
 
 ## The facts against the code
 
@@ -9,9 +9,9 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 | fact | says | source | before | now |
 |---|---|---|---|---|
 | `max-speed` | 50 km/h, also off the road, unless a Rychlostník allows more | D 1/2 § 25.1 | **differs:** untagged dedicated track 60, 5.97 km over 50 with no tag | 50 |
-| `user-speed-signs` | signs up to 60 for now, "higher speeds to be picked up from osm" | the user, 2026-11-03 | **differs:** every speed capped at 60, 1.77 km of line 17 held back (0.89 km of it before the first stop) | the limit follows OSM up to the T3's 65; signs not changed yet |
+| `user-speed-signs` | signs up to 60 for now, higher speeds picked up from OSM | maintainer, 2026-11-03 | **differs:** every speed capped at 60, 1.77 km of line 17 held back (0.89 km of it before the first stop) | the limit follows OSM up to the T3's 65; signs not changed yet |
 | `restriction-start-end` | front in, rear out | § 25.1, 49.14, 49.22 | holds (`currentLimit`, lowest under the whole tram) | holds |
-| `restriction-past` | a restriction ends right at a curve's end, a switch's frog or a crossing: "keep it simply right after", since "the tram bogie leaves the switch sooner than the end of car" | the user, 2026-11-08 (2 m on 2026-11-07) | **differs:** a curve's limit ran 15 m past its last low 5 m bin; a switch's ended at the frog's bin | 0 m, to the metre |
+| `restriction-past` | a restriction ends right at a curve's end, a switch's frog or a crossing, since the bogie leaves the switch before the car's end does | maintainer, 2026-11-08 (2 m on 2026-11-07) | **differs:** a curve's limit ran 15 m past its last low 5 m bin; a switch's ended at the frog's bin | 0 m, to the metre |
 | `higher-speed-start-end` | rear in, front out | § 25.1 | holds (falls out of the same minimum) | holds |
 | `point-restriction` | front only | § 49.16 | missing; no place known | the stop signs' points (below) |
 | `switch-facing-speed` | 15 km/h facing, straight or diverging | § 25.4a | **differs:** 30 straight, 15 diverging; 18 m stretch | 15; blades to frog |
@@ -19,12 +19,12 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 | `switch-trailing-straight-speed` | 30 km/h | § 25.5a | missing | as above |
 | `crossing-speed` | 15 km/h over diamonds and wire crossings | § 25.4c | missing, except where OSM tags it | build writes the diamonds, game reads them; wire crossings not |
 | `small-radius-speed`, `small-radius-curves` | 15 km/h over a whole curve under 25 m | § 49.19; 11 places | **differs:** 10 at R 20 (8 of the 28 curves under 25 m) | at least 15 from a curve alone; the list is not read  15 under R 25 m, and a curve no sign sets at `curve-lateral-acceleration` 1.0 m/s² in whole km/h since #451 (was 0.8 in 5 km/h steps) |
-| `loop-speed` | 15 km/h in a loop's curves | § 25.4e | only where OSM tags it | 15 from the switch into a loop to the switch out of it, the loops found by the user's rule (below) |
+| `loop-speed` | 15 km/h in a loop's curves | § 25.4e | only where OSM tags it | 15 from the switch into a loop to the switch out of it, the loops found by the maintainer's rule (below) |
 | `switch-v-sign-speed` | 10 km/h facing diverging at a "V" | § 49.20 | missing; no list of places | missing |
 | `stop-pass-speed` | 30 km/h, the front passing a stop's sign without stopping | § 25.5b | missing | a point at each stop's sign for the front; the autopilot keeps it, passing it 3 km/h over costs the overspeed (below) |
 | `slow-sign-speed` | 10 km/h at *Pomalu* | § 49.13 | missing; no places | missing |
-| `gradient-no-speed` | the dangerous-gradient rules set no speed; PPS Q53 marks "25 km/h" wrong | § 49.9–12, the user | **differs:** 25 under −6 %, 35 under −4.5 %: 4.64 km of limits with no source | holds: no limit from a slope |
-| `trojska-descent` | 20–25 km/h, rolling, Hercovka → Nad Trojou | website, local rule | covered by chance by the rule above | 25 by its `place`, only where OSM tags no speed (the user: a backup after OSM) |
+| `gradient-no-speed` | the dangerous-gradient rules set no speed; PPS Q53 marks "25 km/h" wrong | § 49.9–12, the maintainer | **differs:** 25 under −6 %, 35 under −4.5 %: 4.64 km of limits with no source | holds: no limit from a slope |
+| `trojska-descent` | 20–25 km/h, rolling, Hercovka → Nad Trojou | website, local rule | covered by chance by the rule above | 25 by its `place`, only where OSM tags no speed (the maintainer: a backup after OSM) |
 | `speed-switches` | R01–R09 with their speeds | register | not read | not read: [design](2026-11-07-speed-switch-signals.md) |
 | `night-zones` | 40 km/h, 22–6 h | website | not read | not read: below |
 | `dangerous-gradients` | Trojská 80.15 ‰, below Sídliště Modřany 69.9 ‰, the embankment curve 40 km/h | website | a board from the profile at −5.5 % | unchanged |
@@ -41,7 +41,7 @@ Every speed fact in `data/truth.json`, what the game did before this work, and w
 
 **Where a slow stretch ended** (two-car set, 30.24 m). #211 read three extensions. The window of `speedLimits` applies only to curves, not to switches, so two remained: the stretch ran to 14 m past the fork, and 5 m bins rounded it up. Measured: the limit lifted **46–48 m** past the fork.
 
-The rule leaves one extension. `restriction-start-end` holds the limit until the rear has passed, so the stretch is only the switch itself (with the user's 2 m until 2026-11-08, none since):
+The rule leaves one extension. `restriction-start-end` holds the limit until the rear has passed, so the stretch is only the switch itself (with the maintainer's 2 m until 2026-11-08, none since):
 - **The frog** lies a median **11.5 m** past the fork (10.5–13.5 m p10–p90), measured on the 82 facing switches: where the other leg is one gauge off the route.
 - **Now 42–43 m** at a switch with no other trackwork after it: the frog and the tram (44–45 m with the 2 m). D 1/2 asks no less: "může být vyšší nejdříve při míjení místa ukončení platnosti omezené rychlosti zadním čelem vlaku" (§ 25.1). A one-car tram: 28–29 m.
 
@@ -68,7 +68,7 @@ OSM's pieces go, but the first rise stays at a median 64–75 m. `--checks limit
 
 So at most forks the limit is what the rules ask: 39 of the 82 have a trailing switch or a diamond within 15 m past the frog, and each holds the limit until the rear has passed. `liftPast.twoCars` counts the pieces that start in the first 20 m past the fork, so 51 m is its ceiling: on the rebuild with the 2 m rule its median is 45–46 m on lines 22, 23 and 37 and that ceiling on 9 and 17.
 
-**Right at the end, no margin** (`restriction-past` 0 m, the user, 2026-11-08: "Can we discard the 2 metre rule and keep it simply right after? I realize this because the tram bogie leaves the switch sooner than the end of car so we don't need to hold safety tolerance."). The rear still has to leave each restriction (§ 25.1); the 2 m on top of it are gone. Measured on the published W2 data (`--checks limits`):
+**Right at the end, no margin** (`restriction-past` 0 m, maintainer, 2026-11-08: the bogie leaves the switch before the car's end does, so no safety margin is needed). The rear still has to leave each restriction (§ 25.1); the 2 m on top of it are gone. Measured on the published W2 data (`--checks limits`):
 
 | line | two-car lift past a fork, median m (2 m → 0 m) | one car, m | curve: back at the posted speed past its end, median / p90 m | km at 15 km/h or less (2 m → 0 m) |
 |---|---|---|---|---|
@@ -80,7 +80,7 @@ So at most forks the limit is what the rules ask: 39 of the 82 have a trailing s
 
 At a switch with nothing after it the two-car lift is the frog and the tram, 42–43 m. 51 m is the measure's ceiling: on lines 9 and 17 another trailing switch or diamond of the junction holds the limit at most forks. Across the five lines what holds it last is that trackwork at 52 forks, the switch itself at 19, a curve at 9 and a posted piece at 2.
 
-**2 m past the end** (`restriction-past`, the user, 2026-11-07; 0 m since 2026-11-08, above). Since the initial commit `speedLimits` had taken each 5 m bin's lowest limit over 15 m behind and 5 m ahead ("a curve limit applies to the whole curve"), with no source. Now:
+**2 m past the end** (`restriction-past`, maintainer, 2026-11-07; 0 m since 2026-11-08, above). Since the initial commit `speedLimits` had taken each 5 m bin's lowest limit over 15 m behind and 5 m ahead ("a curve limit applies to the whole curve"), with no source. Now:
 - **The table is per metre.** A curve's limit follows the radius at each metre (`Route._radius`), from 5 m before it asks for less (`CURVE_AHEAD`, unchanged) to 2 m after. A switch's stretch ends 2 m past the frog, a trailing switch's 2 m past its blades, a diamond's 2 m past its rails. `Game.currentLimit` reads the metres under the tram; the 5 m `values` (the signs, the overlay) keep each bin's lowest.
 - **The curve's end** is where the game's radius estimate (16 m of heading) last asks for less than the posted speed. Against a short estimate (6 m), the limit is back at the posted speed a median **2–3 m** past the curve's end on lines 9, 17, 22 and 23 and −1 m on line 37, p90 at most 5 m (published data, 222 curves). The 16 m estimate is close to the true radius because most curves here have transitions: the limit climbs step by step along the transition and leaves its lowest speed a median 7–8 m before that end. The p10 of −15 m on lines 23 and 37 is the measure's search reach.
 - **The radius estimate smears a sharp end** by about 12 m each way, so on a curve without a transition the limit would run that far past its end. Most curves here have one.
@@ -114,7 +114,7 @@ Dropping the slope limits (4.6 km at 25 or 35) and the 15 m window gains more th
 
 ## Turning loops and stop signs (2026-11-09)
 
-The user, on PR 362's open points: the stop-pass limit is "point limit with overspeed penalty, autopilot has to follow", and where a loop is comes from a rule, not a list: "it's loop at the end of gtfs route, or any loop where two track diverge and come back together with larger than 180 degree turn, that's for double track loop (Sídliště Petřiny). There are side loops like Dvorce or Hlubočepy which are not used by regular service but still need the limit." Both quotes are on their facts in `data/truth.json`.
+The maintainer, on PR 362's open points: the stop-pass limit is a point limit with an overspeed penalty, which the autopilot has to follow, and where a loop is comes from a rule, not a list: a loop at the end of a GTFS route, or any place where two tracks part and come back together after a turn of more than 180° (the double-track loop at Sídliště Petřiny); side loops such as Dvorce or Hlubočepy are not used in regular service but still need the limit. Both quotes are on their facts in `data/truth.json`.
 
 **Loops** (`tools/track_loops.py`; `python -P -E tools/track_loops.py` lists them). A loop is a path over DI's passes from a switch entered by its toe to a switch left by its toe (the same switch for a balloon) that:
 - turns 170° or more from the heading arriving at the first switch to the heading leaving the second: the street's two tracks run opposite ways. From the switch's own leg the turn falls short by the switch's angle: Divoká Šárka 173°;
@@ -122,9 +122,9 @@ The user, on PR 362's open points: the stop-pass limit is "point limit with over
 - runs at most 600 m;
 - has a mean radius of at least `min-radius-network`, 18 m. A 52 m path turning 276° at Radošovická is a junction drawn in pieces.
 
-On DI's network (2026-09-30) the rule finds 47 loops: the termini, the depots, Dvorce, Hlubočepy, Špejchar (listed by its nearest stop, Chotkovy sady), both of Petřiny's loop tracks and Lehovec's whole loop. The user reviewed the list on 2026-11-09: all of them are real loops. Špejchar was confirmed after a second look: "This one at Chotkovy sady is correct, named by stop špejchar, I misunderstood the street Chotkovy sady". Of the 50 GTFS termini with 90 or more trips, eight have no loop:
-- Karlovo náměstí and Zvonařka are none. The user: "karlovo náměstí isn't a loop and zvonařka technically doesn't loop, it's a triangle and radius plus switch speed limits are enough there".
-- DI does not draw the loops at Libuš, Nádraží Holešovice, Nákladové nádraží Žižkov, Pankrác and Slivenec yet. The user: "leave for now".
+On DI's network (2026-09-30) the rule finds 47 loops: the termini, the depots, Dvorce, Hlubočepy, Špejchar (listed by its nearest stop, Chotkovy sady), both of Petřiny's loop tracks and Lehovec's whole loop. The maintainer reviewed the list on 2026-11-09: all of them are real loops. Špejchar, listed as Chotkovy sady, was confirmed after a second look. Of the 50 GTFS termini with 90 or more trips, eight have no loop:
+- Karlovo náměstí and Zvonařka are none: Zvonařka is a triangle, where the radius and switch limits are enough (maintainer).
+- DI does not draw the loops at Libuš, Nádraží Holešovice, Nákladové nádraží Žižkov, Pankrác and Slivenec yet; left for now (maintainer).
 - Nádraží Hostivař, a large loop like Lehovec's, lies outside DI's districts.
 
 None of the eight is on the five lines' routes.
@@ -146,7 +146,7 @@ Line 9's run does not turn at Nákladové nádraží Žižkov: it goes on there 
 
 ## Steep descents
 
-The user (2026-11-07): drop the limits from the slope. Both steep descents the user knows are tagged in OSM: 25 km/h on the Trojská way (1256351697, 440 m) and 35 on Hlubočepy – Geologická (465270521, 465270522, 1246102955, 1246102956). `trojska-descent` stays as the backup, 25 km/h between Hercovka and Nad Trojou in that order of stops, where OSM tags no speed (`placeStretches`). Line 17's route climbs Trojská, so it fires on no built line today.
+The maintainer (2026-11-07): drop the limits from the slope. Both steep descents the maintainer knows are tagged in OSM: 25 km/h on the Trojská way (1256351697, 440 m) and 35 on Hlubočepy – Geologická (465270521, 465270522, 1246102955, 1246102956). `trojska-descent` stays as the backup, 25 km/h between Hercovka and Nad Trojou in that order of stops, where OSM tags no speed (`placeStretches`). Line 17's route climbs Trojská, so it fires on no built line today.
 
 `--checks limits` lists every stretch of at least 20 m steeper than −4.5 % on our track profile, with what is posted on it: 48 on the five lines, 14 of them untagged. The steepest:
 
@@ -163,7 +163,7 @@ The grades are our profile's, before #358's denoising; they are read again on it
 
 ## Anticipating the end of a restriction
 
-The user asked whether the autopilot rises toward the limit as a restriction ends. **It does not, on main or on #351's branch:** its target is the limit in force less 0.6 m/s, so it reaches the end of a 15 km/h stretch at 11.8–13.9 km/h. Test drives with the real `Tram` and `Autopilot` on 11 made-up lines, seconds saved per restriction left, median (range):
+The maintainer asked whether the autopilot rises toward the limit as a restriction ends. **It does not, on main or on #351's branch:** its target is the limit in force less 0.6 m/s, so it reaches the end of a 15 km/h stretch at 11.8–13.9 km/h. Test drives with the real `Tram` and `Autopilot` on 11 made-up lines, seconds saved per restriction left, median (range):
 
 | autopilot | rising to the limit as it lifts (1.5 s early) | margin 0.45 m/s | margin 0.3 m/s |
 |---|---|---|---|
@@ -219,13 +219,13 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 
 **Size:** 200×300 mm with a 30 mm white frame, panel 140×240 mm. D 1/2 gives none; this is the same sign family on the website, and D 1/2's drawings have that shape. Estimated from the drawings: triangle 400×300 mm, zone plate 200×312 mm.
 
-**Figures and shapes from photos (the user's of 2026-11-08, the website's):** shapes and colours follow D 1/2; the figures follow the photos.
-- Every sign's figures are a heavy condensed DIN, as on the user's 60 Rychlostník and 80 climb board and the website's 10 and 30. D 1/2 draws a heavy face filling the panel, and a serif on the gradient boards.
-- The faces use Bahnschrift Condensed Bold, Windows' DIN 1451 (the user, 2026-11-08: "Bahnschrift bold looks good"); elsewhere the nearest condensed face.
-- Its figures are wider than the signs': two are 1.18 as wide as high, the photos' 0.86–1.01. They are drawn at 0.8 of their width, which matches the photos side by side, the vertical strokes as heavy as theirs (the user: "stretch it so it looks close to the real signs").
+**Figures and shapes from photos (the maintainer's of 2026-11-08, the website's):** shapes and colours follow D 1/2; the figures follow the photos.
+- Every sign's figures are a heavy condensed DIN, as on the maintainer's photos of a 60 Rychlostník and 80 climb board and the website's 10 and 30. D 1/2 draws a heavy face filling the panel, and a serif on the gradient boards.
+- The faces use Bahnschrift Condensed Bold, Windows' DIN 1451 (maintainer, 2026-11-08); elsewhere the nearest condensed face.
+- Its figures are wider than the signs': two are 1.18 as wide as high, the photos' 0.86–1.01. They are drawn at 0.8 of their width, which matches the photos side by side, the vertical strokes as heavy as theirs (as the maintainer asked).
 - They are the photos' size, 113 mm (0.47 of the panel), on every plate: restriction, point, Rychlostník and zone.
 - Text on the plates (ZÓNA, the hours, a car type) keeps the font's own width ("keep the type under number, unsqueezed").
-- The gradient boards' figures are larger and heavier than the photos', to read in the game (the user, 2026-11-08). They are 0.30 of the board high (the photos: 0.23), bold with an outline of 0.035 of their height.
+- The gradient boards' figures are larger and heavier than the photos', to read in the game (maintainer, 2026-11-08). They are 0.30 of the board high (the photos: 0.23), bold with an outline of 0.035 of their height.
 - The gradient board's pentagon has its shoulders 0.56 of the height from its point's edge, as on both photos and D 1/2 p. 52. They were drawn at 0.42.
 - The speed switch's arrow is measured on the two R01 photos ([speed-switch signals](2026-11-07-speed-switch-signals.md)).
 
@@ -245,9 +245,9 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 | yellow backing board (§ 49.32) | any sign may have it; no rule says where | an option of the face |
 | SIG-V2 *Pomalu*, V5 point, V9 "V" | faces only: no source lists their places | |
 
-**Limits that come only from a curve** (11.1 km since the 2 m rule; R over 25 m) have no real sign. The user (2026-11-08): "I would still keep them for now for diagnostic purposes, we can drop them later with more stable release". So they keep a board, today's black on white one, marked as a diagnostic in the code. The gauge marker and the hint show them too. In the driving view they read as real signs in the old design, three to one against the real ones (301 to 83 on the five lines), and 13 stood within 20 m of a real sign. So they show only with the debug overlay (F8), and none stands within 20 m of a real sign (the user, 2026-11-08, #389: "Only with F8"). Today's boards stand at every change and call themselves rychlostník; the real signs replace them everywhere else.
+**Limits that come only from a curve** (11.1 km since the 2 m rule; R over 25 m) have no real sign. The maintainer kept them for now as diagnostics, to be dropped in a more stable release (2026-11-08). So they keep a board, today's black on white one, marked as a diagnostic in the code. The gauge marker and the hint show them too. In the driving view they read as real signs in the old design, three to one against the real ones (301 to 83 on the five lines), and 13 stood within 20 m of a real sign. So they show only with the debug overlay (F8), and none stands within 20 m of a real sign (#389). Today's boards stand at every change and call themselves rychlostník; the real signs replace them everywhere else.
 
-**Size in the game:** the user (2026-11-08): "because of monitor's low dpi and resolution we need larger signs". Measured in the game's cab view at 1920×1080 (about 96° across, 15 px per degree), boards hung over the track. The figures need about 8 px to read.
+**Size in the game:** a monitor's low resolution needs larger signs (maintainer, 2026-11-08). Measured in the game's cab view at 1920×1080 (about 96° across, 15 px per degree), boards hung over the track. The figures need about 8 px to read.
 
 | scale | board | figures 113 mm × scale read up to | at 50 m | at 100 m |
 |---|---|---|---|---|
@@ -255,9 +255,9 @@ Faces and placement are in `src/speedSigns.js`, held by `tools/test_speed_signs.
 | 150 % | 300×450 mm | about 18 m | 3 px | 1.5 px |
 | 200 % | 400×600 mm | about 24 m | 4 px: colour and shape | 2 px |
 
-An eye reads the real 113 mm figures at about 75 m (5′ per character). No board size the scene can hold matches that on a 1080p screen: 100 % would need about 6 times its size. Where the driver must act (a restriction 90–125 m ahead at 50 km/h, a warning board 140–200 m ahead), the board shows its kind by colour and shape, and the number has to come from elsewhere: the gauge marker and the hint, or a zoom key that narrows the view as an eye would. The user chose from the screenshots ([the review page](https://claude.ai/artifact/Hx86b3fvNzVYjJnGWDfazq)): "pick 200% now for testing, can you keep the size of signs a parameter that can be changed later?" `SIGN_SCALE` in `src/speedSigns.js` is 2; `shownSize(sign)` gives the size the game shows, `signSize(sign)` the real one.
+An eye reads the real 113 mm figures at about 75 m (5′ per character). No board size the scene can hold matches that on a 1080p screen: 100 % would need about 6 times its size. Where the driver must act (a restriction 90–125 m ahead at 50 km/h, a warning board 140–200 m ahead), the board shows its kind by colour and shape, and the number has to come from elsewhere: the gauge marker and the hint, or a zoom key that narrows the view as an eye would. The maintainer chose from the screenshots ([the review page](https://claude.ai/artifact/Hx86b3fvNzVYjJnGWDfazq)): 200 % for testing, the size a parameter to change later. `SIGN_SCALE` in `src/speedSigns.js` is 2; `shownSize(sign)` gives the size the game shows, `signSize(sign)` the real one.
 
-**Where Bahnschrift is missing** (macOS, Linux, phones, browsers that hide installed fonts), the faces use **D-DIN Condensed Bold**. It is Datto's DIN 1451 recreation under the SIL Open Font License. `loadFigureFont()` loads it from Datto's repository through jsDelivr, pinned to commit e199c84 (the user, 2026-11-08: "Can we load the font externally anyway and use the din one as fallback?"). Bahnschrift itself may not be redistributed.
+**Where Bahnschrift is missing** (macOS, Linux, phones, browsers that hide installed fonts), the faces use **D-DIN Condensed Bold**. It is Datto's DIN 1451 recreation under the SIL Open Font License. `loadFigureFont()` loads it from Datto's repository through jsDelivr, pinned to commit e199c84 (maintainer, 2026-11-08). Bahnschrift itself may not be redistributed.
 - The game must await `loadFigureFont()` before it draws the faces (#364). If the load fails, the next condensed face in `FIGURES` draws.
 - Each face is narrowed by what the canvas measures of it, so two figures come out 0.94 as wide as high whatever face draws: Bahnschrift at 0.79 of its width, D-DIN at 0.88. `test_speed_signs` holds that between the photos' 0.86 and 1.01.
 - Side by side, D-DIN is closer to the photos in two places. Its 3 has a flat top, as on the website's 30, where Bahnschrift's is round. Its strokes are heavier, as on the 80 board. Its 6 and 9 end in a curved hook, where Bahnschrift's run straight.
@@ -268,7 +268,7 @@ An eye reads the real 113 mm figures at about 75 m (5′ per character). No boar
 ## The 65 and 70 km/h stretches
 
 See [places.md](../research/prazsketramvaje/places.md). In short:
-- **No source shows these signs.** The rule makes them a Rychlostník, white number on black. The user's photo of one for 60 (2026-11-08) shows it: white DIN figures on black, a white frame, hung from the span wire.
+- **No source shows these signs.** The rule makes them a Rychlostník, white number on black. The maintainer's photo of one for 60 (2026-11-08) shows it: white DIN figures on black, a white frame, hung from the span wire.
 - **By type:** § 49.17 allows several signs for different car types. OSM's note fits that: a 65 for all and a 70 for the 14T.
 - **How the type is written** is not in any source read. The faces draw it on a strip under the panel, as the arrow is, marked unsourced.
 - **The T3's limit** there is 65 either way, its own top speed.

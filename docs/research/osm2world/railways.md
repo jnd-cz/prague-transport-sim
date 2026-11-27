@@ -89,7 +89,7 @@ masts mapped on the track. `power=portal`: 238 nodes, 31 ways.
    coordinates, sleepers as one instanced box per sleeper type, rails as extruded profiles; far, one strip
    texture with ballast, sleepers and rails painted (OSM2World's `custom/Railway`, CC0, fits standard
    gauge at 3.0 m across). Our numbers, not its: a concrete sleeper 2.6 m long, the spacing, the rail
-   profile and the tram's open-track sleepers (wood or concrete, per place: the user's answer, as for
+   profile and the tram's open-track sleepers (wood or concrete, per place: the maintainer's answer, as for
    Výtoň's wooden sleepers in `docs/research/prazsketramvaje/web-notes.md`). Flat-bottomed rail heads at
    ±0.753 m; grooved rail keeps ±0.72.
 2. **Rail end caps** where a rail has no continuation (buffer stops, depot ends). **Take**: trivial.
@@ -106,7 +106,7 @@ masts mapped on the track. `power=portal`: 238 nodes, 31 ways.
    `(1 − (2t − 1)²) × f`; for our 10–20 m cross-spans f is centimetres to decimetres (to be measured on
    photos), and droppers keep the contact wire level. OSM2World's 6 m is for high-voltage spans.
 8. **Clearance under bridges (#71).** **Nothing in OSM2World.** Ours: a per-place contact-wire height in
-   `data/truth.json` (where the user or a source gives it) or the structure's underside minus a fixed
+   `data/truth.json` (where the maintainer or a source gives it) or the structure's underside minus a fixed
    clearance, interpolated along the track; `buildCatenary` and the pantograph read the same function.
 
 No code is worth porting: the railway module is 309 lines over its own network classes. A close

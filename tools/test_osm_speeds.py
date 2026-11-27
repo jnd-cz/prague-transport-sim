@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Posted speeds along a line from the OSM tram ways, and the user's posted speeds over them (tools/osm_speeds.py,
+"""Posted speeds along a line from the OSM tram ways, and the maintainer's posted speeds over them (tools/osm_speeds.py,
 #612): python -I tools/test_osm_speeds.py.
 
 A way's correction in data/truth.json `postedSpeeds` holds over its `maxspeed`, and its state says whether OSM

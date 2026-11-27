@@ -146,7 +146,7 @@ class Queue(unittest.TestCase):
         self.assertEqual(heavy.HELD, baseline_store.HELD)
 
     def test_night_starts_early_and_ends(self):
-        """#851: heavy.py --night on the user's word, --night off."""
+        """#851: heavy.py --night on the maintainer's word, --night off."""
         on = subprocess.run([sys.executable, "-I", str(TOOLS / "heavy.py"), "--night"], env=self.env, capture_output=True,
                             text=True, timeout=60)
         self.assertEqual(on.returncode, 0, on.stderr)

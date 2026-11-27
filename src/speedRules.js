@@ -2,7 +2,7 @@
 // The speeds D 1/2 § 25 sets over switches and crossings, read from data/truth.json `operation`, as stretches of route
 // for Route.speedLimits (#211). Pure: docs/decisions/2026-11-07-speed-limits-and-signs.md measures and explains them.
 //
-// A stretch runs over the trackwork itself, from the blades to the frog, and `restriction-past` metres on (the user's
+// A stretch runs over the trackwork itself, from the blades to the frog, and `restriction-past` metres on (the maintainer's
 // margin, 0 since 2026-11-08). Game.currentLimit holds it until the rear has left it (`restriction-start-end`: front in,
 // rear out), so the stretch does not add the tram's length.
 const TIP = 4;       // m before the fork: DI draws 48 of its switches as a section whose fork lies 4-5 m past the tip (docs/knowledge.md)
@@ -44,7 +44,7 @@ export function trackworkStretches(switches, trackwork, facts) {
     out.push({ from: w.s - (w.frog ?? FROG), to: w.s + TIP + past, v: w.fromDiverging ? facts.trailingDiverging : facts.trailingStraight });
   }
   for (const s of trackwork?.crossings || []) out.push({ from: s - DIAMOND, to: s + DIAMOND + past, v: facts.crossing });
-  // turning loops, from the switch into the loop to the switch out of it (§ 25.4 e; found on DI's network by the user's
+  // turning loops, from the switch into the loop to the switch out of it (§ 25.4 e; found on DI's network by the maintainer's
   // rule, tools/track_loops.py)
   for (const l of trackwork?.loops || []) out.push({ from: l.from, to: l.to + past, v: facts.loop });
   return out;
@@ -53,13 +53,12 @@ export function trackworkStretches(switches, trackwork, facts) {
 // [{s, v, stop}] by s: limits the front alone keeps at a point (`point-restriction`, D 1/2 § 49.16): the stop sign of
 // each stop but the first at `stop-pass-speed` (§ 25.5 b, the front passing the sign of a stop where the train does not
 // stop; a train that stops there comes to its sign at a crawl anyway). `stops` the game's, `target` where the front stops
-// beside the sign. The user, 2026-11-09 (#211): "point limit with overspeed penalty, autopilot has to follow".
+// beside the sign. A point limit with an overspeed penalty, which the autopilot follows too (#211).
 export function stopPassPoints(stops, facts) {
   return stops.slice(1).map((st) => ({ s: st.target, v: facts.stopPass, stop: st.name })).sort((a, b) => a.s - b.s);
 }
 
-// Derailment, a game rule (#451; the user, 2026-11-10: "Instead of flat offset I would build something like 40-50% over speed limit or
-// something over 2-2.5 m/s² for at least one second"): for DERAIL.secs on end, a curve under any part of the tram taken at more than
+// Derailment, a game rule (#451; a share over the limit or a lateral acceleration held a while, not a flat offset): for DERAIL.secs on end, a curve under any part of the tram taken at more than
 // DERAIL.lateral unbalanced, 1.5 times the speed `curve-lateral-acceleration` allows there, or a switch, crossing or loop restriction of
 // DERAIL.upTo km/h or less taken at more than DERAIL.over times its speed. It was 22 km/h over any limit of 20 and under: 37 km/h on
 // a 15 km/h hairpin, and none at all on the curves #451 raised over 20.
@@ -79,7 +78,7 @@ export function derailRisk(route, limits, s, length, v) {
 
 // [{from, to, v}]: a local rule's speed where a line runs from its first stop straight to its second (so not the other
 // way, uphill at Trojská) and OSM tags no speed: `posted` is data.speed.osm, `step` m apart, 0 where untagged. OSM comes
-// first; the fact is the backup (the user, 2026-11-07, `trojska-descent`).
+// first; the fact is the backup (maintainer, 2026-11-07, `trojska-descent`).
 export function placeStretches(places, stops, posted, step) {
   const out = [];
   for (const p of places) {

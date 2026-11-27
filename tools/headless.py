@@ -173,7 +173,7 @@ def judge(check, r):
         more = f"warn passes {r.get('warnPasses')}, holds {r.get('holds')}"
     elif check in STOPS_LIKE:
         # (#351: once braking for a stop the autopilot does not go back to the drive pedal, unless what is in
-        # front of it changed; the user, 2026-11-06: "without any jums to jízda unless you're following tram in front of you")
+        # front of it changed, such as a tram it follows)
         if r.get("stuck") is not None:
             bad.append(f"stuck at {round(r['stuck'])}")
         if r.get("flipsFree"):

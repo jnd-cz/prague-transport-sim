@@ -1,6 +1,6 @@
 # Candidates for `data/truth.json`
 
-Facts from these notes that the game could use, for the user to pick. Each points to its note
+Facts from these notes that the game could use, for the maintainer to pick. Each points to its note
 (where the source, page and the game's current value are). Tick the ones to record; a follow-up PR
 writes them and nothing else.
 
@@ -9,7 +9,7 @@ game lacks would need it; **C** reference.
 
 ## Shape
 
-`truth.json` has no section for operating rules yet (`rules` holds the user's short statements;
+`truth.json` has no section for operating rules yet (`rules` holds the maintainer's short statements;
 `trackGeometry.facts` holds design values with a `source` object). Proposed: a new top-level
 `operation` with the same fact shape as `trackGeometry.facts`, plus `section`, and keyed lists for
 places and switches.
@@ -45,8 +45,8 @@ places and switches.
 ```
 
 The website's pages carry no date; "year" is the year read (2026), the register's newest entries are
-the Dvorecký most junctions. A user's answer to an open question goes in with the user's quote and
-date, as AGENTS.md asks.
+the Dvorecký most junctions. The maintainer's answer to an open question goes in citing where it was
+said, as AGENTS.md asks.
 
 ## Speeds (D 1/2 § 25, 49; [rules-d1-2.md](rules-d1-2.md))
 
@@ -137,7 +137,7 @@ date, as AGENTS.md asks.
 | ☐ | `t3sucs-brake-steps` | 5 steps at 3/7/12/18/23°; park 27°; track 37° / 40°; 160 / 211 / 262 / 306 / 350 A (1–4 inferred) | ČKD T-50407 p. 6, T-50361 p. 4; drawing 1-38-370 444 | A | the game's 4 brake notches |
 | ☐ | `t3sucs-accelerator` | 99 positions, 3.614 Ω (2.835 Ω in drive), 5 s sweep; bridged at 75; fields at 80/85/90/95; dampers 0.35 + 0.7 Ω | ČKD T-50408 p. 1, 5; T-50413 p. 8; drawing 1-38-370 444 | A | not modelled |
 | ☐ | `t3sucs-parking` | ratchet at 27°; full release only with the drive pedal | ČKD T-50407 p. 1, T-50413 p. 16 | B | no parked position |
-| ☐ | `t3sucs-door-interlock` | door relay cuts traction at any speed; no brake | ČKD T-50413 p. 7; drawing 1-38-370 444 | A | the user's answer 5 |
+| ☐ | `t3sucs-door-interlock` | door relay cuts traction at any speed; no brake | ČKD T-50413 p. 7; drawing 1-38-370 444 | A | the maintainer's answer 5 |
 | ☐ | `t3sucs-switch-button` | the switch button works only with drive off and the accelerator at 1–30 (≈ below 12 km/h) | drawing 1-38-370 444 | B | the contact switches |
 | ☐ | `t3-no-deadman` | no dead-man pedal; safety button | ČKD T-50172 p. 7 | B | the game's optional dead-man pedal |
 | ☐ | `t3sucs-max-relay` | 750 A, latched until the drive pedal is at 0 | ČKD T-50413 p. 9 | C | fault events |

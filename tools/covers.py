@@ -7,12 +7,11 @@ and the passage as areas of its own under them (level -1: `underpass`, its `side
 with the bridges taken out, and it takes such a cover out too: over the passage it shows the floor. By the tunnel
 south of Čechova čtvrť, line 17 s 3084 (-1453, -9105), the survey's roads, verges and tram area stand at
 214.7-215.4 m and the raster has 211.2 m in a slot 43 m long and 5-7 m wide. Everything laid on the raster fell into
-it: the verges 3.6 m, the generated roads up to 1.8 m (the user's note fb-20261120-153903-93585637, 2026-11-20:
-"Looks like a ditch but OSM has pedestrian tunnel here. Both tram tracks and road should lie flat on surface and
-tunnel be placed under than ground level.").
+it: the verges 3.6 m, the generated roads up to 1.8 m (the maintainer's note fb-20261120-153903-93585637: OSM has a
+pedestrian tunnel there, and the tracks and the road lie flat on the surface over it).
 
 The passages. The survey's areas one level under the ground (level -1), and OSM's ways in a tunnel of layer -1 or
-above (tunnel_ways: from the local extract; the user's note names OSM's tunnel): the survey has no area under the
+above (tunnel_ways: from the local extract; the maintainer's note names OSM's tunnel): the survey has no area under the
 cycleway's underpass by line 17 (1787, 2800), a slot 4 m deep across a road, and OSM has the way. The metro's tubes
 (level -2, `railway=subway`) are no passages under a street's cover: by them the railway yard north of Hlavní
 nádraží, line 9 (1240, -15), has a cutting 3.7 m deep, a track's under the others. A road whose outline stands over the raster with neither near is
@@ -43,8 +42,8 @@ bridgehead), the survey has the street over it at level 1 and the passage's area
 street's point for point: Národní divadlo's bridgehead, line 9 (-625, -585), road 24 and sidewalks 151-156 at 193.2 m
 over Divadelní's underpass (OSM's tunnel way, maxheight 4.4), its roads 18, 16 and 17 on the floor at 187.6-188 m.
 The ground fell into the floor, a pit 5 m deep in the street, and the page drew the level-1 areas as slabs over it.
-The user, 2026-11-23: "for now we draw the ground as in 783 with future update waiting in 449 to draw the actual low
-ground for all the underpasses and then put invented deck cover over them". So a level-1 area is a cover too, judged
+For now the ground is drawn as in #783; #449 will draw the actual low ground of every underpass with an invented deck
+over it (maintainer, #824). So a level-1 area is a cover too, judged
 apart from level 0's (UPPER: judged together, a bridge's cut beside a level-0 cover ran on past LIMIT, and two of the
 lines' covers were lost), and the ground's corners under it lie on it (ground_mesh.build); the page draws no slab of
 the areas it holds (covered). A bridge is none: the survey's deck (`deck`) and the areas ON_DECK on one. Under

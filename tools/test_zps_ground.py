@@ -121,7 +121,7 @@ class Judge(unittest.TestCase):
         self.assertEqual(v["verdict"], "review")
 
     def test_the_users_rule_decides_what_nothing_else_does(self):
-        """The user, 2026-11-10: courtyards to the lidar, greenery outside to the survey (paved outside: the lidar)."""
+        """The maintainer's rule (2026-11-10): courtyards to the lidar, greenery outside to the survey (paved outside: the lidar)."""
         rule = {"courtyard": "lidar", "outsideGreen": "survey", "outside": "lidar"}
         older = lambda E, N: np.full(np.shape(E), GROUND + 1.0)  # noqa: E731  (the lidars disagree: nothing else decides)
         ring_of_houses = shapely.box(-40, -40, 60, 60).difference(shapely.box(-20, -20, 40, 40))
@@ -157,7 +157,7 @@ class Judge(unittest.TestCase):
         self.assertEqual((v["verdict"], v["by"]), ("survey", "fact"))
 
     def test_an_answer_states_what_the_sources_decide_without_it(self):
-        """#670: the rails say the survey is wrong (lidar): the user's lidar matches, survey holds; an area that fits
+        """#670: the rails say the survey is wrong (lidar): the maintainer's lidar matches, survey holds; an area that fits
         IPR now matches whatever the answer; an answer whose point lies in no area is not stated."""
         rails = rails_through(0, 0, 20, GROUND)
         for said, state in (("lidar", "matches"), ("survey", "holds")):
@@ -171,7 +171,7 @@ class Judge(unittest.TestCase):
         zg.judge([square(0, 0, 20, GROUND - 0.1)], ground, ground, zg.cover_union([]), NONE, F,
                  [{"lat": 0.01, "lon": 0.01, "verdict": "survey"}], states=states)
         self.assertEqual(states, {0: ("matches", "fits", "fits")})
-        # the user's held rule giving the same verdict is no source catching up: holds
+        # the maintainer's held rule giving the same verdict is no source catching up: holds
         states, rule = {}, {"courtyard": "lidar", "outsideGreen": "survey", "outside": "survey"}
         zg.judge([square(0, 0, 20, GROUND - 1.8)], ground, lambda E, N: [float("nan")] * len(E), zg.cover_union([]), NONE, F,
                  [{"lat": 0.01, "lon": 0.01, "verdict": "survey"}], rule=rule, buildings=shapely.Polygon(), states=states)

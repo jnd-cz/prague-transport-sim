@@ -9,7 +9,7 @@ to 600 bytes come back from their page as they went in, a changed byte fails the
 pages of their own, the granules grow and the last one is pre-skip + the audio's samples. The MP3 info frame: the
 CRC-16 of its checksums, the frames of a stream counted, the frame count, encoder delay and padding read back, a
 changed byte failing its checksum, a stream too short for its master refused. The encoder, on a generated pack (a
-stereo 16-bit WAV of a tone and clicks over noise, a mono 32-bit float WAV as the user's recorder writes them): both
+stereo 16-bit WAV of a tone and clicks over noise, a mono 32-bit float WAV as the maintainer's recorder writes them): both
 encoded in Ogg Opus and MP3 that decode to their master's length to the sample, no shift, their envelopes matching;
 the manifest naming the .ogg files, each with its MP3 as fallback and its WAV as master; the .ogg files at most a
 fifth of the WAVs' size, the MP3s a third; a second run writes the same bytes; --check passes, then fails on a

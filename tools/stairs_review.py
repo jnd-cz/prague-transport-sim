@@ -22,7 +22,7 @@
   outline's lowest and highest points.
 - **--import** takes the answers (python -P -E tools/deploy.py --pull, in the deploy checkout) into data/truth.json
   `stairsReview`, keyed by place: a point inside the area, as lat/lon (survey area numbers change with a rebuild).
-  An area holding an answered place gets no card again, unsure included: the user answers unsure where the imagery
+  An area holding an answered place gets no card again, unsure included: the maintainer answers unsure where the imagery
   does not show the stairs (a private garden, 2026-11-22), and another look would not either.
 """
 import argparse

@@ -1,7 +1,7 @@
 # A source per layer, with fallbacks and provenance
 
 **Date:** 2026-10-30
-**Status:** agreed and implemented 2026-10-30 (issue #10). The user chose: IPR's terrain ZIP whole in the
+**Status:** agreed and implemented 2026-10-30 (issue #10). The maintainer chose: IPR's terrain ZIP whole in the
 snapshot, its heights taken as Bpv behind a build check, all five lines rebuilt. Snapshot 2026-10-30c.
 
 ## Measured

@@ -190,9 +190,8 @@ export const vehicleName = (v, lang) => v.names[lang] || v.names.en;
 
 // The fleet (#527; docs/decisions/2026-11-10-vehicle-packages.md, section 4): the manifest's
 // `fleet: { types: { <type>: { ranges: [[first, last], …], except: […] } | { list: […] } }, sets: [[lead, second], …] }`.
-// A set listed runs together and with no other car; one of its cars may run alone as a single car (the user,
-// 2026-11-13: "if the player gets single car of the pair then the other number is free to be used by ai tram"),
-// and the set is then not dealt whole while it is out. A set not listed is numbers of one type dealt together.
+// A set listed runs together and with no other car; one of its cars may run alone as a single car, its partner
+// then free for an AI tram (maintainer, 2026-11-13), and the set is then not dealt whole while it is out. A set not listed is numbers of one type dealt together.
 const FLEETS = new WeakMap();
 export function fleetOf(v) {
   if (!v?.fleet?.types) return null;
@@ -211,7 +210,7 @@ export function fleetOf(v) {
   return f;
 }
 
-// The player's preferred set (the user, 2026-11-11: "I would add optinal preferred set for the player"): '6892+6921'
+// The player's optional preferred set (#527): '6892+6921'
 // or one lead car's number, '7269'; null when the vehicle has no such numbers.
 export function preferredSet(v, text) {
   const f = fleetOf(v), numbers = String(text ?? '').split('+').map((x) => +x.trim()).filter((n) => n > 0);
@@ -229,7 +228,7 @@ export function fleetChoices(v) {
 }
 
 // Dealing (the record's section 4): the run's own stream shuffles every number of the vehicle into one deck, so each
-// type comes up as often as it has numbers (the user, 2026-11-10: "roughly related to their range sizes"); a set is
+// type comes up as often as it has numbers (maintainer, 2026-11-10); a set is
 // dealt from where the deck stands, skipping numbers on the street, and given back when it leaves; when every number
 // is out it deals again from the start. The player's numbers are held for the whole run. rand: a stream of its own
 // (src/random.js), so dealing draws nothing from the traffic's.

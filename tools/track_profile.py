@@ -29,7 +29,7 @@ STEP = .3  # m: a point the curve misses by more is a step (#184's departure thr
 
 def radii(truth=None):
     """The design minimum radii (street, open track, switch) from data/truth.json, and the floor under them (`min`: the
-    radius gives way to the data no further, the user's rule; the street's radius where there is none)."""
+    radius gives way to the data no further, the maintainer's rule; the street's radius where there is none)."""
     truth = truth or json.loads((ROOT/'data/truth.json').read_text(encoding='utf-8'))
     facts = {f['id']:f['value'] for f in truth['trackGeometry']['facts']}
     return {'street':facts['vertical-radius-street'],'open':facts['vertical-radius-open-track'],

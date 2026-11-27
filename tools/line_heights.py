@@ -4,7 +4,7 @@
     python -P -E tools/line_heights.py 17 22       # stage the heights, assemble, write data/line17.json, line22.json
     python -P -E tools/line_heights.py 17 --staged reports/track-heights.json   # reuse an import of this checkout
 
-The staged heights (tools/import_track_heights.py: numeric DI, the archive, the user's reviewed spans from
+The staged heights (tools/import_track_heights.py: numeric DI, the archive, the maintainer's reviewed spans from
 data/truth.json, survey plus the style fact) are binned every 5 m along each chain of DI paths
 (tools/track_profile.py `chains`: through a fork the straightest pair continues; copies are dropped as in
 tools/di_tracks.py) and smoothed once with `vertical_profile` at each point's design radius: 500 m on paved
@@ -13,7 +13,7 @@ street and where the construction is unknown, 1000 m on open track, in a turnout
 cuts the profile and is listed. The chains are solved longest first; where a track meets one already solved (a
 junction, tracks that cross at grade) it is pinned to that track's height, so no junction has two heights.
 
-Before the smoother, the user's answers (data/truth.json) and the rules that apply them set the bins' heights, and the
+Before the smoother, the maintainer's answers (data/truth.json) and the rules that apply them set the bins' heights, and the
 solver asks them where an answer holds or follows the radius: tools/height_answers.py.
 
 A line's path, opposite path and drawn tracks take the heights of the chains they lie on every 2 m (`heights`,
@@ -52,10 +52,9 @@ SWITCH, BEHIND, DIAMOND = 15.0, 3.0, 5.0  # m: the switch radius from a fork int
                                           # on both tracks, and either side of a crossing (a 20 m zone around every pin
                                           # held a 430 m sag at Nádraží Holešovice to 1000 m, the curve 3 m under it)
 NEAR_PIN = 1.5  # m: a bin this near a pinned point gives way to it
-BAND = 0.10     # m: the curve stays within this of the staged heights (the user, 2026-11-03: "If the curve >=500m fits
-                # within 10cm then it's solved, otherwise let's keep it for review again so we can find the root cause")
-JUNCTION_BAND = 0.15  # m within a turnout or a diamond: the play the user allowed there for input errors and noise
-                      # ("there can be little play within the junction if we account for input data errors, noise")
+BAND = 0.10     # m: the curve stays within this of the staged heights; within it a place is solved, else it goes back
+                # to review for its root cause (maintainer, 2026-11-03)
+JUNCTION_BAND = 0.15  # m within a turnout or a diamond: the play the maintainer allowed there for input errors and noise
 FIT, PIN_FIT = 0.01, 0.002  # m outside the band that still fits (the solver's convergence); at a pin, where rails join
 PIN_TOL = 0.005  # m: a junction's pinned height, within this
 LONE = 2        # bins: a group of misses this small is a lone bad point, not held to the band
@@ -66,7 +65,7 @@ RELEASE, RELEASE_ROUNDS = 15.0, 3  # m, rounds: where the floor cannot meet the 
 REVIEW_ISSUE = 276  # the issue the radius review waits for (reports/review/track-radius.json names it): W3's track
                     # profile work, since #358 closed at W2 (#416)
 TIGHT = 0.95        # a solved curve under this share of the floor is a place for review: the solver's own tolerance is 2 %
-                    # (track_profile.TOL), and 10 junctions read 478-490 m, no question for the user
+                    # (track_profile.TOL), and 10 junctions read 478-490 m, no question for the maintainer
 NEAR_MEET = 2.0  # m: two tracks meeting a third this near each other along it meet each other too (Ke Stírce: two
                  # track ends 0.65 m apart on a third track, 9 cm apart in height, pinned it to both)
 HOLD_WEIGHT = 1e-3  # a held bin's pull towards the straight line across its hold
@@ -477,8 +476,8 @@ def solve_run(c, run, r):
     tol = [PIN_TOL if x.get('pin') else None if (not x['w'] or i in dropped) else GROUND_BAND if x.get('ground') is True
            else JUNCTION_BAND if zone(x['s']) else BAND for i, x in enumerate(run)]
     weight = [0.0 if i in dropped else w for i, w in enumerate(weight)]
-    # (where an answer drops the heights between a junction's switches, they go: the tracks meet on the curve around them;
-    # the user, Malovanka, 2026-11-07: "if you ignore any height between the switches and fit the best vertical radius")
+    # (where an answer drops the heights between a junction's switches, they go: the tracks meet on the curve around them,
+    # at the best vertical radius; maintainer, Malovanka, 2026-11-07)
     for a in ha.IGNORE_ANSWERS:
         near = [(lo, hi) for lo, hi in c.switch if a['ignore'] == 'switches'
                 and math.dist(c.line.interpolate((lo + hi) / 2).coords[0], a['xy']) <= a['reach']]
@@ -489,14 +488,14 @@ def solve_run(c, run, r):
                     tol[i], weight[i] = None, HOLD_WEIGHT
     # the band rule: within BAND of the staged heights at the design radius, else the radius gives way where the
     # band is missed, down to the floor (an answer to hold the radius keeps the design radius), and where the floor
-    # cannot meet the band either, the band gives way and the place goes to the user's review
+    # cannot meet the band either, the band gives way and the place goes to the maintainer's review
     rmin = list(rmin0)
     fit = [PIN_FIT if x.get('pin') else FIT for x in run]
     over = lambda r_: [i for i, e in enumerate(r_['excess']) if e > fit[i]]
     xy_of = lambda j: run[j]['xy'] or tuple(c.line.interpolate(s[j]).coords[0])
     floor = r.get('min', MIN_RADIUS)
     # how far the radius may give way at each point: below the floor in an area that follows the ground, down to the area's
-    # own limit (the user's word), and at most down to `least` anywhere
+    # own limit (the maintainer's word), and at most down to `least` anywhere
     grounds = [ground_at(xy_of(j), BLEND_REACH) for j in range(len(s))]
     least = [g['radius_min'] if g else MIN_RADIUS for g in grounds]
     lowest = [g['radius_min'] if g else floor for g in grounds]
@@ -557,8 +556,8 @@ def solve_run(c, run, r):
         # radius gives way near the pin as it would without the answer; 24 junctions 1-2.5 cm apart, 2026-11-04)
         for to_floor in (True, False):
             if not to_floor and apart and answer_at([xy_of(i) for i in apart], (HOLD,)):
-                # (an answer holds the floor here: the radius stays, and the tracks meet half way, assemble; the user,
-                # 2026-11-07: "best fit to 500m limit even at the price of larger height difference from source")
+                # (an answer holds the floor here: the radius stays, and the tracks meet half way, assemble; the 500 m
+                # limit before nearness to the source's heights, maintainer, 2026-11-07)
                 found_apart += [(s[i], res['z'][i]) for i in apart]
                 break
             for _ in range(RELAX_STEPS):
@@ -1206,7 +1205,7 @@ def write_line(line, lookup, chs):
     track_styles.own_lifts(data, track_styles.offsets(json.loads((ROOT / 'data' / 'truth.json').read_text(encoding='utf-8'))))
     data['heights'] = heights
     data['heightSource'] = src_ranges
-    # the user's structures no source maps that lie on the tracks this line draws, with their state (#670)
+    # the maintainer's structures no source maps that lie on the tracks this line draws, with their state (#670)
     on = [shapely.LineString([q[:2] for q in p]) for p in [data.get('path'), data.get('pathBack')]
           + [t['p'] for t in data['tracks']] if len(p or []) > 1]
     structs = [{k: v for k, v in f.items() if k != 'ends'} for f in ha.STRUCTURE_FACTS
@@ -1282,7 +1281,7 @@ def line_report(line, chs, lookup, data, summary):
 def radius_review(chs, snapshot):
     """reports/review/track-radius.json: every place where the radius gave way (or an answer held it), the curve
     held to the design radius and the final one as answer previews over the staged heights and the terrain. A place
-    the user answered (data/truth.json radiusAnswers) leaves the list."""
+    the maintainer answered (data/truth.json radiusAnswers) leaves the list."""
     from geo import Frame
     from atomic import replacing
     F = Frame()
@@ -1311,8 +1310,8 @@ def radius_review(chs, snapshot):
         near = {n: min(g.distance(Point(at)) for g in gs) for n, gs in routes.items()}
         lines = sorted((n for n, dd in near.items() if dd < 10), key=int)
         if not lines:
-            # (off the lines' routes: the floor holds there as built and nobody drives it; the user, 2026-11-07:
-            # "Generally tracks far from the main line aren't important")
+            # (off the lines' routes: the floor holds there as built and nobody drives it; tracks far from the lines
+            # matter little, maintainer, 2026-11-07)
             continue
         spans, previews = [], {HOLD: {}, FOLLOW: {}}
         for k, p in enumerate(sorted(places, key=lambda p: -len(p['data']))):

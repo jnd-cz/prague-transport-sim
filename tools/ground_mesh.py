@@ -198,10 +198,9 @@ class StairsHeights:
     heights are the stairs'. A point under a level-1 survey
     area (a deck, a bridge) is not judged: the raster reads the deck there (the stairs under the bridge on line 17 at
     (1418, 2497) and (1457, 2503); the National Theatre's under Národní, line 9 (-620, -565)). A point on the stairs' own
-    boundary keeps its height: the 1 m raster does not see a narrow flight (the user, 2026-11-23: "the narrow places
-    can't be properly seen by the lidar sampling").
+    boundary keeps its height: the 1 m raster does not see a narrow flight (maintainer, 2026-11-23).
 
-    Judged on the user's 24 answers (data/truth.json stairsReview): one flight 5615 34 -> 0 m² steeper than 1:1 (one
+    Judged on the maintainer's 24 answers (data/truth.json stairsReview): one flight 5615 34 -> 0 m² steeper than 1:1 (one
     plane now), 5662 11.5 -> 0, 5663 22 -> 0, 582 11 -> 0, 439 27 -> 0; flights that turn 1998 20 -> 3.3, 1022 12 -> 0;
     no stairs, line 37 (4001, 1412), 10 -> 0 (the sidewalk's level). The lines' stairs: 1,223 -> 621 m² (199 areas
     better, 13 worse by 0.5 m², 16 m² in all: a side on a wall's line partly past STAIRS_OFF moves and the rest keeps
@@ -384,8 +383,8 @@ def pits(D, ids):
     """Which of the survey areas `ids` are a tree pit or a small bed in a sidewalk: {id}. A green area at level 0, up
     to PIT m2, whose every outline point lies in a raised area (RAISED) or within PIT_NEAR of one. On the lidar it
     stood 5-10 cm off the sidewalk's street surface round it, a kerb's step at its outline (STEP), and bumped inside:
-    a green slab with dark sides in the sidewalk (line 22 (-772, 534.5), area 1973, 30 m2: -0.09 to +0.3 m). The user,
-    2026-11-20, on pictures of alpha-4, which drew them flush, against main (#696): flush. The five lines have 82-528
+    a green slab with dark sides in the sidewalk (line 22 (-772, 534.5), area 1973, 30 m2: -0.09 to +0.3 m). The maintainer
+    chose flush on pictures of alpha-4, which drew them so, against main (#696). The five lines have 82-528
     such areas up to 5 m2 and 127-290 more up to PIT; a larger one is a lawn (106-167 a line of 50-200 m2)."""
     ids = [i for i in ids if D["areas"][i].get("c") == "green" and D["areas"][i].get("l", 0) == 0 and len(D["areas"][i]["r"]) >= 3]
     if not ids:
@@ -419,7 +418,7 @@ def bare_holes(D, ids):
     """The small holes of the raised survey areas `ids` that no other area fills: [polygons]. The survey leaves a
     shelter's or a kiosk's footprint out of the sidewalk it stands on (line 37, Krejcárek's platform, area 284: a hole
     of 5.7 m2 at (3907.3, 318.2)). The ground filled it with the terrain on the lidar, 0.1-0.2 m over the platform
-    round it with step walls: a slab on the platform (the user, 2026-11-20, #776). A hole up to PIT m2 at least half
+    round it with step walls: a slab on the platform (#776). A hole up to PIT m2 at least half
     bare is the raised area's own ground."""
     out = []
     polys, own = [], []
@@ -469,14 +468,14 @@ def platform_planes(L, x, y, z, ok, log=None, wide=None):
     the platform's plane: (z, the corners moved). A platform stands a steady height over the top of rail along the
     track, with one crossfall; the sidewalk's street surface follows IPR's raster and the survey's points instead, and
     at Krejcárek (line 37 s 2904-2974) stood +0.01 to +0.41 m over the rail top 0.6 m behind the edge, up to 0.16 m
-    apart from one metre to the next, with a mound of 0.3 m by the shelter (the user, 2026-11-20, #776: "uneven
-    surface"; his photo: level asphalt). 98 of the five lines' 149 platforms were over 5 cm off a line along.
+    apart from one metre to the next, with a mound of 0.3 m by the shelter (#776: the maintainer's photo shows
+    level asphalt). 98 of the five lines' 149 platforms were over 5 cm off a line along.
     - A platform is one of L["platforms"] along the route or the back path, not a Vienna-type one (boarding from the
       sidewalk across a lane: that sidewalk follows its street).
     - Its band: between its ends along its path, on its side, up to PLATFORM_BAND from the path's axis.
     - Its plane: over the rail top beside each corner, the height at the axis and one crossfall, fitted to the band's
       own corners (the survey's and the raster's reading); the crossfall held to PLATFORM_CROSS. No one height holds
-      for every stop (the user: "the heights can vary between different stops and stop styles"). The plane lies at the
+      for every stop: it varies between stops and stop styles (maintainer). The plane lies at the
       top of the corners it fits (PLATFORM_TOP), not at their middle: at their middle Motol's platform B (line 9
       s 25524-25592, an island between the track and Plzeňská) came 0.08 m down at the road's kerb, flush with the
       road, and ground batch B's surfaces check counted new flat kerbs at 23 / 21 / 13 / 5 / 12 platforms. On the
@@ -490,8 +489,8 @@ def platform_planes(L, x, y, z, ok, log=None, wide=None):
       the whole area is the platform, and its corners are its outline's alone, their own heights the survey's few
       points. Hlušičkova's platforms (line 9 s 1334-1402 and s 27076-27144: 68 m, 12 and 14 outline points, the back
       edge 5.5 m from the axis, where the band had faded out) kept the plane at the track and their back edge at
-      +0.02 to +0.23 m over the rail top, 0.16 m to 0.05 m under the road's kerb from one point to the next (the user,
-      2026-11-21, on ground batch B: "looks clean from track side, a bit bumpy from road side"); IPR has them level
+      +0.02 to +0.23 m over the rail top, 0.16 m to 0.05 m under the road's kerb from one point to the next (maintainer,
+      2026-11-21, on ground batch B: clean from the track side, bumpy from the road side); IPR has them level
       across, +0.21 and +0.22 m at 0.7 m and 2 m behind the edge.
     - Fitted corners all at one distance from the axis (such a platform's edge alone, PLATFORM_SPREAD) tell no
       crossfall: none is taken."""
@@ -617,14 +616,70 @@ def beside(D, ids, raised, lidar):
     return out
 
 
+BEND = ("median", "island", "parking", "cycle")  # (survey classes whose long edges follow the lidar's shape: bent, #638)
+BEND_LONG = 10.0  # m: an outline edge between two surveyed points this long or longer is bent
+BEND_STEP = 2.5  # m between the points laid along it
+BEND_MOST = 0.5  # m: the lidar off its own chord along the edge; further is no vertical curve (a wall's foot, a bank)
+BEND_JUMP = 0.15  # m between two neighbouring points' offsets: more is a step the edge crosses, no curve
+BEND_LEAST = 0.08  # m: an edge whose curve leaves the chord by less stays straight (the lidar's noise at a kerb: 0.05 m)
+
+
+def bent(ring, lidar):
+    """A survey ring ([[x, y, z], ...]) with its long edges following the lidar's shape: (the ring, the edges bent).
+    The survey has an area's heights at its outline's points only, and a kerb along a street may run 10-60 m between
+    two of them. Triangulated, such an edge is a chord, while the street beside it (the generated surface, the beds)
+    follows the lidar over a crest or through a dip: Mariánské hradby, lines 22 and 23 (-1040, 920), the median between
+    the two tracks, area 509, its south edge 27.6 m from 243.92 to 242.35 m over the hill's crest: the chord 0.25 m
+    under the lidar's curve at 9 m, the median 0.17-0.22 m under the upper track's bed beside it for 28 m (13 sunk
+    kerb samples, ground batch E, #757).
+    An edge of BEND_LONG or more between two surveyed points gets a point every BEND_STEP at the chord's height plus a
+    curve: the lidar's offsets from its own chord (read at the edge's two ends and every BEND_STEP between), fitted by
+    t (1 - t) (a + b t) along the edge, a crest, a dip or one of each, nothing at the ends. The surveyed heights stay,
+    the lidar gives the shape between them, and what it reads at a kerb (its top and foot in one cell, 0.05 m of noise
+    along a kerb) cancels in the difference and in the fit. Not where the lidar leaves its chord by over BEND_MOST or
+    two neighbouring offsets differ by over BEND_JUMP (the edge runs along a wall's foot or crosses a step: no curve),
+    nor where the curve leaves the chord by under BEND_LEAST (half the five lines' long edges, by a median 0.05 m: the
+    noise)."""
+    out, n = [], 0
+    for p, q in zip(ring, list(ring[1:]) + list(ring[:1])):
+        out.append(p)
+        L = math.hypot(q[0] - p[0], q[1] - p[1])
+        if L < BEND_LONG or p[2] is None or q[2] is None:
+            continue
+        k = int(math.ceil(L / BEND_STEP))
+        t = np.arange(k + 1) / k
+        g = np.asarray(lidar(p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])), float)
+        if not np.isfinite(g).all():
+            continue
+        sag = g - (g[0] + t * (g[-1] - g[0]))
+        if np.abs(sag).max() > BEND_MOST or np.abs(np.diff(sag)).max() > BEND_JUMP:
+            continue
+        w = t * (1 - t)
+        B = np.column_stack([w, w * t])
+        sag = B @ np.linalg.lstsq(B, sag, rcond=None)[0]
+        if np.abs(sag).max() < BEND_LEAST:
+            continue
+        n += 1
+        out += [[p[0] + u * (q[0] - p[0]), p[1] + u * (q[1] - p[1]), p[2] + u * (q[2] - p[2]) + s]
+                for u, s in zip(t[1:-1].tolist(), sag[1:-1].tolist())]
+    return out, n
+
+
 class SurveySurface:
     """Each survey area's own surface: its outline's heights, triangulated (the page's DtmSurface); a stairs area that is
-    one flight, its plane (flight()); one that is not, on the stairs' own heights where `stairs` (StairsHeights) is given."""
+    one flight, its plane (flight()); one that is not, on the stairs' own heights where `stairs` (StairsHeights) is given.
+    lidar(x, y): the BEND classes' long edges follow its shape between their surveyed points (bent; `bends` counts them)."""
 
-    def __init__(self, D, areas, stairs=None):
-        self.tris, self.area, self.flights = [], [], {}
+    def __init__(self, D, areas, stairs=None, lidar=None):
+        self.tris, self.area, self.flights, self.bends = [], [], {}, 0
         for i in sorted(set(areas)):
             a = D["areas"][i]
+            if lidar is not None and a["c"] in BEND and a.get("l", 0) == 0:
+                r, nb = bent(a["r"], lidar)
+                hs = [bent(h, lidar) for h in a.get("h", [])]
+                if nb or any(m for _, m in hs):
+                    a = {**a, "r": r, "h": [h for h, _ in hs]}
+                    self.bends += nb + sum(m for _, m in hs)
             if a["c"] == "stairs":
                 f = flight(a)
                 if f is None and stairs is not None:
@@ -1375,8 +1430,7 @@ def meet_lidar(x, y, zc, zf, lidar, area, held=None):
     Without it the weld moved the edge corner alone. Královka's loop, line 23: the lawn's corner on its border with the
     tram's area at (-2889.000, 144.046) welded to 298.916 m, its lattice corner (-2889.000, 144.000), 4.6 cm inside,
     on the lidar at 298.986: two slivers at 57-67 degrees, 7 cm tall there, 3.7 and 4.7 m long along the lattice's
-    lines, whose back sides the page drew as dotted dark lines (the user, 2026-11-26: "visible only from shallow
-    angle [...] Is there a step too?", #770)."""
+    lines, whose back sides the page drew as dotted dark lines, seen only from a shallow angle (#770)."""
     from scipy.spatial import cKDTree
     ok = lidar & np.isfinite(zc) & np.isfinite(zf) & (area >= 0)
     if held is not None:
@@ -1421,7 +1475,7 @@ def wall_areas(D):
     197.43 m and the other at 194.84 m. Line 17 has 5.8 km of sidewalk edges on such strips beside 10.9 km on walls and
     stairs, and what held a sidewalk at a wall (street_profile.sidewalks, snap_to_walls, #653) knew the walls and
     stairs alone: the platform above that wall lay on IPR's smear of it, 196.35 m at its edge, a trench 1.1 m deep
-    along the wall's top (the user's notes of 2026-11-20, #786)."""
+    along the wall's top (the maintainer's notes, #786)."""
     return [i for i, a in enumerate(D["areas"]) if a.get("l", 0) == 0 and len(a.get("r") or []) >= 3
             and (a["c"] in WALL_CLASSES or (a["c"] == "paved" and wall_like(a)))]
 
@@ -1655,8 +1709,8 @@ def wall_face(ring_segs, x, y, tx, ty):
     where it is over WALL_WIDE across there (and for a whole area that wide, wall_width: the build), as across_outline:
     the bastion at Strahov (line 23, area 860: 16.5 m up over 5 m across, 3.7 m as a whole) is a battered face, and level
     across at its top it moved 4,000 corners by up to 16.5 m. Chotkova's road wall (line 23, area 842: its foot's side at 205.3 m, 1.7 m from its top's at 208.5)
-    leaned as a ramp between its sides where a stone wall stands with a footpath on its top (the user's photo,
-    2026-11-19, #697)."""
+    leaned as a ramp between its sides where a stone wall stands with a footpath on its top (the maintainer's
+    photo, #697)."""
     x, y = np.asarray(x, float), np.asarray(y, float)
     vx, vy = np.asarray(tx, float) - x, np.asarray(ty, float) - y
     n = np.maximum(np.hypot(vx, vy), 1e-9)
@@ -1682,8 +1736,8 @@ def standing(cx, cy, z, wall, street):
     stood 1.4 m under the wall's top in a trench (#776). A wall under WALL_FACE
     took its heights between its two sides and was welded with whatever it shared a point with: the quay's low wall at
     line 17 (-755.8, -1827), area 1086 (0.18 m across, its outline 0.5 m over the ground at the median), lay as a flat
-    strip. The user, 2026-11-20, on pictures of alpha-4, which drew such walls as low boxes, against main (#696):
-    upright, by the survey's own heights."""
+    strip. The maintainer chose upright, by the survey's own heights, on pictures of alpha-4, which drew such walls as
+    low boxes, against main (#696)."""
     out = np.zeros(len(cx), bool)
     wall = np.asarray(wall, bool)
     z = np.asarray(z, float)
@@ -2126,7 +2180,7 @@ def belt_kerbs(x, y, tx, ty, z, road, tram, surface, step):
     bed_kerb), but at the edge the two areas share a point, the tram's area ranks first there and the road's corner
     took its height: the road ramped up to the belt over its last face, up to 5 m, or stepped by chance where a
     lattice line fell near (Vinohradská from Olšanské hřbitovy to Flora, line 9 (3333, -1478): 269.36 to 269.53 m over
-    2 m; the user, 2026-11-21: "mostly placed on corridor with kerb", #606).
+    2 m; seen mostly on corridors with a kerb, #606).
     - At a point the road's and the tram's (`tram`) corners share, each side's surface is read BELT_SIDE from the
       point towards its triangle's centre, no farther than the centre: the lowest of the road's readings and the
       highest of the tram's (a reading short of BELT_SIDE lies in the step's cells, between the two).
@@ -2187,9 +2241,9 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, k
       no kerb: within MEET_STEP of it it takes the edge's height, and its face rises to the lawn's own ground from
       there. As a kerb it kept every difference over 3 cm upright: within 45 m of Královka's loop (line 23 (-2890,
       140)) 234 m of such faces of 3-30 cm between grass and sidewalk, the lidar having the same difference a metre
-      either side (12 of 13 faces within 5 cm) and no way to tell a kerb from a bank; the user, 2026-11-26: "the only
-      raised areas with kerb above track seem to be the stop platforms. Other raise areas like the green patches rise
-      with smoother slope" (#770). A larger difference stands (a terrace; a sidewalk off the lidar).
+      either side (12 of 13 faces within 5 cm) and no way to tell a kerb from a bank; the only raised areas with a kerb
+      over the track are the stop platforms, the others (the green patches) rise in a smoother slope (maintainer,
+      #770). A larger difference stands (a terrace; a sidewalk off the lidar).
     `label`: what gave each corner its height (default `kind`), for the report and the lidar's rule."""
     key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
     if apart is not None:
@@ -2401,8 +2455,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     lines.append(box.boundary)
     lines += rails
     # (a raised area beside a track or a plot that reaches a rail: within RAIL_CLEAR of it at the bed's height, its kerb
-    # or wall RAIL_CLEAR past the rail; its edge in the lines. The user, 2026-11-16: "any structure crossing the track
-    # should be at most level with the rail head", data/truth.json groundRules)
+    # or wall RAIL_CLEAR past the rail; its edge in the lines. Anything crossing the track stands at most level with
+    # the rail head: maintainer, 2026-11-16, data/truth.json groundRules)
     across = crossing_pieces(pieces["survey"], beds)
     band = rail_band(beds, outline, [q["g"] for k, q in enumerate(pieces["survey"]) if q["c"] in RAISED and not across[k]] +
                      [q["g"] for q in pieces["plot"]])
@@ -2486,8 +2540,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     prio = np.full(len(cx), 9.0)
     kind = np.full(len(cx), "", dtype=object)
     from track_styles import RANK
-    surface = SurveySurface(D, [pieces["survey"][owners[o][1]]["area"] for o in owner if owners[o][0] == "survey"], stairs)
-    log(f"  stairs: {stairs.areas} on their own heights ({stairs.points} outline points moved, StairsHeights)")
+    surface = SurveySurface(D, [pieces["survey"][owners[o][1]]["area"] for o in owner if owners[o][0] == "survey"], stairs, lidar_raw)
+    log(f"  stairs: {stairs.areas} on their own heights ({stairs.points} outline points moved, StairsHeights); "
+        f"{surface.bends} long outline edges follow the lidar's shape (bent)")
     # terrain: the parent triangle's plane
     m = corner_cls == "terrain"
     par = np.array([owners[o][1] for o in owner])[corner_face[m]]
@@ -2677,9 +2732,9 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (and in any tunnel of the route the tram's own area lies at the rails' level: under a cover the raster has the
     # cover, and the street surface the tram's area takes read it. By Hlavní nádraží, line 9 s 11840-11860, the upper
     # street crosses the track on a cover: the tram's area stood at 201-204.4 m over rails at 197.4 m, the ground
-    # closed over the track. The base ground is the tunnel's floor; its cover is a slab to come (the user, 2026-11-20:
-    # "build the base groundlevel, that is stream bed or underpass floor but then we have to place invented bridge
-    # decks on top of the ground", #449). The lines' other tunnels off the rock have the raster at the rails, #788)
+    # closed over the track. The base ground is the tunnel's floor; its cover is a slab to come, a deck laid over the
+    # base ground as over a stream bed or an underpass floor (#449). The lines' other tunnels off the rock have the
+    # raster at the rails, #788)
     in_tun, rail_t = in_the_rock(L, [tuple(v) for v in L.get("tunnels") or []], cx[m], cy[m])
     in_tun &= (sc == "tram") & ~in_rock
     zs, on_floor = off_the_hill(zs, np.where(in_tun, rail_t, np.nan))

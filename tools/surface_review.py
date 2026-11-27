@@ -5,9 +5,8 @@ changes, and the junctions in them (#574).
     python -P -E tools/surface_review.py --cards           # reports/review/track-surface-N.json
     python -P -E tools/surface_review.py --import          # the answers into data/truth.json trackSurfaceReview
 
-The user, 2026-11-13, on the setts style's source: OSM first, calibrated against the user's answers; "One per street,
-stretch where it switches and per junction would make it more efficient to label"; on OSM's concrete: "osm could help
-but should be checked if it's up to date".
+The maintainer, 2026-11-13, on the setts style's source: OSM first, calibrated against the maintainer's answers, one
+card per street stretch, per switch and per junction; OSM's concrete can help, checked for being up to date.
 
 OSM's surface along our route, every STEP m: the tram way's own `surface` within TRAM m of the axis, else the
 `surface` of the carriageway carrying the tracks (`embedded_rails=tram`) within ROAD m. Classes: setts (sett,

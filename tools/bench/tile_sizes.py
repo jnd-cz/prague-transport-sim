@@ -2,8 +2,8 @@
 """What a tile size costs (#30): a line's ground file cut into squares of each size (m, from the city origin; a
 triangle goes to the square holding its centre), each encoded on its own (ground_mesh.encode) and brotli'd, and a drive
 along its route every 25 m with two windows of tiles held (round the tram, and along 1 km of route ahead): the tiles,
-triangles and the page's MB held, the loads and MB fetched per km. Measured for the user's choice of 500 m on
-2026-11-17 (#30's comment; the user: "test you couple different sizes on a single line and report back the tradeoffs").
+triangles and the page's MB held, the loads and MB fetched per km. Measured on one line for the maintainer's choice
+of 500 m (#30's comment).
 
 Usage: python -P -E tools/bench/tile_sizes.py LINE [SIZES]      (sizes in m, default 128,256,512,1024)
 """

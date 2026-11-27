@@ -15,7 +15,7 @@ it, so nothing lies under anything else, and the five cover the box once:
 - **bed:** every drawn track's bed outline (track_beds.outline: its style's width, the middle of the strip to a paired
   track), the tracks merged where they overlap at switches and crossings (#165). A bed sample whose ground (top of rail
   - lift) lies over LEVEL m from IPR's ground is on a structure (a bridge, a deck, a tunnel) and is left out: bridges
-  and decks stand on the ground (the user, 2026-11-10), and the terrain stays under them.
+  and decks stand on the ground (maintainer, 2026-11-10), and the terrain stays under them.
 - **plot:** OSM's building footprints (lineN.json `buildings`), flat at PLOT_RULE of IPR's ground along the footprint,
   PLOT_OUT m outside it (calibrated on the survey's building outlines, --calibrate).
 - **water:** OSM's water areas with their islands (osm_water), level at the banks it sees past its weirs (WaterLevels,
@@ -61,8 +61,8 @@ GRID = 1e-3  # m: the pieces' vertices on this grid, the ground file's (ground_m
 TILE = 500.0  # m: the terrain is cut in squares this size side by side (threads; the world's tiles are geo.TILE)
 GAUGE = 0.72  # m: a rail from the axis (track_beds.GAUGE)
 # (the line's ground reaches this far from its route and tracks: the fog ends at 950 m (src/main.js), nothing farther is
-# seen. The user, 2026-11-16, #509: "I want to get to tile streaming as soon as possible so let's do just option 1": the
-# crop, lines 17 and 22 keeping 63 % of their triangles)
+# seen. Option 1 of #509, the maintainer's pick for the shortest way to tile streaming: the crop, lines 17 and 22
+# keeping 63 % of their triangles)
 CORRIDOR = 1200.0  # m
 CORRIDOR_SIMPLIFY = 1.0  # m: the corridor's outline, simplified (its arcs need no more)
 # #166's and #165's places: (line, route s, the city-frame sample where the issue gives one)

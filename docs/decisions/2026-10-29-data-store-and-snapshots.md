@@ -9,7 +9,7 @@
   (`data/truth.json`).
 - Raw sources are pinned **snapshots** (`snapshots/<id>.json`, `snapshots/CURRENT`: per file path, size,
   SHA-256, source, licence, date); built game data is listed in `data/MANIFEST.json`. The files
-  themselves are stored by hash in an SFTP-only store on the user's server (`tools/snapshot.py`).
+  themselves are stored by hash in an SFTP-only store on the maintainer's server (`tools/snapshot.py`).
 - Builds are reproducible from a snapshot; the built data per commit is published so playing and tuning
   need no build.
 

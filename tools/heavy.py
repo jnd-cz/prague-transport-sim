@@ -7,10 +7,10 @@
     python -I tools/heavy.py "#516 options" -- bash job.sh
     python -I tools/heavy.py --shared 4,2 "#707 pictures" -- bash shots.sh   # beside other counts and builds (#728)
     python -I tools/heavy.py --expect 20m "#812 trace" -- python -P -E trace.py   # its expected time (#815)
-    python -I tools/heavy.py --day --expect 2h "#800 places" -- bash all.sh   # long, by day, on the user's word (#851)
+    python -I tools/heavy.py --day --expect 2h "#800 places" -- bash all.sh   # long, by day, on the maintainer's word (#851)
     python -I tools/heavy.py --stop PID      # asks a job of this checkout to end, with all it started
     python -I tools/heavy.py --history       # the finished jobs' times per kind: the time rule's calibration
-    python -I tools/heavy.py --night         # the night from now until 07:00, on the user's word (#851); --night off
+    python -I tools/heavy.py --night         # the night from now until 07:00, on the maintainer's word (#851); --night off
 
 A timing needs the machine to itself: the plain form, which waits for every other job and holds them. --shared GB,CORES
 is for a command whose result does not depend on what runs beside it (pictures, counts, a build): its peak memory and
@@ -28,10 +28,10 @@ the median of the same command's last runs. --no-limit keeps the warnings and en
 on. --stop PID ends a job that lost its owner (a stopped background task whose command outlived it); a job of another
 checkout only with --force.
 
-By day (07:00-23:00) a job expected over 30 min, or whose time is not known, waits for the night (#851; the user,
-2026-11-24): it stands ahead of no other job meanwhile, and the board shows it held. --day (or TRAM_HEAVY_DAY=1 for a
-tool that takes its own turn) runs it by day, on the user's word only. A waiting job of 10 min or less goes before
-longer ones queued earlier, but not before one that has waited 2 h. --night starts the night now, on the user's word
+By day (07:00-23:00) a job expected over 30 min, or whose time is not known, waits for the night (#851): it
+stands ahead of no other job meanwhile, and the board shows it held. --day (or TRAM_HEAVY_DAY=1 for a tool that takes
+its own turn) runs it by day, on the maintainer's word only. A waiting job of 10 min or less goes before longer ones
+queued earlier, but not before one that has waited 2 h. --night starts the night now, on the maintainer's word
 only (a machine left free by day): the held jobs take their turns as at 23:00, after the jobs running now, until 07:00
 or --night off.
 """
@@ -179,7 +179,7 @@ def show_history(out=sys.stdout):
 
 
 def night(off=False, out=sys.stderr):
-    """--night: the night from now until the morning, on the user's word (#851); --night off ends it."""
+    """--night: the night from now until the morning, on the maintainer's word (#851); --night off ends it."""
     import baseline_store as b
     if off:
         print("heavy.py: the early night ended" if b.end_night() else "heavy.py: no early night to end", file=out)

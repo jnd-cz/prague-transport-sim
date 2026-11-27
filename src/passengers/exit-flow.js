@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), dist/traffic/exit-flow.js, as it was (sha256 776c708cc81c7d75);
-// accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
+// accepted by the maintainer as good enough for now (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
 // #249: changed: the alighting pace an option (PACE, the lab's values by default: the lab's times hold).
 // #249 step 2: changed: an alighter already on the steps when the door closes finishes the way out (the lab froze them there).
 // #249 (2026-11-26, Dveře I): changed: drop (exits not yet set off taken from their door's plans, for another door).
@@ -10,8 +10,7 @@ import {createCabinNavigator,pointPolygonDistance} from './cabin-navigation.js';
 // (#249: the alighting pace as an option, PACE the lab's values: walk m/s, foot s a transfer down the steps, gap and stairGap m
 // between centres, laneSteps the least planner steps between a lane's stair entries)
 export const PACE={walk:.95,foot:.64,gap:.64,stairGap:.74,laneSteps:30};
-// The game's alighting pace (#249; the user, 2026-11-25: "going out from tram shoul be always faster than filling it to full
-// capacity"): down the steps a foot in 0.44 s (up, boarding: the lab's 0.64), a brisk 1.2 m/s, 0.52 m between the centres of
+// The game's alighting pace (#249: getting out always faster than filling the car to full capacity): down the steps a foot in 0.44 s (up, boarding: the lab's 0.64), a brisk 1.2 m/s, 0.52 m between the centres of
 // two alighters of a door (the body outline is 0.558 m wide with the arms: side by side they brush shoulders, as a crowd
 // squeezing out; boarders keep their distance only to the one ahead in their own stream), 0.64 m on one stream's steps, a
 // lane's stair entries 1 s apart. On the game's T3, a full car empties before it fills on every packing: 105 (16 headings on

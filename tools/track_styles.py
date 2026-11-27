@@ -1,39 +1,36 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The line's track styles, built offline (#276 step 2, #479): one implementation of the user's marks and the survey's
+"""The line's track styles, built offline (#276 step 2, #479): one implementation of the maintainer's marks and the survey's
 grass track, read by the page (src/heights.js) and the height import (tools/track_decks.py).
 
     python -P -E tools/track_styles.py --line 22     # writes `styles` into data/line22.json
 
-- **The user's marks** (data/truth.json `trackStyles`, by stops so they hold in any frame): from the first stop of the
+- **The maintainer's marks** (data/truth.json `trackStyles`, by stops so they hold in any frame): from the first stop of the
   mark's `from` name to the next stop of its `to` name; a mark with `between` runs between its two ends, each a lat,
   lon point (the route position nearest it) or a stop name (that stop nearest the point end).
 - **The grassed-track list** (data/truth.json `grassTrack`, prazsketramvaje.cz): every line passing both stops of a
-  stretch takes it, each time it passes them (an out-and-back line twice). Where the user's marks cover the track they
+  stretch takes it, each time it passes them (an out-and-back line twice). Where the maintainer's marks cover the track they
   win, and what is left of a stretch stays if MIN_GRASS long.
 - **The survey's grass track:** a `green` area under the track axis (the survey's ground-level area at the route,
   data/lineN.dtm.json) for MIN_GRASS metres and more, read every SAMPLE m, runs less than JOIN m apart one section.
-  The facts (the user's marks, the list) win where they overlap (line 22 Koh-i-noor - Slavia, whose bank fell 0.5 m
+  The facts (the maintainer's marks, the list) win where they overlap (line 22 Koh-i-noor - Slavia, whose bank fell 0.5 m
   across the rails).
 
-- **The answered review** (data/truth.json `grassReview`, tools/grass_review.py): OSM's grass the user confirmed,
-  between the card's two points; as strong as the user's marks.
-- **The holes** (#503; the user, 2026-11-12: "the green cover is not placed around stop platforms on either side and
-  road, pedestrian crossings, junctions. Open ballast can be nect to stops but elso end before road and pedestrian
-  crossings"): grass and ballast stop at streets, paths and footways crossing at street level and OSM's crossing
-  nodes; grass also at the platforms beside either track. Not at switches and diamonds (open ballast runs through
-  them; one in a street lies in its hole). HOLE metres past each, measured on
-  OSM's grass areas inside the known spans (tools/grass_review.py prints how near). A street across the track is an
-  `embedded` section; pieces under MIN_PIECE between two holes are left out.
+- **The answered review** (data/truth.json `grassReview`, tools/grass_review.py): OSM's grass the maintainer confirmed,
+  between the card's two points; as strong as the maintainer's marks.
+- **The holes** (#503, maintainer; open ballast may run beside stops): grass and ballast stop at streets, paths and
+  footways crossing at street level and OSM's crossing nodes; grass also at the platforms beside either track. Not at
+  switches and diamonds (open ballast runs through them; one in a street lies in its hole). HOLE metres past each,
+  measured on OSM's grass areas inside the known spans (tools/grass_review.py prints how near). A street across the
+  track is an `embedded` section; pieces under MIN_PIECE between two holes are left out.
 
-- **Junctions and road crossings** (#546; the user, 2026-11-13: "the track styles don't switch at the
-  expected places like in junctions (expected embedded asphalt color) and crossing roadway across track isn't
-  displayed in full width"): where no section says otherwise, the track is `embedded` over a carriageway crossing it
+- **Junctions and road crossings** (#546, maintainer: embedded asphalt at junctions, a carriageway across the track
+  in its full width): where no section says otherwise, the track is `embedded` over a carriageway crossing it
   (the survey's carriageway at our axis through the crossing point, CROSS_REACH m past OSM's width at most, else
   OSM's width at its angle; a way without OSM's car flag counts where the survey has carriageway at the crossing
   point, a service road at Řepy), a switch (SWITCH_PAD m before it to SWITCH_PAD past its frog) and a diamond (a drawn
   track crossing ours at DIAMOND_MIN° or more, where the two beds overlap). Pieces less than MIN_PIECE apart join.
-  Grass yields to them too (the user, 2026-11-13: "for the roads crossing tracks and junctions I would default to
-  embedded asphalt style"); open ballast keeps its switches (#503) and the user's marks of another style win. The
+  Grass yields to them too (embedded asphalt by default at road crossings and junctions; maintainer, 2026-11-13); open
+  ballast keeps its switches (#503) and the maintainer's marks of another style win. The
   survey's carriageway is read at crossing
   points only: along the route its road areas run over grass track it does not map (line 22 at Pohořelec). Embedded
   and panels stand the same height over the bed (`railAboveDeck`), so this moves no height.
@@ -45,7 +42,7 @@ grass track, read by the page (src/heights.js) and the height import (tools/trac
   they get no grass where neither has it.
 
 `styles` is a list of {s0, s1, style, source, mark | stretch | card | hole}, by s0: `source` 'user', 'review', 'list',
-'survey' or 'hole'; `mark` is the index of the user's mark in truth.json `trackStyles`, `stretch` the index in
+'survey' or 'hole'; `mark` is the index of the maintainer's mark in truth.json `trackStyles`, `stretch` the index in
 `grassTrack.stretches`, `card` the review card's id. How high the rails stand over each style is a fact in truth.json (`railAboveDeck`), which the
 page reads with the sections. Where ground-level areas overlap at a point, the higher rank counts. The page picked the
 one whose surface lay nearest the lidar ground, then the rank (src/terrain.js DtmSurface._hitTri): on all five lines
@@ -83,7 +80,7 @@ BED = 2.7              # m: a bed's width (src/world.js), the extent a diamond c
 PAVED_IN = ("embedded", "setts")   # the styles a junction's pieces join across (#574: setts as embedded)
 SURFACE_STYLE = {"setts": "setts", "embedded": "embedded", "panels": "panels", "grass": "grass"}  # answer -> style
 STYLE_MATCH = 0.9      # of an answer's stretch the styles laid without the answers give its style, for it to match (#670)
-DATA_SECTIONS = ("survey", "lidar", "list")  # the sections a source lays (not a rule's, nor the user's marks or answers)
+DATA_SECTIONS = ("survey", "lidar", "list")  # the sections a source lays (not a rule's, nor the maintainer's marks or answers)
 CROSS_REACH = 6        # m past OSM's carriageway half-width that the survey's road at the axis may still extend it
 BRIDGE_HEAD = 6        # m inside a bridge's ends (OSM's) where a way across still meets the track at grade (on_bridge)
 CARRIAGEWAY = ("road", "parking")   # survey classes of a carriageway
@@ -91,7 +88,7 @@ NEAR_ROUTE = 6         # m: a drawn track this near our route takes the route's 
 BRANCH = 15            # m of a track along where another one leaves it, or it leaves another: the switch
 RAMP, LIFT_STEP = 15, 2  # m: a style's offset blends in over RAMP inside its section; `lift` every LIFT_STEP m
 # Another track's open ballast where IPR reads it (#548): the rails over IPR's ground at the axis, their running median
-# over BALLAST_WIN m, BALLAST_BAND for BALLAST_RUN m or more. On the five lines' route, whose styles are the user's
+# over BALLAST_WIN m, BALLAST_BAND for BALLAST_RUN m or more. On the five lines' route, whose styles are the maintainer's
 # marks, the grassed-track list and the survey, that calls 92 % of the 33.7 km of ballast (its rails 0.16-0.21 m over
 # IPR, the middle half), 3 % of the 86 km of panels, 2 % of the 28 km of embedded track and none of the setts
 BALLAST_BAND = (0.12, 0.35)
@@ -142,7 +139,7 @@ class Survey:
     def carriageway(self, x, y):
         """Only a carriageway at the point: a road or parking area and no track or green area over it. Read where a way
         crosses the route, not along it: the survey's road areas run over grass track it does not map (line 22 at
-        Pohořelec, 522 m of the user's grass with no green or tram area within 4 m of the axis)."""
+        Pohořelec, 522 m of the maintainer's grass with no green or tram area within 4 m of the axis)."""
         c = self.classes_at(x, y)
         return bool(c & set(CARRIAGEWAY)) and not c & {"tram", "green", "rail"}
 
@@ -228,9 +225,8 @@ def holes(data, survey=None):
                 out.append({"s0": c - half - HOLE[kind], "s1": c + half + HOLE[kind], "kind": kind, "grass": False})
     for s in data.get("crossings", []):   # (OSM's crossing nodes on the track)
         out.append({"s0": s - HOLE["node"], "s1": s + HOLE["node"], "kind": "footway", "grass": False})
-    # (no holes at switches and diamonds: the user, 2026-11-12, #503: "I wouldn't make holes for switches and
-    # diamonds, the branch to depo hostivař loop has open ballast including switches. They are covered if they lie
-    # on paved surface", which the streets' holes already are)
+    # (no holes at switches and diamonds (maintainer, #503): the branch to the Depo Hostivař loop has open ballast
+    # through its switches; they are covered where they lie on a paved surface, which the streets' holes already are)
     return sorted(out, key=lambda h: h["s0"])
 
 
@@ -279,9 +275,8 @@ def on_bridge(data):
 
 
 def junctions(data, survey):
-    """Where paved track is embedded (#546; the user, 2026-11-13: "the track styles don't switch at the expected places
-    like in junctions (expected embedded asphalt color) and crossing roadway across track isn't displayed in full
-    width"): [{s0, s1, kind}].
+    """Where paved track is embedded (#546, maintainer: embedded asphalt at junctions, a carriageway across the track in
+    its full width): [{s0, s1, kind}].
     - a road crossing: a car road of OSM's, or another way (a service road; not a footway) where the survey has
       carriageway at the crossing point (line 9 s 360, Řepy). Over the survey's carriageway at our axis around it (its
       run through the crossing point, within CROSS_REACH m past OSM's half-width), else OSM's width at its angle;
@@ -328,8 +323,8 @@ def junctions(data, survey):
 
 
 def track_sections(data, survey):
-    """Every drawn track's own style sections beyond our route (#546; the user, 2026-11-13, on the tracks that branch
-    off and run elsewhere: they "don't have consistent styles"): {track index: [[s0, s1, style], ...]}, s along the
+    """Every drawn track's own style sections beyond our route (#546, maintainer: the tracks that branch off and run
+    elsewhere had no consistent styles): {track index: [[s0, s1, style], ...]}, s along the
     track's `p`. Grass where the survey's green lies under the track (MIN_GRASS m or more, gaps under JOIN m joined),
     embedded over a carriageway crossing it, a diamond (another track or our route crossing it at DIAMOND_MIN° or more)
     and a switch (BRANCH m from where another track's end meets it, or it ends on another), panels elsewhere (no
@@ -468,13 +463,13 @@ def own_lifts(data, off):
 
 
 def embed(secs, js):
-    """Embedded over the junctions `js`, whatever the section there, but open ballast (the user, #503: "the branch to
-    depo hostivař loop has open ballast including switches") and the user's own marks of another style than grass.
-    Grass yields to them (the user, 2026-11-13: "for the roads crossing tracks and junctions I would default to
-    embedded asphalt style which will be also easier to judge if the transition happens at the correct place").
-    Embedded pieces less than MIN_PIECE apart join over the panels between."""
-    # (an answered asphalt stretch yields to a junction inside it: the junction is one surface from fork to fork, the
-    # user 2026-11-14, #574, and the card's ends are OSM's surface changes, metres off)
+    """Embedded over the junctions `js`, whatever the section there, but open ballast (maintainer, #503: the branch to the
+    Depo Hostivař loop has open ballast through its switches) and the maintainer's own marks of another style than
+    grass. Grass yields to them (maintainer, 2026-11-13: embedded asphalt by default at road crossings and junctions,
+    which also makes it easier to judge whether the change happens at the right place). Embedded pieces less than
+    MIN_PIECE apart join over the panels between."""
+    # (an answered asphalt stretch yields to a junction inside it: the junction is one surface from fork to fork,
+    # maintainer, #574, and the card's ends are OSM's surface changes, metres off)
     yields = lambda x: x.get("source") == "surface" and x["style"] == "embedded"  # noqa: E731
     wins = [x for x in secs if not yields(x) and (x["style"] in ("ballast", "embedded", "setts")
             or (x["source"] in ("user", "surface") and x["style"] != "grass"))]
@@ -533,7 +528,7 @@ def cut(secs, hs):
 
 
 def reviewed(data, truth):
-    """The user's answers to the OSM grass review (truth.json `grassReview`, tools/grass_review.py): grass between
+    """The maintainer's answers to the OSM grass review (truth.json `grassReview`, tools/grass_review.py): grass between
     the card's two points on every line it lists."""
     path = LineString([p[:2] for p in data["path"]])
     out = []
@@ -549,10 +544,10 @@ def reviewed(data, truth):
 
 
 def answer_states(data, truth, survey, opens=()):
-    """The user's grass and surface answers this line lays (grassReview `grass`, trackSurfaceReview's styles) against
+    """The maintainer's grass and surface answers this line lays (grassReview `grass`, trackSurfaceReview's styles) against
     the styles laid without them: matches where a source's sections (DATA_SECTIONS: the survey, the lidar, the grassed-
     track list) give the answer's style over STYLE_MATCH of its stretch (a junction answer: of its place), else holds,
-    with what lays it there most (a rule's or the user's own count for `by`, not for a match) (#670). {truth.json
+    with what lays it there most (a rule's or the maintainer's own count for `by`, not for a match) (#670). {truth.json
     section: [state entry]}."""
     # (the two sections without their answers over the rest, not a copy of it: the step cache keys this step by the
     # sections of truth.json it reads, and a copy reads every one, #816)
@@ -577,15 +572,15 @@ def answer_states(data, truth, survey, opens=()):
 
 def sections(data, truth, survey, opens=(), track="ours"):
     """The style sections along the route, by s0, with their holes (src/heights.js trackStyles until #479), the
-    paved track embedded at junctions and road crossings (#546), and the junctions the user's surface answers lay in
+    paved track embedded at junctions and road crossings (#546), and the junctions the maintainer's surface answers lay in
     setts (#574). `opens`: the lidar's runs of open ballast (tools/open_track.py `found`, #591). `track`: ours, or
-    back for the other direction's track beside the route (#584), by route s: the user's marks for that track."""
+    back for the other direction's track beside the route (#584), by route s: the maintainer's marks for that track."""
     return setts_junctions(embed(cut(spans(data, truth, survey, opens, track), holes(data, survey)),
                                  junctions(data, survey)), data, truth)
 
 
 def surface_places(data, truth):
-    """The user's answers to the track surface review (truth.json `trackSurfaceReview`, tools/surface_review.py, #574)
+    """The maintainer's answers to the track surface review (truth.json `trackSurfaceReview`, tools/surface_review.py, #574)
     that lie on this line's route, whichever line's card asked: [(s0, s1, what, answer, id)]. A place both of whose
     ends lie within 15 m of the route."""
     path = LineString([p[:2] for p in data["path"]])
@@ -602,16 +597,16 @@ def surface_places(data, truth):
 
 
 def surfaced(data, truth):
-    """The answered stretches as sections: the style the user gave between the card's two points (as strong as the
-    user's marks)."""
+    """The answered stretches as sections: the style the maintainer gave between the card's two points (as strong
+    as the maintainer's marks)."""
     return [{"s0": s0, "s1": s1, "style": st, "source": "surface", "card": i}
             for s0, s1, what, st, i in surface_places(data, truth) if what == "stretch"]
 
 
 def setts_junctions(secs, data, truth):
-    """A junction the user answered setts is setts over its whole junction section, from the switches' forks to the
-    others' (the user, 2026-11-14, #574: "sett style inside a junction usually means the whole track junction from
-    switch fork to the other switch forks is covered by setts, this is for easy repairs and replacements"); so is a
+    """A junction the maintainer answered setts is setts over its whole junction section, from the switches' forks to
+    the others' (maintainer, #574: setts in a junction usually cover the whole junction from fork to fork, for easy
+    repairs and replacements); so is a
     junction section that touches a setts stretch. #546's junction sections already run from SWITCH_PAD before the
     first switch to past the last frog, its pieces less than MIN_PIECE apart joined."""
     places = surface_places(data, truth)
@@ -691,7 +686,7 @@ def spans(data, truth, survey, opens=(), track="ours"):
                 start = None
             s += SAMPLE
     # The lidar's open ballast (tools/open_track.py, #591) where nothing above says what the track is: the sure runs,
-    # pieces of MIN_GRASS m and more; a place the user answered on its card decides there (truth.json openTrackReview).
+    # pieces of MIN_GRASS m and more; a place the maintainer answered on its card decides there (truth.json openTrackReview).
     have = facts + found
     ans = open_answers(data, truth)
     lid = []
@@ -704,7 +699,7 @@ def spans(data, truth, survey, opens=(), track="ours"):
 
 
 def open_answers(data, truth):
-    """The user's answers to the open track review (truth.json `openTrackReview`, tools/open_track.py --cards, #591)
+    """The maintainer's answers to the open track review (truth.json `openTrackReview`, tools/open_track.py --cards, #591)
     on this line's route: the style between the card's two points (`paved` leaves the track to the rules)."""
     path = LineString([p[:2] for p in data["path"]])
     out = []

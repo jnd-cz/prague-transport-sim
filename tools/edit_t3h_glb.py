@@ -6,7 +6,7 @@
 Rewrites the JSON chunk and appends to the binary buffer; nothing already in the file moves:
 - the track-brake shoes and the coupler bars get names (`Track_Brake_Shoe_Front_Left`, `Coupler_Front`, ...);
 - two empty nodes, `Headlight_Left` and `Headlight_Right`, mark the headlights' centres;
-- the tail lamps the model lacked (the user, 2026-11-10, #436: on the rear panel 0.47 m either side) become lamp groups
+- the tail lamps the model lacked (maintainer, #436: on the rear panel 0.47 m either side) become lamp groups
   `Tail_left` and `Tail_right`, each a lens and a glow as the brake lamps (their materials);
 - the saloon's parts, as the loader picked them by material and box until now, go under one `Saloon` node: those in the
   body; the box also caught the brake lamps' lenses and the side cards' backs, outside it, which stay where they are.

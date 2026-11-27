@@ -1,5 +1,5 @@
 {
-  "source": "Hybrid revision 5 bindings from PR #469 and issue #471. Tail lamp placement and fleet digit height come from the user's decisions in #436 and #471. Since #525 every part is named in the model (tools/edit_t3h_glb.py): no coordinates here.",
+  "source": "Hybrid revision 5 bindings from PR #469 and issue #471. Tail lamp placement and fleet digit height come from the maintainer's decisions in #436 and #471. Since #525 every part is named in the model (tools/edit_t3h_glb.py): no coordinates here.",
   "rigRevision": 2,
   "forward": "+X",
   "up": "+Y",

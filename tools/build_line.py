@@ -842,7 +842,7 @@ def main():
     print(f"facing switches on route: {len(switches)}")
     trackwork = geo.trackwork(route_m, route_ends, path.at)    # (the speeds of D 1/2 § 25.4-5, src/speedRules.js)
     print(f"trailing switches on route: {len(trackwork['trailing'])}, crossings: {len(trackwork['crossings'])}")
-    # turning loops on DI's network by the user's rule, where the route follows one (tools/track_loops.py, loop-speed)
+    # turning loops on DI's network by the maintainer's rule, where the route follows one (tools/track_loops.py, loop-speed)
     import track_loops
     trackwork["loops"] = track_loops.on_route(route_m.pieces, route_ends, track_loops.find(net))
     print(f"loops on route: {trackwork['loops']}")
@@ -979,19 +979,19 @@ def main():
         stops.append({"name": r["stop_name"], "s": round(s, 1), "off": round(d, 1),
                       "side": "left" if side > 0 else "right", "request": flags.get(sid, False), "lines": lines})
         s_last = s
-    # The stop sign (označník): the tram front stops beside it (D 1/2 § 27.6, #258). The user's placed sign
+    # The stop sign (označník): the tram front stops beside it (D 1/2 § 27.6, #258). The maintainer's placed sign
     # (data/truth.json stopSigns, keyed by the stop and the next one, or the previous one at a last stop), else
     # the archive DTM's sign beside our track (raw/dtmpoints/lineN.signs.json, tools/dtm_points.py --signs:
-    # within 2 m of 22 of the user's 23 placed signs, median 0.4 m; the one miss, Výstaviště, is a street rebuilt
+    # within 2 m of 22 of the maintainer's 23 placed signs, median 0.4 m; the one miss, Výstaviště, is a street rebuilt
     # since 2024), else OSM's stop position on our own track (the other direction's lies 3-6 m off, on the
     # parallel track, and was taken at 5 stops within 6 m: tools/stop_signs_review.py; within 2 m of 14 of 25),
     # else none (the game: GTFS + STOP_AHEAD).
-    # Where the sign's point is its pole on the platform (the user's placed sign, a DTM sign: stop_signs_review.pole),
+    # Where the sign's point is its pole on the platform (the maintainer's placed sign, a DTM sign: stop_signs_review.pole),
     # the stop keeps its offset from the track too (`signOff`, + left), and the game stands the sign there; nearer the
     # track's centre than POLE_CLEAR it would stand in the tram's way, and on the left of travel it is another track's
-    # (a T3's doors are on the right): those keep the game's fixed place (#685: the user, 2026-11-18, "the stop sign
-    # placement to the actual place on the platform (where it's available, not decided by point on a track)"; at
-    # Královka, the one pole on the left, "now on the wrong track ... the DTM data being correct on the middle track").
+    # (a T3's doors are on the right): those keep the game's fixed place (#685: the sign stands at its actual place on
+    # the platform where a source gives it, not at a point on the track; at Královka, the one pole on the left, the
+    # DTM's sign is right but belongs to the middle track).
     poles, at_track, other_side = [], [], []
 
     def pole_at(st_, d, side):
@@ -1029,7 +1029,7 @@ def main():
             s, d, side = path.project(q, ref - 45, ref + 45, radius=3)
             if s is not None and d < 6 and side < 0 and abs(s - ref) < 40:
                 near.append((abs(s - ref), s, tuple(q), d, side))
-        # the sign the sources give: the build's without the user's (the fact's state, #670)
+        # the sign the sources give: the build's without the maintainer's (the fact's state, #670)
         chain = ("dtmpoints", *min(near)[2]) if near else ("osm", *min(cand)[2]) if cand else None
         if f:
             s, d, side = path.project((f["x"], f["y"]), st_["s"] - 150, st_["s"] + 150, radius=3)
@@ -1079,8 +1079,8 @@ def main():
             if best is None or score < best[0]:
                 best = (score, s0, s1)
         if best:
-            # (the platform reaches the sign at least: OSM's Malostranské náměstí is 7 m too short, the user
-            # 2026-11-05: "malostranské náměstí on osm maps is too short")
+            # (the platform reaches the sign at least: OSM's Malostranské náměstí is 7 m too short, maintainer,
+            # 2026-11-05)
             st_["p0"], st_["p1"] = round(best[1], 1), round(max(best[2], st_.get("sign", best[2])), 1)
     with_p = [st_ for st_ in stops if "p0" in st_]
     if with_p:
