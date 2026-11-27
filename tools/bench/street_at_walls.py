@@ -93,22 +93,28 @@ def measure(D, V, F, P, box=None):
     pp, ww, aa = (np.array(v) for v in zip(*pairs))
     e = W[ww, 1, :2] - W[ww, 0, :2]
     n = np.column_stack([-e[:, 1], e[:, 0]]) / np.maximum(np.hypot(e[:, 0], e[:, 1]), 1e-9)[:, None]
-    q, ok = np.zeros((len(pp), 2)), np.zeros(len(pp), bool)
-    for s in (1.0, -1.0):  # (into the area: the side of the edge it lies on)
-        c = P[pp, :2] + s * n * IN
-        hit = ~ok & np.array([shapely.contains_xy(poly[a], x, y) for a, (x, y) in zip(aa.tolist(), c.tolist())], bool)
-        q[hit], ok[hit] = c[hit], True
-    pp, ww, aa, q = pp[ok], ww[ok], aa[ok], q[ok]
-    zin = gm.mesh_at(V, F, q[:, 0], q[:, 1])
     key = np.round(P[:, 0] * 1000).astype(np.int64) * 10_000_000_000 + np.round(P[:, 1] * 1000).astype(np.int64)
     _, inv = np.unique(key, return_inverse=True)
+    inv = inv.ravel()
     heights = collections.defaultdict(list)
-    for i, g in enumerate(inv.ravel().tolist()):
+    for i, g in enumerate(inv.tolist()):
         heights[g].append(P[i, 2])
 
     def nearest(p, z0):
         return min(abs(z - z0) for z in heights[inv[p]])
-    off = np.array([nearest(p, zi) if np.isfinite(zi) else np.nan for p, zi in zip(pp.tolist(), zin.tolist())])
+    # (into the area on each side of the edge it lies on: an area on both sides of a wall standing in it, two levels
+    # of one sidewalk, is read on the side nearer the corner; by Modřany's wall 7821, line 17 (-2455, -8516), the low
+    # side's corners were read against the high side's ground, 1.9 m)
+    off, zin = np.full(len(pp), np.nan), np.full(len(pp), np.nan)
+    for s in (1.0, -1.0):
+        c = P[pp, :2] + s * n * IN
+        hit = np.array([shapely.contains_xy(poly[a], x, y) for a, (x, y) in zip(aa.tolist(), c.tolist())], bool)
+        z = np.full(len(pp), np.nan)
+        if hit.any():
+            z[hit] = gm.mesh_at(V, F, c[hit, 0], c[hit, 1])
+        d = np.array([nearest(p, zi) if np.isfinite(zi) else np.nan for p, zi in zip(pp.tolist(), z.tolist())])
+        better = np.isfinite(d) & ~(d >= off)
+        off[better], zin[better] = d[better], z[better]
     # (at its own area's outline height there: no defect)
     qs, qi, zo = at_edges(S, P[pp, 0], P[pp, 1])
     mine = sid[qi] == aa[qs]

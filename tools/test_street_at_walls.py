@@ -54,6 +54,25 @@ class AtWalls(unittest.TestCase):
         V, F, P = street(low=196.0)
         self.assertEqual([r for r in saw.measure(D, V, F, P)[0] if r["off"] > saw.OFF], [])
 
+    def test_an_area_on_both_sides_of_a_wall_is_read_on_the_corners_side(self):
+        # (Modřany's wall 7821, line 17 (-2455, -8516): one sidewalk on both sides of a low wall 0.3 m thick standing in
+        # it, its south part at 196 m, its north part at 200 m; each side's corners at their side's level. 0.5 m in from
+        # the south edge lies past the wall, on the north part)
+        xs = [0.0, 4.0, 5.0, 6.0, 10.0]
+        rows_ = [(-5.0, 196.0), (-3.0, 196.0), (-0.2, 196.0), (0.0, 196.0), (0.3, 200.0), (1.2, 200.0), (3.0, 200.0), (5.0, 200.0)]
+        P = np.array([[x, y, z] for y, z in rows_ for x in xs], float)
+        F = []
+        for j in (0, 1, 2, 4, 5, 6):  # (the two parts' rows, nothing over the wall)
+            for i in range(len(xs) - 1):
+                a, b, c, d = j * len(xs) + i, j * len(xs) + i + 1, (j + 1) * len(xs) + i + 1, (j + 1) * len(xs) + i
+                F += [[a, b, c], [a, c, d]]
+        wall = {"c": "wall", "l": 0, "r": [[0, 0, 196.0], [10, 0, 196.0], [10, 0.3, 200.0], [0, 0.3, 200.0]]}
+        walk = {"c": "sidewalk", "l": 0, "r": [[-1, -5, 196.0], [11, -5, 196.0], [11, 5, 200.0], [-1, 5, 200.0]],
+                "h": [[[0, 0, 200.0], [0, 0.3, 200.0], [10, 0.3, 200.0], [10, 0, 200.0]]]}  # (the hole at the top's height, as shared lines are)
+        rows, n = saw.measure({"areas": [wall, walk]}, np.round(P * 1000).astype(np.int64), np.array(F), P)
+        self.assertEqual(n, 10)
+        self.assertEqual([r for r in rows if r["off"] > saw.OFF], [])
+
     def test_a_street_at_the_foot_whose_outline_has_the_top_is_none(self):
         # (Hořejší nábřeží: the street at the wall's foot, its outline and the wall's at the top's height)
         D = {"areas": [rect("wall", 0, 0, 10, 1, 193.8), rect("sidewalk", 0, 1, 10, 5, 193.8)]}
