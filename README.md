@@ -358,4 +358,7 @@ Kód a vlastní modely projektu (vestavěná tramvaj, chodci): GNU AGPL v3 ([LIC
 Data © přispěvatelé OpenStreetMap (ODbL); jízdní řád PID GTFS, data.pid.cz (CC BY 4.0);
 terén ČÚZK DMR 5G (CC BY 4.0); 3D budovy, opěrné zdi a stromy: datový podklad © IPR Praha (CC BY 4.0).
 
+U připravovaných modelů pražských přístřešků, laviček a košů uvádíme jako autory designu
+**studio Olgoj Chorchoj, spolupráce Aleš Boem**. **Datový podklad © IPR Praha**.
+
 <!-- /help -->
