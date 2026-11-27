@@ -883,8 +883,13 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   its own outline's height as right), so a rule is judged on places' sections, not on it alone. What was off:
   - *A deck's edge took a stair well's rim*: #824's 1.5 m round any level-1 area reached round a cover over a
     passage and put the rim of the stairs' well beside it on the raster's well, line 37 (9264.8, 957.8), 3.4 m down;
-    the edge is a survey `deck`'s alone (`ground_mesh.under_decks`). Place `stairs-well-beside-a-cover`: the largest
-    step along the rim 2.33 → 0.31 m.
+    a corner on a level-0 stairs' outline is under no edge, the stairs' rules hold it (`ground_mesh.under_decks`).
+    Place `stairs-well-beside-a-cover`: the largest step along the rim 2.33 → 0.31 m. The edge stays round every
+    other level-1 area: kept to a survey `deck`'s alone, the portals of passages under covers stood 2.4-3.7 m over
+    their floors (Národní divadlo, line 9 (-623.0, -570.9), 190.9 m over 188.25; U Kina, line 17 (-2510, -9057)),
+    where the street surface runs smoothly from the cover down to the floor. Of the walls and structures rules' 25
+    places 22 are the same as main's build; at Letná (276.8, 796.0) and above Mánes's bridgehead (-567.5, -49.7) a
+    stairs' foot no longer drops into the raster 1.9-5 m under the stairs.
   - Tried and not taken: a corner on a wall's or stairs' outline at its own area's outline height where its street
     2 m in (past the smear) agrees within 0.3 m (`own_side` reads 0.75 m out, inside a tall wall's smear). The count
     fell (line 22 (-2197, 767) 20 → 0, line 17 (-1666, -9080) 13 → 0), but the sections along those two roads grew

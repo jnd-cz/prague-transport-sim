@@ -1077,32 +1077,45 @@ def off_the_deck(z, zl):
     return np.where(low, zl, z), low
 
 
-DECK_EDGE = 1.5  # m round a survey deck: still under its edge (under_decks; a wall's hold, wall_lines.HOLD)
+DECK_EDGE = 1.5  # m round a deck that is not ours: still under its edge (under_decks; a wall's hold, wall_lines.HOLD)
 
 
 def under_decks(D, box, x, y):
     """Which points (x, y) in a box (shapely) lie under one of survey D's areas of level 1 and above but a roof, or
-    within DECK_EDGE of one of its decks (`deck`): the deck of a bridge, ours or not (off_the_deck). A level-0 street's
-    outline climbs into such a deck as it does into ours: Slánská's road under the road bridge, line 9 (-8260, -1375),
-    area 8529, from 337.3 to 349.6 m, a hump of faces 2-6 m tall (#824). The street surface reads the deck's level up
-    to its edge, where the parapet's wall line held the ground at its low side until a parapet over open ground made no
-    stretch (wall_lines.over_open_ground): at the Slánská deck's south-west corner, (-8276.9, -1440.7), the street
-    stood 3.8 m over the raster 0.5 m outside the deck.
-    The edge is a deck's alone: round a level-1 street over a passage (a cover, covers.py) it took the rim of the
-    stairs' well beside it, line 37 (9264.8, 957.8), the sidewalk at 239.4 m on its stairs' outline, down to the
-    raster's well, 236.0 m: a notch 3.4 m deep in the rim (#653)."""
-    up, decks = [], []
+    within DECK_EDGE of one: the deck of a bridge, ours or not (off_the_deck). A level-0 street's outline climbs into
+    such a deck as it does into ours: Slánská's road under the road bridge, line 9 (-8260, -1375), area 8529, from
+    337.3 to 349.6 m, a hump of faces 2-6 m tall (#824). The street surface reads the deck's level up to its edge,
+    where the parapet's wall line held the ground at its low side until a parapet over open ground made no stretch
+    (wall_lines.over_open_ground): at the Slánská deck's south-west corner, (-8276.9, -1440.7), the street stood 3.8 m
+    over the raster 0.5 m outside the deck. And at a passage's portal under a cover (covers.py), where the street
+    surface runs smoothly from the cover down to the floor: Národní divadlo, line 9 (-623.0, -570.9), 190.9 m over the
+    floor's 188.25 without the edge.
+    A point on a level-0 stairs' outline is under the edge of none: the raster there reads the stairs' well, and the
+    edge took the rim of the stairs down to the underpass beside a cover, line 37 (9264.8, 957.8), the sidewalk at
+    239.4 m, down to the well, 236.0 m: a notch 3.4 m deep (#653). The stairs' rules hold such a corner."""
+    up = []
     for a in D["areas"]:
         if a.get("l", 0) >= 1 and a.get("c") != "roof" and len(a.get("r") or []) >= 3:
             g = shapely.Polygon([q[:2] for q in a["r"]])
             g = g if g.is_valid else shapely.make_valid(g)
             if g.intersects(box.buffer(DECK_EDGE)):
-                (decks if a.get("c") == "deck" else up).append(g)
-    if not up and not decks:
+                up.append(g)
+    if not up:
         return np.zeros(np.shape(x), bool)
-    g = shapely.union_all(up + [d.buffer(DECK_EDGE) for d in decks])
+    g = shapely.union_all(up)
     shapely.prepare(g)
-    return shapely.contains_xy(g, x, y)
+    edge = g.buffer(DECK_EDGE)
+    shapely.prepare(edge)
+    out = shapely.contains_xy(g, x, y)
+    near = ~out & shapely.contains_xy(edge, x, y)
+    if near.any():
+        rims = [shapely.LineString([q[:2] for q in a["r"]] + [a["r"][0][:2]]) for a in D["areas"]
+                if a.get("c") == "stairs" and a.get("l", 0) == 0 and len(a.get("r") or []) >= 3]
+        rims = [r for r in rims if r.intersects(edge)]
+        if rims:
+            k = np.flatnonzero(near)
+            near[k] = ~shapely.dwithin(shapely.union_all(rims), shapely.points(np.asarray(x)[k], np.asarray(y)[k]), WALL_ON)
+    return out | near
 
 
 def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):

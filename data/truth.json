@@ -6943,7 +6943,7 @@
    ],
    "reach": 15,
    "issue": 653,
-   "what": "the rim of the stairs (area 4863) down to a pedestrian underpass beside the street over it on line 37 (50.10719, 14.54781), the street a level-1 cover since #824: the sidewalk's (area 4668) corners on the rim at s 20.4-21.2 m along the stairs' outline stood at 236.0 m, the raster's well, under the rim's 239.5-239.7 m: #824's deck edge (1.5 m round any level-1 area) put them on the lidar (batch E's file). The edge is a deck's alone now (under_decks)",
+   "what": "the rim of the stairs (area 4863) down to a pedestrian underpass beside the street over it on line 37 (50.10719, 14.54781), the street a level-1 cover since #824: the sidewalk's (area 4668) corners on the rim at s 20.4-21.2 m along the stairs' outline stood at 236.0 m, the raster's well, under the rim's 239.5-239.7 m: #824's deck edge (1.5 m round any level-1 area) put them on the lidar (batch E's file). A corner on a stairs' outline is under no edge now (under_decks)",
    "source": "the scan of 2026-11-27 on batch E's ground (tools/bench/street_at_walls.py), #653",
    "sections": [
     {
