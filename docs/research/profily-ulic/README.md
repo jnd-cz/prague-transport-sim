@@ -129,7 +129,7 @@ At each station it writes the carriageway's strips from kerb to kerb, in profily
 1. **The extent.** The survey's kerbs: `road`, `tram` and `parking` areas, with medians and associated areas read
    (the class table above). A median splits the carriageway.
 2. **The tram space.** DI's track axes ± a tram envelope of ±1.75 m (IPR's manual: 6.5 m for two tracks 3 m
-   apart), where the tracks are not on a separate bed (the user's answer 3 below; a fact for `data/truth.json`).
+   apart), where the tracks are not on a separate bed (the maintainer's answer 3 below; a fact for `data/truth.json`).
    From the envelope and the counted lanes, the kind: a separate bed (the survey's `tram`), a reserved lane
    (every counted lane fits beside it), or shared (cars drive on the rails).
 
@@ -139,7 +139,7 @@ At each station it writes the carriageway's strips from kerb to kerb, in profily
       depth and the stall count, and the kind (deliveries, disabled, special);
    2. OSM's parking areas and `parking:<side>` tags;
    3. profily-ulic's § 25 estimate outside the zones, logged as a heuristic (AGENTS.md: heuristics log what they
-      decided) and measured on the calibration sample (the user's answer 2 below).
+      decided) and measured on the calibration sample (the maintainer's answer 2 below).
 
    Cars on the kerb take their strip out of the sidewalk.
 4. **Cycle and bus lanes** from OSM: `cycleway:<side>=lane`, `busway`, and `bus:lanes` / `psv:lanes` only where
@@ -164,7 +164,7 @@ At each station it writes the carriageway's strips from kerb to kerb, in profily
 - **The drawing:**
   - the road paint (#309): solid and dashed lines from the strip boundaries, hatched shoulders;
   - the parking strips and bays as strips, with no cars, shown apart in `?review` and the F8 overlay (the
-    user's answer 1 below).
+    maintainer's answer 1 below).
 - **The traffic** (#304, #32):
   - cars drive the built lane centrelines instead of `laneOffset`;
   - turn lanes come from `turn:lanes`;
@@ -186,15 +186,14 @@ measure each change as an A/B on the same sample.
   photo is one moment anyway; TSK's stalls say where cars may stand.
 - **The cut's per-click geometry fixes** (snapping the cut, reach, edges). Our division is along the street.
 
-## The user's answers (2026-11-13)
+## The maintainer's answers (2026-11-13)
 
-1. Parking: "only draw the strips and perhaps show them differently in review mode or debug overlay". There are
-   no parked cars.
-2. The § 25 estimate: "we can try to apply this rule and see how it holds up". It is measured on the calibration
-   sample.
-3. The tram envelope ±1.75 m: "if not sitting on separate track bed then we can go with that figure".
-4. Where: "this can go to the issue and milestone where we start working with the network graph, which will be
-   for trams, trains, cars+buses, pedestrians". That is #16 in M4.
+1. Parking: only the strips are drawn, perhaps shown apart in the review mode or the debug overlay. There are no
+   parked cars.
+2. The § 25 estimate: tried, to see how it holds up. It is measured on the calibration sample.
+3. The tram envelope ±1.75 m: taken where the tracks do not sit on a separate bed.
+4. Where: the issue and milestone that start the network graph, for trams, trains, cars and buses, and walkers.
+   That is #16 in M4.
 
 ## What became of the proposals
 

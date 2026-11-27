@@ -69,7 +69,7 @@ exceeds its error budget (16 px by default in CesiumJS): with a 2 m error at 108
   builds every mesh at load (`src/world.js`, `src/terrain.js`). `ChunkedGeometry` merges triangles per
   material into 350 m cells (`CELL`) so frustum culling skips far ones; no levels of detail for the world;
   the walkers have a near and a far GLB (`src/people.js`). Line 17: 13.5 MB gzip download, 656 MB of float32
-  GPU buffers (`docs/history/PERF-ANALYSIS.md` §6), 28 s load (`docs/knowledge.md`).
+  GPU buffers ([`docs/history/PERF-ANALYSIS.md`](https://github.com/jnd-cz/prague-transport-sim/blob/35133a2/docs/history/PERF-ANALYSIS.md) §6), 28 s load (`docs/knowledge.md`).
 - **The plan:** 500 m squares on the S-JTSK grid, vertices relative to each tile's SW corner, networks
   global with their meshes clipped at tile edges once in the build and the clip points written to both
   tiles, terrain levels on cells that divide 500 m (2, 4, 10, 20, 50 m) with skirts

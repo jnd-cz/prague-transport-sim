@@ -32,7 +32,7 @@ The layout of the extracted PDF scrambles the right-hand column. The pairing abo
 - Note: hand-push tribometers read about 0.6–0.7 on sunny dry rail (Lewis & Olofsson, *Wheel-Rail Interface Handbook* 2009, in Zhu 2011 Table 2). That is a sliding-friction reading, not usable wheel adhesion, and twin-disc lab values (0.3–0.6) run higher than field values for the same reason. Use the field and full-scale numbers.
 
 ### Onset of rain, damp rail, dew, drizzle (the "wet-rail phenomenon")
-The user's observation is well documented. A small amount of water mixed with iron oxide and wear debris is worse than a lot of water.
+The maintainer's observation is well documented. A small amount of water mixed with iron oxide and wear debris is worse than a lot of water.
 - **M (tram wheel)** WILAC 2017 (above), §4 and Fig. 3, on the Pardubice tram wheel rig at 4.2 kN and 5 m/s:
   - water at **25 µL/s**: peak about the wet level, then a steep fall with slip to **0.06**, measured repeatedly at 60–90 % creep;
   - **35 µL/s**: "wet" type curve, **~0.15**, nearly flat with creep;
@@ -191,7 +191,7 @@ Source: **DPP (Dopravní podnik hl. m. Prahy), oddělení Výcvik a vzděláván
 - **Capacity:** the usable volume of a seat-pedestal box is perhaps 15–25 L. Dry quartz sand weighs about 1.5 kg/L, so **≈ 25–35 kg per box, 50–70 kg per car**.
 - **Rate:** a gravity flap valve with no air is likely at or below the Melbourne pneumatic figure. Take **20–40 g/s per sander, so 40–80 g/s per car**.
 - **Duration:** this gives **≈ 10–25 minutes of continuous sanding** per filling. Boxes are refilled at the depot, not per run.
-- So a fixed 90 s per run is far below the hardware. If the game wants scarcity, base it on a box mass that empties at that rate over a shift, starting at a random fill level; **ask the user** (the Prague tram expert) for the real box size and refill practice, and cite his answer in `data/truth.json`.
+- So a fixed 90 s per run is far below the hardware. If the game wants scarcity, base it on a box mass that empties at that rate over a shift, starting at a random fill level; **ask the maintainer** (the Prague tram expert) for the real box size and refill practice, and cite the answer in `data/truth.json`.
 
 ## 5. Proposed values for the game
 
@@ -227,13 +227,13 @@ Sand, replacing "+0.1, cap 0.33":
   - ≈ 25–35 kg each;
   - ≈ 20–40 g/s per sander;
   - ≈ 10–25 min of continuous sanding per filling.
-  - Confirm with the user.
+  - Confirm with the maintainer.
 
 **Follow-up issue for weather that changes during a run:** supported by the measurements. Small water on oxidised rail gives the lowest wet-weather values. Bulk water gives about 0.2, and drying rail passes back through a minimum.
 - **E** Model "rain starts" as the damp value until the water rate is high enough, then rinsed wet. The time to rinse is unmeasured: assume a few minutes in steady rain, longer in drizzle.
 - **E** When rain stops, pass through the damp value again before dry. Dew mornings use the damp value.
 
-## Not read (blocked, login or paywall; links for the user)
+## Not read (blocked, login or paywall; links for the maintainer)
 - VUT Brno theses on sanding units, bot-checked (Anubis):
   - https://dspace.vut.cz/items/cc025f0f-8b2b-4c50-b672-34ce75aefad3 (*Vývoj pískovacích jednotek pro kolejová vozidla*; tested for tram conditions);
   - https://dspace.vut.cz/items/2b37cb9b-b5c4-4dec-a509-bc8a3176562e (*Koncepční návrh dávkovače písku*);
@@ -244,9 +244,9 @@ Sand, replacing "+0.1, cap 0.33":
 - Lyu et al. 2016, Sci. Rep. 6:32455 (snow, sub-zero numbers; nature.com redirected to a login): https://www.nature.com/articles/srep32455
 - Rheinbahn sand page (JS-only): https://www.rheinbahn.de/warum-braucht-die-strassenbahn-sand/
 
-## The user's sand figures (2026-11-04)
+## The maintainer's sand figures (2026-11-04)
 
-The user ran a Gemini query that gave no links: "my simple gemini query turned up with some estimates we could use … no specific links giben sadly". The figures are unverified estimates (**E**).
+The maintainer ran a Gemini query that gave estimates but no links. The figures are unverified estimates (**E**).
 - **Sanders on the original T3 / T3SUCS:** gravity-fed, with an electromagnetic flap; the outlet size sets the flow.
 - **Hopper:** 12–15 l, with a gravity flow of 3–6 kg/min per bogie (attributed to ČKD technical descriptions).
 - **Sand:** dry quartz of 0.4–1.2 mm weighs 1.4–1.6 kg/l, so a hopper holds 17–24 kg.
@@ -254,7 +254,7 @@ The user ran a Gemini query that gave no links: "my simple gemini query turned u
 
 Together: 2 hoppers last about 3–8 min of continuous sanding. The game uses 5 min per filling (`src/tram.js` `SAND_TIME`).
 
-The user, on practice (2026-11-04): "Sand can be refilled at each terminus, starts with full from the depot." A run in the game is one trip, so it starts full.
+The maintainer, on practice (2026-11-04): "Sand can be refilled at each terminus, starts with full from the depot." A run in the game is one trip, so it starts full.
 
 ## Used in the game (#265, #266)
 

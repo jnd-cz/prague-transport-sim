@@ -7,8 +7,7 @@ Status: proposed (PR #312).
 Since #20 the build moved OSM's track graph onto DI piece by piece (`di_tracks.TrackGeometry`). Where OSM's
 junctions lay 2-3 m from DI's this needed a rule per place, and each rule found the next case: Strossmayerovo
 náměstí (straight-on context), Malostranské náměstí (the gauntlet), merged nodes (#219), Anděl (OSM's track 2.2 m
-east of DI's through three crossings, PR #218). The user, 2026-11-04: "If it's getting too complicated maybe we
-should reconsider and start over with the rules?", answered "Rewrite matching on DI".
+east of DI's through three crossings, PR #218). The maintainer chose to rewrite the matching on DI (2026-11-04).
 
 ## The rule
 
@@ -30,11 +29,11 @@ should reconsider and start over with the rules?", answered "Rewrite matching on
   edge the stretch OSM's track ways of the corridor run on (matched the same way).
 - **From OSM**: which tracks a line uses, bridges and tunnels (by route node), the stops and signals as before.
 - **Facing switches**: where a route leaves a node by one of two or more passes from the end it arrived by.
-- **The user's facts**: a switch tip (`trackSources.switchTips`) moves its fork along the through track; an
+- **The maintainer's facts**: a switch tip (`trackSources.switchTips`) moves its fork along the through track; an
   orthophoto track (`photoTracks`) replaces the edges it covers along 80 % of their length.
 - **In the junction OSM has little say**: inside a zone (another track within 2.7 m; plain double track lies
   2.75-3.5 m apart) a route sample's position and heading weigh 5 %, and the network's connections between the anchors
-  outside decide (the user, 2026-11-05: "ignore the exact place of osm track inside the junction").
+  outside decide (maintainer, 2026-11-05).
 
 ## Staying on DI
 
@@ -48,8 +47,8 @@ each now a rule, none a place:
 - **A node stands on the straight track**: where record ends meet (within 0.5 m), on the pair continuing each other;
   where two such pairs cross, at their crossing. The mean of the ends lay up to 12 cm off the straight track.
 - **A track ending beside its node gives up its points** within sqrt(h x 50 m) of it (h the step, at most 6 m back, none
-  under 3 cm), and nothing is put on the chord they leave: the fit takes it to the node in an S bend of about 50 m. The
-  user, 2026-11-06: "when you encounter end of di walk back".
+  under 3 cm), and nothing is put on the chord they leave: the fit takes it to the node in an S bend of about 50 m
+  (maintainer, 2026-11-06).
 - **Surveyed lines reach the fit with points every 2 m** (DI draws straights with vertices tens of metres apart: the
   fit sagged 0.41 m between them), and edges every 1 m before their ends move to their nodes.
 - **A section's tracks start at its tip without Y's point**, each with the leg on its own side (Y is the middle of two
@@ -73,8 +72,8 @@ each now a rule, none a place:
 - **Copies and folds go**: a record turning back on itself splits, two records leaving one point the same way do not merge, a branch's copy
   running on the track is trimmed per end, and a chain with nothing left is a whole copy (these made the only folds,
   176-180°, at Kobylisy, Ďáblice and Hloubětín).
-- **Gaps**: ends facing each other across a crossing track, up to 8 m, join along the archive's axis (Ohrada, the
-  user: "sadly missing piece of data"), each going on as itself across the crossing.
+- **Gaps**: ends facing each other across a crossing track, up to 8 m, join along the archive's axis (Ohrada, a piece
+  missing from the data, as the maintainer confirmed), each going on as itself across the crossing.
 
 What is left over 10 cm on the five lines is DI's own: record joints with a sideways step of up to 26 cm (the curve
 passes in the middle), and the middle of a 1.1 m gap, which reads 0.42 m along the track from both ends. Under 18 m

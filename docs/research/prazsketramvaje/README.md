@@ -2,7 +2,7 @@
 
 Prague tram rules, signals, switches and the T3, gathered on 2026-11-03 from
 [prazsketramvaje.cz](https://www.prazsketramvaje.cz) and the DP Praha documents it publishes, each fact
-set against what the game does now (main at 7cac287). The user picks from
+set against what the game does now (main at 7cac287). The maintainer picks from
 [truth-candidates.md](truth-candidates.md) what goes into `data/truth.json`.
 
 | Note | What |
@@ -67,7 +67,7 @@ note gives the page.
    before** the switch; the switch is thrown and blocked when the front passes the **receiver, 25–35 m
    before it**. Two line 17 switches are **hand-set lockable** ones that stay straight in service:
    **U07** at Podolská vodárna (from Kublov, next to the #204 work) and **U17** at Ke Stírce. The game
-   works every switch by contact, by design; the user keeps both, the player chooses (answer 1 below).
+   works every switch by contact, by design; the maintainer keeps both, the player chooses (answer 1 below).
 8. **Switch signal**: a **steady** arrow already means "set and locked"; **blinking** adds "blocked
    by a train in the circuit"; a centre dot means "assume not locked" (§ 45). The game blinks the
    arrow "while locked" and has no centre-dot aspect.
@@ -90,26 +90,26 @@ note gives the page.
     than 1 s red (over 60 s flashing), 180–419 s late yellow, 420 s and more flashing yellow
     ([web-notes.md](web-notes.md) 4.7): a ready design for the game's deviation display.
 
-## The user's answers (session 2026-11-03)
+## The maintainer's answers (session 2026-11-03)
 
-Quoted as given; they go into `data/truth.json` as the user's facts (picker: "Your answers").
+They go into `data/truth.json` as the maintainer's facts (picker: "Your answers").
 
-1. Switches: "For game purposes I'm keeping both historic current switch and new radios at the same
-   time. It costs nothing and player can choose which ones to use." OSM can mark which switches are
+1. Switches: for the game, both the historic current-worked switches and the new radio ones are kept at the
+   same time; it costs nothing and the player chooses which to use. OSM can mark which switches are
    remote-controlled (`railway:switch:electric=yes` on 525 of 1017 tram switch nodes) and carries DP's
    number in `ref` on 257 ([switches.md](switches.md)).
-2. Speeds: "For now the game uses 60 km/h spped sign at most, higher speeds to be picked up from osm
-   (openrailwaymap) track info."
-3. The T3 pedals: "currently there are only placeholder simplified controls without pedals, you can
-   research that and how to simulate zrychlovač behavior." Done: [t3-accelerator.md](t3-accelerator.md).
-4. Request stops: the game's T3 has no request buttons; "In short driver should stop for any
-   passengers waiting on the stop." This agrees with D 1/2 § 27.14 a and d.
-5. Doors: "open door currently block adding power, not sure if brake is auto applied as well." ČKD:
+2. Speeds: for now the game's speed signs go up to 60 km/h; higher speeds are to come from OSM's
+   (OpenRailwayMap's) track tags.
+3. The T3 pedals: the game had only simplified placeholder controls without pedals; the pedals and the
+   zrychlovač's behaviour were to be researched. Done: [t3-accelerator.md](t3-accelerator.md).
+4. Request stops: the game's T3 has no request buttons; "driver should stop for any passengers waiting
+   on the stop." This agrees with D 1/2 § 27.14 a and d.
+5. Doors: an open door blocks power in the game; whether the brake is applied too was not known. ČKD:
    a door relay blocks traction; no brake from the doors found ([t3-accelerator.md](t3-accelerator.md) 4).
 6. Section insulators: not known. No public list was found; OSM does not tag them (its 57
    `power=insulator` nodes in Prague all sit on 22 kV and 110 kV lines) and the DTM snapshot (ZPS, DI)
    has no overhead-line equipment ([signals.md](signals.md) SIG-W1).
-7. Pantographs: "for t3 we use both cars pantographs as it is in real operation". The second car's
+7. Pantographs: "both cars pantographs as it is in real operation". The second car's
    pantograph is why contact-worked switches are blocked until the whole set has passed
    ([switches.md](switches.md) SW-C6).
 

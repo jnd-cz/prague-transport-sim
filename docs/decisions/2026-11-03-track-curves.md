@@ -7,9 +7,8 @@ followed (the second PR for #204).
 
 Since #20 the drawn and driven track follows DI's polyline (resampled at 1 m, a 0.1 m Gaussian), because OSM's
 6 m smoothing pulled an 18 m curve 0.2 m inside the real one. DI's vertices then showed as corners, and
-switches joined with kinks. The user, driving line 17 on 2026-11-03: "switches joining tracks together appear
-too jagged", "even straight direction isn't really straight", "curves should be smooth instead of stepped
-line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
+switches joined with kinks. The maintainer, driving line 17 on 2026-11-03, reported jagged switches, straights
+that were not straight and stepped curves (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
 
 ## The rule
 
@@ -19,14 +18,14 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
   the tongue DI draws, else at the branch's end (Čechův most: 13 cm off for 25 m, then the tracks part at the
   junction). Interlaced is 0.05-0.2 m beside the track for 10 m or more, followed across record joints; a
   switch's branch is 0.2 m off within 4-9 m. Placing that fork where the branch left (as first built) moved
-  Čechův most's switches 21 m onto the junction; the user: "The DI fork is wrong while OSM seems right [...]
-  the fork starts and ends well in front of/behind the road junction" (2026-11-03).
+  Čechův most's switches 21 m onto the junction; there OSM is right and DI's fork wrong, the switches lie well in
+  front of and behind the road junction (maintainer, 2026-11-03).
 - A switch DI draws as a section (both legs as records up to `SECTION` = 6 m from the tip, the fork of record
   ends at their far joint) forks at the tip: Dvorecký most's switches on line 17's eastern track moved 4.6-4.8 m
   onto their switch machine covers and OSM's switches (0.09-0.13 m off).
 - Where DI starts the branch already 13 cm off at a record joint, the tip is `TONGUE` = 8.5 m back (the tongues
   DI draws elsewhere are 8.4-9 m; Čechův most's OSM switches lie 8.0 and 8.8 m back).
-- **Places the user corrects** (`data/truth.json` `trackSources`): a switch tip (`switchTips`: the switch takes the
+- **Places the maintainer corrects** (`data/truth.json` `trackSources`): a switch tip (`switchTips`: the switch takes the
   point of its through track nearest a mark, Podolská vodárna's eastern switch at the archived map's manhole, 3.3 m
   from DI's fork) and, as an exception, a track measured on the orthophoto (`photoTracks`: Podolská vodárna's north
   curve, where DI's line is 19-34 cm off the rails and reads 14.6 m over 5 m). The measured track takes the edges
@@ -37,21 +36,20 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
   OSM draws one way from the switch to where the tracks part. The stretch from the tip to that junction is
   doubled and the copy carries the leg on the branch's side, so each track matches its own DI record, the switch
   sits at the tip, and the routes on either leg take their own track. Pairing OSM's split node with the tip
-  instead had pulled it 14 m along the shared way and left a zigzag at OSM's switch node (Čechův most, "a small
-  white kink south of the 829 marked DI fork", the user). Line 17: 3 tip nodes added, 12 nodes copied: interlaced
+  instead had pulled it 14 m along the shared way and left a zigzag at OSM's switch node (Čechův most, a small
+  white kink south of the DI fork marked 829, the maintainer's report). Line 17: 3 tip nodes added, 12 nodes copied: interlaced
   pairs at Čechův most, Ke Stírce and Březiněveská.
 - An OSM switch takes the fork on its through track (a chain its toe or through edge runs on), facing the same
-  way, within `FORK` = 15 m (was 5 m), nearest first, one switch per fork. The user's four answered forks lie
+  way, within `FORK` = 15 m (was 5 m), nearest first, one switch per fork. The maintainer's four answered forks lie
   5.3-7.4 m from OSM's switches. "The same side" was dropped: OSM's legs near a switch are a few metres long,
   and in a curved switch OSM and DI disagree which leg is straight (Křižovnická).
 - OSM nodes between the switch and its fork (two-edge nodes, the next one beyond the fork) move onto the fork
   with it; a fork behind a junction is still refused (Holešovice).
 - A switch's diverging edge matched only to the chain both through edges run on is left to the next source
   (Dvorce: DI has no branch onto the new Dvorecký most).
-- **The through track first** (the user, 2026-11-03, at Strossmayerovo náměstí with a photo: "The straight
-  direction should be straight without any kinks, first switch is to the left, then further to the right"; "I
-  would put higher priority to keep the through track straight, then let other track branch from it to the
-  side"). There the straights swung 8-12 cm over 21 m, though DI draws them straight within 0.1°:
+- **The through track first** (maintainer, 2026-11-03, at Strossmayerovo náměstí with a photo: the straight runs
+  without kinks, the first switch branches to the left, the next further to the right; the through track is kept
+  straight and the other tracks branch from it). There the straights swung 8-12 cm over 21 m, though DI draws them straight within 0.1°:
   - A stretch is matched with up to `CONTEXT` = 10 m of its straight continuation: through two-edge nodes, and
     through a switch only from its toe or through leg (its legs by their directions over 10 m). Alone, the
     4.75 m between two switches lay nearer the branch DI draws 0.19 m beside the straight, and the straight was
@@ -79,12 +77,11 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
 - Where the curve bends under 20 m over 2 m, the tolerance of the points within 10 m grows by 1.5, at most to
   the mean coordinate error of their records' accuracy class (`data/truth.json` `sourceAccuracy`: DI class 3
   0.14 m, class 2 0.08 m; the archive states none and is taken as class 3, the DTM's minimum; OSM fill 0.5 m).
-  The user, 2026-11-03: "keep stricter rules and relax only where we get under the specified radius". Twice the
+  Strict elsewhere, relaxed only under the radius (maintainer, 2026-11-03). Twice the
   error (a 95 % bound; the decree states no limit) gave 6 bends over 10° inside tracks instead of 11 and 32
   joins over 1° instead of 39, and is not used.
-- **18 m is held past the class** (`data/truth.json` `min-radius-network`, the user: "18m and over could be some
-  exceptions [...] under 18m there shouldn't be anything like that. [...] At which cost can we snap it to 18m
-  curve?"; asked how, the user chose "18 m held, cost reported", 2026-11-03): where the curve still bends under
+- **18 m is held past the class** (`data/truth.json` `min-radius-network`; the maintainer: 18 m and over
+  can be exceptions, under 18 m there should be none; chosen: 18 m held, cost reported, 2026-11-03): where the curve still bends under
   18 m with every point near it at its class, its bending weight there grows by `STIFFEN` = 1.5 per round and
   those points' tolerance keeps growing, at most to `HOLD_LIMIT` = 0.5 m. The build logs each such place with how
   far its points moved. A wider tolerance alone does not widen a curve, it only stops pulling it: on a 30° test
@@ -105,7 +102,7 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
   It first read points interpolated on the game's 1.5 m resample: a 1 m chord sags 7 mm inside a 19 m curve, and
   it read 19.1 m (the fit's own measure) as 17.6 m at Právnická fakulta.
 - `trackJoins`: through tracks breaking over 1° where chains meet, per class; diverging start angles listed. The
-  user kept 1° (2026-11-03: "Keep 1°, fix the nodes"). An end's direction is the tangent of the least-squares
+  maintainer kept 1° and had the nodes fixed (2026-11-03). An end's direction is the tangent of the least-squares
   parabola through the drawn points within 2 m (the parabola through the first three read a smooth 21 m curve
   as a 1.2° break where the first step was 0.17 m).
 
@@ -113,7 +110,7 @@ line" (reports `report-20261103-073229-s4ki`, `-073606-cwa4`).
 
 - 64 places on line 17 read 18-20 m over 5 m (58 on DI's tracks, 2 each on both paths and the photo curve),
   listed as exceptions: connecting curves held at both switches keep DI's radius, and 20 m needs the switches
-  about 0.5 m off. Real curves under 20 m, or switches DI places wrong? #210 closed without measuring DI's forks: the user's
-  checks on the orthophoto found them right (2026-11-06: "DI fork position looks good as it is"). Not re-counted
+  about 0.5 m off. Real curves under 20 m, or switches DI places wrong? #210 closed without measuring DI's forks: the maintainer's
+  checks on the orthophoto found them right. Not re-counted
   on the network of #237.
 - Dvorecký most: resolved by DI's state of 2026-10-31 (#209, PR #213), which has the new tracks.

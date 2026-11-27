@@ -1,6 +1,6 @@
 # The T3SUCS: pedals, accelerator (*zrychlovač*), interlocks
 
-Read 2026-11-03 for #215 (the user: "you can research that and how to simulate zrychlovač behavior"). Scope: the resistance-controlled T3 with ČKD electrical equipment
+Read 2026-11-03 for #215 (the maintainer asked how to simulate the zrychlovač). Scope: the resistance-controlled T3 with ČKD electrical equipment
 **TR 37** (*elektrická výzbroj TR 37*), used on T3, T3SU and T3SUCS ([imhd]; [cswikiT3] infobox).
 The thyristor T3M has equipment **TV1** ([cswikiT3M]); the T3R.P has TV Progress; neither is
 covered here. The German T3D had UB 13 equipment ([cswikiT3]).

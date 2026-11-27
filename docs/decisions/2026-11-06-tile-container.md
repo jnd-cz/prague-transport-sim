@@ -1,8 +1,8 @@
 # The tile container: integer differences, not GLB, for the ground and a tile's objects (#307)
 
 Status:
-- **The ground:** accepted by the user (2026-11-06, PR #313, on the slower decode: "it can be loaded and decoded by separate thread to not slow down the playthrough when we do dynamic tile loading ... If yes then then go with it").
-- **A tile's objects:** accepted by the user (2026-11-06, PR #324: "yes integer differences for objects look really good as well, go for it and merge").
+- **The ground:** accepted by the maintainer (PR #313; the slower decode on the condition that it runs on a separate thread, so dynamic tile loading does not slow the game).
+- **A tile's objects:** accepted by the maintainer (PR #324).
 
 ## The ground, measured
 
@@ -96,7 +96,7 @@ Decoding the densest tile's 2,918 takes under 0.5 ms in all three. GLB's are flo
 
 ## The frame and the lattice
 
-**The frame stays [one city frame and its tile grid](2026-10-29-city-frame-and-tiles.md):** a fixed origin at the Marian column, vertices relative to their tile, the simulation in city coordinates (the user, 2026-11-06: "I agree that fixed origin and tile local geometry is fine for our purpose"). The 1,024 m tiles above are a size to measure on, not that record's 500 m grid; #30 decides the tile size.
+**The frame stays [one city frame and its tile grid](2026-10-29-city-frame-and-tiles.md):** a fixed origin at the Marian column, vertices relative to their tile, the simulation in city coordinates (maintainer, 2026-11-06). The 1,024 m tiles above are a size to measure on, not that record's 500 m grid; #30 decides the tile size.
 
 **The ground is stored in 1 cm on every axis, not 1 mm.** Once the survey is cut into it, x and y need the survey's lattice too, not the 1 m of the bench above. Buildings keep the 5 cm they have.
 

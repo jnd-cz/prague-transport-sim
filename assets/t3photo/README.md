@@ -77,7 +77,7 @@ pink-beige lower wall panels with silver kick plates, red/silver sill trim and d
 The model uses box bases for the frontmost chair in each file and flared pedestals for the others.
 Door leaves have cream outer faces and silver inner faces, with long handles on the inner leaves.
 The rubber pattern is an original generated 64-pixel tile, embedded alongside the lettering atlas.
-The user's quotes are retained in `data/truth.json`, section `t3PhotoModel`.
+The maintainer's statements are retained in `data/truth.json`, section `t3PhotoModel`.
 [DPP's October 2022 history](https://www.dpp.cz/data/leaflets/documents/2022-10-27-16-03-56_DP-kontakt-rijen-2022.pdf)
 corroborates the padded leatherette seats fitted to early T3 cars 6102–6323.
 
@@ -88,7 +88,7 @@ The view down through the end window (`20261121_124445.jpg`) supplies the broad 
 the tighter corners. The stair photograph (`20261122_121753.jpg`) shows a projecting middle tread
 with clipped corners. Both cars use that profile. Door tops align with the 2.63 m window heads.
 The test samples the lower edges of every leaf at 25 angles through the 84° opening.
-The 84° stop is a visual interpretation of the user's “a bit less” than 90°, not a factory dimension.
+The 84° stop is a visual interpretation of the maintainer's “a bit less” than 90°, not a factory dimension.
 Each wheel has a solid disc, a separate tyre and a single central hex nut. The side frame, layered suspension
 pack, flared cover and inboard housings occupy the space above the brake. The two 8053 views establish their
 silhouettes. The hidden geometry and hanger construction are estimates repeated on both bogies.
@@ -174,5 +174,5 @@ The studio works without world data. Its first load needs the same CDN as the ga
 | `rig-6312.json`, `rig.json`, `fleet-comparison.jpg`, `preview.png`, `doors-open.png` | Rig manifests and original studio renders | AGPL-3.0-or-later |
 | `../../src/t3photo.js` | Reproducible geometry and pose source | AGPL-3.0-or-later |
 
-Own-model licence follows the user's 2026-11-12 change recorded in
+Own-model licence follows the maintainer's 2026-11-12 change recorded in
 `docs/decisions/2026-10-29-tests-and-licences.md`. See the repository `LICENSE`.

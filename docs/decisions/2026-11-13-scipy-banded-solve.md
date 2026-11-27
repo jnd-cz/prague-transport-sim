@@ -2,9 +2,9 @@
 
 **Date:** 2026-11-13. **Issue:** #516, PR #532. **Code:** `tools/track_profile.py` (`_D.system`).
 
-**Status:** accepted by the user (2026-11-13, PR #532):
-- for the trial: "Let's install scipy and compare options a and b against what you get now";
-- for the decision, on the measurements below: "Yes let's go with scipy and we can merge all PRs".
+**Status:** accepted by the maintainer (PR #532):
+- for the trial: SciPy installed, options a and b compared against the dense inverse;
+- for the decision, on the measurements below: SciPy.
 
 ## The change
 

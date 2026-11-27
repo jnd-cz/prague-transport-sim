@@ -14,14 +14,13 @@ type checking would come with it.
 
 - **Code:** **AGPL-3.0-or-later** since 2026-11-12 (#518; GPL-3.0 from 2026-10-29): fully open source, and versions others
   distribute stay open, as do versions others run as a service (AGPL §13: the game is played over the network,
-  https://sim.8b.cz/). The user, 2026-11-12: "I would still like to change to AGPL, including the built tram
-  model." Every source file carries an `SPDX-License-Identifier` line. MIT code (e.g. ported from OSM2World) can be included with its notice kept.
-- **Own assets** (models, textures, the user's photos and recordings): their own licence, separate from
+  https://sim.8b.cz/). The built tram model is AGPL too (#518).
+  Every source file carries an `SPDX-License-Identifier` line. MIT code (e.g. ported from OSM2World) can be included with its notice kept.
+- **Own assets** (models, textures, the maintainer's photos and recordings): their own licence, separate from
   the code (e.g. CC BY-NC-SA 4.0).
   - **Models made for the project by agents** (the asset labs' cars, vans, trucks, people and furniture
-    studies, #247): **AGPL-3.0**, like the code (GPL-3.0 until #518). The user, 2026-11-04: "for the project's own models, made by
-    chatgpt agent, I will choose the same as source, GPL 3.0". The user's photos and recordings are not
-    decided yet.
+    studies, #247): **AGPL-3.0**, like the code (maintainer, 2026-11-04; GPL-3.0 until #518). The maintainer's photos and
+    recordings are not decided yet.
 - **Third-party assets:** only with a licence that allows redistribution, each listed in an asset
   register (file, author, source, licence).
 - **OSM2World:** code is MIT, ports keep its notice; its bundled models and textures are checked one by
