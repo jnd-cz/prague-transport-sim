@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The project's overview for the test site (#826): what waits for the user, the heavy queue with its expected times,
+"""The project's overview for the test site (#826): what waits for the maintainer, the heavy queue with its expected times,
 the agents' sessions and the board, as overview.json, which overview.html shows at phone width.
 
     python -I tools/overview.py --print          # the snapshot to stdout, nothing written or uploaded
@@ -12,7 +12,7 @@ The snapshot:
 - sessions: every agent's session log changed in the last 48 h (LOGS), with its last activity and the folder it works
   in, mapped to its worktree, issue and PR. Only the `cwd` field is read from a log, from its end (the logs reach
   hundreds of MB); no message text, title or prompt;
-- waiting for the user: the open PRs' questions, the issues labelled `needs-user`, the PRs ready for a merge window
+- waiting for the maintainer: the open PRs' questions, the issues labelled `needs-user`, the PRs ready for a merge window
   (the review sets with their unanswered counts the page reads live, as reviews.html does);
 - the heavy queue: each job with its expected time and estimated start and finish (baseline_store.schedule), the
   machine's free memory and cores, and the jobs a watch ended in the last day.
@@ -20,7 +20,7 @@ The snapshot:
 The upload goes to the test target of deploy.local.json only (never a public one), over tools/deploy.py's FTPS
 connection, when the snapshot changed or HEARTBEAT s after the last one (the page turns red after 15 min without
 one). tools/deploy.py never deletes overview.json (KEPT). A failed login is not tried again for RETRY s: the host bans
-repeated failed logins. Its own task, every 5 min (the user, 2026-11-23: "I would pick every 5 minutes"), not a step
+repeated failed logins. Its own task, every 5 min (maintainer, 2026-11-23), not a step
 of tools/autodeploy.py's: that one runs every 10 min and waits for a deploy or a data fetch. It never waits for the heavy queue (it is no heavy job). Log and state:
 reports/overview.log, reports/overview-state.json, reports/overview-cache.json (git-ignored).
 """
@@ -67,7 +67,7 @@ def read_log(path, chunk=1 << 16, most=1 << 23):
     linked, a "pr-link" entry's prNumber), read from its end in growing chunks up to `most` bytes, the cwd else from
     its first line; None for what it does not name. Only those two fields are read: no text of a message, a title or
     a prompt. (A Claude Code session started in the main checkout logs that folder as its cwd while it works in an
-    issue's worktree: its PR says which. The PR number read too on the user's word, 2026-11-23, PR #827: "yes".)"""
+    issue's worktree: its PR says which. The PR number read too on the maintainer's word, PR #827.)"""
     cwd = pr = None
 
     def look(line):

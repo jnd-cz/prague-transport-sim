@@ -6,7 +6,7 @@
 // either `pack` (the .zip) or meta.url (its address on the author's host). Stored as submissions/<id>/ (meta.json,
 // pack.zip), denied to the web; tools/deploy.py --pull moves them off over FTPS and tools/submissions.py reviews
 // them. No IP address is stored. Its checks and caps are tools/submissions.py's (tools/serve.py applies them
-// locally): change both. The user, 2026-11-15: "these sound like reasonable limits for now".
+// locally): change both. The limits hold for now (maintainer, #580).
 // The host's PHP must take a 64 MB upload (upload_max_filesize, post_max_size).
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');

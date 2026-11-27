@@ -7,8 +7,8 @@
 // and the zone plate are read off the drawings (p. 54, 56).
 export const PLATE = { w: 0.2, h: 0.3, frame: 0.03 };
 // How much larger than real the game shows the signs: on a 1080p screen the real figures read only up to about 12 m
-// (the size experiment, docs/decisions/2026-11-07-speed-limits-and-signs.md). 2 for testing (the user, 2026-11-08: "pick
-// 200% now for testing ... keep the size of signs a parameter that can be changed later").
+// (the size experiment, docs/decisions/2026-11-07-speed-limits-and-signs.md). 2 for testing, a parameter to change
+// later (maintainer, 2026-11-08).
 export const SIGN_SCALE = 2;
 const YELLOW = '#f6c500';      // the photos' reflective orange-yellow (D 1/2 draws pure yellow)
 const BLACK = '#111';
@@ -39,16 +39,15 @@ export function shownSize(sign, scale = SIGN_SCALE) {
 }
 
 // ------------------------------------------------------------------ the figures and text
-// Every photo shows a heavy condensed DIN (DIN 1451 Engschrift): the user's 60 Rychlostník and 80 gradient board
+// Every photo shows a heavy condensed DIN (DIN 1451 Engschrift): the maintainer's 60 Rychlostník and 80 gradient board
 // (2026-11-08), the website's 10 and 30 restrictions. D 1/2's drawings use a heavy face for speeds and a serif for
-// gradients; the photos win. Bahnschrift Condensed Bold, Windows' DIN 1451 ("Bahnschrift bold looks good", the user,
+// gradients; the photos win. Bahnschrift Condensed Bold, Windows' DIN 1451 (maintainer,
 // 2026-11-08); elsewhere the nearest condensed face. Its figures are wider than the signs': two of them are 1.18 as wide
-// as high, the photos' 0.86-1.01. Narrowed to 0.8 of its width ("stretch it so it looks close to the real signs", the
-// user), it matches the photos side by side, the vertical strokes as heavy as theirs; at its own width it looked too
+// as high, the photos' 0.86-1.01. Narrowed to 0.8 of its width to look close to the real signs (maintainer), it matches the photos side by side, the vertical strokes as heavy as theirs; at its own width it looked too
 // wide. The figures are the photos' size, 0.47 of the panel's height.
 // Where Bahnschrift is missing (macOS, Linux, phones), D-DIN Condensed Bold: a DIN 1451 recreation by Datto under the SIL
-// Open Font License, loaded from its repository through jsDelivr, pinned to a commit (the user, 2026-11-08: "load the font
-// externally anyway and use the din one as fallback"). `loadFigureFont` must have settled before faces are drawn.
+// Open Font License, loaded from its repository through jsDelivr, pinned to a commit (maintainer,
+// 2026-11-08). `loadFigureFont` must have settled before faces are drawn.
 const FIGURES = '"Bahnschrift Condensed", "D-DIN Condensed", "Bahnschrift SemiCondensed", "DIN Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
 export const DDIN_URL = 'https://cdn.jsdelivr.net/gh/amcchord/datto-d-din@e199c8441e758d6e492cd01ef52c3c67ba4bae26/D-DINCondensed-Bold.woff2';
 const FIGURE_H = 0.113;        // m: the speed signs' figures, the same on every plate
@@ -153,7 +152,7 @@ function triangle(g, x, y, w, h, digit, u) {
 }
 
 // The gradient board: a grey square, a white pentagon whose point takes the half of the height it points to: its
-// shoulders at 0.56 of the height from the point's edge (the user's photos 2026-11-08: 0.56 climbing, 0.44 from the top
+// shoulders at 0.56 of the height from the point's edge (the maintainer's photos 2026-11-08: 0.56 climbing, 0.44 from the top
 // descending; D 1/2 p. 52: 0.56, 0.43).
 function pentagon(g, x, y, w, h, up, u) {
   g.fillStyle = '#bdbdbd'; g.fillRect(x, y, w, h);
@@ -184,7 +183,7 @@ export function drawSign(g, sign, W, H) {
     const up = k.startsWith('climb');
     pentagon(g, x, y, w, h, up, u);
     // red figures, their middle at 0.575 of the board climbing and 0.47 descending (the photos); larger and bolder than
-    // the photos' (0.23 of the board high) to read in the game (the user, 2026-11-08): 0.30 high, Bahnschrift's bold
+    // the photos' (0.23 of the board high) to read in the game (maintainer, 2026-11-08): 0.30 high, Bahnschrift's bold
     // with an outline of 0.035 of the height on top
     figures(g, sign.permille, x + w / 2, y + h * (up ? 0.575 : 0.47), h * 0.30, '#d81e1e', { maxW: w * 0.62, bold: 0.035 });
     if (k.endsWith('End')) diagonal(g, x, y, x + w, y + h, 0.016 * u, BLACK);

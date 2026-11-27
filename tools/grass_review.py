@@ -8,10 +8,9 @@ OSM has no tag for grassed track on the tram ways; mappers draw the grass as are
 village_green, flowerbed; natural=grassland; leisure=park) over it. Read from the local extract
 (raw/osm/praha.osm.pbf, closed ways; multipolygon relations are not read) and laid under each line's route every
 metre, on the ground only: not on our bridges or in our tunnels (line 22 at Újezd crosses Střelecký ostrov's park on
-the bridge, the user 2026-11-12: "the only green area over track I see is střelecký ostrov which lies on lower level
-under the bridge").
+the bridge, the park on the lower level under it: the only green area over its track; maintainer, 2026-11-12).
 
-- **The calibration** (printed per line): inside the facts' grass spans (the user's marks, the grassed-track list,
+- **The calibration** (printed per line): inside the facts' grass spans (the maintainer's marks, the grassed-track list,
   answered cards), where OSM's grass ends and the built grass (tools/track_styles.py, with its holes) ends. OSM
   lacks much of the known grass (Sídliště Řepy - Slánská has none), so only its edges are compared.
 - **The cards** (reports/review/grass-track-N.json): OSM grass outside the facts, runs less than JOIN m apart one

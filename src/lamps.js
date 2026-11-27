@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The lamps' common parts (#436), for every tram model: the indicators' rhythm and the high beams' glow.
-// What is lit when (the user, 2026-11-10, #436): the dipped headlights and the tail lamps whenever a tram is
-// in service ("off only when the car is turned off"), the brake lamps while it brakes, the indicators before a
+// What is lit when (#436): the dipped headlights and the tail lamps whenever a tram is
+// in service (off only when the car is switched off), the brake lamps while it brakes, the indicators before a
 // turn at a junction and at a stop where passengers cross a car lane (the right ones, from braking into it until
 // it pulls away), the high beams flashed as a warning or on at night on dark stretches.
 import * as THREE from 'three';

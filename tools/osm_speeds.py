@@ -6,7 +6,7 @@ Every 5 m along the route: the `maxspeed` of the OSM tram way under the track (0
 whether the track is dedicated (no vehicle road along it: its own corridor, where curves may be
 canted). Reads the Overpass cache written by build_line.py, writes `speed` into data/lineN.json:
   {"step": 5, "osm": [km/h or 0, ...], "dedicated": [0/1, ...], "source": "..."}
-A posted speed in data/truth.json `postedSpeeds` (seen by the user, keyed by the OSM way id) holds over that way's
+A posted speed in data/truth.json `postedSpeeds` (seen by the maintainer, keyed by the OSM way id) holds over that way's
 `maxspeed` (#612); its state against OSM (holds, matches, changed: tools/sources.py fact_state) goes into the
 provenance's `facts` (#670, tools/fact_status.py).
 

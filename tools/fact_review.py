@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The facts a source now matches, for the user's review before they retire (#670):
+"""The facts a source now matches, for the maintainer's review before they retire (#670):
     python -P -E tools/fact_review.py            reports/review/fact-matches-N.json from the built data
     python -P -E tools/fact_review.py --import   the answers (reports/reviews/lineN.json) into data/truth.json
 
-The user, 2026-11-18: "I will need to review each case of new match to make sure we get proper fact replacement."
-A card per fact whose state is `matches` (tools/fact_status.py) and whose state gives its point (`at`): the user's
-fact in yellow, the source's point (`src`) in red, over the orthophoto on the review page. Its answers:
-- retire: a placed stop sign becomes a confirmation of the DTM's sign (the user: "Yes turn them into confirmation of
-  the DTM sign"): the build takes the same sign, the stop-sign review keeps its card away, and a DTM refresh that
-  moves the sign shows as `moved`. Any other fact is deleted from data/truth.json (the user: "I would delete them
-  from the file, git history is good enough"): its own text is cut out, the rest of the file stays as it is.
+Each new match is reviewed, so that a fact is replaced properly (maintainer, #670).
+A card per fact whose state is `matches` (tools/fact_status.py) and whose state gives its point (`at`): the
+maintainer's fact in yellow, the source's point (`src`) in red, over the orthophoto on the review page. Its answers:
+- retire: a placed stop sign becomes a confirmation of the DTM's sign (maintainer, #670): the build takes the same
+  sign, the stop-sign review keeps its card away, and a DTM refresh that moves the sign shows as `moved`. Any other
+  fact is deleted from data/truth.json, git history being enough (maintainer, #670): its own text is cut out, the
+  rest of the file stays as it is.
 - keep, unsure: the fact stays.
 A matching fact without a point (a speed, a structure, a style answer) is listed by fact_status.py and retired by hand
 in a PR that quotes it.
@@ -34,7 +34,7 @@ YOURS, SOURCE = "#ffd60a", "#ff3b30"
 RETIRE_SIGN = "retire: the DTM sign is right (mine becomes a confirmation of it)"
 RETIRE = "retire: the source is right (delete my fact)"
 KEEP, UNSURE = "keep my fact", "unsure"
-# the marks' labels: the user's fact, the source's point
+# the marks' labels: the maintainer's fact, the source's point
 WHAT = {"stopSigns": ("your placed stop sign", "the DTM's sign (state 2024)"),
         "switchTips": ("your switch tip", "DI's fork"),
         "photoTracks": ("your orthophoto track", "DI's track"),

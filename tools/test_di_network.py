@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import di_network as dn  # noqa: E402
 import di_tracks as dt  # noqa: E402
 
-dn.SMOOTHED = []  # (the networks here are made up: none of the user's answers in data/truth.json applies to them)
+dn.SMOOTHED = []  # (the networks here are made up: none of the maintainer's answers in data/truth.json applies to them)
 
 
 def rec(i, pts):
@@ -190,10 +190,10 @@ class Network(unittest.TestCase):
         self.assertEqual(sum(ed['src'] == 'ortho' for ed in net.edges.values()), 1)
 
     def test_a_user_tip_states_where_dis_fork_is(self):
-        # #670: DI's fork (50, 0) still where the user answered holds; at the tip's point on the through track matches
+        # #670: DI's fork (50, 0) still where the maintainer answered holds; at the tip's point on the through track matches
         # (within TIP_MATCH: a manhole 1.65 m beside the track at the fork, Podolská); elsewhere changed. `off` is the
         # fork's distance from that point
-        # (a fork DI still gives where it did when the user answered holds, however near: the user set the tip apart
+        # (a fork DI still gives where it did when the maintainer answered holds, however near: they set the tip apart
         # from it, #685; it matches where DI moved it there)
         for near, tip, state, off in (((50.0, 0.0), (46.7, -1.65), 'holds', 3.3), ((50.0, 0.0), (50.3, 0.1), 'holds', 0.3),
                                       ((54.0, 0.0), (50.3, 0.1), 'matches', 0.3), ((53.7, 0.0), (50.2, -1.65), 'matches', 0.2),
@@ -205,7 +205,7 @@ class Network(unittest.TestCase):
         self.assertEqual(net.facts['switchTips'], [])  # no id: not stated
 
     def test_a_switch_whose_fork_dis_network_moved_to_the_tip_is_found_by_the_tip(self):
-        # #677: DI's fork when the user answered lay 48.6 m from the pin (Ohrada); the network forks at the pin since,
+        # #677: DI's fork when the maintainer answered lay 48.6 m from the pin (Ohrada); the network forks at the pin since,
         # 0.75 m along the track from it: the switch is found by the tip, stays and matches
         net = net_of([(0, 0), (50, 0)], [(50, 0), (120, 0)], turnout(50), tips=[((98.0, 0.0), (50.75, 0.3), 'Ohrada')])
         self.assertEqual(net.report['switch tips at their fork already'], 1)

@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The user's answers on the track heights and the rules that apply them before the solve (tools/line_heights.py, #418).
+"""The maintainer's answers on the track heights and the rules that apply them before the solve (tools/line_heights.py, #418).
 
 The answers (data/truth.json trackHeights radiusAnswers and stepAnswers, `load`) are this module's globals, read here by
 the rules and by line_heights' solver: whatever sets them (line_heights `main`, tools/track_steps.py, the tests in
 tools/test_line_heights.py) sets them on this module. `apply` runs the rules on the chains' 5 m bins before the smoother;
 `answer_at`, `ground_at` and `below_floor` answer the solver at a place; `staged_heights` stages the heights with the
-user's reviewed spans as evidence.
+maintainer's reviewed spans as evidence.
 """
 import bisect
 import json
@@ -37,20 +37,20 @@ BLEND_REACH = 20.0    # m: the survey's pull fades in and out over this (per poi
 TOWARD_AGREE, TOWARD_OTHER = 0.08, 0.5  # m: survey and lidar this near agree (else the lidar alone); a lidar this far from the
                                         # archive is another level (a deck, a wall), no evidence for the rail
 NEIGHBOUR_LOG = []    # (xy, height) of the heights the last snap_to_neighbour moved: reports/line-heights.json
-STEP_ANSWERS = []     # the user's answers on the step review: data/truth.json trackHeights.stepAnswers
+STEP_ANSWERS = []     # the maintainer's answers on the step review: data/truth.json trackHeights.stepAnswers
 STEP_REACH = 70.0     # m: the stretch a step card showed either side of its place
-IGNORE_ANSWERS = []  # the user's answers that drop heights: data/truth.json radiusAnswers with `ignore` (load_ignore_answers)
+IGNORE_ANSWERS = []  # the maintainer's answers that drop heights: data/truth.json radiusAnswers with `ignore` (load_ignore_answers)
 STRETCH_NEAR = 1.0   # m: a height this near an `ignore` answer's stretch is on it
-RADIUS_ANSWERS = []  # the user's answers on the radius review: [{'xy': city frame, 'answer': ...}] (data/truth.json)
+RADIUS_ANSWERS = []  # the maintainer's answers on the radius review: [{'xy': city frame, 'answer': ...}] (data/truth.json)
 HOLD, FOLLOW, GROUND = 'hold the radius', 'follow the data', 'follow the ground'
-STRUCTURE_FACTS = []  # the state of the user's structures no source maps (import_track_heights.structure_states, #670)
-GROUND_ANSWERS = []  # the user's areas where the tracks take the lidar ground: radiusAnswers with `area` (load_ground_answers)
+STRUCTURE_FACTS = []  # the state of the maintainer's structures no source maps (import_track_heights.structure_states, #670)
+GROUND_ANSWERS = []  # the maintainer's areas where the tracks take the lidar ground: radiusAnswers with `area` (load_ground_answers)
 GROUND_OTHER = 1.5   # m: a lidar this far from the track's height there is another level (a wall, a roof), no evidence
 ANSWER_REACH = 15.0  # m: an answer applies to the place where the radius would give way this near it
 
 
 def load_radius_answers(truth):
-    """data/truth.json trackHeights.radiusAnswers: a place (lat, lon) and the user's choice there."""
+    """data/truth.json trackHeights.radiusAnswers: a place (lat, lon) and the maintainer's choice there."""
     from geo import Frame
     F = Frame()
     out = [{'xy': tuple(float(v) for v in F.xy(*a['place'])), 'answer': a['answer'], 'outliers': a.get('outliers'), 'date': a.get('date')}
@@ -76,8 +76,8 @@ def load_ignore_answers(truth):
 
 
 def answered_ignore(chs):
-    """Where an answer drops a source's heights along a stretch, they go and the curve bridges them (the user, line 9 at
-    Olšanské hřbitovy, 2026-11-07: "if you discard di on the left half, left of the white marker")."""
+    """Where an answer drops a source's heights along a stretch, they go and the curve bridges them (maintainer, line 9 at
+    Olšanské hřbitovy, 2026-11-07: DI dropped on the left half, left of the marker)."""
     n = 0
     for a in IGNORE_ANSWERS:
         if a['ignore'] != 'stretch' or len(a['stretch']) < 2:
@@ -95,7 +95,7 @@ def answered_ignore(chs):
 
 def load_ground_answers(truth):
     """data/truth.json radiusAnswers with an `area` (lat, lon corners): 'follow the ground' there, the radius no tighter
-    than `radius_min` (the user, 2026-11-08: 250 m; the 131 m curve at Malovanka was a 2.4 cm bump in the lidar over 5 m)."""
+    than `radius_min` (maintainer, 2026-11-08: 250 m; the 131 m curve at Malovanka was a 2.4 cm bump in the lidar over 5 m)."""
     from geo import Frame
     F = Frame()
     return [{'area': Polygon([tuple(float(v) for v in F.xy(*p)) for p in a['area']]), 'answer': FOLLOW, 'date': a.get('date'),
@@ -112,9 +112,8 @@ def answered_ground(chs):
     """Where an answer has the tracks follow the ground in an area, each height there takes the lidar ground and is marked,
     so that no rule drops it as a step steeper than any track; around the area the heights move part way, fading out over
     BLEND_REACH, so the edge makes no step, and are marked too (Královka: the ground climbs 61 cm in 5 m just past where
-    the arms meet, at the area's edge; dropped there, the track lay 49 cm under it) (the user, Královka and Malovanka, 2026-11-08: "Can you try fitting the tracks to
-    ground in the highlighted areas ... With smooth transition to the rest of tracks"). A lidar over GROUND_OTHER off is
-    another level and stays out."""
+    the arms meet, at the area's edge; dropped there, the track lay 49 cm under it) (maintainer, Královka and Malovanka,
+    2026-11-08). A lidar over GROUND_OTHER off is another level and stays out."""
     n = 0
     for g in GROUND_ANSWERS:
         near = g['area'].buffer(BLEND_REACH)
@@ -159,7 +158,7 @@ def step_answer_at(xy):
 
 
 def answer_at(xys, kinds=(HOLD,)):
-    """The user's answer (of `kinds`) at a place: the nearest within ANSWER_REACH of any of its points, else None. In an area
+    """The maintainer's answer (of `kinds`) at a place: the nearest within ANSWER_REACH of any of its points, else None. In an area
     where the tracks follow the ground, and the BLEND_REACH around it, that answer is the later word: it follows the data there."""
     g = next((g for xy in xys if (g := ground_at(xy, BLEND_REACH))), None)
     if g:
@@ -171,9 +170,9 @@ def answer_at(xys, kinds=(HOLD,)):
 
 
 def below_floor(xys):
-    """A 'follow the data' answer given since the floor (FLOOR_SINCE) at this place: the user's later word lets the radius give
-    way below the floor here. One given before it lets the radius give way only down to it (the user, 2026-11-07: "hold
-    minimum radius at 500m everywhere and get back with review cases which can't fit the rule")."""
+    """A 'follow the data' answer given since the floor (FLOOR_SINCE) at this place: the maintainer's later word lets the radius
+    give way below the floor here. One given before it lets the radius give way only down to it (maintainer, 2026-11-07:
+    the 500 m floor holds everywhere, the places that cannot fit it go to review)."""
     a = answer_at(xys, (FOLLOW,))
     return bool(a and FLOOR_SINCE and (a.get('date') or '') >= FLOOR_SINCE)
 
@@ -187,7 +186,7 @@ def load(truth):
 
 
 def staged_heights(path=None):
-    """The staged heights with the user's answers as evidence: imported now, or read from `path` if that import
+    """The staged heights with the maintainer's answers as evidence: imported now, or read from `path` if that import
     has this checkout's snapshot and the same reviewed spans."""
     import track_span_evidence as ev
     truth = json.loads((ROOT / 'data/truth.json').read_text(encoding='utf-8'))
@@ -210,8 +209,8 @@ def staged_heights(path=None):
 
 
 def answered_source(series):
-    """Where the user's step answer takes the archive: its height in each bin, and where it has none the bin is held, so the
-    curve bridges it (the user, Malostranské náměstí, 2026-11-06: "archive, bridge the gap")."""
+    """Where the maintainer's step answer takes the archive: its height in each bin, and where it has none the bin is held,
+    so the curve bridges it (maintainer, Malostranské náměstí, 2026-11-06)."""
     for x in series:
         a = step_answer_at(x['xy']) if x['xy'] and STEP_ANSWERS else None
         if not a or a['use'] != 'archive':
@@ -246,9 +245,9 @@ def answered_toward(chs):
     """Where a step answer moves the archive part way to survey + lidar (`toward`): each archive height within the answer's
     reach goes that share of the way to the mean of survey and lidar where they agree within TOWARD_AGREE, else to the
     lidar, fading out over the reach's last BLEND_REACH m so the edge makes no step; a height whose lidar lies on another
-    level (over TOWARD_OTHER away) stays (the user, Malovanka, 2026-11-07: "Let's pick the half option for malovanka now").
+    level (over TOWARD_OTHER away) stays (maintainer, Malovanka, 2026-11-07: the half-way option there).
     `from` names the sources it moves, the archive by default, and `other` how far the lidar may lie off for it to (Královka's
-    loop: DI too, up to 1 m off, no structure there and the user's photos showing the whole loop flush with the grass)."""
+    loop: DI too, up to 1 m off, no structure there and the maintainer's photos showing the whole loop flush with the grass)."""
     moved = 0
     # (by its own reach, not the nearest answer's: the next card 85 m on would cut it off half way, in a step)
     for a in [a for a in STEP_ANSWERS if a['toward']]:
@@ -442,15 +441,14 @@ def archive_before_lidar(chs):
     - Over: on paved track (the bin's `kind`: a style fact, OSM's surface, the survey's pavement at the axis;
       OVER_KINDS). A kerbed bed or a crown stands a little over the street, hence the larger margin. #539: line 9 at
       Bertramka, both tracks' records of 1999 humped up to 0.83 and 0.92 m over the lidar for 200 m, the lidar level
-      across the street with its kerbs (the user, 2026-11-21: "bertramka is embedded asphalt, same level as the road next
-      to it"); one track at Letenské náměstí, its record of 2013 on a 1.0 m plateau for 25 m beside a track on the lidar
-      (the user, 2026-11-22: "Letenské náměstí has both track at the same height ... there shouldn't be 1m step anywhere
-      near"). Calibrated where numeric DI has a height too (samples off structures, an older record 0.5-1.5 m over the
-      lidar): on paved track DI sides with the lidar at 71 of 76, where the construction is unknown at 23 of 52 (a
+      across the street with its kerbs (maintainer: the track there is embedded in asphalt, level with the road beside
+      it); one track at Letenské náměstí, its record of 2013 on a 1.0 m plateau for 25 m beside a track on the lidar
+      (maintainer: both tracks there at one height, no 1 m step anywhere near). Calibrated where numeric DI has a
+      height too (samples off structures, an older record 0.5-1.5 m over the lidar): on paved track DI sides with the lidar at 71 of 76, where the construction is unknown at 23 of 52 (a
       ballast bed on its own body, small bridges nothing marks).
     - Under: on paved track and track of unknown construction (UNDER_KINDS). Rails lie in the street's surface or over
-      the bed, so they cannot lie a fifth of a metre under the lidar between them (the user, 2026-11-14, on Bělohorská:
-      the track "doesn't sit lower"). Calibrated as over: UNDER_OFF. On paved track a stretch from SOURCES_EDGE under
+      the bed, so they cannot lie a fifth of a metre under the lidar between them (maintainer, 2026-11-14, on Bělohorská:
+      the track does not sit lower). Calibrated as over: UNDER_OFF. On paved track a stretch from SOURCES_EDGE under
       it counts where the bin's survey keeps to the record (SURVEY_WITH): the two are the street's old level.
     A track within BESIDE m of a stretch taken lies in the same street: where its own archive lies more than SOURCES_EDGE
     off the lidar the same way, it goes with it (no rail stays under its neighbour's bed).
@@ -549,7 +547,7 @@ def archive_over_di(chs):
     Sídliště Řepy, DI's outbound track humped 0.97 m over the lidar for 90 m, 0.7-0.9 m over the return track 3 m beside it,
     the archive within 0.2 m of the lidar; the support drawn under it stood 0.9 m over the other track's bed). Not on a
     structure (the bare-earth lidar and the archive both lie under a bridge, DI on it: up to 14 m apart), nor where both
-    tracks lie off the lidar (a rebuild may have raised them since the archive), nor where the user answered a step card."""
+    tracks lie off the lidar (a rebuild may have raised them since the archive), nor where the maintainer answered a step card."""
     tree = shapely.STRtree([c.line for c in chs])
     moved = 0
     for ci, c in enumerate(chs):
@@ -596,9 +594,8 @@ def archive_over_di(chs):
 
 def snap_to_neighbour(chs):
     """A sudden step or dip on one track that the track beside it does not have takes the neighbour's height, their slow offset
-    kept (the user, 2026-11-06: "snap to the other track on sudden jumps", "again use neighbor track when there are steps
-    and dips"). The tracks' real differences are kept: the offset is the median over 50 m either side, and a height only
-    moves if it left its own line by NEIGHBOUR_STEP while the neighbour stays near its line."""
+    kept (maintainer, 2026-11-06). The tracks' real differences are kept: the offset is the median over 50 m either
+    side, and a height only moves if it left its own line by NEIGHBOUR_STEP while the neighbour stays near its line."""
     offs = {}
     for ci, c in enumerate(chs):
         offs[ci] = {}

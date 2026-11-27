@@ -273,8 +273,8 @@ def checks(o):
     sp = o["sprung"]
     want(sp["tap"][:3] == [1, 1, 0] and sp["tap"][3] <= 0.2, f"the sprung lever tapped 0.2 s: lever, step, let go, s to the pedal off {sp['tap']}")
     want(sp["held"] == [4, 5, 5, 5] and sp["kmh"] > 3, f"the sprung lever held 1.9, 2.1, 4.1 s: {sp}")
-    # (let go as fast as N: the user, 2026-11-23, "the rate the current game simple controls goes when going from full power
-    # to neutral on neutral key press")
+    # (let go as fast as N: at the rate the simple controls go from full power to neutral on the neutral key; maintainer,
+    # 2026-11-23)
     want(sp["letGo"][0] == 0 and sp["n"][0] == 5 and abs(sp["letGo"][1] - sp["n"][1]) <= 0.04 and sp["letGo"][1] <= 0.5,
          f"drive step 5 let go: lever {sp['letGo'][0]}, the pedal off in {sp['letGo'][1]} s; after N {sp['n'][1]} s")
     want(sp["brake"][:3] == [-5, -5, 0] and abs(sp["brake"][3] - sp["brakeN"]) <= 0.04,
@@ -282,8 +282,8 @@ def checks(o):
     want(sp["set"] == 2 and sp["through"] == [1, 0, -1], f"a number key's step stays, brake held steps through 0: {sp}")
     want(sp["doors"] == [0, 1], f"drive held with the doors open stays at 0, then steps on: {sp['doors']}")
     want(sp["emergency"] == [-6, 0], f"the emergency stop held, then let go: {sp['emergency']}")
-    # (the user, 2026-11-23: "If player wants to brake after emergency he will hold the brake button while letting go of
-    # emergency brake button")
+    # (a player who wants to brake after the emergency stop holds the brake key while letting go of the emergency one;
+    # maintainer, 2026-11-23)
     want(sp["brakeBefore"] == [-6, -5, -5, 0] and sp["brakeDuring"] == [-6, -5] and sp["driveDuring"] == [-6, 0, 1],
          f"the emergency stop with brake held before it, brake pressed during it, drive during it: {sp}")
     f = o["feed"]

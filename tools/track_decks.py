@@ -214,7 +214,7 @@ def load_decks(root):
     facts = truth.get('trackHeights', {}).get('railAboveDeck', [])
     styles = []
     # (the facts as the build placed them on every line: data/lineN.json `styles`, tools/track_styles.py, #479: the
-    # user's marks and the grassed-track list; the survey's grass sections are not facts and stay out)
+    # maintainer's marks and the grassed-track list; the survey's grass sections are not facts and stay out)
     marks = truth.get('trackStyles', [])
     listed = truth.get('grassTrack', {}).get('stretches', [])
     for p in sorted((root / 'data').glob('line*.json'), key=lambda p: p.name):

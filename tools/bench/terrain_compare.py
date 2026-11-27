@@ -69,7 +69,7 @@ def mapy(lat, lon):
 
 def passage_covers(frame, shape, origin, city):
     """bool (rows, cols): cells within PASSAGE_R of an OSM passage inside the city (the rule's reach; the city
-    mesh had it until the user dropped the rule there, 2026-11-10)."""
+    mesh had it until the maintainer dropped the rule there, 2026-11-10)."""
     import osm_local
     import shapely
     from shapely.geometry import LineString

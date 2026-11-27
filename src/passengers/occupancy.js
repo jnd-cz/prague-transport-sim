@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), dist/traffic/occupancy.js, as it was (sha256 56c16fd032bb58f7);
-// accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
+// accepted by the maintainer as good enough for now (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
 // Session/simulation data only. No Three.js or DOM references.
 export function createSeatLedger(layout){
  const seats=layout.seats.map(s=>({id:s.id,status:'free',passengerId:null})),map=new Map(seats.map(s=>[s.id,s]));

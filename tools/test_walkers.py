@@ -2,7 +2,7 @@
 """Walkers with nowhere to go (#366, #269, #393): python -P -E tools/test_walkers.py (own free-port server, a page with
 no game in it). src/traffic.js `_updateWalkers` stepped on made-up walks and tracks:
 - between the two tracks of a crossing (the tracks near both ways) a walker leaves: it does not stand there turning
-  (line 17 s 2918, three walkers twitching in the user's report of 2026-11-18);
+  (line 17 s 2918, three walkers twitching in the maintainer's report of 2026-11-18);
 - along a track inside TRACK_CLEAR it keeps walking (turning there every frame froze it in a car's way, line 23 s 662);
 - towards a track it turns back before it and walks away, and pacing between a dead end and the tracks is no reason to
   leave; on a crossing over a reserved track it turns back onto the sidewalk it came from;

@@ -14,7 +14,7 @@ OSM's movements are looked for on the whole network, so a track a line leaves ou
 A point stands on any track within NEAR (OSM lies up to metres off, and a fork up to 48 m from DI's, Ohrada): a wrong
 connection between tracks closer than that goes unseen, and nothing here says which graph is right. Differences are a
 list to review, one per place, so the exit code stays 0. A di-only place can be OSM out of date (rebuilt track, 50.07847 N
-14.43178 E, the user 2026-11-06): each run says the extract's date, --latest asks Geofabrik whether a newer one exists.
+14.43178 E, maintainer, 2026-11-06): each run says the extract's date, --latest asks Geofabrik whether a newer one exists.
 """
 import heapq
 import json
@@ -35,7 +35,7 @@ from geo import Frame  # noqa: E402
 from track_fit import line_edges  # noqa: E402
 
 LEG = 15.0      # m before and after a junction: past the switch, whichever graph's fork lies nearer
-NEAR = 2.5      # m: a point stands on a track this near (the user: the closest tracks in OSM lie 2.5 m apart)
+NEAR = 2.5      # m: a point stands on a track this near (maintainer: the closest tracks in OSM lie 2.5 m apart)
 TURN = 60.0     # degrees at one node of a path; a tram does not turn more within a junction
 THROUGH = 30.0  # degrees at a junction's own node: more is two tracks crossing at a node OSM has not tagged
 SLACK = 1.25    # a path may be this much longer than the movement, plus SLACK_M: a graph's detour is another movement

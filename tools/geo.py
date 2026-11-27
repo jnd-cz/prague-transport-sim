@@ -107,7 +107,7 @@ class Frame:
 
 # The world's tiles: TILE m squares on the absolute S-JTSK grid, named by their south-west corner's index on it
 # (e-1486_n-2087: E -743,000, N -1,043,500, the tile holding the origin), so a name does not depend on the origin
-# (docs/decisions/2026-10-29-city-frame-and-tiles.md; the user's choice for #30, 2026-11-17). The build's lattices
+# (docs/decisions/2026-10-29-city-frame-and-tiles.md; the maintainer's choice for #30). The build's lattices
 # (5 and 25 m) divide it and lie on the same grid, so their lines meet a tile's border.
 TILE = 500.0
 

@@ -221,8 +221,8 @@ def main():
                 "the destination card in the leading car only": s["dest"][0] and all(s["dest"][0]) and not any(s["dest"][1]),
                 "the cards drawn (canvas)": s["destCanvas"] == 1024,
                 "each car its own fleet number": s["fleetOwn"],
-                # the user, 2026-11-10: "fix the hybrid's fleet number size" (0.14 m as on the photos; were 0.106 m on
-                # the ends, 0.13 m on the sides)
+                # the hybrid's fleet number size fixed (maintainer, 2026-11-10): 0.14 m as on the photos; were 0.106 m on
+                # the ends, 0.13 m on the sides
                 f"the fleet numbers' digits 0.14 m on all four quads ({[round(d, 3) for d in s['fleetDigits']]})": len(s["fleetDigits"]) == 4
                 and all(abs(d - 0.14) < 0.004 for d in s["fleetDigits"]),
                 "faded in: the fleet numbers stay blended (their clear canvas drew black)": s["fadedFleet"] == {"transparent": True, "depthWrite": False, "opacity": 1},
@@ -238,7 +238,7 @@ def main():
                 f"the tail lamps on the rear panel ({s['lamps'].get('tailAt')}), lit on every car": s["lamps"]["tails"][0] == s["lamps"]["tails"][1] > 1
                 and s["lamps"]["tailAt"][0][2] < -6.9 and 0.85 < s["lamps"]["tailAt"][0][1] < 1.1
                 and abs(s["lamps"]["tailAt"][0][0] + 0.57) < 0.01,
-                # the user, 2026-11-10: "in between cars only the rear red lights light up"
+                # between the cars only the rear red lamps light up (maintainer, 2026-11-10)
                 "the brake lamps on every car": s["lamps"]["brakes"] == [[True, True], [True, True]],
                 "the high beams' glow on the leading car, at its headlights (7.0 m ahead, 1.2 m up)": s["lamps"]["beams"] == [True, False]
                 and s["lamps"]["beamAt"] and 6.9 < s["lamps"]["beamAt"][0][2] < 7.2 and 0.8 < s["lamps"]["beamAt"][0][1] < 1.3,

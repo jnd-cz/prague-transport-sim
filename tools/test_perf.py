@@ -258,7 +258,7 @@ def main():
             card = page.text_content("#resultsCard")
             page.click("#ptSend")
             page.wait_for_function("document.getElementById('ptSend').textContent.includes('Sent')", timeout=20000)
-            # frames held to 68 ms each (the user's N100 nettop, 2026-11-15): the game still keeps real time (#609)
+            # frames held to 68 ms each (the maintainer's N100 nettop): the game still keeps real time (#609)
             page.click("#ptMenu")
             page.evaluate(SLOW.replace("MS", "68"))
             slow = perf_test(page, 120000)

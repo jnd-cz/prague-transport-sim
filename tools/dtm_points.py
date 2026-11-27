@@ -9,7 +9,7 @@
 # Source: https://mp.iprpraha.cz/arcgis/rest/services/Hosted/DTMP_CUR_TMISZNAK_B/FeatureServer/0
 # (open data hub item d4418172a31b46b7b875668eaa354f22). Points have no heights. The raw answer is a
 # snapshot input: raw/dtmpoints/lineN.json (tools/snapshot.py).
-# Checked at Palackého náměstí: the stop sign ~3 m from the OSM stop position / the user's photo, a
+# Checked at Palackého náměstí: the stop sign ~3 m from the OSM stop position / the maintainer's photo, a
 # "semafor" ~1 m from the tram signal pole at the island's tip (tram signals are coded "semafor" too).
 import json
 import math

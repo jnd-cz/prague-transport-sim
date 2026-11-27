@@ -2,7 +2,7 @@
 """An issue's session, started and finished the same way every time (#727; AGENTS.md, Start):
 
     python -I tools/session.py start N [--name short-name] [--agent claude|codex] [--fetch-raw]
-    python -I tools/session.py merge N [--discard]      # on the user's word only (AGENTS.md, Merge windows)
+    python -I tools/session.py merge N [--discard]      # on the maintainer's word only (AGENTS.md, Merge windows)
     python -I tools/session.py finish N [--discard]
 
 start: the issue's worktree beside the main checkout (../<repo>-N) on a new branch N-<short-name> from origin/main

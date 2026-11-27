@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The project's own passenger lab, street-life-boarding v14 (2026-10-27), dist/traffic/passenger-core.js, as it was (sha256 79d84c76ffbdca0d);
-// accepted by the user as "good enough for now" (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
+// accepted by the maintainer as good enough for now (2026-10-27). #249 step 1: brought in unchanged; step 2 fits it to the game.
 // Renderer-independent passenger identity, place ownership and door predicates.
 // Vehicle-specific routes, steps, queues and collision rules remain with adapters.
 import {createSeatLedger} from './occupancy.js';

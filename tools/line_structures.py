@@ -13,10 +13,10 @@ Every PROFILE_STEP m of the route (the page's profile step):
 - **ramps**: the parts of the spans where IPR's bare-earth lidar (tools/ipr_dtm.py: under a bridge it shows the ground
   or the passage beneath, on a ramp between walls the fill) lies within RAMP_GAP m of the rails: no void under the
   track, a walled ramp up to the bridge; pieces shorter than MIN_SPAN m are left out. They stay spans (the street beside
-  a walled ramp keeps its own level); the deck checks leave them out (lint groundUnderDecks; the user, 2026-11-14, #549, with Street View: line 17 s 3971-4152
-  and 7344-7504 are "ramp leading towards bridge with sharp wall like edge", s 4308-4359 has a pedestrian underpass
-  "and the bridge over street is further back"; the Krejcárek viaduct's span begins 6 m on its ramp). Where the lidar has
-  no ground, no ramp.
+  a walled ramp keeps its own level); the deck checks leave them out (lint groundUnderDecks; the maintainer, #549,
+  with Street View: line 17 s 3971-4152 and 7344-7504 are ramps up to a bridge between sharp-edged walls, s 4308-4359
+  a pedestrian underpass with the bridge over the street farther back; the Krejcárek viaduct's span begins 6 m on its
+  ramp). Where the lidar has no ground, no ramp.
 - **realDecks**: the spans the track lies on a deck in: the survey's bed under more than half of the span, or the
   bridge model (Geoportál Mosty 3D, data/lineN.geo.json buildings of kind 1) under more than DECK_SHARE of it. On
   OSM's bridges a sample without the model under the axis takes it 3.3 m to either side: the Krejcárek viaduct's

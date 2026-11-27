@@ -36,7 +36,7 @@ export function platformsOf({ data, route, backRoute }) {
   }
   // A platform both paths tie on (they run over its track the same way: line 9 from Řepy to Motol) serves both: the
   // other path gets it along its own s, not drawn again and without a sign of its own, its kerb and survey the drawn
-  // one's (the user, 2026-11-14, #419: platforms belong to the track, docs/architecture.md)
+  // one's (#419: platforms belong to the track, docs/architecture.md)
   for (const [plat, list] of also) for (const a of list) {
     const art = a.path === 'back' ? backRoute : route;
     if (art) platforms.push({ ...plat, rt: art, back: art !== route, s0: a.s0, s1: a.s1, side: a.side, ours: null, twin: true, shared: true });

@@ -312,7 +312,7 @@ export const SCENES = {
 
   // The same street, and a one-way street east over it 8 m past the track with no junction there (as short lanes inside a
   // junction in the data): a car on it from car 1's right gets to where their ways cross with car 1. Car 1 waits before
-  // the track, not on it for that car (line 23 s 329, seed 31, the user's picture, #602). Reports also car 1's clearance of
+  // the track, not on it for that car (line 23 s 329, seed 31, the maintainer's picture, #602). Reports also car 1's clearance of
   // the track's centre as car 3 crosses its way (x 0).
   crossPastTrack() {
     const T = build({ roads: [{ p: [[0, 60], [0, -60]], o: 1 }, { p: [[-60, -8], [60, -8]], o: 1 }], track: [[-150, 0], [150, 0]] });

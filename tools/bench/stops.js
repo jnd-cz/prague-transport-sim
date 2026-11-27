@@ -5,7 +5,7 @@
 // An approach runs from the first brake pedal with the stop within its braking distance at the autopilot's 0.65 m/s²
 // (and 10 m) until the tram stands there; a brake for a curve further out is not one, and driving on after it is fine.
 // flips: the drive pedal after the brake pedal inside an approach, by what allowed it: ahead (a tram ahead short of the stop
-// point: the user, #351, "unless you're following tram in front of you"), signal (a signal short of the stop point
+// point: maintainer, #351, "unless you're following tram in front of you"), signal (a signal short of the stop point
 // showed stop), car (a car on or crossing our track that it would stop for short of it), contact (a turn under a contact too fast for the
 // switch button, only the drive pedal can draw it), free (nothing: the plan changed its mind, which
 // is what must stay at 0). shoesAtSpeed: approaches where the shoe brakes came fully in above 8 km/h (LO dropped).
@@ -20,7 +20,7 @@
 // coasting and brake, coastStretches (coasting 20 m or more). In the wet: slipSecs, slideSecs, sandSecs, emergencies (the pedal to the floor),
 // slips and slides as episodes, slidesAtStops (a slide begun within 30 m before the stop point, #265).
 // Per stretch, the way to each stop (stretches: drive presses, brake applications, seconds from moving off the stop before it to standing
-// served at this one), as the user counted them on a ride, "drive + braking" (#396); held, the seconds of it standing or under 1.5 m/s
+// served at this one), as the maintainer counted them on a ride, "drive + braking" (#396); held, the seconds of it standing or under 1.5 m/s
 // by what the autopilot stopped for (signal, gauntlet for a single track's signal, car, tram, walker, junction, obstacle, none), the
 // last 30 m into the stop left out, and tt, the timetable's time there (departure to departure, so with this stop's dwell; #431);
 // arr and dep, standing at the stop and moving off it against its time in the timetable (#460).

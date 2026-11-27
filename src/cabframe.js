@@ -2,8 +2,7 @@
 // The cab's frame in the cab view (#246): the T3's windscreen posts, the pillars where the windscreen's wrap ends, the cab
 // window on the left up to the cab's rear wall and the front door on the right, drawn where the driver's eye sees them.
 // They turn with the head (Q / E), the zoom (G) and the cab's pitch and sway, so the view ends where the car's windows
-// end (the user, 2026-11-17: "keep real pillars and end the view where real window ends. Right side can have door view
-// there"). The geometry is the T3 model's (src/t3simple.js CAB); the ceiling band over it stays the screen's
+// end, the real pillars kept and the door in view on the right (maintainer, 2026-11-17). The geometry is the T3 model's (src/t3simple.js CAB); the ceiling band over it stays the screen's
 // (index.html #cab .roof) and is the top of every opening. A 2D canvas under the panel: a few polygons, each clipped at
 // the eye's near plane.
 import * as THREE from 'three';
@@ -14,8 +13,7 @@ const NEAR = 0.05;
 const LEAN = 0.25, LEAN_TO = 1.3; // the eye leans towards the window it looks out of: 0.25 m a radian, up to 1.3 rad
 // The driver's eye, over the seat of the T3's general arrangement (drawingdatabase.com Tatra-T3-1.gif, its plan view at
 // 20 mm a pixel): the seat 0.32 m left of the centre line, its backrest 1.4 m and its front edge 1.0 m behind the nose,
-// the eye over its middle (the user, 2026-11-17: "does the camera sit as real driver would, somewhat left off center? The
-// t3 drawing ... shows the driver's seat"). It was on the centre line 0.8 m behind the nose, about over the desk. Its
+// the eye over its middle, left of the centre as a real driver sits (maintainer, 2026-11-17). It was on the centre line 0.8 m behind the nose, about over the desk. Its
 // height is the old one: the drawing's side view has no seat. x left of the centre line, h over the rail, back from the
 // body's front; src/main.js places the camera there
 export const EYE = { x: 0.32, h: 2.39, back: 1.2 };
@@ -24,8 +22,7 @@ const dz = (z) => z - CAB.front;
 const SIDE = { window: CAB.window.map(dz), door: CAB.door.map(dz), wrap: dz(CAB.wrap) };
 const half = (d) => CAB.half(CAB.front + d);
 // The cab's rear wall, 1.62 m behind the nose on the general arrangement's plan view (docs/knowledge.md): it crosses the
-// cab window, so the cab has the window's front 0.57 m of 1.3 (the user, 2026-11-17: "start of the side window frame with
-// portion of the window on driver's side, then the back wall of the cabin starts"). It runs from the left side to the
+// cab window, so the cab has the window's front 0.57 m of 1.3 and then its back wall (maintainer, 2026-11-17). It runs from the left side to the
 // middle, where the drawing's partition turns diagonally to the front door's front jamb; that one is left out: the
 // door is in view from the seat ("door view").
 const REAR = -1.62;
@@ -53,8 +50,8 @@ function members() {
 }
 // The pillars in front of the door: where the windscreen's wrap ends, between it and the cab window (left) or the door
 // (right), the glass's rubber along their edges; and the windscreen's two posts, leaning back with the face. Those two
-// join its panes: 3 cm, the rubber gasket's black stripe down their middle (the user, 2026-11-17: "the window divider
-// frame I would make thinner with rubber gasket stripe in middle"; they were 6 cm, plain)
+// join its panes: 3 cm, the rubber gasket's black stripe down their middle (maintainer,
+// 2026-11-17; they were 6 cm, plain)
 function posts() {
   const L = [], w = SIDE.window, d = SIDE.door, wrap = SIDE.wrap, g = 0.012;
   L.push([side(1, w[1], wrap, 0.5, 3.4), COL.post, COL.postEdge]);
@@ -70,13 +67,12 @@ function posts() {
   return L;
 }
 // The rounded top corners of the openings by the pillars: the windscreen's ends, the cab window's front and the door's
-// (the user, 2026-11-17: "end of main window with rounded corners"): [side, d of the pillar's edge, the opening's way
+// (maintainer, 2026-11-17): [side, d of the pillar's edge, the opening's way
 // along the car (+1 forward)]
 const CORNERS = [[1, SIDE.wrap, 1], [1, SIDE.window[1], -1], [-1, SIDE.wrap, 1], [-1, SIDE.door[1], -1]];
 // The front door's four leaves (a tall pane over a lower one: src/t3simple.js draws them so from outside), two folding
 // to each jamb as it opens: open (0..1) folds each pair into a V standing into the cab, 80° at its most. They reach up
-// under the ceiling band, so the door's top is the windscreen's (the user, 2026-11-17: "door view where doors top end is
-// aligned with the front window top frame").
+// under the ceiling band, so the door's top is the windscreen's (maintainer, 2026-11-17).
 function door(open) {
   const L = [], [d0, d1] = SIDE.door, lw = (d1 - d0) / 4, th = open * 1.4, x0 = -half((d0 + d1) / 2);
   for (const [jamb, dir] of [[d0, 1], [d1, -1]]) {
@@ -149,8 +145,8 @@ export class CabFrame {
     }
     const yb = this.roof ? rectOf(this.roof).bottom * dpr : 0; // (the boxes kept between the changes that move them, #706)
     if (yb > 0) for (const c of CORNERS) this.corner(...c, yb, dpr);
-    // the mirror's picture stays on top of the frame (the user, 2026-11-17: "mirror view should stay on top of
-    // everything, not be hidden by other surface ... only menu can draw over it"; index.html #mirror is over the rest)
+    // the mirror's picture stays on top of the frame and everything but the menu (maintainer, 2026-11-17; index.html
+    // #mirror is over the rest)
     if (hole) {
       const b = rectOf(hole);
       if (b.width > 12 && b.height > 12) g.clearRect((b.left + 6) * dpr, (b.top + 6) * dpr, (b.width - 12) * dpr, (b.height - 12) * dpr);

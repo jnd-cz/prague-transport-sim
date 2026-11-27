@@ -8,8 +8,8 @@
 // `visible` is the game's (an obstacle pedestrian appears by it) and they come back with ?boxpeople.
 // An animated figure is one primitive, one draw call (its shirt, trousers and the rest were three before), and only
 // people in view are animated (the slots went by distance alone, to people behind the camera too): in the camera's view,
-// or in the right mirror's near the tram (people boarding, running for the doors; the user, 2026-11-24: "The main use
-// of mirrors in player's vehicle is to check is people finished boarding").
+// or in the right mirror's near the tram (people boarding, running for the doors: a driver's mirrors are
+// above all for seeing that boarding is done, maintainer, 2026-11-24).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { bindPose, middleBody, withStyle, styleOf, STYLES, SKIN_COLOR, HAT_COLOR } from './figures.js';
@@ -21,7 +21,7 @@ export const PEOPLE_FILES = ['assets/people/person-near.glb', 'assets/people/per
 const CAR_FAR = 140; // a car's distant passengers at most, of each posture (105 places, those walking in and out)
 
 // at most 64 animated figures, in within 80 m, out beyond 88 m; an animated one keeps its place against
-// a newcomer up to 5 m closer (the handoff's values, which the user tried on line 17); of them the full
+// a newcomer up to 5 m closer (the handoff's values, which the maintainer tried on line 17); of them the full
 // figure within 40 m, out beyond 46 m. (The lab switched at 21 m, where 13 % of the figure's 1,222 pixels
 // change visibly at 1080 px and the game's 62 deg: the face and the head's shading. At 40 m it is 48 pixels
 // of a 42 px tall figure; #251.)

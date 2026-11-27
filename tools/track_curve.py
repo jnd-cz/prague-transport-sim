@@ -49,7 +49,7 @@ SIGMAS = 1.0       # a point moves at most this many mean errors of its class (t
                    # limit; 2 on line 17: 6 bends over 10° inside tracks instead of 11, 32 joins over 1° instead of 39)
 GROW = 1.5         # the factor the tolerance grows by per round
 MIN_RADIUS = float(geometry_fact('min-radius-network'))  # m, 18: the radius a curve is held to over BEND_LONG (`min-radius-network`:
-                   # the user, "under 18m there shouldn't be anything like that"; `min-radius-passenger` says 20, but at
+                   # maintainer: no track curves under 18 m; `min-radius-passenger` says 20, but at
                    # 20 the fit moved DI's points up to 14 cm in curves DI draws at 18-20 m, all over the city)
 KINK_RADIUS = 15.0 # m: the radius over BEND: a shorter window sees a bend squeezed into a metre, a longer one averages it
                    # out; a sagitta of 3.3 cm, so that most of the scatter within TOL stays below it
@@ -673,8 +673,8 @@ class Network:
                 d = (d[0] * inward, d[1] * inward)
                 t0 = max(node[n]['dirs'], key=lambda t: abs(d[0] * t[0] + d[1] * t[1]))
                 dot = d[0] * t0[0] + d[1] * t0[1]
-                # (a track measured on the orthophoto always joins tangent: the user, "try to join smootly on both
-                # ends if possible (smallest angle)"; its points start metres from the switch)
+                # (a track measured on the orthophoto always joins tangent, smoothly at both ends where it can, at the
+                # smallest angle (maintainer); its points start metres from the switch)
                 photo = edges[k(n, seq[1] if j == 0 else seq[-2])][1] == 'ortho'
                 if abs(dot) >= math.cos(math.radians(START)) or photo:
                     sg = 1 if dot > 0 else -1

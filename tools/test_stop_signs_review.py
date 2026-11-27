@@ -27,15 +27,15 @@ class State(unittest.TestCase):
         self.assertEqual(R.sign_state(placed, ("dtmpoints", 0.6, 0.6)),
                          {"id": "A → B", "state": "matches", "how": "placed on the map", "now": "dtmpoints", "off": 0.85,
                           "at": [0.0, 0.0], "src": [0.6, 0.6]})
-        # in the plane, within 2 m of the DTM's sign (the user, 2026-11-18): 1.6 m along or across matches, 2.5 m holds
+        # in the plane, within 2 m of the DTM's sign (maintainer, 2026-11-18): 1.6 m along or across matches, 2.5 m holds
         self.assertEqual(R.sign_state(placed, ("dtmpoints", 0.0, 1.6))["state"], "matches")
         self.assertEqual(R.sign_state(placed, ("dtmpoints", 2.5, 0.0))["state"], "holds")
-        # only the DTM's: OSM's stop position on the track's centre line never retires the user's sign
+        # only the DTM's: OSM's stop position on the track's centre line never retires the maintainer's sign
         self.assertEqual(R.sign_state(placed, ("osm", 0.3, 0.0))["state"], "holds")
         self.assertEqual(R.sign_state(self.fact(R.OPTIONS[1]), ("osm", 0.3, 0.0))["state"], "holds")
         self.assertEqual(R.sign_state(placed, None), {"id": "A → B", "state": "holds", "how": "placed on the map", "now": None,
                                                       "off": None, "at": [0.0, 0.0], "src": None})
-        # placed 1.6 m from the DTM's sign the card showed (its pin): the user set theirs apart, it holds (Královka)
+        # placed 1.6 m from the DTM's sign the card showed (its pin): the maintainer set theirs apart, it holds (Královka)
         self.assertEqual(R.sign_state(self.fact(R.PLACED, pin=[1.6, 0.0]), ("dtmpoints", 1.6, 0.05))["state"], "holds")
         # with the pin recorded: the source still there holds, gone elsewhere changed
         pinned = self.fact("placed on the map", pin=[5.0, 0.0])

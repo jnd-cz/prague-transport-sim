@@ -84,7 +84,7 @@ export function circles(as, next = waitsFor) {
   return out;
 }
 
-// Does o come from c's right (#560, the user, 2026-11-24: "the traffic rule that car on the right should go first")? Their
+// Does o come from c's right (#560: the car from the right goes first)? Their
 // poses { x, y, hx, hy }: o heads across c's way from right to left (its heading turned left of c's by 0.5 to π − 0.5,
 // read as turnOf in src/traffic.js reads a turn) and stands on c's right, within `near` m.
 export function fromRight(c, o, near = 25) {

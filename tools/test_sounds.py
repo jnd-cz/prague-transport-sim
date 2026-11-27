@@ -4,7 +4,7 @@
 Usage: python -P -E tools/test_sounds.py [--line 17] [--stop 13] [--secs 240] [--impacts-only]
 
 Beside the shipped pack (tools/test_contactor_pack.py), this test makes a sample basic pack for the built-in car,
-short generated WAVs for the seven sounds the user named first (2026-11-11, PR #462: the door alert, the main bell,
+short generated WAVs for the seven sounds the maintainer named first (PR #462: the door alert, the main bell,
 accelerating under power, idle, switches and crossings, the curves' screech, the doors opening and closing), and
 serves it to the page as a package listed in assets/vehicles.json. Then, once with the hybrid (no pack: the built-in
 sounds) and once with the built-in car (the sample pack picked in the menu's Sounds), on line --line: the bell rung and a door cycle raise their

@@ -15,7 +15,7 @@ reads only what those two wrote, and only the first group writes data/lineN.json
   dtm → zps_source (lines with surveyed streets, not those in dtm_packages.HOLD: the areas, then
     the source lines for review mode)
 then placement (the signals and the platforms placed, and the stop types from the survey's areas: after dtm, #701),
-then track_styles (the user's marks, the grassed-track list and the survey's grass track with their holes, and the
+then track_styles (the maintainer's marks, the grassed-track list and the survey's grass track with their holes, and the
 rails' height over the bed, #479, #503, #480: it reads the survey's areas and writes data/lineN.json), then ipr_pits once
 (IPR's pits under the survey's streets filled from their rim, data/ipr.fills.json from every line's survey: the steps
 after it read the raster so, #867; dtm and track_styles before it read it as it is), then line_heights
@@ -87,7 +87,7 @@ def writers(line):
     """The steps that read build_line's output and write beside it, in order."""
     out = [["platforms.py", "--line", line], ["osm_speeds.py", "--line", line], ["cant.py", "--line", line], ["clearances.py", "--line", line],
            ["dtm_points.py", line]]
-    # (the user, 2026-11-06, #348: "should solve their placement before we populate them elsewhere", #22)
+    # (OSM's signals on line 17 alone: their placement solved there before they go elsewhere; maintainer, #348, #22)
     if line == "17":
         out.append(["osm_signals.py", line])
     # (the validation counts OSM's signals as found before placement places them, #22)

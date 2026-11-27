@@ -10,7 +10,7 @@ of `paved` lies more than 1 m off IPR's lidar, against 0-4 % for the street clas
 (src/terrain.js DtmSurface: its triangles split to 5 m, the new points inside on the lidar, the outline keeping the
 survey's heights; #276's ground built offline will cut the terrain mesh by it instead: on line 37 that mesh as JSON was
 750,000 triangles and 24 MB more):
-- a lawn always, as main's page draped every lawn, unless the rails, DMR 5G or the user hold it off IPR (HELD; the
+- a lawn always, as main's page draped every lawn, unless the rails, DMR 5G or the maintainer hold it off IPR (HELD; the
   drape's points inside also let the page lay a lawn by a grass track to its bed: left a sheet, lawns covered the rails
   on line 22 and let the terrain through on line 17);
 - a railway yard, a paved yard or a parking area where it lies open on IPR's ground (DRAPE: zps_ground's verdict within
@@ -35,7 +35,7 @@ import shapely
 
 INSIDE = {"rail", "green", "paved", "parking"}  # the classes with heights only on their outline (measured above)
 DRAPE = {"fits", "lidar", "uneven"}  # zps_ground.judge's verdicts of an area lying open on IPR's ground
-HELD = {"survey", "review", "changing"}  # its verdicts holding an area off IPR (the rails, DMR 5G, the user; a building site)
+HELD = {"survey", "review", "changing"}  # its verdicts holding an area off IPR (the rails, DMR 5G, the maintainer; a building site)
 # m: the sheet misses the ground where the 95th percentile of |sheet - IPR| inside is over this (zps_ground's OFFSET);
 # a sheet that fits stays (a paved yard draped on the lidar's 2 m terrain in 5 m triangles counted 8 cm waves the
 # street check reads: line 9's streetWaviness 2348 -> 2617 with every open area draped)

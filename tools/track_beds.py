@@ -4,8 +4,8 @@
     python -P -E tools/track_beds.py --line 37              # the widths' report (track_styles.py writes them)
     python -P -E tools/track_beds.py --calibrate 9,17,22,23,37   # the style widths, measured on the survey
 
-The user, 2026-11-13: "The track style is too narrow, it should cover wider area, particularly in between the tracks
-running together in both direction should be filled with the same style". Until #547 every bed was a 2.7 m ribbon.
+The track style was too narrow: it should cover a wider area, the strip between two tracks running together in both
+directions filled with the same style (maintainer, #547). Until #547 every bed was a 2.7 m ribbon.
 
 Each side of a track, every `heights.step` m along its `p` (as `zs`), from its axis:
 - **in the survey's area of its style** (tram for paved track, green for grass, rail for ballast: GROUP): out to that

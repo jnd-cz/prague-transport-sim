@@ -122,7 +122,7 @@ class TrafficScenes(unittest.TestCase):
         self.assertIsNotNone(r['through'])
 
     def test_a_car_waits_before_the_track_for_one_crossing_its_way_past_it(self):
-        # (#602, line 23 s 329, seed 31, the user's picture: before, the car went on and met the crossing one 8 m past the
+        # (#602, line 23 s 329, seed 31, the maintainer's picture: before, the car went on and met the crossing one 8 m past the
         # track, the two 0.23 m inside each other)
         r = self.play('crossPastTrack')
         self.clean(r)
@@ -161,7 +161,7 @@ class TrafficScenes(unittest.TestCase):
         self.assertEqual(r['heads'], {})
 
     def test_of_a_circle_of_cars_the_one_with_nobody_on_its_right_goes(self):
-        # (#560, the user, 2026-11-24: "the traffic rule that car on the right should go first"; a junction at 0,0, the
+        # (#560, maintainer: the traffic rule that the car on the right goes first; a junction at 0,0, the
         # cars 6 m before it on their lanes, 1.75 m right of the roads' middles)
         r = self.page.evaluate('''async () => {
           const { Traffic } = await import('/src/traffic.js');

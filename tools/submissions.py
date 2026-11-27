@@ -48,8 +48,8 @@ DEST = _dest()
 HOSTED = os.path.join(DEST, "hosted")   # accepted packs the project hosts: deploy uploads them as hosted/<name>
 ID = re.compile(r"sub-\d{8}-\d{6}-[0-9a-f]{8}")
 VERSION = re.compile(r"\d+\.\d+\.\d+")   # (a package's: major.minor.patch, src/packages.js manifestProblems)
-# (the caps of tools/submit.php, which tools/serve.py applies locally: change both. The user, 2026-11-15, #580: "these
-# sound like reasonable limits for now": 10 an hour from everyone together, 64 MB each, 2 GB kept until a pull)
+# (the caps of tools/submit.php, which tools/serve.py applies locally: change both. The limits the
+# maintainer accepted for now, #580: 10 an hour from everyone together, 64 MB each, 2 GB kept until a pull)
 MAX_META = 65536          # bytes of the meta field
 MAX_CONTACT = 200         # characters: an email or a Discord name
 MAX_NOTE = 2000

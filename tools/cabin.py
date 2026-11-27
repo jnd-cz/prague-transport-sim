@@ -14,9 +14,9 @@ filled and emptied, and 10 out / 10 in, both exit policies, with the lab's check
 (src/passengers/exit-flow.js GAME_PACE; --pace JSON for another): the times in through the doors and out.
 --model defaults to the game's assets/t3h/tatra-t3-hybrid-nc.glb; the lab's own GLB with --lab-floor reproduces its files
 (without it the floor behind the cab's partition by the front door is open floor: the cab's control panel no longer marks
-it as a fixture by its box; the user, 2026-11-25). --packing adds an adaptive packing with those options
+it as a fixture by its box; maintainer, 2026-11-25). --packing adds an adaptive packing with those options
 (adaptivePacking's: id, padding, trials; {"search": {...}} the search's own, tools/cabin/packing-search.js).
---game LAYOUT writes the game's cabin, assets/passengers/t3-cabin.json: one packing (--packing-id, the user's s16f by default: the
+--game LAYOUT writes the game's cabin, assets/passengers/t3-cabin.json: one packing (--packing-id, the maintainer's s16f by default: the
 search with 16 headings on 2 cm, 3000 moves, seed 1, 105 people a car) and the navigation grid beside the layout;
 --packing-from LAYOUT2 takes the packing from another layout of the model, each place checked to stand on LAYOUT's open floor
 (the game's: the 81 places searched on the lab's floor, on the corrected one, where the same search packs 80).
@@ -170,9 +170,9 @@ def timings(result):
 
 
 GAME = os.path.join(ROOT, "assets", "passengers", "t3-cabin.json")
-GAME_PACKING = "s16f"  # (the user, 2026-11-25, #249: "ok let's keep the 105 people per car": the search, 16 headings on 2 cm)
-# m over the top of rail: the game's platforms (src/platforms.js), for the lab's fixed 0.23 at the doors (the user's rules for
-# #249 step 2: "the lab's fixed 0.23 m platform becomes the surface at that door"); it places the people only, no time
+GAME_PACKING = "s16f"  # (maintainer, #249: 105 people per car kept: the search, 16 headings on 2 cm)
+# m over the top of rail: the game's platforms (src/platforms.js), for the lab's fixed 0.23 at the doors (#249 step 2:
+# the lab's fixed 0.23 m platform becomes the game's surface at that door); it places the people only, no time
 GAME_PLATFORM_Y = 0.18
 
 

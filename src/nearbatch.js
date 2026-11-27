@@ -3,7 +3,7 @@
 // trees) keeps every instance, and draws those within its range, refilled as the camera moves. One draw call
 // as before, without the line's far instances: the trees were 294 k triangles in every view at Spojovací
 // (line 37), most of them out of view or past the fog.
-// The range comes from the thing's size on screen, the user's rule (2026-11-15): "hide the small things far away".
+// The range comes from the thing's size on screen, the maintainer's rule (#610).
 // Upright things (a hydrant, a crown) go when they would stand under UPRIGHT_PX pixels tall; flat ones on the
 // ground (a manhole cover) are seen at a grazing angle from the cab's eye EYE m up, their height on screen
 // size * EYE / d^2, and go under FLAT_PX. Nothing is drawn past the fog's end. The zoom key and a larger

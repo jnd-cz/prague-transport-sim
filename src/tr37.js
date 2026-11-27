@@ -37,8 +37,8 @@ export const TR37_SPEC = {
   br1Angle: 9.5,             // BK9 opens between brake steps 2 and 3
   pedalRate: 20,             // °/s a held key moves a pedal (0 to the stop in 2 s)
   footRate: 45,              // °/s a pedal goes to the step asked for: a firm press, ≈0.5 s to brake step 5 [assumed]
-  leverRate: 2,              // steps/s the Simple controls' lever moves held, and back to 0 let go (the user, 2026-11-23:
-                             // "Let's try 2 notches per second", #837)
+  leverRate: 2,              // steps/s the Simple controls' lever moves held, and back to 0 let go (maintainer,
+                             // #837)
   // currents (A, car)
   driveCurrent: [220, 290, 360, 420, 480],   // [ckd03] p. 4
   brakeCurrent: [160, 211, 262, 306, 350],   // step 5 [ckd26] p. 4; steps 1–4 from the wiring diagram (§ 8.2)
@@ -290,8 +290,8 @@ export class TR37 {
     else this.goal = { drive: 0, brake: 0 };
   }
   // a gamepad's trigger (#592): the pedal straight on step n's angle, as setStep's, the other one released; how fast it
-  // goes from one step to another is the player's foot on the trigger (the user, 2026-11-14: "it's up to their skill to
-  // vary the rate of change themselves"). Drive waits for the ratchet released, as a tap does.
+  // goes from one step to another is the player's foot on the trigger, their own skill
+  // (#592). Drive waits for the ratchet released, as a tap does.
   pressTo(n) {
     const P = this.pedal;
     this.goal = null;
@@ -319,8 +319,8 @@ export class TR37 {
 
   // arcade: the lever is sprung (#837). Drive or brake held (dir +1 / −1) moves it a step at once and on at leverRate, through
   // 0 from the other side; held 2 s it is on step 5. Let go (dir 0), it is on 0 at once, as N puts it: the helper lifts the
-  // pedal at twice footRate, from drive step 5 in 0.4 s, from brake step 5 in 0.26 s (the user, 2026-11-23: "the rate the
-  // current game simple controls goes when going from full power to neutral on neutral key press"). A tap drives or
+  // pedal at twice footRate, from drive step 5 in 0.4 s, from brake step 5 in 0.26 s (the Simple controls' rate from full
+  // power to neutral on N, #837). A tap drives or
   // brakes for as long as the finger is down. (While the emergency stop is held, −6, drive or brake held waits for it.)
   press(dir) {
     this.leverT = 0;
@@ -329,8 +329,7 @@ export class TR37 {
     this.lever = dir ? Math.max(-5, Math.min(5, this.lever + dir)) : 0;
   }
   // the emergency stop (Space / STOP) held, −6; let go, brake step 5 where brake is held, else 0 (drive held steps on from
-  // there): the user, 2026-11-23, "If player wants to brake after emergency he will hold the brake button while letting go
-  // of emergency brake button"
+  // there): maintainer, 2026-11-23
   emergency(on) {
     this.leverT = 0;
     this.lever = on ? -6 : this.held < 0 ? -5 : 0;
@@ -413,8 +412,8 @@ export class TR37 {
       else if (now < 0 && s < now && e < 0.3) s = now;
       // (a high step comes off sooner: each takes 0.6 s on the way down, and up 50 ‰ on step 4 it went 2.8 km/h over the limit)
       else if (now > 0 && s >= 0 && e < 0.2 - 0.25 * (now - 1) && e > -0.7) s = now;
-      // (once it let go, it coasts down w.holdSag under the speed before it presses again, 1 m/s at 30 km/h and over: the user, 2026-11-08,
-      // "The hysteresis for speed under limit when another pedal press starts can be higher, which will lead to less presses"; at 0.35
+      // (once it let go, it coasts down w.holdSag under the speed before it presses again, 1 m/s at 30 km/h and over: a wider band, fewer
+      // presses, maintainer, 2026-11-08; at 0.35
       // the autopilot pressed 12.5-14.7 times a km on line 23, a driver 5.8 on a phone's count)
       else if (now === 0 && s > 0 && e > -(w.holdSag ?? 0.35) && v > 1) s = 0;
       else if (now === 0 && s < 0 && e < 0.25) s = 0;
@@ -428,9 +427,8 @@ export class TR37 {
     if (w.power === true) s = Math.max(1, s);
     if (w.power === false) s = Math.min(0, s);
     if (w.noDrive) s = Math.min(0, s);
-    // a wheel that spins: noticed after 0.5 s, the pedal off for 0.6 s, and back on a step lower, the cap held 6 s [assumed]; the user,
-    // 2026-11-04: "the wheel spin up quickly and the reaction of real driver is slower. They ease of the drive and try again with less
-    // power". Spinning, the rail gives half its peak (#265's creep curve), and a step or two less still pulled more: stepped down one
+    // a wheel that spins: noticed after 0.5 s, the pedal off for 0.6 s, and back on a step lower, the cap held 6 s [assumed]; a wheel spins
+    // up fast and a real driver reacts slower, eases off the drive and tries again with less power (#265). Spinning, the rail gives half its peak (#265's creep curve), and a step or two less still pulled more: stepped down one
     // at a time the spin went on through steps 4 to 1, and on step 1, the lowest, for good (109 s of a 150 s drive up 50 ‰ on leaves)
     A.slipT = (A.slipT || 0) - w.dt;
     A.slideT = (A.slideT || 0) - w.dt;
@@ -467,7 +465,7 @@ export class TR37 {
     // with the pedal held, as far as coasting reaches, and the last metres' rule below takes over without a new press. Let off where the
     // plan found it ahead of its curve, it was off at 12.7 m and 11.5 km/h and on again at 6 m, or off 2–3 m out at 3–6 km/h and on
     // again to stand, or off after braking for a lower limit 70-130 m out and on again for the stop: 27 of 45 stops on line 9 took two
-    // brake presses or more, seed 2; the user, 2026-11-15: "consistently stop in a single pedal press", #502)
+    // brake presses or more, seed 2; a stop in a single pedal press, #502)
     // (only where the stop's own braking would begin within ≈3 s at 0.9 m/s²: held from further out, step 1 took away speed that the drive
     // pedal had to give back)
     if (w.holdBrake && now < 0 && s === 0 && w.power !== true && !w.stand && v > 0.05 && w.stopDist != null) {

@@ -41,8 +41,8 @@ class Records(unittest.TestCase):
 
     def test_an_interlaced_branch_beside_a_joint_leaves_the_track_whole(self):
         # Ke Stírce: the branch starts 11.7 cm beside the through track's record joint; met there, the node lay on the
-        # branch and line 17 stepped 12 cm through it. The user, 2026-11-07: "intarlaced switch here, same case as
-        # Čechův most"
+        # branch and line 17 stepped 12 cm through it. An interlaced switch, the same case as Čechův most (maintainer,
+        # 2026-11-07)
         branch = [(50, 0.117), (90, 0.117)] + [(x, y + 0.117) for x, y in turnout(90)[1:]]
         di = dt.Source('di', [rec(1, [(0, 0), (50, 0)]), rec(2, [(50, 0), (200, 0)]), rec(3, branch)])
         ids = lambda c: [r['id'] for r in c['records']]
@@ -60,8 +60,8 @@ class Records(unittest.TestCase):
 
     def test_two_interlaced_tracks_split_at_the_same_places_stay_two(self):
         # Nádraží Libeň: both tracks split every 6-27 m, their joints 10.7 cm apart; met there, the through track's
-        # records were dropped as copies of the branch's and line 37 ran the branch. The user, 2026-11-07: "there should
-        # be two tracks running with a small shift that corresponds to the current jolts"
+        # records were dropped as copies of the branch's and line 37 ran the branch. Two tracks run there, shifted by
+        # as much as the jolts were (maintainer, 2026-11-07)
         cuts = [0, 6, 33, 39]
         a = [rec(10 + k, [(cuts[k], 0), (cuts[k + 1], 0)]) for k in range(3)]
         b = [rec(20 + k, [(cuts[k], 0.107), (cuts[k + 1], 0.107)]) for k in range(3)]

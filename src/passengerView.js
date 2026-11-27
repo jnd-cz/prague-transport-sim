@@ -3,15 +3,14 @@
 // the figures (src/people.js), drawing only: it reads the core and writes nothing back, so a seeded run counts the same
 // with or without it. Only a model whose manifest names its cabin (`passengers`; today the hybrid T3's, assets/passengers/).
 //
-// The frames (the user's rules for #249, 2026-11-25): a passenger on the car (its floor or its entry steps) is drawn in the
+// The frames (the maintainer's rules for #249): a passenger on the car (its floor or its entry steps) is drawn in the
 // car's own frame, a child of its model's node, so they sway, pitch and lean with the body and are hidden with it (the cab
 // view) and shown with it (the mirror, the outside views); one on the platform is drawn in the world, on the car's frame
 // without its lean (the platform does not lean with the body). The switch is at the platform's edge. The counted passengers
 // (above the 105 places) are drawn only on the steps and outside. A boarder first seen at the queue walks there from one of
 // the stop crowd's places (src/gameView.js crowdSpots), which then stays empty; a runner, or one who walked in while the tram
-// stood (src/game.js runners, the boarder's `who`), is the same figure on: their key, look and place go on into the queue (the
-// user, 2026-11-26: "Can we keep the single model and transition him smoothly from running to queueing for door and getting
-// inside, with the same stats?"). One who alighted walks from where the core lets them go to a lane along the platform and on
+// stood (src/game.js runners, the boarder's `who`), is the same figure on: their key, look and place go on into the queue and
+// inside (#249). One who alighted walks from where the core lets them go to a lane along the platform and on
 // to its nearer end, and goes. With the front door alone open (Dveře I), one sent there from the other car is the same figure on.
 import * as THREE from 'three';
 
@@ -38,7 +37,7 @@ export class PassengerView {
 
   // the records of our set's passengers for this frame (src/people.js sync's): { recs, cars: the car nodes }; model: our
   // set's model, posed for this frame; gameView: its crowd's places; shows: the model shows passengers (its manifest's
-  // `passengers`: working doors, a saloon and a cabin measured from it, accepted by the user; docs/vehicles.md)
+  // `passengers`: working doors, a saloon and a cabin measured from it, accepted by the maintainer; docs/vehicles.md)
   sync(game, model, gameView, shows = true) {
     const recs = this.recs;
     recs.length = 0;
