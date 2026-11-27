@@ -78,15 +78,15 @@ export function createConsist(layout, { cars, crush, rand }) {
     return out;
   }
 
-  // the boarders not yet given a car go to the one with the most room (the fewest coming, then the front first); a runner to the
-  // rear car's rear door (src/game.js _spawnRunners)
+  // the boarders not yet given a car go to the one with the most room (the fewest coming, then the front first); one who walked or
+  // ran in while the tram stood to the door they came to (src/game.js _spawnWalker)
   function assign() {
     for (let i = 0; i < platform.length;) {
       const b = platform[i];
       const car = b.car != null ? (room(set[b.car]) > 0 ? set[b.car] : null)
         : set.filter((c) => room(c) > 0).sort((x, y) => room(y) - room(x) || incoming(x) - incoming(y) || x.k - y.k)[0];
       if (!car) { i++; continue; }
-      car.c.enqueue(1, null, b.door, { waitForPlace: true, extra: { tag: b.tag, stands: b.stands, runner: b.car != null } });
+      car.c.enqueue(1, null, b.door, { waitForPlace: true, extra: { tag: b.tag, stands: b.stands, runner: b.car != null, who: b.who } });
       platform.splice(i, 1);
     }
   }
@@ -110,8 +110,13 @@ export function createConsist(layout, { cars, crush, rand }) {
       for (const car of set) for (const a of actorsOf(car)) if (!a.aboard && !a.exiting && a.tag === tag) n++;
       return n;
     },
-    // n boarders of a stop (tag) on the platform; car and door for a runner's
-    board(n, tag, { car = null, door = null } = {}) { for (let i = 0; i < n; i++) platform.push({ tag, car, door, stands: stands() }); },
+    // n boarders of a stop (tag) on the platform; car and door for one who came while the tram stood there (walking or running), and who
+    // they were (src/game.js: their figure walks on as the boarder, src/passengerView.js; queued at once, so that it does in the
+    // same step)
+    board(n, tag, { car = null, door = null, who = null } = {}) {
+      for (let i = 0; i < n; i++) platform.push({ tag, car, door, who, stands: stands() });
+      if (who) assign();
+    },
     // n of those aboard and not yet leaving alight: the nearest to a door in the whole set by walking, the counted ones first
     // (in the doorways), one car after another; the number scheduled
     // (the ones chosen when the stop came near, if it was this many: ready)
@@ -136,13 +141,17 @@ export function createConsist(layout, { cars, crush, rand }) {
       for (const car of set) moving += car.c.ready(readied.cars[car.k].ids, { speed: READY_SPEED, gap: READY_GAP });
       return moving;
     },
-    // the boarders of a stop not yet on the steps go home (the doors closed on them, or the set is full); the number
-    abandon(tag) {
+    // the boarders of a stop not yet on the steps go home (the tram leaves the stop without them); the number
+    // (out: an array for who those gone were, src/game.js: one who walked or ran in goes back to the platform)
+    abandon(tag, out = null) {
       let n = 0;
-      for (let i = platform.length - 1; i >= 0; i--) if (platform[i].tag === tag) { platform.splice(i, 1); n++; }
-      for (const car of set) for (const a of car.c.abandon((a) => a.tag === tag)) { n++; if (a.counted) car.flight--; }
+      for (let i = platform.length - 1; i >= 0; i--) if (platform[i].tag === tag) { if (platform[i].who) out?.push(platform[i].who); platform.splice(i, 1); n++; }
+      for (const car of set) for (const a of car.c.abandon((a) => a.tag === tag)) { n++; if (a.counted) car.flight--; if (a.who) out?.push(a.who); }
       return n;
     },
+    // the boarders of a stop at the doors and not yet on the steps, left where they are (the doors closed on them: they wait at
+    // them and get on when they open again, #249); the passengers
+    outside(tag) { return set.flatMap((car) => car.c.outside((a) => a.tag === tag)); },
     // boarders waiting on the platform with no room in any car and nobody left to alight
     get full() { return platform.length > 0 && set.every((c) => room(c) <= 0 && outgoing(c) === 0); },
     // those of a stop still on the platform stay there (the set is full); the number

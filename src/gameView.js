@@ -249,15 +249,15 @@ export class GameView {
     mesh.rotation.y += ob.turn;
   }
 
-  // the late passengers running along the platform to the rear door (bobbing while they run); gone once aboard or
-  // left far behind
+  // those walking in along the platform to the doors, and running for the tram (bobbing while they run, #249); gone once aboard
+  // or left far behind
   _runners() {
     const g = this.game, live = new Set();
     for (const r of g.runners) {
       live.add(r);
       let mesh = this.runners.get(r);
       if (!mesh) { mesh = makePerson(r.model); this.objects.add(mesh); this.runners.set(r, mesh); }
-      const o = g.route.offset(r.s, r.lat), bob = r.state === 'run' ? Math.abs(Math.sin(r.s * 2.2)) * 0.08 : 0;
+      const o = g.route.offset(r.s, r.lat), bob = r.ran && r.state === 'walk' ? Math.abs(Math.sin(r.s * 2.2)) * 0.08 : 0;
       mesh.position.set(o.x, g.profile.height(r.s) + 0.18 + bob, -o.y);
     }
     for (const [r, mesh] of this.runners) if (!live.has(r)) { this.objects.remove(mesh); this.runners.delete(r); }

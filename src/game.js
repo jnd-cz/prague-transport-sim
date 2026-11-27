@@ -47,6 +47,11 @@ export const fmtDev = (d) => {
   return `${sign}${Math.floor(d / 60)}:${String(d % 60).padStart(2, '0')}`;
 };
 
+// (#249) those walking in while the tram stands at a stop (src/game.js _updateRunners): their walk and their run (m/s, the base and
+// the drawn span); one runs once a walk would not reach the door RUN_IF s before the departure time but a run would RUN_HOPE s after
+// it; WAITED_FOR points each one running for the tram the driver waited for who got on
+const WALK_V = [1.2, 0.3], RUN_V = [3.4, 0.6], RUN_IF = 2, RUN_HOPE = 8, WAITED_FOR = 5;
+
 export class Game {
   constructor(data, route, tram, audio, opts) {
     this.data = data;
@@ -81,7 +86,9 @@ export class Game {
     this.deadmanHeld = false;
     this.deadmanTimer = 0;
     this.action = null; // { label, t, done }
-    this.runners = []; // late passengers running for the tram (C14)
+    this.runners = []; // those walking in while the tram stands at a stop, and running for it (C14; #249)
+    this.came = { aboard: 0, left: 0, ran: 0, waited: 0 }; // (of those walking in: boarded, left behind, ran, waited for and got on;
+    // per stop st.came; tools/bench/stops.js)
     this.holdTimer = 0;
 
     this.profile = route.ground.profile;
@@ -132,6 +139,9 @@ export class Game {
     // stream of their own (a passenger's draws leave the rules' and the traffic's as they were); the count is theirs
     this.pax = createConsist(opts.cabin, { cars: tram.cars, crush: T3.crushCapacity, rand: rng((opts.seed ?? 12345) ^ 0x2490) });
     this.paxProblems = []; // (what pax.check() found at the stops: none, or a count or a place gone wrong)
+    // (#249) those coming to a stop while the tram stands there (_comeTo): a stream of their own, so the passengers', the rules'
+    // and the traffic's draws stay as they were
+    this.comeRand = rng((opts.seed ?? 12345) ^ 0x249c);
     // a run from the line's first stop, its terminus, starts empty and nobody alights there (the user, 2026-11-26, #249: "The
     // first stop off any line should always start with empty car and people are only going inside", "The rule should apply
     // only at first terminus stop"); from any other stop, the one where the run takes its next line too, with those aboard
@@ -143,6 +153,7 @@ export class Game {
     this.nextStop = opts.startStop;
     st.arrived = true;
     st.arriveClock = this.clock;
+    this._comeTo(st);
   }
 
   // ------------------------------------------------------------------ setup
@@ -159,17 +170,23 @@ export class Game {
       const demand = demandAt(this.trip[i]); // peak hours bring crowds
       let waiting = Math.floor(r() * (8 + central * 14) * demand);
       if (request && r() < 0.55) waiting = 0;
+      const alightFrac = 0.08 + r() * 0.25 + central * 0.05;
+      // (the late runners' draws, kept so that the stream after them stays: they are drawn no more, those walking in who see the
+      // tram and can still catch it run, _updateRunners; #249)
+      if (r() < 0.35) r();
+      r();
       const stop = {
         i, name: s.name, request,
         // the front stops beside the stop sign (D 1/2 § 27.6; tools/build_line.py, #258)
         target: Math.min(s.sign ?? s.s + STOP_AHEAD, this.route.length - 2),
         p0: s.p0, p1: s.p1,
         sched: this.trip[i],
-        waiting, alightFrac: 0.08 + r() * 0.25 + central * 0.05,
-        alight: 0, runners: r() < 0.35 ? 1 + Math.floor(r() * 3) : 0, runnerDelay: 4 + r() * 9,
+        waiting, alightFrac, alight: 0,
         arrived: false, served: false, done: false, departClock: null,
       };
       if (request && r() < 0.5) stop.alightFrac = 0;
+      // (#249: how many wait for us here on the mean at demand 1, the draw's above: those coming while we stand, _comeTo)
+      stop.come = i === n - 1 ? 0 : (4 + central * 7) * (request ? 0.45 : 1);
       this._stopZone(stop);
       // those waiting for other lines (drawn only: src/gameView.js), who stay when we leave: only where other lines stop (the
       // platform's day tram lines, tools/build_line.py; the user, 2026-11-26, #249: "some of them left waiting even if the stop
@@ -178,7 +195,7 @@ export class Game {
       const others = s.lines ? s.lines.filter((l) => !oursAt(i).has(l)).length : 2, u = r();
       stop.ambient = others === 0 ? 0 : request ? Math.floor(u * 2) : Math.floor(u * others * (3 + central * 3) * demand);
       stop.otherLines = others;
-      if (i === n - 1) { stop.waiting = 0; stop.alightFrac = 1; stop.runners = 0; }
+      if (i === n - 1) { stop.waiting = 0; stop.alightFrac = 1; }
       // the run continues as its next line here: those aboard may stay (the user, 2026-11-26, #249: "if the run continues as
       // different line then people can stay aboard"), the stop's share alights as anywhere
       const change = this.segments.find((g) => g.from === i && g.from > 0);
@@ -850,12 +867,14 @@ export class Game {
       this.doorTimer = DOOR_CLOSE_TIME;
       this.audio.emit('door.buzzer');
       this.audio.emit('door.close');
-      // (those not yet on the entry steps stay behind; those on them finish the climb, #249)
+      // (those on the entry steps finish the climb; those at the doors not yet on them wait there and get on when the doors open
+      // again, the lab's door predicate; they go home if the tram leaves, _finishStop. Closing on them costs 15 each, once a person;
+      // #249, the user, 2026-11-26: "If player closes door and then opens again at the same stop, do people come inside again?")
       const st = this.stops[this.nextStop];
       if (st && st.arrived && st.waiting > 0 && this._atStop(st)) {
-        const n = this.pax.abandon(st.i);
-        if (n) this.penalty('leftBehind', n * 15, t('msg.closedOn', { n }));
-        st.waiting -= n;
+        const shut = this.pax.outside(st.i).filter((a) => !a.shutOn);
+        for (const a of shut) a.shutOn = true;
+        if (shut.length) this.penalty('leftBehind', shut.length * 15, t('msg.closedOn', { n: shut.length }));
       }
     }
   }
@@ -889,44 +908,114 @@ export class Game {
     };
   }
 
-  // Late passengers (C14): when the tram arrives they come running along the platform side from behind
-  // (3.4-4 m/s, timed to arrive about runnerDelay later) to the rear door. With the doors open they
-  // join the waiting passengers and board; at closed doors they wait (the driver may open again); left
-  // behind when the tram goes: a penalty.
-  _spawnRunners(st) {
-    const tr = this.tram;
-    for (let k = 0; k < st.runners; k++) {
-      const target = tr.s - tr.length + 2.2 + k * 0.6;
-      this.runners.push({ model: 11 + st.i + k, st, s: target - 6 - k * 2.5 - 3.4 * st.runnerDelay, lat: -3.4 + (k % 2) * 0.5, v: 3.4 + this.rand() * 0.6, target, state: 'run' });
-    }
-    this.msg(t('msg.runners', { n: st.runners }), 'info');
-    st.runners = 0;
+  // (#249, the user, 2026-11-26: "This will also allow showing more people getting into tram as they keep coming, so waiting for
+  // departure time makes sense") People come to the stop while the tram stands there: as many in a headway as wait for a tram on
+  // the mean (stop.come, by the time of day), the headway the timetable's (the trip before this one at this stop, else the one
+  // after; 3 to 30 min). Their times a Poisson stream from the tram's arrival on, drawn from their own stream (comeRand)
+  _comeTo(st) {
+    const T = this.data.timetable, k = this.opts.tripIndex, i = st.i, a = T[k - 1]?.[i], b = T[k + 1]?.[i];
+    const gap = a != null && this.trip[i] > a ? this.trip[i] - a : b != null && b > this.trip[i] ? b - this.trip[i] : 600;
+    st.headway = Math.max(180, Math.min(1800, gap));
+    st.comeRate = ((st.come ?? 0) * demandAt(this.clock)) / st.headway;
+    st.nextCome = this.clock + this._comeGap(st);
   }
 
-  // is anybody still running for the tram at this stop (the autopilot keeps its doors open)
-  runnersFor(st) { return this.runners.some((r) => r.st === st && r.state !== 'left'); }
+  _comeGap(st) { return st.comeRate > 0 ? -Math.log(1 - this.comeRand()) / st.comeRate : Infinity; }
 
-  _updateRunners(dt) {
-    const tr = this.tram;
-    for (const r of this.runners) {
-      if (r.state === 'run') {
-        r.s = Math.min(r.target, r.s + r.v * dt);
-        r.lat += (-1.9 - r.lat) * Math.min(1, dt * 0.8); // towards the platform edge by the door
-        if (r.s >= r.target) r.state = 'door';
+  // a stop's platform along our track: [its back end, its front end] (the OSM platform, else from the crowd's 26 m behind the stop
+  // point, or the set's length, to 2 m past it)
+  platformEnds(st) {
+    return st.p0 !== undefined && st.p1 - st.p0 >= 15 ? [st.p0, st.p1] : [st.target - Math.max(28, this.tram.length + 4), st.target + 2];
+  }
+
+  // where a door of our set is along the track: car k (0 the front one), the door's id in the cabin (src/passengers/consist.js)
+  doorS(k, id) {
+    const tr = this.tram, d = this.pax.cars[0].c.layout.doors.find((x) => x.id === id);
+    return tr.s - (tr.length / tr.cars) * (k + 0.5) + (d?.x ?? 0);
+  }
+
+  // one coming to the stop (_comeTo): in from the platform's back or front end, at a walk, to the door nearest that end, along the
+  // platform's edge (the stop crowd stands further from it). With the doors open they join its queue and board. Each with a look
+  // of their own (look: src/people.js's person number; model: the box figure's shirt), kept into the tram (the passenger core's
+  // boarder is `who` them, src/passengerView.js). (from: 'back' or 'front' for the tests, tools/test_people.py; drawn the same)
+  _spawnWalker(st, from = null) {
+    const r = this.comeRand, tr = this.tram, [lo, hi] = this.platformEnds(st), u = r();
+    const s = (from ? from === 'back' : u < 0.5) ? lo - 1 : hi + 1;
+    let car = 0, door = null, best = Infinity;
+    for (let k = 0; k < tr.cars; k++) {
+      for (const d of this.pax.cars[0].c.layout.doors) {
+        const e = Math.abs(this.doorS(k, d.id) - s);
+        if (e < best) { best = e; car = k; door = d.id; }
       }
-      if (r.state !== 'left') {
+    }
+    const look = (r() * 4294967296) >>> 0;
+    this.runners.push({ walk: true, st, car, door, look, model: look % 10, s, lat: -1.9 - r() * 0.4, v: WALK_V[0] + r() * WALK_V[1],
+      vRun: RUN_V[0] + r() * RUN_V[1], ran: false, target: this.doorS(car, door), state: 'walk' });
+  }
+
+  // is anybody running for the tram at this stop whom the driver waits for (the autopilot keeps its doors open): until the tram is
+  // ready to leave (st.readyAt) anybody running, then those who were running then; not those walking (the user, 2026-11-26:
+  // "Driver should not wait for walkers past the departure time"), nor those who set off running after it
+  runnersFor(st) {
+    return this.runners.some((r) => r.st === st && r.ran && (r.state === 'walk' || r.state === 'door') && (st.readyAt == null || r.waitedFor));
+  }
+
+  // those coming to the stop (#249): in at a walk; one who sees that a walk would not reach the door by the departure time (RUN_IF s
+  // to spare; the tram past it, now) but a run would by RUN_HOPE s after it, runs (the user, 2026-11-26: "people who would see the
+  // tram, have time to catch it and start running towards it rather than randomly appearing runners out of nowhere"). The tram ready
+  // to leave (st.readyAt: its time come, nobody at the doors, the doors open), those running then are waited for, WAITED_FOR points
+  // each who gets on (_finishStop; "give extra points for waiting for passenger trying to board which the player has to trade off
+  // against running late"). Those the tram leaves walk on to where their door was and wait there, without a penalty ("Some people
+  // really will run towards to tram but miss it and the driver would be right to leave")
+  _updateRunners(dt) {
+    const tr = this.tram, now = this.stops[this.nextStop];
+    const here = now?.arrived && now.departClock === null && this._atStop(now);
+    if (here) while (this.clock >= now.nextCome) { this._spawnWalker(now); now.nextCome += this._comeGap(now); }
+    if (here && now.readyAt == null && this.clock >= now.sched && now.waiting === 0 && now.alight === 0 && this.doorState === 'open') {
+      now.readyAt = this.clock;
+      for (const r of this.runners) if (r.st === now && r.ran && (r.state === 'walk' || r.state === 'door')) r.waitedFor = true;
+    }
+    for (const r of this.runners) {
+      if (r.state === 'walk' || r.state === 'left') {
+        // (to their door, which stays with the tram while it is at the stop; one the tram left walks on to where it was)
+        if (r.state === 'walk' && this._atStop(r.st)) r.target = this.doorS(r.car, r.door);
+        const d = r.target - r.s;
+        if (r.state === 'walk' && !r.ran && r.st === now && here) {
+          const left = Math.max(0, r.st.sched - this.clock), far = Math.abs(d);
+          if (far / r.v > left + RUN_IF && far / r.vRun <= left + RUN_HOPE) {
+            r.ran = true;
+            this.came.ran++;
+            if (!(this.clock - (r.st.runMsgAt ?? -Infinity) < 5)) {
+              r.st.runMsgAt = this.clock;
+              this.msg(t('msg.runners', { n: this.runners.filter((x) => x.st === r.st && x.ran && x.state === 'walk').length }), 'info');
+            }
+          }
+        }
+        const step = (r.ran && r.state === 'walk' ? r.vRun : r.v) * dt;
+        r.s += Math.sign(d) * Math.min(Math.abs(d), step);
+        if (r.ran && r.state === 'walk') r.lat += (-1.9 - r.lat) * Math.min(1, dt * 0.8); // (towards the edge by the door)
+        if (Math.abs(d) <= step && r.state === 'walk') r.state = 'door';
+      }
+      if (r.state === 'door' || r.state === 'walk') {
         const open = this.doorState === 'open' || this.doorState === 'opening';
-        // (at the rear car's rear door they join its queue, #249)
-        if (r.state === 'door' && open && this._atStop(r.st) && tr.v < 0.05) { r.st.waiting++; this.pax.board(1, r.st.i, { car: tr.cars - 1, door: 'Rear' }); r.state = 'aboard'; }
-        else if (tr.s > r.st.zone[1] + 2 || (tr.v > 0.5 && this.doorState === 'closed')) { // (the tram leaves)
+        if (r.state === 'door' && open && this._atStop(r.st) && tr.v < 0.05) { // (at their door they join its queue)
+          r.st.waiting++;
+          this.pax.board(1, r.st.i, { car: r.car, door: r.door, who: r });
+          r.state = 'aboard';
+          this.came.aboard++;
+          (r.st.came ||= [0, 0])[0]++;
+          if (r.waitedFor) { this.came.waited++; r.st.waited = (r.st.waited || 0) + 1; }
+        } else if (tr.s > r.st.zone[1] + 2 || (tr.v > 0.5 && this.doorState === 'closed')) { // (the tram leaves)
           r.state = 'left';
-          this.penalty('leftBehind', 15, t('msg.runnerLeft'));
+          this.came.left++;
+          (r.st.came ||= [0, 0])[1]++;
         }
       }
     }
     // aboard, or left far behind: gone
     this.runners = this.runners.filter((r) => !(r.state === 'aboard' || (r.state === 'left' && tr.s - r.s > 150)));
   }
+
 
   // ------------------------------------------------------------------ update
   update(dt, input) {
@@ -1046,10 +1135,10 @@ export class Game {
     if (at && !st.arrived) {
       st.arrived = true;
       st.arriveClock = this.clock;
+      this._comeTo(st);
       const err = tram.s - st.target;
       if (Math.abs(err) < 3) this.bonus(15, t('msg.precise'));
       else if (err > 4) this.penalty('precision', 20, t('msg.overshot', { d: Math.round(err) }));
-      if (st.runners > 0) this._spawnRunners(st);
     }
     // on arrival the share of those aboard to alight here, the nearest to the doors (the user's rule, #249), with any who could
     // not get off at the stop before; the waiting queue at the doors
@@ -1093,7 +1182,18 @@ export class Game {
     st.done = true;
     // (#249: whoever still waits for this tram stays on the platform; the counts and places checked once a stop)
     const needed = !st.request || st.waiting > 0 || st.alightFrac > 0;
-    if (st.alightSet) st.waiting -= this.pax.abandon(st.i);
+    if (st.alightSet) {
+      // (one who walked or ran in and was still at the doors: back on the platform, where their door was, the same figure)
+      const back = [];
+      st.waiting -= this.pax.abandon(st.i, back);
+      for (const r of back) {
+        r.state = 'left';
+        this.runners.push(r);
+        this.came.aboard--; this.came.left++;
+        st.came[0]--; st.came[1]++;
+        if (r.waitedFor) { this.came.waited--; st.waited--; }
+      }
+    }
     const bad = this.pax.check();
     if (bad.length) { this.paxProblems.push({ stop: st.name, bad }); console.warn(`passengers at ${st.name}: ${bad.join('; ')}`); }
     if (!st.served) {
@@ -1106,6 +1206,7 @@ export class Game {
       return;
     }
     if (st.alight > 0) this.penalty('leftBehind', st.alight * 10, t('msg.cantAlight', { n: st.alight }));
+    if (st.waited) this.bonus(WAITED_FOR * st.waited, t('msg.waitedFor', { n: st.waited })); // (#249: _updateRunners)
     const dep = st.departClock ?? this.clock;
     const dev = dep - st.sched;
     st.dev = dev;

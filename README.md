@@ -41,13 +41,19 @@ Otevřete http://localhost:8742. Nic se nesestavuje: jsou to prosté moduly ES, 
 - Cestující: počítadlo ve voze (běžná obsaditelnost 110, nejvýše 160 na vůz). Poptávka se řídí denní dobou:
   ranní (7–9:30) a odpolední (15:30–17:30) špička přivádí davy, v noci je klid; při plném vozu zůstanou cestující
   čekat na další spoj. Na první zastávce linky je vůz prázdný a cestující jen nastupují. Kdo čeká na jiné linky,
-  stojí jen na zastávkách, kde nějaké jiné linky jezdí.
+  stojí jen na zastávkách, kde nějaké jiné linky jezdí. Dokud tramvaj v zastávce stojí, přicházejí další z obou konců
+  nástupiště, tolik, kolik jich za interval linky podle jízdního řádu přijde, a nastoupí, když dojdou ke dveřím
+  ještě otevřeným. Kdo vidí, že by chůzí odjezd nestihl, ale během ano, rozběhne se. Na ty, kdo jdou, řidič
+  nečeká; na ty, kdo běží ve chvíli, kdy je tramvaj připravená odjet, počkat může: každý z nich, kdo nastoupí,
+  dá 5 bodů, ale zpoždění body bere. Kdo tramvaj nestihne, zůstane na zastávce bez trestu. Kdo vystoupil, odchází
+  k bližšímu konci nástupiště. Kdo přijde nebo přiběhne, je jedna postava od nástupiště až po místo ve voze.
 - Nástup a výstup trvají tak dlouho, jak cestujícím trvá projít dveřmi: každé dveře mají dva proudy, nejdřív
   vystoupí ti, kdo stojí nebo sedí nejblíž dveřím, pak nastoupí čekající a jdou si sednout nebo stoupnout. Kdo
   vystupuje, vstane už při příjezdu k zastávce a postaví se ke dveřím, takže vyjde hned, jak se otevřou. Ve voze
   je 24 sedadel a 81 míst k stání; kdo nastoupí nad těchto 105, toho vůz jen počítá (až do 160). Asi pětina
   nastupujících zůstane stát, i když je volno; uvolněná sedadla zaberou stojící, kteří chtějí sedět, i za jízdy. Kdo už je na schodech,
-  když zavřete dveře, projde; ostatní zůstanou na zastávce, a kdo nestihl vystoupit, vystoupí na další.
+  když zavřete dveře, projde; ostatní počkají u dveří a nastoupí, když je znovu otevřete (zavřít jim dveře před nosem
+  stojí 15 bodů za každého); když odjedete, zůstanou na zastávce. Kdo nestihl vystoupit, vystoupí na další.
   S podrobným modelem tramvaje (výchozím) jsou cestující vidět: okny sedí a stojí ve voze, po schodech vystupují a
   nastupují, čekající jdou z nástupiště ke dveřím a v pravém zrcátku uvidíte, kdo ještě nastupuje. Ty nad 105 vůz jen
   počítá a vidět jsou jen na schodech a venku.

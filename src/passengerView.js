@@ -8,12 +8,16 @@
 // view) and shown with it (the mirror, the outside views); one on the platform is drawn in the world, on the car's frame
 // without its lean (the platform does not lean with the body). The switch is at the platform's edge. The counted passengers
 // (above the 105 places) are drawn only on the steps and outside. A boarder first seen at the queue walks there from one of
-// the stop crowd's places (src/gameView.js crowdSpots), which then stays empty; one who alighted walks on off the platform
-// a little longer and goes.
+// the stop crowd's places (src/gameView.js crowdSpots), which then stays empty; a runner, or one who walked in while the tram
+// stood (src/game.js runners, the boarder's `who`), is the same figure on: their key, look and place go on into the queue (the
+// user, 2026-11-26: "Can we keep the single model and transition him smoothly from running to queueing for door and getting
+// inside, with the same stats?"). One who alighted walks from where the core lets them go to a lane along the platform and on
+// to its nearer end, and goes.
 import * as THREE from 'three';
 
-const EASE = 1.3; // m/s: from the crowd's place to the queue (only drawn: the core has them queued already)
-const LEAVE = 3; // s an alighter walks on after the core lets them go
+const EASE = 1.3; // m/s: from the crowd's place, or where a runner stopped, to the queue (only drawn: the core has them queued already)
+const LEAVE = 3; // s an alighter walks on after the core lets them go, where the platform is not known
+const OFF_V = 1.3, OFF_LANE = 2.3, OFF_PAST = 1.5, OFF_MAX = 90, TURN_V = 4; // the alighters' walk: m/s, m right of the track, m past the platform's end, s at most; rad/s
 const SHIRTS = [0x8b2f2f, 0x2f4f8b, 0x3c6b3c, 0x666666, 0xc29a3a, 0x222222, 0x8a5a9a, 0xd0d0d0, 0x2a5c63, 0xa8523a]; // (the stop crowd's, src/models.js)
 const TURN_BACK = new THREE.Matrix4().makeRotationY(Math.PI / 2); // (src/people.js multiplies a record's matrix by its TURN)
 const UP = new THREE.Vector3(0, 1, 0);
@@ -54,7 +58,8 @@ export class PassengerView {
         const on = a.z < edge || !!a.legPose;
         let s = this.seen.get(a.id);
         if (!s) { s = { spot: null, off: null, walked: 0, last: null, n: null, shirt: null }; this.seen.set(a.id, s); }
-        const r = { key: a.id, parent: null, local: null, m: new THREE.Matrix4(), x: 0, y: 0, z: 0, shirt: null, n: 0, shown: true, pax: null };
+        const who = a.who || null; // (a runner's or a walker's figure goes on: their record's key)
+        const r = { key: who || a.id, parent: null, local: null, m: new THREE.Matrix4(), x: 0, y: 0, z: 0, shirt: null, n: 0, shown: true, pax: null };
         // the car-local pose (the figure faces +X, as the cabin's frame; scaled to the cabin's fit, as the lab drew them)
         this._q.setFromAxisAngle(UP, a.heading ?? 0);
         const local = new THREE.Matrix4().compose(this._p.set(a.x, a.y, a.z), this._q, this._s.set(fit.x, fit.y, fit.z));
@@ -66,7 +71,8 @@ export class PassengerView {
         } else {
           // on the platform: the car's frame without its lean; a boarder new at the queue walks from a crowd place
           const p = this._onLevel(level, a.x, a.y, a.z, this._o);
-          if (!s.last && a.tag === st?.i && !a.runner && !a.aboard) this._fromSpot(s, st, gameView, p);
+          if (!s.last && who && !a.aboard) this._fromWho(s, who, p);
+          else if (!s.last && a.tag === st?.i && !a.runner && !a.aboard) this._fromSpot(s, st, gameView, p);
           if (s.off) {
             const d = s.off.length(), step = Math.min(d, EASE * Math.max(0, t - (s.t ?? t)));
             if (d - step < 0.05) s.off = null;
@@ -86,10 +92,12 @@ export class PassengerView {
         s.walked += extra;
         s.t = t;
         s.last = true;
+        s.key = r.key;
         if (a.aboard) s.boarded = true;
         if (s.n === null) {
-          s.n = s.spot ? s.spot.n : (Math.imul(k + 1, 0x9e3779b1) ^ Math.imul(a.index, 0x85ebca6b)) >>> 0;
-          s.shirt = s.spot ? s.spot.shirt : new THREE.Color(SHIRTS[s.n % SHIRTS.length]);
+          s.n = who ? who.look : s.spot ? s.spot.n : (Math.imul(k + 1, 0x9e3779b1) ^ Math.imul(a.index, 0x85ebca6b)) >>> 0;
+          // (a runner's shirt their box figure's, src/models.js makePerson: by its model)
+          s.shirt = who ? new THREE.Color(SHIRTS[who.model % SHIRTS.length]) : s.spot ? s.spot.shirt : new THREE.Color(SHIRTS[s.n % SHIRTS.length]);
         }
         r.n = s.n; r.shirt = s.shirt;
         const e = r.m.elements;
@@ -100,21 +108,18 @@ export class PassengerView {
         recs.push(r);
       }
     });
-    // alighters the core let go: on a little further off the platform, then gone
+    // alighters the core let go: off the edge and along the platform to its nearer end, then gone
     for (const [id, s] of this.seen) {
       if (alive.has(id)) continue;
-      if (s.lastOut?.egress && !this.ghosts.has(id)) this.ghosts.set(id, { p: s.lastOut.p, yaw: s.lastOut.yaw, n: s.n, shirt: s.shirt, t0: t, t, walked: s.walked });
+      if (s.lastOut?.egress && !this.ghosts.has(id)) this.ghosts.set(id, this._ghost(s, t));
       // (a boarder the doors closed on, or for whom there was no room: back to their place in the crowd)
       else if (s.spot && !s.boarded) this.used.get(s.spot.stop)?.delete(s.spot.i);
       this.seen.delete(id);
     }
     for (const [id, g] of this.ghosts) {
-      if (t - g.t0 > LEAVE || t < g.t0) { this.ghosts.delete(id); continue; }
-      const step = 1.2 * Math.max(0, t - g.t);
-      g.t = t; g.walked += step;
-      g.p.x += Math.cos(g.yaw) * step; g.p.z -= Math.sin(g.yaw) * step;
+      if (t < g.t0 || !this._walkOff(g, t)) { this.ghosts.delete(id); continue; }
       this._q.setFromAxisAngle(UP, g.yaw);
-      const r = { key: id, parent: null, local: null, m: new THREE.Matrix4().compose(g.p, this._q, this._s.set(fit.x, fit.y, fit.z)).multiply(TURN_BACK),
+      const r = { key: g.key ?? id, parent: null, local: null, m: new THREE.Matrix4().compose(g.p, this._q, this._s.set(fit.x, fit.y, fit.z)).multiply(TURN_BACK),
         x: g.p.x, y: g.p.y, z: g.p.z, shirt: g.shirt, n: g.n, shown: true,
         pax: { motion: 'Walk', phase: g.walked / ((16 / 15) * fit.x), blend: null, legPose: null, seated: false, car: -1 } };
       recs.push(r);
@@ -136,6 +141,58 @@ export class PassengerView {
 
   _onLevel(L, x, y, z, out) {
     return out.copy(L.o).addScaledVector(L.x, x).addScaledVector(L.y, y).addScaledVector(L.z, z);
+  }
+
+  // a runner's or a walker's boarder (src/game.js runners): their figure walks on from where it stood (gameView's box figure there:
+  // on the track's profile, 0.18 m up) to the queue, its offset from p in the world
+  _fromWho(s, who, p) {
+    const g = this.game, o = g.route.offset(who.s, who.lat);
+    const off = new THREE.Vector3(o.x - p.x, g.profile.height(who.s) + 0.18 - p.y, -o.y - p.z);
+    if (off.length() > 20) return; // (not near: no walk)
+    s.off = off;
+    s.t = g.clock;
+  }
+
+  // an alighter let go, from where they stepped out: along our track (its s, the lateral, their height over the track's profile)
+  // to the nearer end of the stop's platform (src/game.js platformEnds) in a lane off its edge; without a platform near, on the
+  // way they faced for a few seconds
+  _ghost(s, t) {
+    const g = { key: s.key, p: s.lastOut.p, yaw: s.lastOut.yaw, n: s.n, shirt: s.shirt, t0: t, t, walked: s.walked, along: null };
+    const game = this.game, route = game.route, st = game.stops[game.nextStop], q = route.nearest(g.p.x, -g.p.z);
+    if (!q || q.d > 8 || !st?.arrived) return g;
+    const o = route.at(q.s), [lo, hi] = game.platformEnds(st), dir = hi - q.s < q.s - lo ? 1 : -1;
+    g.along = {
+      s: q.s, lat: -o.hy * (g.p.x - o.x) + o.hx * (-g.p.z - o.y), dir, lane: -(OFF_LANE + (s.n % 5) * 0.08),
+      end: dir > 0 ? Math.max(hi, q.s) + OFF_PAST : Math.min(lo, q.s) - OFF_PAST, dy: g.p.y - game.profile.height(q.s),
+    };
+    return g;
+  }
+
+  // an alighter's step to t (_ghost): to their lane, along it, turned towards the way they go at TURN_V; false once past the
+  // platform's end
+  _walkOff(g, t) {
+    const dt = Math.max(0, t - g.t), a = g.along;
+    g.t = t;
+    if (!a) {
+      if (t - g.t0 > LEAVE) return false;
+      g.p.x += Math.cos(g.yaw) * 1.2 * dt; g.p.z -= Math.sin(g.yaw) * 1.2 * dt; g.walked += 1.2 * dt;
+      return true;
+    }
+    if (t - g.t0 > OFF_MAX || (a.dir > 0 ? a.s >= a.end : a.s <= a.end)) return false;
+    if (dt === 0) return true;
+    const game = this.game, route = game.route, step = OFF_V * dt;
+    // (to their lane from either side: the core lets them go up to about 6 m off the track, where they cleared the door)
+    const side = Math.max(-step * 0.8, Math.min(step * 0.8, a.lat - a.lane)), ds = a.dir * Math.sqrt(step * step - side * side);
+    const h = route.heading(a.s, 3);
+    a.lat -= side; a.s += ds; g.walked += step;
+    const o = route.offset(a.s, a.lat);
+    g.p.set(o.x, game.profile.height(a.s) + a.dy, -o.y);
+    // (the way: ds along the track, side to its right; a yaw as the world's rotation about the up, x = cos, -z = sin)
+    const wx = ds * h.hx + side * h.hy, wy = ds * h.hy - side * h.hx;
+    let d = Math.atan2(wy, wx) - g.yaw;
+    d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI;
+    g.yaw += Math.max(-TURN_V * dt, Math.min(TURN_V * dt, d));
+    return true;
   }
 
   // the nearest crowd place of the stop not yet taken: the boarder walks from there (its offset from p, in the world)

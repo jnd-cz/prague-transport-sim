@@ -12,6 +12,7 @@
 // queues), a walk's own speed, a boarder on the steps finishing the climb when the doors close, and an idle step that only counts time.
 // #249 step 4: changed, likewise: ready (before a stop, those to alight there go to their doors' doorway places) and alight's ids (the
 // ones chosen then alight, one still on the way from where they get to).
+// #249 (2026-11-26): outside (the boarders abandon would take, left where they are: those the doors close on wait at them).
 import {createPassengerCore,doorIsOpen} from './passenger-core.js';
 import {createExitFlow} from './exit-flow.js';
 import {planExitDoors} from './exit-routing.js';
@@ -213,11 +214,12 @@ export function createBoardingController(layout,{vehicleId='T3-DEMO-01',exitPoli
  }
  // (#249: the boarders not yet on the entry steps for whom test(a) holds leave the queues and the controller, their places given back:
  // the doors closed on them, or the car is full. They are returned)
- function abandon(test=()=>true){const gone=[...actors.values()].filter(a=>!a.aboard&&!a.exiting&&(a.stage==='queue'||a.actions&&(a.actionIndex<3||a.actionIndex===3&&!a.actionTime))&&test(a));
+ function outside(test=()=>true){return [...actors.values()].filter(a=>!a.aboard&&!a.exiting&&(a.stage==='queue'||a.actions&&(a.actionIndex<3||a.actionIndex===3&&!a.actionTime))&&test(a));}
+ function abandon(test=()=>true){const gone=outside(test);
   for(const a of gone){core.releasePlace(a);for(const c of channels){const i=c.queue.indexOf(a);if(i>=0)c.queue.splice(i,1);}actors.delete(a.id);}return gone;}
  // (#249: nothing moving, queued or planned: a step only counts the time)
  const idle=()=>!exitFlow.preparing&&channels.every(c=>!c.queue.length)&&![...actors.values()].some(a=>a.actions||a.exiting||a.yielding||a.stage==='exit queue'||a.readyAt!=null);
- return {setExitPolicy(value){if(!['balanced','boarding'].includes(value))throw new Error('Unknown exit policy');exitPolicy=value;},layout,ledger,standingLedger,actors,channels,events,enqueue,preload,alight,seatAboard,reseat,ready,abandon,doorDistance,quietDoor,get time(){return time;},get active(){return [...actors.values()].find(a=>a.actions||a.exiting||a.yielding)||null;},get message(){return message;},
+ return {setExitPolicy(value){if(!['balanced','boarding'].includes(value))throw new Error('Unknown exit policy');exitPolicy=value;},layout,ledger,standingLedger,actors,channels,events,enqueue,preload,alight,seatAboard,reseat,ready,abandon,outside,doorDistance,quietDoor,get time(){return time;},get active(){return [...actors.values()].find(a=>a.actions||a.exiting||a.yielding)||null;},get message(){return message;},
  update(dt,{doorsOpen=true}={}){if(!Number.isFinite(dt)||dt<0)throw new Error('Non-negative finite dt required');if(dt===0){tick(0,doorsOpen);return;}if(!prepareStops&&idle()){time+=dt;return;}for(let left=dt;left>1e-8;left-=.025)tick(Math.min(left,.025),doorsOpen);},
  snapshot(){const active=[...actors.values()].filter(a=>a.actions||a.exiting||a.yielding),st=standingLedger.snapshot();return {waitingAvoidance:exitFlow.diagnostics,planningExits:exitFlow.preparing,scheduledExits:exitFlow.pending.length,exitPolicy,exitPlan,vehicleId,simulationTime:time,boarded,lastBoardDoorAt,lastExitDoorAt,lastExitRouteAt,...ledger.snapshot(),standing:st.seated,standingReserved:st.reserved,studyStandingPlaces:st.mappedSeats,queued:channels.reduce((n,c)=>n+c.queue.length,0),waitingForPlace:[...actors.values()].filter(a=>a.stage==='queue'&&!a.seatId&&!a.standingId).length,exited,active:active[0]?{id:active[0].id,stage:active[0].stage,seatId:active[0].seatId}:null,moving:active.length,doorStreams:channels.map(c=>({id:c.id,queued:c.queue.length,alighted:c.alighted,entry:c.entry??entryActors(c)[0]?.id??null,climbing:entryActors(c).filter(a=>a.legPose).length,descending:[...actors.values()].filter(a=>a.channel===c.id&&a.exiting&&a.legPose).length,direction:[...actors.values()].some(a=>a.doorId===c.door.id&&(a.stage==='exit queue'||a.exiting&&a.egressClearAt==null))?'out':'in'})),message};}};
 }

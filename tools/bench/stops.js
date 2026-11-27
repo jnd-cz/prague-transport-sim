@@ -161,6 +161,8 @@ export function stopsWatch(game) {
         // (the passengers, #249: the stops where their counts or places went wrong, game.paxProblems; the exchanges' seconds from the
         // doors open to the last one across, mean and longest)
         paxProblems: (game.paxProblems || []).length, paxProblem: (game.paxProblems || [])[0] ?? null,
+        // (those walking in while the tram stood at a stop, #249: boarded, left behind, ran for it, waited for and got on)
+        cameAboard: game.came?.aboard ?? null, cameLeft: game.came?.left ?? null, cameRan: game.came?.ran ?? null, cameWaited: game.came?.waited ?? null,
         exchangeMean: R.exchanges?.length ? +(R.exchanges.reduce((t, x) => t + x, 0) / R.exchanges.length).toFixed(1) : null, exchangeMax: R.exchanges?.length ? +Math.max(...R.exchanges).toFixed(1) : null,
         devMean: devs.length ? Math.round(devs.reduce((t, x) => t + x, 0) / devs.length) : 0, lateStops: devs.filter((x) => x > 180).length, flips: R.flips.slice(0, 40), worst: [...S].sort((p, q) => Math.abs(q.err) - Math.abs(p.err)).slice(0, 5),
         // (arrival against the timetable's time, which is the departure: arrOnTime the share within ±30 s of it, arrEarly the stops
@@ -172,7 +174,7 @@ export function stopsWatch(game) {
         depOnTime: ((D) => (D.length ? +(D.filter((x) => x.dev >= 0 && x.dev < (x.first ? 60 : 180)).length / D.length).toFixed(2) : null))(
           game.stops.filter((x, i) => i < game.stops.length - 1 && x.departClock != null && x.sched != null).map((x) => ({ dev: x.departClock - x.sched, first: x === game.stops[game.opts.startStop] }))),
         stretches: R.stretches.map((q, i) => ({ to: q.to, drive: q.drive, brake: q.brake, secs: Math.round((R.stretches[i + 1]?.t0 ?? game.clock) - (q.tMove ?? q.t0)), quick: q.quick == null ? null : Math.round(q.quick), hand: q.hand == null ? null : Math.round(q.hand), sched: q.sched == null ? null : Math.round(q.sched), tt: q.tt == null ? null : Math.round(q.tt),
-          arr: q.st.arriveClock == null ? null : Math.round(q.st.arriveClock - q.st.sched), dep: q.st.departClock == null ? null : Math.round(q.st.departClock - q.st.sched), held:Object.fromEntries(Object.entries(q.held).map(([k, v]) => [k, Math.round(v)])) })) };
+          arr: q.st.arriveClock == null ? null : Math.round(q.st.arriveClock - q.st.sched), dep: q.st.departClock == null ? null : Math.round(q.st.departClock - q.st.sched), came: q.st.came ?? null, held:Object.fromEntries(Object.entries(q.held).map(([k, v]) => [k, Math.round(v)])) })) };
     },
   };
 }

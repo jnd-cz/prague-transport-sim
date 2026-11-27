@@ -42,15 +42,21 @@ A fresh clone first needs the game data: [Set up](DEVELOPING.md#set-up).
 - Passengers: an on-board counter (normal capacity 110, crush 160 per car). Demand follows the time of day:
   morning (7–9:30) and afternoon (15:30–17:30) peaks bring crowds, nights are quiet; a full car leaves people
   for the next tram. At a line's first stop the car starts empty and people only get on. People waiting for other
-  lines stand only at stops that other lines serve.
+  lines stand only at stops that other lines serve. While the tram stands at a stop, more people come from both ends
+  of the platform, as many as come in the line's interval by the timetable, and board if they reach a door still open.
+  Someone who sees that walking would not make the departure but running would breaks into a run. The driver does not
+  wait for those walking; for those running when the tram is ready to leave they may: each of them who gets on is worth
+  5 points, while lateness costs points. Whoever misses the tram stays at the stop, without a penalty. Those who got off
+  walk to the nearer end of the platform. Whoever walks or runs in is one figure from the platform to their place inside.
 - Getting on and off takes as long as the passengers need to pass the doors: each door has two streams, those
   standing or sitting nearest the doors get off first, then those waiting board and go to sit or stand. Those getting
   off stand up as the tram comes into the stop and wait at the doors, so they are out as soon as the doors open. A car has
   24 seats and 81 standing places; above these 105 it only counts the passengers (up to 160). About one boarder in
   five stands even with seats free; seats that come free go to standing passengers who want to sit, also while the
   tram drives.
-  Whoever is on the steps when you close the doors gets through; the others stay at the stop, and anyone who could
-  not get off gets off at the next one.
+  Whoever is on the steps when you close the doors gets through; the others wait at the doors and get on when you open
+  them again (closing on them costs 15 points each); if you leave, they stay at the stop. Anyone who could not get off
+  gets off at the next one.
   With the detailed tram model (the default) you see them: sitting and standing through the windows, getting off and
   on by the steps, those waiting walking from the platform to the doors, and in the right mirror who is still
   boarding. Those above the 105 a car only counts are seen on the steps and outside only.

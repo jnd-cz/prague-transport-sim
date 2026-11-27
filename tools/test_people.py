@@ -13,7 +13,12 @@ leaves the box figures. Our set's passengers (#249 step 3, src/passengerView.js)
 drawn (the counted ones only on the steps and outside), those on a car as its node's children (the animated ones) or
 in its own batches (the distant ones, standing and seated); and the same seeded drive, drawn once a second, ends the
 same with the figures and with ?boxpeople (nothing drawn feeds back into the run). The run, from the line's first stop,
-starts with nobody aboard and nobody to alight there, and nobody waits for other lines at a stop of our line only (#249)."""
+starts with nobody aboard and nobody to alight there, and nobody waits for other lines at a stop of our line only (#249).
+At the next stop, the departure 12 s off, one walking in from the platform's front end and one from its back end who runs (a walk
+would not make it) are each one figure from the platform into the car (the same key, look and shirt in every drawn step, none
+missing, no jump); the doors closed on four at them and opened again, they wait at the doors and get on, 15 points off each
+once; then the departure time come, one running 25 m from their door is waited for and gets on (the points for waiting), one
+45 m off is not waited for, left without a penalty (#249)."""
 import argparse
 import faulthandler
 import functools
@@ -142,6 +147,82 @@ GAME = """async () => {
 }"""
 
 
+# (#249) after GAME's drive, on to the next stop, the departure 12 s off: one walking in from the platform's front end, and one
+# from its back end who runs (a walk would not make it), each one figure from the platform into the car (the same key, number and
+# shirt in every drawn step, no step missing, no jump); then the departure time a second off: one 25 m from their door runs and
+# is waited for (points), one 45 m off walks and is not, nor penalised
+SCENE = """async () => {
+  const { Autopilot } = await import('/src/autopilot.js');
+  const g = window.game, traffic = window.traffic, view = window.run.trafficView, ap = new Autopilot(), dt = 1 / 30;
+  const gv = window.run.gameView, people = window.people, model = window.tramModel, { placeConsist } = await import('/src/models.js');
+  model.visible = true;
+  const step = () => { ap.step(g, dt); g.update(dt, ap.input); traffic.update(dt); view.sync(window.camera); };
+  // (the model where the tram is, as the page places it each frame, src/main.js placeTram: the passengers on its cars go with it)
+  const place = () => placeConsist(model, g.tram.s, (q) => { const p = g.route.at(q); return [p.x, p.y, g.profile.height(q), g.route.rollAt(q)]; });
+  const draw = () => { place(); gv.sync(); gv.syncCrowd(); people.sync(window.camera, view, gv, null, window.paxView.sync(g, model, gv)); };
+  for (let t = 0; t < 900 && !(g.stops[g.nextStop].arrived && g.doorState === 'open'); t += dt) step();
+  const st = g.stops[g.nextStop], [lo, hi] = g.platformEnds(st);
+  st.nextCome = Infinity; // (the stream off: the test's only)
+  st.sched = g.clock + 12;
+  g._spawnWalker(st, 'front'); g._spawnWalker(st, 'back');
+  const who = g.runners.slice(-2), out = { stop: st.name, ends: [lo, hi].map((x) => +x.toFixed(1)), tram: +g.tram.s.toFixed(1), who: [] };
+  const start = who.map((r) => ({ s: +r.s.toFixed(1), car: r.car, door: r.door }));
+  const tracks = who.map(() => []);
+  const actorOf = (r) => { for (const c of g.pax.cars) for (const a of c.c.actors.values()) if (a.who === r) return a; return null; };
+  const aboard = who.map(() => null);
+  step(); draw(); st.sched = g.clock + 60; // (once they chose to walk or to run, the departure later: time for both to settle)
+  for (let t = 0; t < 80 && aboard.some((x) => x === null || g.clock - x < 3); t += dt) {
+    step(); draw();
+    who.forEach((r, i) => {
+      const rec = people.recs.find((x) => x.key === r), a = actorOf(r);
+      if (a?.aboard && aboard[i] === null) aboard[i] = g.clock;
+      tracks[i].push(rec ? { x: rec.x, y: rec.y, z: rec.z, n: rec.n, shirt: rec.shirt.getHex(), pax: !!rec.pax } : null);
+    });
+  }
+  who.forEach((r, i) => {
+    const tr = tracks[i], first = tr.findIndex(Boolean);
+    let gaps = 0, jump = 0, box = false, pax = false;
+    const looks = new Set();
+    for (let k = first; k >= 0 && k < tr.length; k++) {
+      const p = tr[k];
+      if (!p) { gaps++; continue; }
+      looks.add(`${p.n}/${p.shirt}`);
+      if (p.pax) pax = true; else if (!pax) box = true;
+      const q = tr[k - 1];
+      if (q && k > first) jump = Math.max(jump, Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z));
+    }
+    out.who.push({ ...start[i], ran: r.ran, seen: first >= 0, gaps, looks: [...looks], jump: +jump.toFixed(3), boxThenPax: box && pax, aboard: aboard[i] !== null });
+  });
+  // the doors closed on four at them, opened and at once closed again, then opened: they wait at the doors, cost 15 each once,
+  // and all get on (the user, 2026-11-26: "If player closes door and then opens again at the same stop, do people come inside
+  // again?"); the tram held by the input of a standing step, the autopilot not asked meanwhile
+  g.pax.board(4, st.i); st.waiting += 4;
+  step();
+  const hold = { ...ap.input }, pen0 = g.penalties.leftBehind || 0, out0 = g.pax.outside(st.i).length, w0 = st.waiting;
+  const still = (secs) => { for (let t = 0; t < secs; t += dt) { g.update(dt, hold); traffic.update(dt); } };
+  g.toggleDoors(); still(6);
+  const closed = { outside: g.pax.outside(st.i).length, waiting: st.waiting, penalty: (g.penalties.leftBehind || 0) - pen0, doors: g.doorState };
+  g.toggleDoors(); still(0.4); g.toggleDoors(); still(4);
+  const again = (g.penalties.leftBehind || 0) - pen0;
+  g.toggleDoors();
+  for (let t = 0; t < 40 && st.waiting > 0; t += dt) still(dt);
+  out.shut = { out0, w0, closed, again, after: st.waiting, aboard: g.pax.aboard };
+  // the departure time a second off: one 25 m from their door, one 45 m
+  g._spawnWalker(st, 'back'); g._spawnWalker(st, 'back');
+  const [near, far] = g.runners.slice(-2);
+  near.s = g.doorS(near.car, near.door) - 25; far.s = g.doorS(far.car, far.door) - 45;
+  const pen = g.penalties.leftBehind || 0, waited = g.came.waited, score = g.score, sched = (st.sched = g.clock + 1);
+  let closing = null;
+  for (let t = 0; t < 60 && st.departClock === null; t += dt) { step(); if (closing === null && g.doorState !== 'open') closing = g.clock; }
+  for (let t = 0; t < 8; t += dt) step(); // (on its way: those left behind are left; the stop's points given)
+  out.dep = { closingAfter: closing === null ? null : +(closing - sched).toFixed(2), penalty: (g.penalties.leftBehind || 0) - pen,
+    waited: g.came.waited - waited, waitedStop: st.waited ?? 0,
+    near: { ran: near.ran, waitedFor: !!near.waitedFor, boarded: !!actorOf(near) },
+    far: { ran: far.ran, waitedFor: !!far.waitedFor, boarded: !!actorOf(far), state: far.state } };
+  return out;
+}"""
+
+
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -237,6 +318,41 @@ def main():
                             len(gm["start"]["lone"]) > 0 and not any(gm["start"]["lone"]),
                     }
                     fails += [f"game: {k}" for k, ok in want.items() if not ok]
+                    # (#249: those walking in and the runner, one figure each into the car; the late one not waited for)
+                    r["scene"] = sc = page.evaluate(SCENE)
+                    lo, hi = sc["ends"]
+                    for i, w in enumerate(sc["who"]):
+                        name = f"{'runner' if w['ran'] else 'walker'} {i + 1} at {sc['stop']}"
+                        want = {
+                            f"{name}: boarded": w["aboard"],
+                            f"{name}: one figure, no drawn step without it ({w['gaps']})": w["seen"] and w["gaps"] == 0,
+                            f"{name}: one look, number and shirt ({w['looks']})": len(w["looks"]) == 1,
+                            f"{name}: from their own figure on into the core's boarder": w["boxThenPax"],
+                            f"{name}: no jump between drawn steps ({w['jump']} m)": w["jump"] < 0.6,
+                        }
+                        want[f"{name}: in from a platform end ({w['s']}; ends {lo}, {hi})"] = min(abs(w["s"] - (lo - 1)), abs(w["s"] - (hi + 1))) < 0.15
+                        # (the departure 12 s off: from the front end a walk; from the back end, 30-40 m, a run)
+                        want[f"{name}: {'ran' if w['ran'] else 'walked'} from the {'back' if i else 'front'} end"] = w["ran"] == (i == 1)
+                        fails += [f"scene: {k}" for k, ok in want.items() if not ok]
+                    sh = sc["shut"]
+                    want = {
+                        f"the doors closed on {sh['out0']} at them: they wait there ({sh['closed']})":
+                            sh["out0"] > 0 and sh["closed"]["outside"] == sh["out0"] and sh["closed"]["waiting"] == sh["w0"] and sh["closed"]["doors"] == "closed",
+                        f"15 points each, once a person ({sh['closed']['penalty']}, after closing again {sh['again']})":
+                            sh["closed"]["penalty"] == 15 * sh["out0"] == sh["again"],
+                        f"opened again, all of them got on (still waiting {sh['after']})": sh["after"] == 0,
+                    }
+                    fails += [f"scene: {k}" for k, ok in want.items() if not ok]
+                    dep = sc["dep"]
+                    want = {
+                        f"the departure time come, the doors wait for the one running 25 m off ({dep['closingAfter']} s)":
+                            dep["closingAfter"] is not None and 3 < dep["closingAfter"] < 12,
+                        f"the one 25 m off ran, was waited for and got on ({dep['near']}), the stop's points for one ({dep['waitedStop']})":
+                            dep["near"]["ran"] and dep["near"]["waitedFor"] and dep["near"]["boarded"] and dep["waited"] == 1 == dep["waitedStop"],
+                        f"the one 45 m off not waited for, left ({dep['far']})": not dep["far"]["waitedFor"] and not dep["far"]["boarded"] and dep["far"]["state"] == "left",
+                        f"no penalty for those left ({dep['penalty']})": dep["penalty"] == 0,
+                    }
+                    fails += [f"scene: {k}" for k, ok in want.items() if not ok]
                     if gm["people"] < gm["walkers"] or gm["walkers"] == 0:
                         fails.append(f"game: {gm['walkers']} walkers, {gm['people']} drawn as figures")
                     if gm["near"] == 0 or gm["near"] > 64:

@@ -1482,8 +1482,10 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   alighting first at each door. About one boarder in five wishes to stand though seats are free (`STAND_SHARE`, from the
   passengers' own seeded stream: the rules' and the traffic's draws are as they were); a seat freed by a door whose exchange is
   over goes to the nearest standing passenger who wants to sit, at 0.8 m/s round the others, also while driving. Doors closed
-  during the exchange: who is on the steps finishes the way, the rest of the queue stays (`leftBehind`, as before), those not
-  yet on the steps out get off at the next stop (`cantAlight`, as before). The exchange took 3.3 people a second a car before
+  during the exchange: who is on the steps finishes the way, the rest of the queue waits at the doors and gets on when they open
+  again (since #869; before, it was dropped from the stop and never got on), 15 points off each, once a person (`leftBehind`,
+  `pax.outside`), and goes home if the tram leaves (`_finishStop`); those not yet on the steps out get off at the next stop
+  (`cantAlight`, as before). The exchange took 3.3 people a second a car before
   (a 15 out / 20 in two-car exchange in about 5 s); now its time is the queues': on line 22 (seed 1, 38 stops) 2.6–15.8 s, mean
   10.3 s (line 17: 10.0 s, at most 14.9 s), with the doors' 2 s to open and 3 s to close about 15 s a stop. Their cost on line
   17's drive (seed 1, 102 748 steps): 1.1 s in all, 0.011 ms a step, 0.1 ms at the 99th percentile, 5.3 ms at most (one step).
@@ -1528,6 +1530,33 @@ footprints include abutments on land (top within 1.5 m of the lidar terrain): 10
   timetable's `route_stops.txt` (`tools/build_line.py`), which lists each line's pattern in the feed's two weeks (2026-10-21
   to 11-03) with that time's diversions: lines 22 and 23 skip Pražský hrad and Královský letohrádek there (23 also Pohořelec,
   via Hládkov), line 17 runs by Myslíkova, so those stops list only the line file's own line (our line is always added).
+- **Those coming while the tram stands, and one figure from the run to the seat** (#249; the user, 2026-11-26: "This will also
+  allow showing more people getting into tram as they keep coming, so waiting for departure time makes sense", "Driver should
+  not wait for walkers past the departure time", and of the runner seen changing colour at the door: "Can we keep the single
+  model and transition him smoothly from running to queueing for door and getting inside, with the same stats?"). From the
+  tram's arrival at a stop until it leaves, people come at the rate of those who wait for a tram on the mean (`stop.come`:
+  4, in the centre 11, at request stops 0.45 of it, times the demand by the time of day) over the line's headway at that stop
+  (`_comeTo`: the trip before ours in the timetable, else the one after, held to 3-30 min; the timetables' gaps run 4-20 min
+  on lines 9, 17, 22 and 37, 24-60 on 23), as a Poisson stream from a seeded stream of their own (`comeRand`, seed ^ 0x249c),
+  so the passengers', the rules' and the traffic's draws stay. Each walks in at 1.2-1.5 m/s from the platform's back or front
+  end (`platformEnds`: the OSM platform, else the crowd's 26 m behind the stop point to 2 m past it) to the door nearest that
+  end, along the edge (1.9-2.3 m right of the track; the crowd stands 2.4-4 m off it). At an open door they join its queue.
+  One who sees that a walk would not reach the door 2 s before the departure time (the tram past it: now) but a run at 3.4-4
+  m/s would by 8 s after it runs (the user, the same day: "people who would see the tram, have time to catch it and start
+  running towards it rather than randomly appearing runners out of nowhere"); the late runners drawn per stop (C14, 0-3 at
+  35 % of the stops, a penalty of 15 each left behind) are drawn no more, their draws kept so the stream stays. The tram ready
+  to leave (`st.readyAt`: its time come, nobody at the doors, the doors open), those running then are waited for: the
+  autopilot keeps the doors open for them (`runnersFor`), not for those walking or setting off later, and each who gets on is
+  5 points (`WAITED_FOR`, at the stop's end) against the departure's lateness ("give extra points for waiting for passenger
+  trying to board which the player has to trade off against running late"); the lateness scores a band (0-60 s late +40,
+  to 180 s +10, then -1 per 6 s). One the tram leaves walks on to where their door was and waits there, without a penalty
+  ("Some people really will run towards to tram but miss it and the driver would be right to leave"). A walker or runner keeps
+  their look (`look`, the figure's person number; `model`, the box figure's shirt) into the passenger core: the core's boarder
+  carries `who`, queued at once (`board`), and its figure
+  (`src/passengerView.js`) has their key, number and shirt and walks on from where they stood. Before, the boarder was a new
+  person at the queue (a number from the car and its index, a shirt by it). Those who alight walk from where the core lets them
+  go (clear of the door, up to about 6 m off the track) to a lane 2.3-2.6 m off it and along it to the platform's nearer end and
+  1.5 m past it, and go (drawn only; before, 3 s on the way they faced).
 - **The passengers drawn** (#249 step 3, `src/passengerView.js`, `src/people.js`; the detailed model only, whose cabin the core's
   is): a passenger on a car (its floor or entry steps, car-local z under the platform's edge, 1.33 m) is a child of the car's
   model node, in the cabin's frame (+X forward, the figure scaled to the cabin's fit, 0.88 × 1 × 0.84), so they sway with the body
