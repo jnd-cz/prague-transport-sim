@@ -17,13 +17,17 @@
 // streetGeometry `raised-belt`, the height from which the build keeps the road's own level at the belt's edge, #606)
 // and by no more than BED_KERB. On Řepy such a kerb stands at Makovského (maintainer, 2026-11-21). Against IPR 1 m
 // either side of the edge (batch D, 1,088 steps of 0.10-0.25 m on the five lines): the lidar has the belt 5 cm or more over the road at 69 % of those of 0.10-0.15 m and at 80 % of those of
-// 0.15-0.25 m, and has it level or lower at 14 and 6 %. Over 0.25 m (204 samples) the lidar's median is 0.15 m,
-// about half of what is built: those stay seams, as does a road standing over the tram's surface.
+// 0.15-0.25 m, and has it level or lower at 14 and 6 %. Over 0.25 m (batch E, 205 samples, IPR 2 m either side:
+// at 0.75 m the raster's cell reads the kerb's top and foot together) they are two kinds: Vinohradská's corridor, 98
+// of them, built 0.26-0.45 m over its roads where the lidar has 0.06-0.12 m (#876: its heights), and 96 kerbs of
+// 0.25-0.30 m on the four other lines, where the lidar has a median 0.22 m and 5 cm or more at 89. So the band ends
+// at 0.30 m; over it (11 samples off Vinohradská, the lidar 0.23-0.26 m) a step stays a seam, as does a road
+// standing over the tram's surface.
 // `over10cm` is the part of them seams10 counted before.
 import { findKerbs } from '../../src/review.js';
 const STREETS = new Set(['road', 'tram', 'parking', 'sidewalk', 'island', 'median', 'cycle', 'paved', 'platform']);
 const ROAD = new Set(['road', 'tram', 'parking']), RAISED = new Set(['sidewalk', 'island', 'median', 'platform']);
-const BED_KERB = 0.25; // m: a raised belt's kerb at most (the calibration above)
+const BED_KERB = 0.30; // m: a raised belt's kerb at most (the calibration above)
 
 export async function run() {
   const g = window.game, r = g.route, dtm = r.ground.dtm;

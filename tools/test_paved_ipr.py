@@ -17,7 +17,7 @@ class Flat:
         return np.full(np.shape(E), 100.0)
 
 
-def line(dips, staged, areas=(), humps=()):
+def line(dips, staged, areas=(), humps=(), styles=(), track='paved'):
     """A straight 300 m route along x; the rails 0.2 m under the ground over each (s0, s1) of `dips` and 0.5 m over it
     over each of `humps`; staged heights as given ([s, z]); the archive named as the source throughout."""
     s = np.arange(151) * 2.0
@@ -27,8 +27,8 @@ def line(dips, staged, areas=(), humps=()):
     for a, b in humps:
         z[(s >= a) & (s <= b)] = 100.5
     d = {'path': [[0, 0], [300, 0]], 'heights': {'step': 2.0, 'path': z.tolist(), 'staged': {'path': staged}},
-         'heightSource': {'path': [[0, 300, 'dtmp']]}}
-    return pi.measure_data('t', d, list(areas), Flat())
+         'heightSource': {'path': [[0, 300, 'dtmp']]}, 'styles': [{'s0': a, 's1': b, 'style': st} for a, b, st in styles]}
+    return pi.measure_data('t', d, list(areas), Flat(), track)
 
 
 def tram(x0, x1, z):
@@ -69,6 +69,17 @@ class Measure(unittest.TestCase):
 
     def test_a_short_stretch_over_ipr_is_no_run(self):
         self.assertEqual(line([], [], humps=[(50, 56)])['over_runs'], [])   # (8 m)
+
+    def test_grass_track_is_measured_apart(self):
+        # (#876, Bělohorská: the archive's records 0.2-0.45 m under the lidar on grass track, which the paved measure
+        # leaves out; the lidar reads the lawn at the rail heads)
+        held, styles = [[s, 99.8] for s in range(50, 101, 5)], [(40, 120, 'grass'), (200, 260, 'ballast')]
+        r = line([(50, 100), (210, 250)], held, styles=styles)
+        self.assertEqual((r['runs'], r['paved_km']), ([], 0.2))
+        r = line([(50, 100), (210, 250)], held, styles=styles, track='grass')
+        (run,) = r['runs']
+        self.assertEqual((run['s0'], run['s1'], run['cause'], r['paved_km']), (50, 100, 'held, no survey', 0.1))
+        self.assertEqual(line([], [], track='grass')['runs'], [])   # (a line with no grass track)
 
     def test_along_samples_the_route_every_step(self):
         s, xy, d = pi.along([[0, 0], [10, 0], [10, 10]], 2.0, 11)
