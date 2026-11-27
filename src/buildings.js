@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 import { rng } from './random.js';
 import { STREET_BELOW } from './heights.js';
+import { tramClearance } from './tram.js';
+import { CONTACT_WIRE } from './models.js';
 import { LANDMARK_TALL, LANDMARK_HIGH, LANDMARK_RISE, landmarkHaze, textureMean } from './landmarks.js';
 import { weatherize } from './weather.js';
 import { GFX } from './gfx.js';
@@ -107,13 +109,17 @@ function glassTexture() {
 const FACADE_COLORS = ['#e8d9b5', '#d9c7a0', '#efe3c8', '#c9b79a', '#e3c9b0', '#d6d0c2', '#e6d2a8', '#cfc3ad',
   '#e0b9a0', '#b9c4c9', '#d8cfb8', '#f0e6d2'].map((c) => new THREE.Color(c));
 const MODEL_UNDER = 0.05; // m: a bridge model's top lies this far under the bed top inside the trams' sweep (#742) ...
-const MODEL_REACH = 0.5;  // m: ... its corners from there up to this far over the rail heads
+const MODEL_REACH = 1.5;  // m: ... its corners from there up to this far over the rail heads (as over a street,
+// STREET_REACH: at 0.5 m, with the cut no wider than the trams, the model's slabs 0.5-1.2 m over the rails stood between
+// the tracks of Most Legií's junction, 53 m2 on line 17, #13)
 // A bridge model's top over a street on the ground (#13): within MODEL_NEAR m of our route the model's corners from
 // MODEL_UNDER under the survey's street to STREET_REACH over it come down under the street. Mosty 3D's footprints
 // take in the abutments on land, its top there 0-1.5 m over the surveyed street: on line 17, within 40 m of the
 // route, 1,229 m2 at Jiráskův most's junction (carriageway 657, sidewalk 219, island 109), 500 m2 at Štefánikův,
 // 434 m2 at Most Legií, as light slabs over the carriageway and the crossings.
 const MODEL_NEAR = 40, STREET_REACH = 1.5;
+const MODEL_SIDE = 0.1, BODY_TOP = 3.6, COLLECTOR = 1.0, COLLECTOR_OVER = 0.1; // m: the trams' space cut out of a model (envelope, below)
+const ROAD_CLEAR = 4.5, DECK_ROADS = ['road', 'parking', 'cycle']; // m: the vehicles' space over a surveyed deck's carriageway
 const MODEL_STREETS = new Set(['road', 'sidewalk', 'island', 'median', 'tram', 'parking', 'cycle', 'platform', 'paved']);
 const ROOF_COLORS = ['#8c4a32', '#7a3f2c', '#5f5a55', '#6d6862', '#9a5638', '#4f4b47'].map((c) => new THREE.Color(c));
 
@@ -253,6 +259,28 @@ export function buildLod2(group, data, route, ground) {
     const lb = ground.profile.onBack(n.s, l) ? o : 0, zr = ground.profile.heightAt(n.s, lb);
     return { zr, zb: zr - ground.profile.lift(n.s, lb) };
   };
+  // The space a tram takes on each track (ours, and the opposite one at its offset), cut out of a bridge model: the car
+  // body, the half width a T3 sweeps there (src/tram.js tramClearance less its margin) and MODEL_SIDE m, from just over
+  // the rail heads up to BODY_TOP m, and the collector, COLLECTOR m a side from there to COLLECTOR_OVER m over the
+  // contact wire (the lint's mounted-clear-of-tram takes the same two boxes). No wider: the cut was 3 m past each track
+  // and 5.8 m high, and took 314 m2 of faces off Trojský most's arch, whose legs come no nearer than 1.62 m to a track's
+  // axis at the body's height and pass 5.50 m over the rails at their lowest (line 17 s 17970; the maintainer, #13:
+  // the model kept whole). For a point: how far it lies inside each face of each box, m (left, right, floor, ceiling
+  // of our track's body, of its collector, then the opposite track's two); null off the route.
+  const envelope = (x, y, z) => {
+    const n = route.nearest(x, y);
+    if (!n) return null;
+    const o = ground.profile.backOffset(n.s), E = new Array(16).fill(-1);
+    if (n.d > Math.abs(o) + 3.5) return E;
+    const q = route.at(n.s), l = q.hx * (y - q.y) - q.hy * (x - q.x), hw = tramClearance(route, n.s) - 0.25 + MODEL_SIDE;
+    for (let i = 0; i < (o ? 2 : 1); i++) {
+      const a = i ? o : 0, h = z - ground.profile.heightAt(n.s, a), d = l - a, k = i * 8;
+      E[k] = d + hw; E[k + 1] = hw - d; E[k + 2] = h - 0.02; E[k + 3] = BODY_TOP - h;
+      E[k + 4] = d + COLLECTOR; E[k + 5] = COLLECTOR - d; E[k + 6] = h - BODY_TOP; E[k + 7] = CONTACT_WIRE + COLLECTOR_OVER - h;
+    }
+    return E;
+  };
+  const inEnvelope = (E) => !!E && [0, 4, 8, 12].some((k) => E[k] > 0 && E[k + 1] > 0 && E[k + 2] > 0 && E[k + 3] > 0);
   // landmarks (src/landmarks.js): in meshes of their own with a lighter haze, and their triangles copied for the pass
   // past the far plane; "high ground" over the line's typical ground, the median along its route
   const along = [];
@@ -304,19 +332,10 @@ export function buildLod2(group, data, route, ground) {
           if (near(t)) split(P[0], P[1], P[2], 0);
           else out.push(...P);
         }
-        // The space the trams sweep is cut out of the model along its own faces (#13: a clean cut, not dropped
-        // triangles): a triangle that reaches into it is clipped at the sweep's two sides, at its floor just over the rail
-        // heads and at its ceiling, and what lies inside goes. Dropped by their centres alone (below), the triangles left
-        // teeth up to 1.5 m long along the cut: the legs of Trojský most's arch beside the track, line 17.
-        const inSweep = (p) => { // (how far p is inside each of the four faces, m; null off the route)
-          const n = route.nearest(p[0], p[1]);
-          if (!n) return null;
-          const o = ground.profile.backOffset(n.s);
-          if (n.d > Math.abs(o) + 3.5) return [-1, -1, -1, -1];
-          const q = route.at(n.s), l = q.hx * (p[1] - q.y) - q.hy * (p[0] - q.x);
-          const zr = ground.profile.heightAt(n.s, ground.profile.onBack(n.s, l) ? o : 0);
-          return [l - Math.min(0, o) + 3, Math.max(0, o) + 3 - l, p[2] - zr - 0.02, zr + 5.8 - p[2]];
-        };
+        // The trams' space (envelope, above) is cut out of the model along its own faces (#13: a clean cut, not dropped
+        // triangles): a triangle that reaches into one of its boxes is clipped at the box's two sides, its floor and its
+        // ceiling, and what lies inside goes. Dropped by their centres alone, the triangles left teeth up to 1.5 m long
+        // along the cut (the underside of the road bridge over line 22 at s 18170).
         const clipPoly = (poly, k, sign) => { // (the part of a polygon where sign * its k-th term >= 0)
           const res = [];
           for (let i = 0; i < poly.length; i++) {
@@ -331,16 +350,25 @@ export function buildLod2(group, data, route, ground) {
         for (let t = 0; t < out.length; t += 3) {
           const P = [out[t], out[t + 1], out[t + 2]];
           const c = route.nearest((P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3);
-          const F = c && c.d < Math.abs(ground.profile.backOffset(c.s)) + 5.5 ? P.map(inSweep) : null;
-          // (wholly outside one face: as it is)
-          if (!F || F.some((f) => !f) || [0, 1, 2, 3].some((k) => F.every((f) => f[k] <= 0))) { cut.push(...P); continue; }
+          const F = c && c.d < Math.abs(ground.profile.backOffset(c.s)) + 5.5 ? P.map((p) => envelope(p[0], p[1], p[2])) : null;
+          // (a box the triangle lies wholly outside one face of leaves it as it is)
+          const reaches = (b) => ![0, 1, 2, 3].some((k) => F.every((f) => f[b * 4 + k] <= 0));
+          if (!F || F.some((f) => !f) || ![0, 1, 2, 3].some(reaches)) { cut.push(...P); continue; }
           clipped++;
-          let rest = P.map((p, i) => [p[0], p[1], p[2], ...F[i]]);
-          for (let k = 3; k < 7 && rest.length >= 3; k++) {
-            const outside = clipPoly(rest, k, -1);
-            for (let i = 2; i < outside.length; i++) cut.push(outside[0], outside[i - 1], outside[i]);
-            rest = clipPoly(rest, k, 1);
+          let pieces = [P.map((p, i) => [p[0], p[1], p[2], ...F[i]])];
+          for (let b = 0; b < 4; b++) {
+            const next = [];
+            for (let rest of pieces) {
+              if ([0, 1, 2, 3].some((k) => rest.every((v) => v[3 + b * 4 + k] <= 0))) { next.push(rest); continue; }
+              for (let k = 3 + b * 4; k < 7 + b * 4 && rest.length >= 3; k++) {
+                const outside = clipPoly(rest, k, -1);
+                if (outside.length >= 3) next.push(outside);
+                rest = clipPoly(rest, k, 1);
+              }
+            }
+            pieces = next;
           }
+          for (const poly of pieces) for (let i = 2; i < poly.length; i++) cut.push(poly[0], poly[i - 1], poly[i]);
         }
         if (clipped || out.length !== count) {
           n3 = cut.length;
@@ -383,13 +411,12 @@ export function buildLod2(group, data, route, ground) {
       for (let t = 0; t < n3; t += 3) {
         const ax = xs[t], ay = ys[t], bx = xs[t + 1], by = ys[t + 1], cx = xs[t + 2], cy = ys[t + 2];
         let az = zs[t], bz = zs[t + 1], cz = zs[t + 2];
-        // nothing of a bridge model inside the space the trams sweep (±3 m of our track and of the opposite one, from
-        // just over the rail heads to 5.8 m above them): at the north end of Čechův most a slab 3.7 m above the deck
-        // cut through the tram, and the model's top 0-0.5 m over the real deck would cover the rails (src/heights.js)
+        // nothing of a bridge model inside the trams' space (envelope, above; the clip took it out, this holds for what
+        // the clip's straight cuts left): at the north end of Čechův most a slab 3.7 m above the deck cut through the
+        // tram, and the model's top 0-0.5 m over the real deck would cover the rails (src/heights.js)
         if (isBridge) {
           const mx = (ax + bx + cx) / 3, my = (ay + by + cy) / 3, n = route.nearest(mx, my);
-          const sw = sweep(mx, my, n), mz0 = (az + bz + cz) / 3;
-          if (sw && mz0 > sw.zr + 0.02 && mz0 < sw.zr + 5.8) continue;
+          if (inEnvelope(envelope(mx, my, (az + bz + cz) / 3))) continue;
           // (and under that space the model lies under the bed, not in the ballast up to the rail heads: its corners
           // within the sweep come down to MODEL_UNDER under the bed top, the opposite track's bed under its rails
           // (the profile's cross-section, #197: on main its rails ran on the model's top). Krejcárek, line 37: the track climbs
@@ -423,20 +450,21 @@ export function buildLod2(group, data, route, ground) {
             const zr = rd.hf(mx, my), mz = (az + bz + cz) / 3;
             if (mz > zr + 0.14 && mz < zr + 4.5) continue; // (from just over the ribbon, drawn 0.12 over zr)
           }
-          // trimmed to the surveyed deck where there is one (the survey is exact, the model coarse: at
-          // Štefánikův most its top stood in the track and the roads): nothing over it (to 4.7 m)
-          const mz = (az + bz + cz) / 3, zd = ground.dtm?.deckAt(mx, my, mz - 2.35, 2.35);
-          if (zd !== null && zd !== undefined && mz > zd) continue;
-          // (what is kept lies under the deck by its centre: a corner of it that still stood through the deck, up to
-          // STREET_REACH m over it, comes down under it. On Trojský most 141 m2 of the kept top had a corner over 2 cm
-          // above the deck, light specks in the lanes, #13)
-          if (n && n.d < MODEL_NEAR + 1.5) {
-            const below = (x, y, z) => {
-              const zc = ground.dtm?.deckAt(x, y, z, STREET_REACH);
-              return zc !== null && zc !== undefined && z > zc - MODEL_UNDER ? zc - MODEL_UNDER : z;
-            };
-            az = below(ax, ay, az); bz = below(bx, by, bz); cz = below(cx, cy, cz);
-          }
+          // Over the surveyed deck (the survey is exact, the model coarse: at Štefánikův most its top stood in the track
+          // and the roads): nothing of the model over a carriageway of the deck up to ROAD_CLEAR m, the vehicles' space.
+          const mz = (az + bz + cz) / 3;
+          const overRoad = (cl) => { const zc = ground.dtm?.deckAt(mx, my, mz - ROAD_CLEAR / 2, ROAD_CLEAR / 2, cl); return zc !== null && zc !== undefined && mz > zc; };
+          if (DECK_ROADS.some(overRoad)) continue;
+          // Elsewhere on the deck the model's corners up to STREET_REACH m over it come down under it: its top 0-0.5 m
+          // over the real deck, its low blocks, and the corners that stood through the deck as light specks in Trojský
+          // most's lanes (141 m2, #13). What stands higher stays, the bridge's own: the legs of Trojský most's arch come
+          // down beside the tracks, and everything up to 4.7 m over the deck was dropped (the maintainer, #13: the model
+          // kept whole).
+          const below = (x, y, z) => {
+            const zc = ground.dtm?.deckAt(x, y, z, STREET_REACH);
+            return zc !== null && zc !== undefined && z > zc - MODEL_UNDER ? zc - MODEL_UNDER : z;
+          };
+          az = below(ax, ay, az); bz = below(bx, by, bz); cz = below(cx, cy, cz);
         }
         let nx = (by - ay) * (cz - az) - (bz - az) * (cy - ay);
         let ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
