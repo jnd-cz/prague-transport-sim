@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Paved track against IPR's ground, as built (#539).
 
-    python -P -E tools/bench/paved_ipr.py [--lines 9,17,22,23,37] [--json OUT] [--top N]
+    python -P -E tools/bench/paved_ipr.py [--lines 9,17,22,23,37] [--track grass] [--json OUT] [--top N]
 
 Along each line's route (`path`, every heights.step), on paved track only (the styles' grass and ballast left out):
 the track's surface (top of rail less the style's lift) against IPR's 1 m bare-earth DTM at the track's centre.
@@ -27,6 +27,10 @@ the track's surface (top of rail less the style's lift) against IPR's 1 m bare-e
   - other: none of these.
   IPR across the track (`trough`: the lower side's lowest cell at 3-6 m less the centre; negative where the track
   stands higher than its sides) and the survey's class at the centre are listed with each run.
+
+With --track grass the same on the grass style's stretches alone (#876): there IPR reads the lawn at the rail heads,
+so the surface (the rails less the grass style's lift) lies on it as a paved one does. Ballast stays out: its bed
+lies under the rails by more than IPR's cell tells from the ground beside it.
 
 Prints a table per line (paved km, metres under, p1 / p99 of surface - IPR, metres by cause, metres over by the
 heights' source) and the largest runs of both kinds.
@@ -84,16 +88,17 @@ def in_ranges(s, ranges):
     return out
 
 
-def measure(line, ipr):
+def measure(line, ipr, track="paved"):
     """One line's numbers and runs (data/lineN.json, its survey data/lineN.dtm.json)."""
     d = json.load(open(os.path.join(ROOT, "data", f"line{line}.json"), encoding="utf-8"))
     dtm = os.path.join(ROOT, "data", f"line{line}.dtm.json")
     areas = json.load(open(dtm, encoding="utf-8"))["areas"] if os.path.exists(dtm) else []
-    return measure_data(line, d, areas, ipr)
+    return measure_data(line, d, areas, ipr, track)
 
 
-def measure_data(line, d, areas, ipr):
-    """As measure, from a line's data and survey areas; `ipr` has sample(E, N) (S-JTSK)."""
+def measure_data(line, d, areas, ipr, track="paved"):
+    """As measure, from a line's data and survey areas; `ipr` has sample(E, N) (S-JTSK). `track`: "paved" (the styles'
+    grass and ballast left out) or "grass" (the grass style's stretches alone)."""
     H = d["heights"]
     step, z = H["step"], np.asarray(H["path"], float)
     s, xy, dirs = along(d["path"], step, len(z))
@@ -104,6 +109,8 @@ def measure_data(line, d, areas, ipr):
         lift = np.interp(s, ls, lv)
     surf = z - lift
     paved = ~in_ranges(s, [(x["s0"], x["s1"]) for x in d.get("styles", []) if x["style"] in NOT_PAVED])
+    if track == "grass":   # (the measured stretches: the name stays the paved measure's)
+        paved = in_ranges(s, [(x["s0"], x["s1"]) for x in d.get("styles", []) if x["style"] == "grass"])
     out_of = in_ranges(s, [tuple(b) for b in d.get("spans", [])] + [(t[0], t[1]) if isinstance(t, list) else (t["s0"], t["s1"])
                                                                     for t in d.get("tunnels", [])])
     E, N = F.to_jtsk(xy[:, 0], xy[:, 1])
@@ -224,7 +231,7 @@ def measure_data(line, d, areas, ipr):
     over_by = {}
     for r in over_runs:
         over_by["/".join(r["sources"]) or "-"] = over_by.get("/".join(r["sources"]) or "-", 0) + r["m"]
-    v = diff[use]
+    v = diff[use] if use.any() else np.zeros(1)   # (a line with no such track)
     by = {}
     for r in runs:
         by[r["cause"]] = by.get(r["cause"], 0) + r["m"]
@@ -240,11 +247,12 @@ def main(argv=None):
     a.add_argument("--lines", default=LINES)
     a.add_argument("--json")
     a.add_argument("--top", type=int, default=5)
+    a.add_argument("--track", choices=("paved", "grass"), default="paved")
     a = a.parse_args(argv)
     ipr = IprDtm()
-    res = [measure(n, ipr) for n in a.lines.split(",")]
+    res = [measure(n, ipr, a.track) for n in a.lines.split(",")]
     causes = CAUSES
-    print("| line | paved km | under by >10 cm | p1 / p99 of surface - IPR | " + " | ".join(causes) + " | left out (>2 m under) |")
+    print(f"| line | {a.track} km | under by >10 cm | p1 / p99 of surface - IPR | " + " | ".join(causes) + " | left out (>2 m under) |")
     print("|---|---|---|---|" + "---|" * len(causes) + "---|")
     for r in res:
         print(f"| {r['line']} | {r['paved_km']} | {r['under_m']} m | {r['p1']:+.2f} / {r['p99']:+.2f} m | "
