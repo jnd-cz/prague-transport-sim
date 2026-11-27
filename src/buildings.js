@@ -304,9 +304,47 @@ export function buildLod2(group, data, route, ground) {
           if (near(t)) split(P[0], P[1], P[2], 0);
           else out.push(...P);
         }
-        if (out.length !== count) {
-          n3 = out.length;
-          xs = Float32Array.from(out, (p) => p[0]); ys = Float32Array.from(out, (p) => p[1]); zs = Float32Array.from(out, (p) => p[2]);
+        // The space the trams sweep is cut out of the model along its own faces (#13: a clean cut, not dropped
+        // triangles): a triangle that reaches into it is clipped at the sweep's two sides, at its floor just over the rail
+        // heads and at its ceiling, and what lies inside goes. Dropped by their centres alone (below), the triangles left
+        // teeth up to 1.5 m long along the cut: the legs of Trojský most's arch beside the track, line 17.
+        const inSweep = (p) => { // (how far p is inside each of the four faces, m; null off the route)
+          const n = route.nearest(p[0], p[1]);
+          if (!n) return null;
+          const o = ground.profile.backOffset(n.s);
+          if (n.d > Math.abs(o) + 3.5) return [-1, -1, -1, -1];
+          const q = route.at(n.s), l = q.hx * (p[1] - q.y) - q.hy * (p[0] - q.x);
+          const zr = ground.profile.heightAt(n.s, ground.profile.onBack(n.s, l) ? o : 0);
+          return [l - Math.min(0, o) + 3, Math.max(0, o) + 3 - l, p[2] - zr - 0.02, zr + 5.8 - p[2]];
+        };
+        const clipPoly = (poly, k, sign) => { // (the part of a polygon where sign * its k-th term >= 0)
+          const res = [];
+          for (let i = 0; i < poly.length; i++) {
+            const a = poly[i], b = poly[(i + 1) % poly.length], fa = sign * a[k], fb = sign * b[k];
+            if (fa >= 0) res.push(a);
+            if ((fa >= 0) !== (fb >= 0)) { const u = fa / (fa - fb); res.push(a.map((v, j) => v + (b[j] - a[j]) * u)); }
+          }
+          return res;
+        };
+        const cut = [];
+        let clipped = 0;
+        for (let t = 0; t < out.length; t += 3) {
+          const P = [out[t], out[t + 1], out[t + 2]];
+          const c = route.nearest((P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3);
+          const F = c && c.d < Math.abs(ground.profile.backOffset(c.s)) + 5.5 ? P.map(inSweep) : null;
+          // (wholly outside one face: as it is)
+          if (!F || F.some((f) => !f) || [0, 1, 2, 3].some((k) => F.every((f) => f[k] <= 0))) { cut.push(...P); continue; }
+          clipped++;
+          let rest = P.map((p, i) => [p[0], p[1], p[2], ...F[i]]);
+          for (let k = 3; k < 7 && rest.length >= 3; k++) {
+            const outside = clipPoly(rest, k, -1);
+            for (let i = 2; i < outside.length; i++) cut.push(outside[0], outside[i - 1], outside[i]);
+            rest = clipPoly(rest, k, 1);
+          }
+        }
+        if (clipped || out.length !== count) {
+          n3 = cut.length;
+          xs = Float32Array.from(cut, (p) => p[0]); ys = Float32Array.from(cut, (p) => p[1]); zs = Float32Array.from(cut, (p) => p[2]);
         }
       }
       // the tram passes under it (a passage): lift everything below the wire clear of the track
