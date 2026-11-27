@@ -183,13 +183,13 @@ a slope. Check ground contact at the individual posts of longer objects.
 | `bin-recycling` | 790 / 636 / 494 | 2 |
 | `cycle-stand` | 492 / 240 / 132 | 1 |
 | `bollard` | 152 / 56 / 40 | 1 |
-| Z.1–Z.8, straight frame | 144–230 / 72–154 / 56–64 | 1–2 |
-| Z.9–Z.14, bent tubular frame | 432–480 / 192–224 / 88–114 | 1–2 |
+| Z.1–Z.8, straight frame | 144–230 / 72–88 / 40–48 | 1–2 |
+| Z.9–Z.14, bent tubular frame | 432–480 / 192–224 / 64–76 | 1–2 |
 
 The WebGL measurements come from the exported GLB, with shadows off. For a mesh with `extras.singlePass`,
 set its material's `forceSinglePass` to true after loading. The glass railing's single double-sided
 plane and opaque frame then draw in two calls instead of three. Keep the panes sortable as separate
-surfaces and instance the opaque meshes by kind and level in each visible tile. The 874,128-byte file
+surfaces and instance the opaque meshes by kind and level in each visible tile. The 830,876-byte file
 contains its cladding and glass textures.
 
 The bins and bicycle stand were rebuilt in `tools/street_furniture_models.js`. The converted lab references
@@ -215,6 +215,11 @@ configuration. The two Z.S. entries specify the printed pattern used by the stra
 The nominal span is outside frame width for type 1 and post-centre spacing for type 2. The base depths are
 150 mm and 200 mm below finished paving, respectively. Z.11 uses the 1.124 m height dimensioned in its
 drawing. Glass uses one double-sided surface per module. [IPR catalogue, pp. 13–20](https://iprpraha.cz/assets/files/files/edfe93bf29ab70484e25676953ead79c.pdf#page=13)
+
+Near railings include the fastenings, anchor plates and, on straight glazed modules, the full dot print.
+Middle and far glass of that family uses the large marker row with a smaller texture. Far posts, bent
+tube ends and glass corners use less geometry. Every level preserves the visible width, height,
+rail count and the presence of glass.
 
 Rebuild with `python -P -E tools/pack_street_furniture.py --lab <prague-street-assets-lab>`.
 `--audit` writes WebGL counts for the lab and round-tripped GLB, plus the full-detail source models.

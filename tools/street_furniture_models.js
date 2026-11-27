@@ -287,9 +287,10 @@ const glassSurface = { side: T.DoubleSide, transparent: true, depthWrite: false,
 const clearPane = new T.MeshBasicMaterial({ ...glassSurface, name: 'clear railing glass', color: 0xb6cbcb, opacity: .22 });
 const printPanes = new Map();
 
-function printedPane(width, height, bottom) {
-  if (printPanes.has(width)) return printPanes.get(width);
-  const scale = 512;
+function printedPane(width, height, bottom, fullPrint) {
+  const key = width + ':' + fullPrint;
+  if (printPanes.has(key)) return printPanes.get(key);
+  const scale = fullPrint ? 512 : 128;
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(width * scale);
   canvas.height = Math.round(height * scale);
@@ -301,9 +302,11 @@ function printedPane(width, height, bottom) {
     ctx.arc(x * scale, (bottom + height - y) * scale, radius * scale, 0, Math.PI * 2);
     ctx.fill();
   };
-  ctx.fillStyle = 'rgba(72,78,78,.58)';
-  for (let row = 0, y = bottom + .03; y < bottom + height; row++, y += .042) {
-    for (let x = .036 + (row % 2) * .03125; x < width; x += .0625) dot(x, y, .006);
+  if (fullPrint) {
+    ctx.fillStyle = 'rgba(72,78,78,.58)';
+    for (let row = 0, y = bottom + .03; y < bottom + height; row++, y += .042) {
+      for (let x = .036 + (row % 2) * .03125; x < width; x += .0625) dot(x, y, .006);
+    }
   }
   // Z.S.1 and Z.S.2 use a single row at 916 mm above the paving.
   ctx.fillStyle = 'rgba(47,52,54,.88)';
@@ -311,8 +314,10 @@ function printedPane(width, height, bottom) {
   for (let i = 0; i < n; i++) dot(width / 2 + (i - (n - 1) / 2) * .125, .916, .025);
   const map = new T.CanvasTexture(canvas);
   map.colorSpace = T.SRGBColorSpace;
-  const material = new T.MeshBasicMaterial({ ...glassSurface, name: 'printed railing glass', map });
-  printPanes.set(width, material);
+  const material = new T.MeshBasicMaterial({
+    ...glassSurface, name: fullPrint ? 'printed railing glass' : 'railing glass marker row', map,
+  });
+  printPanes.set(key, material);
   return material;
 }
 
@@ -343,18 +348,26 @@ function tubeX(radius, from, to, y, sides, cap = false) {
     .rotateZ(Math.PI / 2).translate((from + to) / 2, y, 0);
 }
 
+function tubeEnd(x, y, height, depth, sides) {
+  return new T.CircleGeometry(1, sides).scale(depth, height, 1)
+    .rotateY(Math.PI / 2).translate(x, y, 0);
+}
+
 function straightRailing(span, fill, level, sides, bend) {
   const glass = fill.startsWith('glass'), height = 1.1, bottom = -.15;
+  const near = level === 'near', far = level === 'far';
   const post = span / 2 - .0165, topRail = height - .02415, lowRail = .2;
   const paneBottom = .238, paneHeight = .803;
   const frame = [tubeX(.02415, -post, post, topRail, sides), tubeX(.02415, -post, post, lowRail, sides)];
   if (fill === 'three-bars') frame.push(tubeX(.02415, -post, post, (topRail + lowRail) / 2, sides));
   for (const x of [-post, post]) {
-    const section = capsule(.05, .033, level === 'near' ? 4 : 2);
-    frame.push(slab(section, bottom, height - bottom).rotateY(Math.PI / 2).translate(x, 0, 0));
-    if (level === 'near') frame.push(new T.BoxGeometry(.110, .012, .154).translate(x, bottom + .006, 0));
+    const upright = far
+      ? new T.BoxGeometry(.033, height - bottom, .05).translate(0, (height + bottom) / 2, 0)
+      : slab(capsule(.05, .033, near ? 4 : 2), bottom, height - bottom).rotateY(Math.PI / 2);
+    frame.push(upright.translate(x, 0, 0));
+    if (near) frame.push(new T.BoxGeometry(.110, .012, .154).translate(x, bottom + .006, 0));
   }
-  if (glass && level !== 'far') {
+  if (glass && near) {
     for (const x of span === 1 ? [-.30, .30] : [-.80, 0, .80]) {
       for (const y of [paneBottom - .006, paneBottom + paneHeight + .006]) {
         frame.push(new T.BoxGeometry(.035, .025, .020).translate(x, y, 0));
@@ -365,14 +378,15 @@ function straightRailing(span, fill, level, sides, bend) {
   group.add(mesh(steel, tint(frame, coating)));
   if (glass) {
     const w = span - .096;
-    group.add(glassPanel(w, paneHeight, paneBottom, fill === 'glass-rounded',
-      printedPane(w, paneHeight, paneBottom), bend));
+    group.add(glassPanel(w, paneHeight, paneBottom, fill === 'glass-rounded' && !far,
+      printedPane(w, paneHeight, paneBottom, near), bend));
   }
   return group;
 }
 
 function bentRailing(span, fill, level, sides, bend) {
   const post = span / 2, base = -.2, long = span === 2;
+  const near = level === 'near', far = level === 'far';
   const height = long ? 1.130 : 1.124, radius = long ? .030 : .025;
   const top = height - radius, low = .2, stub = long ? .104 : .080, elbow = long ? .078 : .063;
   const path = [[-post, base, -1, 0]];
@@ -380,21 +394,24 @@ function bentRailing(span, fill, level, sides, bend) {
     const a = Math.PI - i * Math.PI / (2 * bend), nx = Math.cos(a), ny = Math.sin(a);
     path.push([-post + elbow * (1 + nx), top - elbow * (1 - ny), nx, ny]);
   }
-  path.push([post + stub - .02, top, 0, 1]);
+  const end = post + stub;
+  path.push([far ? end : end - .02, top, 0, 1]);
   const frame = [
     sweep(path, radius, .025, sides),
-    tubeX(radius, post + stub - .021, post + stub, top, sides, true),
-    tubeX(.021, -post, post + stub, low, sides, true),
-    new T.CylinderGeometry(.025, .025, top - base, sides, 1, false, Math.PI / 2)
-      .translate(post, (top + base) / 2, 0),
+    far ? tubeEnd(end, top, radius, .025, sides)
+      : tubeX(radius, end - .021, end, top, sides, true),
+    new T.CylinderGeometry(.025, .025, top - base, sides, 1, far, Math.PI / 2).translate(post, (top + base) / 2, 0),
   ];
-  if (fill === 'three-bars') frame.push(tubeX(.021, -post, post + stub, low + .45, sides, true));
-  if (level === 'near') for (const x of [-post, post]) {
+  for (const y of fill === 'three-bars' ? [low, low + .45] : [low]) {
+    frame.push(tubeX(.021, -post, end, y, sides, !far));
+    if (far) frame.push(tubeEnd(end, y, .021, .021, sides));
+  }
+  if (near) for (const x of [-post, post]) {
     const foot = long ? .105 : .075;
     frame.push(new T.CylinderGeometry(foot, foot, .014, sides).translate(x, base + .007, 0));
   }
   const w = long ? 1.788 : .826, h = long ? .809 : .817, y = .232;
-  if (fill === 'glass') for (const railY of [(y + low + .021) / 2, (y + h + top - radius) / 2]) {
+  if (fill === 'glass' && near) for (const railY of [(y + low + .021) / 2, (y + h + top - radius) / 2]) {
     frame.push(new T.BoxGeometry(w, .016, .016).translate(0, railY, 0));
   }
   const group = new T.Group();

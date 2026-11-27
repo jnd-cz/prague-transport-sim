@@ -12,20 +12,20 @@ from edit_t3h_glb import read  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 LEVELS = ("near", "middle", "far")
 RAILINGS = {
-    "railing-bars-short": (1, 1, (144, 72, 56)),
-    "railing-glass-short": (2, 1, (194, 122, 58)),
-    "railing-glass-rounded-short": (3, 1, (206, 130, 62)),
-    "railing-three-bars-short": (4, 1, (168, 88, 64)),
-    "railing-bars": (5, 2, (144, 72, 56)),
-    "railing-glass": (6, 2, (218, 146, 58)),
-    "railing-glass-rounded": (7, 2, (230, 154, 62)),
-    "railing-three-bars": (8, 2, (168, 88, 64)),
-    "railing-tubular-three-bars-short": (9, 1, (480, 224, 104)),
-    "railing-tubular-bars-short": (10, 1, (432, 192, 88)),
-    "railing-tubular-glass-short": (11, 1, (458, 218, 114)),
-    "railing-tubular-three-bars": (12, 2, (480, 224, 104)),
-    "railing-tubular-bars": (13, 2, (432, 192, 88)),
-    "railing-tubular-glass": (14, 2, (458, 218, 114)),
+    "railing-bars-short": (1, 1, (144, 72, 40)),
+    "railing-glass-short": (2, 1, (194, 74, 42)),
+    "railing-glass-rounded-short": (3, 1, (206, 82, 42)),
+    "railing-three-bars-short": (4, 1, (168, 88, 48)),
+    "railing-bars": (5, 2, (144, 72, 40)),
+    "railing-glass": (6, 2, (218, 74, 42)),
+    "railing-glass-rounded": (7, 2, (230, 82, 42)),
+    "railing-three-bars": (8, 2, (168, 88, 48)),
+    "railing-tubular-three-bars-short": (9, 1, (480, 224, 76)),
+    "railing-tubular-bars-short": (10, 1, (432, 192, 64)),
+    "railing-tubular-glass-short": (11, 1, (458, 194, 66)),
+    "railing-tubular-three-bars": (12, 2, (480, 224, 76)),
+    "railing-tubular-bars": (13, 2, (432, 192, 64)),
+    "railing-tubular-glass": (14, 2, (458, 194, 66)),
 }
 TRIANGLES = {
     "bin-large": (744, 596, 460),
@@ -100,7 +100,7 @@ class TestFurniturePack(unittest.TestCase):
                             if mat.get("alphaMode") == "BLEND":
                                 self.assertTrue(mesh["extras"]["singlePass"] and mat["doubleSided"])
                                 glass += 1
-                                self.check_glass(kind, pos)
+                                self.check_glass(kind, level, pos, mat)
                     has_glass = "glass" in kind
                     draws = 2 if kind in BINS or has_glass else 1
                     self.assertEqual((triangles, passes, glass), (count, draws, int(has_glass)))
@@ -112,6 +112,13 @@ class TestFurniturePack(unittest.TestCase):
                         ground_limit = -.15 if number < 9 else -.20
                         height = 1.1 if number < 9 else 1.124 if span == 1 else 1.130
                         self.assertAlmostEqual(high, height, places=3)
+                        frame = glb["nodes"][model["children"][0]]
+                        part, = glb["meshes"][frame["mesh"]]["primitives"]
+                        positions = samples(glb, binary, part["attributes"]["POSITION"], "<3f")
+                        above_grade = [x for x, y, _ in positions if y >= 0]
+                        end_overhangs = (0, 0) if number < 9 else (.025, .080) if span == 1 else (.030, .104)
+                        self.assertAlmostEqual(min(above_grade), -span / 2 - end_overhangs[0], places=3)
+                        self.assertAlmostEqual(max(above_grade), span / 2 + end_overhangs[1], places=3)
                     self.assertAlmostEqual(low, ground_limit, places=2)
                     self.assertGreater(high, .85)
                     if kind in BINS:
@@ -139,13 +146,19 @@ class TestFurniturePack(unittest.TestCase):
                 self.assertFalse(any(covers((x, 0), face) for face in mouth), x)
             self.assertTrue(any(covers((.159, 0), face) for face in mouth))
 
-    def check_glass(self, kind, accessor):
+    def check_glass(self, kind, level, accessor, material):
         number, span, _ = RAILINGS[kind]
         width = span - .096 if number < 9 else .826 if span == 1 else 1.788
         height = .803 if number < 9 else .817 if span == 1 else .809
         self.assertAlmostEqual(accessor["max"][0] - accessor["min"][0], width, places=3)
         self.assertAlmostEqual(accessor["max"][1] - accessor["min"][1], height, places=3)
-        self.assertEqual(accessor["count"] > 4, "rounded" in kind)
+        self.assertEqual(accessor["count"] > 4, "rounded" in kind and level != "far")
+        if number < 9:
+            name = "printed railing glass" if level == "near" else "railing glass marker row"
+            self.assertEqual(material["name"], name)
+            self.assertIn("baseColorTexture", material["pbrMetallicRoughness"])
+        else:
+            self.assertEqual(material["name"], "clear railing glass")
 
 
 if __name__ == "__main__":
