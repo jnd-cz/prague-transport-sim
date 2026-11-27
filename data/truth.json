@@ -6507,6 +6507,49 @@
     }
    ]
   },
+  "belohorska-grass-track": {
+   "line": "22",
+   "at": [
+    -4401.1,
+    155.0
+   ],
+   "reach": 25,
+   "issue": 876,
+   "what": "Bělohorská's grass track (line 22, s 2850): the track's body stands behind its kerb over the carriageways either side, the lawn at the rail heads",
+   "source": "measured 2026-11-27 on ground batch E (#876): the archive's records of 1999 and 2014 lie 0.2-0.45 m under IPR's 2023 lidar for 1.6 km, and the rails were drawn 0.14 m under the roads (322.31 m by 322.45-322.47 m), where the lidar has the body at 322.59 m, 0.12-0.14 m over them; the maintainer on Bělohorská (#539): the track does not sit lower",
+   "sections": [
+    {
+     "name": "from the south carriageway across the kerb onto the track's body, x = -4401.1, 4.5 m",
+     "from": [
+      -4401.1,
+      149.5
+     ],
+     "to": [
+      -4401.1,
+      154.0
+     ],
+     "expect": {
+      "rise m at least": 0.05
+     },
+     "why": "IPR rises from 322.46 m on the road to 322.59 m on the body"
+    },
+    {
+     "name": "from the north carriageway across the kerb onto the track's body, x = -4401.1, 4.5 m",
+     "from": [
+      -4401.1,
+      161.0
+     ],
+     "to": [
+      -4401.1,
+      156.5
+     ],
+     "expect": {
+      "rise m at least": 0.05
+     },
+     "why": "IPR rises from 322.43 m on the road to 322.58 m on the body"
+    }
+   ]
+  },
   "stairs-reversed-ramp": {
    "line": "9",
    "at": [
