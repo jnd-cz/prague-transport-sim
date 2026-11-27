@@ -122,7 +122,8 @@ def version(n):
 def perf_table(got):
     """Lines of the per-machine table: the performance tests and the shifts' summaries apart.
 
-    A row per machine, browser, kind and game version; its figures are the latest run's, whole (a median per
+    A row per machine, browser, kind, game version and the address's drawing switches (src/gfx.js: runs with
+    different switches are different measurements, #705); its figures are the latest run's, whole (a median per
     column took fps from one run and the slow frames from another, #350). got is newest first, as notes() gives."""
     rows = {}
     for _, n in got:
@@ -130,14 +131,15 @@ def perf_table(got):
         if p and p.get("frames"):
             # (the reference run apart: line 17, the detailed model, the one result every machine has)
             kind = "reference" if p.get("reference") else f"{n['kind']} {p.get('line', n.get('line', '?'))}"
-            rows.setdefault((machine(n), browser(n), kind, version(n)), []).append(p)
+            gfx = p.get("gfx") or (n.get("machine") or {}).get("gfx") or ""
+            rows.setdefault((machine(n), browser(n), kind, version(n), gfx), []).append(p)
     pct = lambda p, k: f"{p['over'][k]}%" if p.get("over", {}).get(k) is not None else "-"  # noqa: E731
-    out = [f"{'machine':48} {'browser':8} {'kind':12} {'version':8} {'runs':>4} {'fps':>6} {'>20 ms':>7} {'>33 ms':>7} {'GPU ms':>7}"]
-    for (m, b, k, v), ps in sorted(rows.items()):
+    out = [f"{'machine':48} {'browser':8} {'kind':12} {'version':8} {'runs':>4} {'fps':>6} {'>20 ms':>7} {'>33 ms':>7} {'GPU ms':>7}  gfx"]
+    for (m, b, k, v, x), ps in sorted(rows.items()):
         p = ps[0]  # (the latest)
         gpu = p.get("gpuMs")
         out.append(f"{m[:48]:48} {b:8} {k:12} {v:8} {len(ps):>4} {p['fps']:>6} {pct(p, '20'):>7} {pct(p, '33'):>7} "
-                   f"{gpu if gpu is not None else '-':>7}")
+                   f"{gpu if gpu is not None else '-':>7}  {x}".rstrip())
     return out
 
 

@@ -31,7 +31,7 @@ def main():
     # (the zoomed run at the bench's own pixel ratio too, #705)
     zoomed = measure(args.line, ["t3simple"], frames=10, headless=True, warm=5, fovs=[22.75], ratios=[2])[0]
     # (every drawing switch of src/gfx.js at once: the page draws at its cap of the pixel ratio, with no page error)
-    switched = measure(args.line, ["t3simple"], frames=10, headless=True, warm=5, params="gfx=nolog,snowif,front,noaa,pr0.5")[0]
+    switched = measure(args.line, ["t3simple"], frames=10, headless=True, warm=5, params="gfx=log,snowall,front,noaa,pr0.5")[0]
     faulthandler.cancel_dump_traceback_later()
     fails = []
     hy, simple = rows
