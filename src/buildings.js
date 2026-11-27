@@ -108,6 +108,13 @@ const FACADE_COLORS = ['#e8d9b5', '#d9c7a0', '#efe3c8', '#c9b79a', '#e3c9b0', '#
   '#e0b9a0', '#b9c4c9', '#d8cfb8', '#f0e6d2'].map((c) => new THREE.Color(c));
 const MODEL_UNDER = 0.05; // m: a bridge model's top lies this far under the bed top inside the trams' sweep (#742) ...
 const MODEL_REACH = 0.5;  // m: ... its corners from there up to this far over the rail heads
+// A bridge model's top over a street on the ground (#13): within MODEL_NEAR m of our route the model's corners from
+// MODEL_UNDER under the survey's street to STREET_REACH over it come down under the street. Mosty 3D's footprints
+// take in the abutments on land, its top there 0-1.5 m over the surveyed street: on line 17, within 40 m of the
+// route, 1,229 m2 at Jiráskův most's junction (carriageway 657, sidewalk 219, island 109), 500 m2 at Štefánikův,
+// 434 m2 at Most Legií, as light slabs over the carriageway and the crossings.
+const MODEL_NEAR = 40, STREET_REACH = 1.5;
+const MODEL_STREETS = new Set(['road', 'sidewalk', 'island', 'median', 'tram', 'parking', 'cycle', 'platform', 'paved']);
 const ROOF_COLORS = ['#8c4a32', '#7a3f2c', '#5f5a55', '#6d6862', '#9a5638', '#4f4b47'].map((c) => new THREE.Color(c));
 
 // Fallback: OSM footprints extruded to their tagged height, sitting on the terrain.
@@ -281,7 +288,7 @@ export function buildLod2(group, data, route, ground) {
       // track with triangles whose centres lay outside the envelope: Modřany s 5070, 5824)
       let n3 = count;
       if (isBridge) {
-        const near = (t) => [0, 1, 2].some((k) => route.distance(xs[t + k], ys[t + k]) < 25 || roadUnder(xs[t + k], ys[t + k], 25) || ground.dtm?.deckAt(xs[t + k], ys[t + k]) != null);
+        const near = (t) => [0, 1, 2].some((k) => route.distance(xs[t + k], ys[t + k]) < MODEL_NEAR || roadUnder(xs[t + k], ys[t + k], 25) || ground.dtm?.deckAt(xs[t + k], ys[t + k]) != null);
         const out = [];
         const split = (a, b, c, depth) => {
           const l = (p, q2) => Math.hypot(p[0] - q2[0], p[1] - q2[1], p[2] - q2[2]);
@@ -351,12 +358,15 @@ export function buildLod2(group, data, route, ground) {
           // 6.2 % onto the viaduct's north end, numeric DI of 2023 and the archive alike, where the coarse model's top
           // falls 2 %: it stood 0.06-0.19 m over the bed top at s 3480-3488, and 0.04-0.06 m over it before the
           // south abutment, s 3030-3038, #742. A triangle's corners lie within 1.5 m of its centre: the split above)
-          if (n && n.d < 14) {
+          if (n && n.d < MODEL_NEAR + 1.5) {
             const under = (x, y, z) => {
               const w = sweep(x, y);
               // (to MODEL_REACH over the rail heads only: a road bridge's underside 5.6 m over the track came down
               // as spikes, line 22 s 18184)
-              return w && z > w.zb - MODEL_UNDER && z < w.zr + MODEL_REACH ? w.zb - MODEL_UNDER : z;
+              if (w) return z > w.zb - MODEL_UNDER && z < w.zr + MODEL_REACH ? w.zb - MODEL_UNDER : z;
+              // (off the tracks, over the survey's street on the ground: under it, #13)
+              const g = route.distance(x, y) < MODEL_NEAR ? ground.dtm?._hitTri(x, y) : null;
+              return g && MODEL_STREETS.has(g.c) && z > g.z - MODEL_UNDER && z < g.z + STREET_REACH ? g.z - MODEL_UNDER : z;
             };
             az = under(ax, ay, az); bz = under(bx, by, bz); cz = under(cx, cy, cz);
           }
