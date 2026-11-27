@@ -166,6 +166,41 @@ wood material, and some parts lie below Y = 0.
 - **Status:** the maintainer reviewed the working set and an illustrative line 17 pilot (Kobylisy – Líbeznická, route m 20,630–21,300). WebGL and mobile frame times are unverified, and the placements are illustrative.
 - **Other files:** `assets.js` holds the older simple furniture. `existing-models.js` is a copy of the game's `src/models.js` from the 2026-10-24 snapshot.
 
+#### Game pack from the street furniture studies
+
+`assets/furniture/ipr-street.glb` contains 21 glTF scenes. Each has one selectable root named
+`<kind>--<level>`, with a level of `near`, `middle` or `far`. Load the file once and read every entry
+in `GLTFLoader`'s `scenes`. The root records its kind, level, standing datum (`groundY: 0`) and Y-up
+axis in glTF extras. Both railing styles are 2 m sections with length along X. The small bin is the
+canopied model and retains its buried anchor. Each freestanding object's origin belongs at the
+finished surface at the centre of its footprint. Apply heading around world Y so it stays upright on
+a slope. Check ground contact at the individual posts of longer objects.
+
+| Root kind | Triangles, near / middle / far | WebGL draws per instance |
+|---|---:|---:|
+| `bin-large` | 452 / 196 / 100 | 2 |
+| `bin-small-canopied` | 580 / 296 / 140 | 2 |
+| `bin-recycling` | 728 / 392 / 280 | 3 |
+| `cycle-stand` | 344 / 104 / 64 | 1 |
+| `bollard` | 152 / 56 / 40 | 1 |
+| `railing-bars` | 448 / 128 / 80 | 1 |
+| `railing-glass` | 450 / 130 / 82 | 2 |
+
+The WebGL measurements come from the exported GLB, with shadows off. For a mesh with `extras.singlePass`,
+set its material's `forceSinglePass` to true after loading. The glass railing's single double-sided
+plane and opaque frame then draw in two calls instead of three. Keep the panes sortable as separate
+surfaces and instance the opaque meshes by kind and level in each visible tile. The 312,872-byte file
+contains its cladding and glass textures. The near bin geometry drops from 804 triangles each by
+simplifying the large bin's two uprights and the small bin's canopy tessellation.
+
+Rebuild with `python -P -E tools/pack_street_furniture.py --lab <prague-street-assets-lab>`.
+`--audit` writes WebGL counts for the lab and round-tripped GLB, plus the full-detail source models.
+`--traction-review reports/ipr-traction-review.glb` also builds the separate traction study pack.
+It contains 33 scenes (three levels for each of the 11 study variants) and stays in local review while
+the pole and wall-anchor question is with DPP. The current-pole studies draw in 1–3 calls and have
+32–348 triangles. The unverified historic study reaches 1,248 triangles near. Wall-anchor roots use
+the wall attachment point and record a +Z normal.
+
 ### Integration slice for the old prototype (handoff `traffic-integration/`)
 
 `game.patch` changes the 2026-10-24 snapshot's `index.html` (rewritten whole), `src/main.js` and
