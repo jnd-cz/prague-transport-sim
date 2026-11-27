@@ -230,7 +230,7 @@ def main():
                     r = perf_test(page, 120000)
                     runs.append(r)
                     print(f"run {i + 1}: {r['fps']} fps, over 20/33/50 ms {r['over']['20']}/{r['over']['33']}/{r['over']['50']} %, "
-                          f"p50/p90/p99 {r['ms']['p50']}/{r['ms']['p90']}/{r['ms']['p99']} ms, gpu {r.get('gpuMs')} ms, "
+                          f"p50/p90/p99 {r['ms']['p50']}/{r['ms']['p90']}/{r['ms']['p99']} ms, cpu {r.get('cpuMs')} ms, gpu {r.get('gpuMs')} ms, "
                           f"{r['calls']['mean']} calls, {r['triangles']['mean'] / 1e6:.2f} M triangles, heap {r.get('heapMB')} MB"
                           + (f", first 300 m over 33 ms {r['first300']['over33']} % of {r['first300']['frames']}" if r.get("first300") else ""))
                     watch.step(f"run {i + 1}")
@@ -265,6 +265,14 @@ def main():
             page.evaluate("window.slowFrameMs = 0")
             # the reference run from another line: line 17 with the detailed model, then back to the line left
             page.click("#ptMenu")
+            # (the log alone: a first frame after a gap is not counted; two frames of 4 and 6 ms of the page's own)
+            own = page.evaluate("""async () => {
+              const { PerfLog } = await import('/src/perf.js'), l = new PerfLog();
+              const first = l.frame(1000, 0, null, 0.016);
+              for (const [t, ms] of [[1016, 4], [1033, 6]]) if (l.frame(t, 0, null, 0.016)) l.spent(ms);
+              const s = l.summary();
+              return { first, frames: s.frames, cpuMs: s.cpuMs, cpuP90: s.cpuP90 };
+            }""")
             page.goto(url.split("?")[0] + "?line=9", timeout=180000)
             page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=180000)
             page.evaluate("document.getElementById('optModel').value = 'simple'")
@@ -299,6 +307,16 @@ def main():
         fails.append(f"68 ms frames do not keep real time: {slow.get('gameRate')}, several steps in {slow.get('multiStep')} % of frames")
     if not (0.97 <= (res.get("gameRate") or 0) <= 1.01):
         fails.append(f"the game's time against real time {res.get('gameRate')}")
+    # (the page's own time a frame: within the frames' interval; the 68 ms frames wait outside the page's frame,
+    # as a slow GPU or display does, so theirs stays far under their interval)
+    print(f"the page's own time a frame: {res.get('cpuMs')} ms (9 in 10 within {res.get('cpuP90')}) of {1000 / max(res.get('fps', 0), 1e-9):.1f}; "
+          f"68 ms frames: {slow.get('cpuMs')} ms; the log's own: {own}")
+    if not (0 < (res.get("cpuMs") or 0) <= 1000 / max(res.get("fps", 0), 1e-9) and res.get("cpuP90", -1) >= 0):
+        fails.append(f"the page's own time a frame {res.get('cpuMs')} ms is not within the interval of {res.get('fps')} fps")
+    if not (0 < (slow.get("cpuMs") or 0) < 500 / max(slow.get("fps", 0), 1e-9)):  # (under half their interval)
+        fails.append(f"68 ms frames: the page's own time {slow.get('cpuMs')} ms of {slow.get('fps')} fps counts the wait outside it")
+    if own != {"first": False, "frames": 2, "cpuMs": 5, "cpuP90": 6}:
+        fails.append(f"the log's own time of two frames of 4 and 6 ms: {own}")
     if not (res.get("frames", 0) > 10 and res.get("fps", 0) > 0 and res.get("test")):
         fails.append(f"the test measured nothing: {res}")
     if "Performance test" not in (card or "") or "Frames per second" not in card:

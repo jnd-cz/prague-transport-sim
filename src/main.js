@@ -818,7 +818,7 @@ function finishPerfTest() {
     <div style="font-size:22px;font-weight:700;margin:8px 0">${t(`pt.${verdict}`)}</div>
     <table class="res">
       ${row('pt.fps', sum.fps)}${row('pt.slow20', `${sum.over[20]} %`)}${row('pt.slow33', `${sum.over[33]} %`)}${row('pt.p90', `${sum.ms.p90} ms`)}
-      ${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
+      ${sum.cpuMs !== undefined ? row('pt.cpu', `${sum.cpuMs} ms`) : ''}${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
       ${row('pt.tris', `${(sum.triangles.mean / 1e6).toFixed(2)} M`)}${row('pt.gpuName', m.gpu || '?')}${row('pt.screen', `${m.viewport} @${m.dpr}${m.pixelRatio !== m.dpr ? ` (${m.pixelRatio})` : ''}${GFX.key ? ` · gfx ${GFX.key}` : ''}`)}
     </table>
     <div class="sub">${t('pt.note')}</div>
@@ -1220,6 +1220,8 @@ window.drawCount = 0; // (draws so far: tools/test_idle.py)
 
 function frame(now) {
   requestAnimationFrame(frame); // first, so an exception in one frame can't stop the loop
+  const began = performance.now(); // (the page's own time in this frame, for the frame log: src/perf.js)
+  let logged = false;
   const span = Math.max(0, Math.min(SPAN_MAX, (now - last) / 1000));
   const dt = Math.min(STEP_MAX, span); // (the camera, weather, sound and HUD: one step a frame)
   let simmed = 0;
@@ -1304,7 +1306,7 @@ function frame(now) {
     lastDraw = now; window.drawCount++;
     // (driving only: the menu, a pause and the results draw 4 frames a second, #149)
     if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) {
-      perfLog.frame(now, tram.s, renderer.info.render, simmed);
+      logged = perfLog.frame(now, tram.s, renderer.info.render, simmed);
       // (the automatic render scale reads the same frames, but a performance test's: it measures at one scale)
       if (scaleSet === 'auto' && !GFX.fixed && !perfTest && autoScale.frame(now) !== null) { applyScale(); resize(); }
     }
@@ -1316,6 +1318,7 @@ function frame(now) {
     mirror.draw(now, !lazy, poseMirror, tramModel);
   }
   between.back();
+  if (logged) perfLog.spent(performance.now() - began);
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back

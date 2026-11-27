@@ -263,7 +263,10 @@ says what a frame costs here. A shift's end offers to send the summary; the menu
 fixed minute (the line's middle stop, the trip nearest 8:00, dry, seed 1; the Reference test below) with the GPU's own time per frame where
 the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the departure, not a shift's 40 s, and the
 minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
-the detailed model. `tools/test_perf.py --runs N` runs it N times here.
+the detailed model. `tools/test_perf.py --runs N` runs it N times here. The summary also carries the page's own time
+a frame (`cpuMs`, `cpuP90`: its scripts from the frame's start to its end; `tools/feedback.py --perf`, CPU ms): an
+interval far over it is spent drawing, in the browser's compositor or waiting for the display, and a smaller
+picture can shorten it; an interval near it is the CPU's. Firefox has no GPU timer, so there it is the only split.
 
 **What the fragments cost** (#705): a weak GPU is short of fragments, not of triangles or draw calls (the testers'
 phone was no faster with both halved). Two things made every fragment dear, and the page draws without both since
