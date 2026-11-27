@@ -338,9 +338,13 @@ SURVEY_WITH = 0.05    # m: on paved track SOURCES_EDGE to UNDER_OFF under the li
                       # survey alongside, DI sides with the lidar at 89 % of that band, whether the street beside the
                       # track lies level with it (241 of 272) or falls away across it (1,743 of 1,927): no rule there
 BESIDE = 7.0         # m: a track this near a stretch the lidar took lies in the same street (NEIGHBOUR_GAP's far side)
-OVER_KINDS, UNDER_KINDS = {'paved'}, {'paved', 'unknown'}  # (the constructions each side holds on: over the lidar, DI
-                      # sided with it at 23 of 52 samples of unknown construction, a ballast bed standing over the bare
-                      # earth; open track has no DI heights to calibrate against)
+OVER_KINDS, UNDER_KINDS = {'paved'}, {'paved', 'unknown', 'open'}  # (the constructions each side holds on: over the
+                      # lidar, DI sided with it at 23 of 52 samples of unknown construction, a ballast bed standing over
+                      # the bare earth, and on grass by a style fact numeric DI itself stands 0.15-0.25 m over it for
+                      # 0.4 km: no rule. Under the lidar on open track no older record has numeric DI beside it (0 of 463
+                      # samples), so the rail itself is the witness: where DI has a height it lies over 0.10 m under the
+                      # lidar at 0 of 1,579 samples on grass and 2 of 452 on ballast (staged 2026-11-27, #876; grass
+                      # without Vinohradská's stretch, whose DI steps 0.30 m between its records))
 SOURCES_CAP = 1.0     # m: an archive this far over or under the lidar is another level (archive_before_lidar; the staging holds it:
                       # track_heights.TERRAIN)
 STRUCTURE_FLAGS = {'structure_hint', 'structure_unverified', 'tunnel_unverified', 'known_archive_disagreement'}
@@ -446,10 +450,13 @@ def archive_before_lidar(chs):
       (maintainer: both tracks there at one height, no 1 m step anywhere near). Calibrated where numeric DI has a
       height too (samples off structures, an older record 0.5-1.5 m over the lidar): on paved track DI sides with the lidar at 71 of 76, where the construction is unknown at 23 of 52 (a
       ballast bed on its own body, small bridges nothing marks).
-    - Under: on paved track and track of unknown construction (UNDER_KINDS). Rails lie in the street's surface or over
-      the bed, so they cannot lie a fifth of a metre under the lidar between them (maintainer, 2026-11-14, on Bělohorská:
-      the track does not sit lower). Calibrated as over: UNDER_OFF. On paved track a stretch from SOURCES_EDGE under
-      it counts where the bin's survey keeps to the record (SURVEY_WITH): the two are the street's old level.
+    - Under: on every construction (UNDER_KINDS). Rails lie in the street's surface or over the bed, so they cannot
+      lie a fifth of a metre under the lidar between them (maintainer, 2026-11-14, on Bělohorská: the track does not
+      sit lower). Calibrated as over: UNDER_OFF. On paved track a stretch from SOURCES_EDGE under it counts where the
+      bin's survey keeps to the record (SURVEY_WITH): the two are the street's old level. Open track too (#876): the
+      lidar reads the lawn at the rail heads or the ballast under them, never over the rails. Bělohorská's grass track,
+      line 22: records of 1999 and 2014 0.2-0.45 m under the lidar for 1.6 km, the rails drawn 0.14 m under the roads
+      beside them, where the lidar has the track's body 0.12-0.14 m over those roads behind its kerb.
     A track within BESIDE m of a stretch taken lies in the same street: where its own archive lies more than SOURCES_EDGE
     off the lidar the same way, it goes with it (no rail stays under its neighbour's bed).
     Not a record of the lidar's year or later (a track rebuilt since the flight stands off it by right), nor one without
