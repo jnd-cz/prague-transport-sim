@@ -4,6 +4,7 @@
     python -P -E tools/shot.py --line 17 --s 5064 --view cab --ref origin/main
     python -P -E tools/shot.py --line 17 --s 5064 --view review --ref ../other-checkout
     python -P -E tools/shot.py --line 17 --s 0 --view review --at 3185.9,3756.8 --dist 25   # a place off the route
+python -P -E tools/shot.py --line 17 --s 18149 --view review --drawn            # from above as the game draws it, no class paint
     python -P -E tools/shot.py --line 17 --s 5064 --view chase --vehicle t3simple --livery sample.t3simple-green
     python -P -E tools/shot.py --line 22 --s 6330 --view cab --weather snow   # bare crowns, snow on the ground
     python -P -E tools/shot.py --line 37 --s 3420 --view cab --plain --ref .   # as a player sees it (the ground's
@@ -106,7 +107,7 @@ def font(size=20):
 
 
 def capture(browser, root, line, s, view, output, timeout, pose=None, target=None, dist=60, pitch=45, picks=(), plain=False, weather='dry',
-            overlay=None, params=''):
+            overlay=None, params='', drawn=False):
     context = browser.new_context(viewport={'width': 1280, 'height': 720}, device_scale_factor=1)
     context.add_init_script('''window.headless = true;
       let state = 158; Math.random = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296);''')
@@ -159,6 +160,10 @@ def capture(browser, root, line, s, view, output, timeout, pose=None, target=Non
                   window.review.ready.then(() => { window._shotReady = true; }); }''')
                 page.wait_for_function('window._shotReady', timeout=remaining())
                 page.add_style_tag(content=HIDE)
+                if drawn:  # (the place as the game draws it: none of the review's own layers over it, #13)
+                    page.evaluate('''() => { const R = window.review;
+                      for (const k of ['classes', 'wire', 'source', 'kerbs', 'seams', 'findings', 'track']) R.layers[k] = false;
+                      R._applyLayers(); }''')
                 page.evaluate('window.review._render()')
             else:
                 if view == 'chase':
@@ -263,7 +268,11 @@ def main(argv=None, root=ROOT):
                     '(a place\'s ground: tools/ground_place.py --overlay); the reference is drawn without it')
     ap.add_argument('--params', default='', help='added to the current checkout\'s page address, e.g. gfx=front (src/gfx.js); '
                     'the reference is drawn without it, so --ref . shows what a switch changes')
+    ap.add_argument('--drawn', action='store_true', help='review: as the game draws the place, without the surface classes, '
+                    'kerbs, seams and track line painted over it, in both pictures')
     a = ap.parse_args(argv)
+    if a.drawn and a.view != 'review':
+        ap.error('--drawn takes the review view\'s layers off: cab and chase have none')
     if a.overlay and not a.overlay.is_dir():
         ap.error(f'--overlay: no folder {a.overlay}')
     if a.view == 'review' and a.weather != 'dry':
@@ -281,7 +290,7 @@ def main(argv=None, root=ROOT):
     if a.line <= 0 or not math.isfinite(a.s) or a.s < 0 or not math.isfinite(a.timeout) or a.timeout <= 0:
         ap.error('s must be finite and nonnegative; timeout must be finite and positive')
     a.out.mkdir(parents=True, exist_ok=True)
-    stem = f'line{a.line}-s{a.s:g}-{a.view}' + (f"-at{at['x']:g}_{at['y']:g}" if at else '') + ''.join(f'-{x}' for x in (a.vehicle, a.livery, a.weather if a.weather != 'dry' else None, re.sub(r'[^\w.,]+', '_', a.params)) if x)
+    stem = f'line{a.line}-s{a.s:g}-{a.view}' + (f"-at{at['x']:g}_{at['y']:g}" if at else '') + ''.join(f'-{x}' for x in (a.vehicle, a.livery, a.weather if a.weather != 'dry' else None, re.sub(r'[^\w.,]+', '_', a.params), 'drawn' if a.drawn else None) if x)
     picks = (('#optModel', a.vehicle), ('#optLivery', a.livery or ''))
     try:
         reference_rev = (git(root, 'rev-parse', '--verify', a.ref + '^{commit}')
@@ -293,7 +302,7 @@ def main(argv=None, root=ROOT):
             browser, renderer = gpu.launch(pw)
             try:
                 now = capture(browser, root, a.line, a.s, a.view, current, a.timeout, target=at, dist=a.dist, pitch=a.pitch, picks=picks,
-                              plain=a.plain, weather=a.weather, overlay=a.overlay and a.overlay.resolve(), params=a.params)
+                              plain=a.plain, weather=a.weather, overlay=a.overlay and a.overlay.resolve(), params=a.params, drawn=a.drawn)
                 report = {'line': a.line, 's': a.s, 'view': a.view, 'renderer': renderer, 'current': now, 'params': a.params,
                           'current_commit': git(root, 'rev-parse', 'HEAD'),
                           'working_changes': git(root, 'status', '--porcelain', '--', 'src', 'index.html', 'data/truth.json', 'data/MANIFEST.json')}
@@ -302,7 +311,7 @@ def main(argv=None, root=ROOT):
                     with checkout(root, reference_rev or a.ref, a.cache, a.line) as other:
                         report['reference'] = capture(browser, other, a.line, a.s, a.view, reference, a.timeout,
                                                       pose=now['camera'], target=now['target_xy'], dist=a.dist, pitch=a.pitch, picks=picks,
-                                                      plain=a.ref_plain, weather=a.weather)
+                                                      plain=a.ref_plain, weather=a.weather, drawn=a.drawn)
                         if reference_rev is None:
                             try:
                                 report['reference_commit'] = git(other, 'rev-parse', 'HEAD')
