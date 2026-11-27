@@ -389,6 +389,16 @@ export function buildLod2(group, data, route, ground) {
           // Štefánikův most its top stood in the track and the roads): nothing over it (to 4.7 m)
           const mz = (az + bz + cz) / 3, zd = ground.dtm?.deckAt(mx, my, mz - 2.35, 2.35);
           if (zd !== null && zd !== undefined && mz > zd) continue;
+          // (what is kept lies under the deck by its centre: a corner of it that still stood through the deck, up to
+          // STREET_REACH m over it, comes down under it. On Trojský most 141 m2 of the kept top had a corner over 2 cm
+          // above the deck, light specks in the lanes, #13)
+          if (n && n.d < MODEL_NEAR + 1.5) {
+            const below = (x, y, z) => {
+              const zc = ground.dtm?.deckAt(x, y, z, STREET_REACH);
+              return zc !== null && zc !== undefined && z > zc - MODEL_UNDER ? zc - MODEL_UNDER : z;
+            };
+            az = below(ax, ay, az); bz = below(bx, by, bz); cz = below(cx, cy, cz);
+          }
         }
         let nx = (by - ay) * (cz - az) - (bz - az) * (cy - ay);
         let ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
