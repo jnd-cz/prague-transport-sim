@@ -1066,14 +1066,37 @@ WALL_JOIN = 0.5  # m: a stretch's end this near another stretch is no free end: 
 
 
 def off_the_deck(z, zl):
-    """(Heights z of street corners under a span with those BED_OVER or more over the lidar zl set to it, which ones).
+    """(Heights z of street corners under a deck with those BED_OVER or more over the lidar zl set to it, which ones).
     The street surface follows the tracks onto a deck, so a level-0 street under the deck read the deck's level: the
     road under the Modřany viaduct, line 17 (-2428, -9241), area 7120: 205.3 m where the lidar has 197.6 m, a slab in
-    the viaduct 1.04 m over the deck's underside (#761)."""
+    the viaduct 1.04 m over the deck's underside (#761). The deck is a span of ours or any of the survey's areas of
+    level 1 and above but a roof (#824)."""
     z, zl = np.asarray(z, float), np.asarray(zl, float)
     with np.errstate(invalid="ignore"):
         low = z - zl >= BED_OVER
     return np.where(low, zl, z), low
+
+
+DECK_EDGE = 1.5  # m round a deck that is not ours: still under its edge (under_decks; a wall's hold, wall_lines.HOLD)
+
+
+def under_decks(D, box, x, y):
+    """Which points (x, y) in a box (shapely) lie under one of survey D's areas of level 1 and above but a roof, or
+    within DECK_EDGE of one: the deck of a bridge, ours or not (off_the_deck). A level-0 street's outline climbs into
+    such a deck as it does into ours: Slánská's road under the road bridge, line 9 (-8260, -1375), area 8529, from
+    337.3 to 349.6 m, a hump of faces 2-6 m tall (#824). The street surface reads the deck's level up to its edge,
+    where the parapet's wall line held the ground at its low side until a parapet over open ground made no stretch
+    (wall_lines.over_open_ground): at the Slánská deck's south-west corner, (-8276.9, -1440.7), the street stood 3.8 m
+    over the raster 0.5 m outside the deck."""
+    up = [shapely.Polygon([q[:2] for q in a["r"]]) for a in D["areas"]
+          if a.get("l", 0) >= 1 and a.get("c") != "roof" and len(a.get("r") or []) >= 3]
+    up = [g if g.is_valid else shapely.make_valid(g) for g in up]
+    up = shapely.union_all([g for g in up if g.intersects(box.buffer(DECK_EDGE))]) if up else None
+    if up is None or up.is_empty:
+        return np.zeros(np.shape(x), bool)
+    up = up.buffer(DECK_EDGE)
+    shapely.prepare(up)
+    return shapely.contains_xy(up, x, y)
 
 
 def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):
@@ -1290,11 +1313,10 @@ def meet_raised(sc, x, y, zs):
         at = ku[ju] == key[edge]
         dl[at] = zu[ju[at]] - zs[edge[at]]
     dl[np.abs(dl) > MEET_STEP] = 0.0
-    ke, first, ie = np.unique(key[edge], return_index=True, return_inverse=True)
-    dp = np.bincount(ie, weights=dl, minlength=len(ke)) / np.bincount(ie, minlength=len(ke))
+    ex, ey, ie = mm_points(x[edge], y[edge])  # (a point's copies lie a float's noise apart: its grid point, #865)
+    dp = np.bincount(ie, weights=dl, minlength=len(ex)) / np.bincount(ie, minlength=len(ex))
     if not (dp != 0).any():
         return zs, shift
-    ex, ey = x[edge[first]], y[edge[first]]
     P = np.column_stack([x[own], y[own]])
     nb = cKDTree(np.column_stack([ex, ey])).query_ball_point(P, r=MEET_FADE)
     cnt = np.fromiter(map(len, nb), int, len(nb))
@@ -1303,7 +1325,7 @@ def meet_raised(sc, x, y, zs):
     d = np.hypot(P[row, 0] - ex[col], P[row, 1] - ey[col])
     k = d < MEET_FADE
     row, col, d = row[k], col[k], d[k]
-    o = np.lexsort((ke[col], d, row))  # (per corner its nearest points first; of points as near, the first by place)
+    o = np.lexsort((col, d, row))  # (per corner its nearest points first; of points as near, the first by place: mm_points' order)
     row, col, d = row[o], col[o], d[o]
     start = np.r_[0, np.flatnonzero(row[1:] != row[:-1]) + 1] if len(row) else np.zeros(0, int)
     k = (np.arange(len(row)) - np.repeat(start, np.diff(np.r_[start, len(row)]))) < MEET_NEAR
@@ -1320,6 +1342,50 @@ def meet_raised(sc, x, y, zs):
     zs[own] += s
     shift[own[has]] = s[has]
     return zs, shift
+
+
+def meet_lidar(x, y, zc, zf, lidar, area, held=None):
+    """The lidar corners' heights zc with what the weld moved at their areas' edges faded into the areas: (heights, how
+    many corners moved by over 5 mm). zf: the welded heights; lidar: the corners laid on the lidar (a lawn, a yard);
+    area: each one's survey area (-1 none); held: corners a wall line holds, left as they are.
+    - An edge corner is a lidar corner at a point it shares with a corner that is not one (a bed, a street, a sidewalk,
+      the terrain). Its shift is what the weld moved it by, none where that is over MEET_STEP (two levels: the weld's
+      own business) or where it kept its height (a pin).
+    - Every lidar corner within MEET_FADE of its own area's edge corners takes their inverse-distance-weighted shift,
+      faded linearly to none at MEET_FADE, as meet_raised fades a yard's. An edge corner takes its own.
+    Without it the weld moved the edge corner alone. Královka's loop, line 23: the lawn's corner on its border with the
+    tram's area at (-2889.000, 144.046) welded to 298.916 m, its lattice corner (-2889.000, 144.000), 4.6 cm inside,
+    on the lidar at 298.986: two slivers at 57-67 degrees, 7 cm tall there, 3.7 and 4.7 m long along the lattice's
+    lines, whose back sides the page drew as dotted dark lines (the user, 2026-11-26: "visible only from shallow
+    angle [...] Is there a step too?", #770)."""
+    from scipy.spatial import cKDTree
+    ok = lidar & np.isfinite(zc) & np.isfinite(zf) & (area >= 0)
+    if held is not None:
+        ok &= ~held
+    own = np.flatnonzero(ok)
+    if not len(own):
+        return zc, 0
+    key = np.round(x * Q).astype(np.int64) * 10_000_000_000 + np.round(y * Q).astype(np.int64)
+    edge = own[np.isin(key[own], np.unique(key[~lidar & np.isfinite(zc)]))]
+    if not len(edge):
+        return zc, 0
+    dl = zf[edge] - zc[edge]
+    dl[np.abs(dl) > MEET_STEP] = 0.0
+    if not (dl != 0).any():
+        return zc, 0
+    apart = 100.0 * MEET_FADE  # (a third coordinate: another area's corners are out of reach)
+    d, i = cKDTree(np.column_stack([x[edge], y[edge], area[edge] * apart])).query(
+        np.column_stack([x[own], y[own], area[own] * apart]), k=min(MEET_NEAR, len(edge)), distance_upper_bound=MEET_FADE)
+    d, i = d.reshape(len(own), -1), i.reshape(len(own), -1)
+    near = np.isfinite(d)
+    w = np.where(near, 1.0 / np.maximum(d, 1e-3) ** 2, 0.0)
+    dv = np.where(near, dl[np.minimum(i, len(edge) - 1)], 0.0)
+    has = near.any(1)
+    sh = np.zeros(len(own))
+    sh[has] = (w[has] * dv[has]).sum(1) / w[has].sum(1) * np.clip(1 - d[has, 0] / MEET_FADE, 0, 1)
+    out = zc.copy()
+    out[own] += sh
+    return out, int((np.abs(sh) > 0.005).sum())
 
 
 WALL_LATTICE = 1.0  # m: a survey wall's faces cut to this, their corners between its sides (across_outline, #653)
@@ -1934,6 +2000,16 @@ def bed_edges(beds, outline):
     return out
 
 
+def mm_points(x, y):
+    """The distinct points of (x, y) on the mm grid: (their x, their y, each input's index into them), sorted by the
+    grid and taken from it. A point's copies (a corner of each face round it) lie a float's noise apart, and the first
+    of them by the order they came in, which the box sets, read the water's level, the rail or a meeting edge's
+    distances there; at a half mm that turns a height either way (#812's on_grid, #865)."""
+    X, Y = np.round(x * Q).astype(np.int64), np.round(y * Q).astype(np.int64)
+    _, first, inv = np.unique(X * 10_000_000_000 + Y, return_index=True, return_inverse=True)
+    return X[first] / Q, Y[first] / Q, inv.ravel()
+
+
 def lowest_at(keys, z):
     """Per distinct key (a point on the mm grid), the lowest of its heights: (the sorted keys, their heights), whatever
     the order they come in."""
@@ -2088,6 +2164,13 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, k
     - corners `apart` (a wall area's, lifted to its top on its foot's outline: wall_face) are welded among themselves
       only, and the others at their point without them: the wall's face stands on the ground at its foot.
     - a road's corner at a raised tram belt's edge (`kerbs`, belt_kerbs) keeps its own as at any kerb.
+    - a lidar corner under a raised top corner (a lawn or a yard on the lidar at a sidewalk's or a platform's edge) is
+      no kerb: within MEET_STEP of it it takes the edge's height, and its face rises to the lawn's own ground from
+      there. As a kerb it kept every difference over 3 cm upright: within 45 m of Královka's loop (line 23 (-2890,
+      140)) 234 m of such faces of 3-30 cm between grass and sidewalk, the lidar having the same difference a metre
+      either side (12 of 13 faces within 5 cm) and no way to tell a kerb from a bank; the user, 2026-11-26: "the only
+      raised areas with kerb above track seem to be the stop platforms. Other raise areas like the green patches rise
+      with smoother slope" (#770). A larger difference stands (a terrace; a sidewalk off the lidar).
     `label`: what gave each corner its height (default `kind`), for the report and the lidar's rule."""
     key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
     if apart is not None:
@@ -2126,6 +2209,12 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, k
                              np.where((kind == "terrain") != (top_kind[inv] == "terrain"), "wall", ""))))))
     if kerbs is not None:
         pair = np.where(kerbs & (pair == ""), "kerb", pair)
+    # (a lawn or a yard on the lidar at a raised area's edge is no carriageway at a kerb: within MEET_STEP it meets
+    # the edge and rises to its own ground over its first faces, #770)
+    label = kind if label is None else label
+    with np.errstate(invalid="ignore"):
+        met = (label == "lidar") & (pair == "kerb") & (top_kind[inv] == "raised") & (np.abs(dz) <= MEET_STEP)
+    pair = np.where(met, "", pair)
     lim = np.array([STEP.get(p, np.inf) for p in pair]) if len(pair) else np.zeros(0)
     # (a weir's two sides share the water's priority: both are top, each keeps its own level more than STEP off the
     # middle; welded to the first's, the second's triangles sloped 1.5 m up to the weir at Šítkovský)
@@ -2133,7 +2222,6 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, k
     # (a corner on the lidar that yielded to a surveyed one of its rank keeps the lidar's height where its own outline
     # stands more than LIDAR_APART off that one's: two levels, not one edge)
     rank = np.round(prio, 2) == np.round(top_p[inv], 2)
-    label = kind if label is None else label
     apart = np.zeros(len(zc), bool)
     if zown is not None:
         with np.errstate(invalid="ignore"):
@@ -2161,6 +2249,7 @@ def weld(cx, cy, zc, prio, kind, label=None, zown=None, held=None, apart=None, k
     ties["max m"] = round(float(np.nanmax(rng[np.isfinite(rng)])), 3) if np.isfinite(rng).any() else 0.0
     ties["survey steps"] = int(split.sum())
     ties["lidar apart"] = int(apart.sum())
+    ties["lidar corners met a raised edge"] = {f"over {c} cm": int((np.abs(dz[met]) > c / 100).sum()) for c in (3, 10, 20)}
     # (the corners that yielded to one of their rank, YIELD: by how far each moved, a step kept for the water and where
     # apart)
     for lb in ("lidar", "pool"):
@@ -2400,9 +2489,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
             if on.any():
                 cen = fc[ci[on] // 3].mean(1)
                 vx[on], vy[on] = off_cuts(vx[on], vy[on], cen[:, 0], cen[:, 1], cuts)
-        key = np.round(vx * Q).astype(np.int64) * 10_000_000_000 + np.round(vy * Q).astype(np.int64)
-        uk_, first_, back = np.unique(key, return_index=True, return_inverse=True)
-        return levels.at(vx[first_], vy[first_])[back]
+        ux, uy, back = mm_points(vx, vy)
+        return levels.at(ux, uy)[back]
     m = np.flatnonzero(corner_cls == "water")
     zc[m], prio[m], kind[m] = water_level(m), WATER_PRIO, "pool"
     # plots: the ground under a building's footprint, the city mesh's (a flat pad at the median ground round it stood on walls
@@ -2432,6 +2520,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     two_levels = {a: climbs(D["areas"][a]) for a in np.unique(sa[on_span]).tolist()}
     under_span = on_span & np.array([two_levels.get(a, False) for a in sa.tolist()], bool)
     on_span &= ~under_span
+    # (and a level-0 street under a deck that is not ours, under_decks, #824)
+    under_deck = np.isin(sc, list(STREETS_ROAD | STREETS_WALK)) & ~on_span & under_decks(D, box, cx[m], cy[m])
     # (a terrace keeps its own outline's surface, and so does a footpath that touches one, #663)
     lidar_ = lidar_w
     raised = terraces(D, np.unique(sa).tolist(), lidar_)
@@ -2469,8 +2559,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     # (such an area's part under the deck lies on the lidar, not on the deck's level the street surface has there:
     # off_the_deck, #761)
     n_under = 0
-    if under_span.any():
-        k = np.flatnonzero(under_span & np.isfinite(zs))
+    if (under_span | under_deck).any():
+        k = np.flatnonzero((under_span | under_deck) & np.isfinite(zs))
         zs[k], low = off_the_deck(zs[k], lidar_(cx[m][k], cy[m][k]))
         n_under = int(low.sum())
     # (a lawn, a yard, a railway yard on the lidar ground (`g`, tools/zps_inside.py) has surveyed heights on its outline
@@ -2555,6 +2645,16 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     in_rock, rail_z = portal_masonry(L, rock, in_rock, rail_z, cx[m], cy[m], zs, sa, lambda a: wall_like(D["areas"][a]))
     zs, on_hill = off_the_hill(zs, np.where(in_rock, rail_z, np.nan))
     lifted &= ~on_hill  # (no face stands there: it welds with the ground beside it)
+    # (a level-0 area under a level-1 street's cover over a passage (covers.py, #824) is the passage: its corners lie on
+    # the cover, as the ground does there. Národní divadlo's bridgehead, line 9 (-625, -585), stood 5 m down in the
+    # passage's floor, its level-1 street a slab over the pit. The passage under the cover waits for #449. Whether a
+    # corner is under it is its triangle's: the passage's outline is the street's, and its corners lie on the cover's edge)
+    c3 = fc[m // 3].mean(1)
+    up = np.where(np.isfinite(cover.at(c3[:, 0], c3[:, 1], level=1)),
+                  cover.at(cx[m], cy[m], level=1, near=covers.NEAR_EDGE), np.nan)
+    n_up = int(np.isfinite(up).sum())
+    zs = np.where(np.isfinite(up), up, zs)
+    lifted &= ~np.isfinite(up)
     # (and in any tunnel of the route the tram's own area lies at the rails' level: under a cover the raster has the
     # cover, and the street surface the tram's area takes read it. By Hlavní nádraží, line 9 s 11840-11860, the upper
     # street crosses the track on a cover: the tram's area stood at 201-204.4 m over rails at 197.4 m, the ground
@@ -2644,7 +2744,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     nan = np.isnan(zc)
     no_height = {str(c): int(n) for c, n in zip(*np.unique(np.where(kind[nan] == "", corner_cls[nan], kind[nan]), return_counts=True))}
     log(f"  heights: {int(nan.sum())} corners without one {no_height}, {len(walls)} wall stretches hold "
-        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a span on the lidar, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
+        f"{int(at_wall.sum()):,} corners, {n_under:,} street corners under a deck on the lidar, {n_up:,} under a street's cover over a passage on it, {n_cover:,} lidar corners on a cover, {n_smear:,} road corners beside a thin wall off its smear, {n_side:,} sidewalk corners by a wall read on their side, {int(on_hill.sum()):,} in a rock tunnel at the rails' level, {int(on_floor.sum()):,} of the tram's area in a covered tunnel, {int(belt.sum()):,} road corners at a raised tram belt's kerb, {surface.missed:,} survey corners off their area's triangles on the nearest one's surface, {time.time() - t1:.0f} s")
     if nan.any():  # (a survey area without heights: the lidar's)
         zc[nan] = lidar_w(cx[nan], cy[nan])
 
@@ -2675,6 +2775,16 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     log(f"  {n_sides:,} stairs corners on their sides' stretches stand apart")
     zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"),
                                belt & (kind != "bed"))
+    # (what the weld moved at a lawn's or a lidar yard's edge fades into it: meet_lidar, #770; then the weld again)
+    c_area = np.full(len(cx), -1, np.int64)
+    c_area[sv_m] = sa
+    zc, n_faded = meet_lidar(cx, cy, zc, zf, label == "lidar", c_area, at_wall)
+    if n_faded:
+        met = steps["ties"]["lidar corners met a raised edge"]
+        zf, steps, n_points = weld(cx, cy, zc, prio, kind, label, zown, at_wall & (kind != "bed"), c_lift & (kind != "bed"),
+                                   belt & (kind != "bed"))
+        steps["ties"]["lidar corners met a raised edge"] = met  # (the first weld's: the second finds them met)
+    steps["ties"]["lidar corners faded to their edge"] = n_faded
     # vertex ids: (x, y, z in mm)
     zq = np.round(zf * Q).astype(np.int64)
     vkey = np.stack([np.round(cx * Q).astype(np.int64), np.round(cy * Q).astype(np.int64), zq], 1)
@@ -2711,7 +2821,7 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     if len(sf):
         area[sf] = [pieces["survey"][owners[o][1]]["c"] for o in owner[tf[sf]].tolist()]
     fcls_id = np.array([CLASS_IDS[c] for c in tcls])
-    log(f"  weld: {n_points:,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items() if p != 'ties']}, ties over 1 cm {steps['ties']['over 1 cm']}, survey steps {steps['ties']['survey steps']}, yielded over 5 cm: lidar {steps['ties']['lidar corners yielded']['over 5 cm']}, pool {steps['ties']['pool corners yielded']['over 5 cm']}, "
+    log(f"  weld: {n_points:,} points, {len(V):,} vertices, steps {[(p, s['corners']) for p, s in steps.items() if p != 'ties']}, ties over 1 cm {steps['ties']['over 1 cm']}, survey steps {steps['ties']['survey steps']}, yielded over 5 cm: lidar {steps['ties']['lidar corners yielded']['over 5 cm']}, pool {steps['ties']['pool corners yielded']['over 5 cm']}, lidar corners over 3 cm off a raised edge met {steps['ties']['lidar corners met a raised edge']['over 3 cm']:,}, faded to their edge {n_faded:,}, "
         f"{time.time() - t1:.0f} s")
 
     # the kept terrain triangles, as they are
@@ -2772,7 +2882,8 @@ def build(ln, mesh=None, threads=8, log=print, within=None):
     rep["draw classes"] = {c: {k or "-": int(v) for k, v in d.items()} for c, d in rep["draw classes"].items()}
     rep["survey classes"] = {c: {k or "-": int(v) for k, v in zip(*np.unique(area[fcls_id == i].astype(str), return_counts=True))}
                              for c, i in CLASS_IDS.items() if (area[fcls_id == i] != "").any()}
-    out = {"V": V, "F": F, "cls": fcls_id, "draw": draw, "area": area, "box": box, "L": L, "rep": rep}
+    out = {"V": V, "F": F, "cls": fcls_id, "draw": draw, "area": area, "box": box, "L": L, "rep": rep,
+           "covered": cover.covered(D)}  # (the level-1 areas the ground holds as a cover: no slab of their own, #824)
     if within is not None:
         out["corners"] = {"x": cx, "y": cy, "z": zf, "label": label}
     return out
@@ -2918,9 +3029,8 @@ def on_rails(cx, cy, beds, outline):
     zr, zl = np.full(len(cx), np.nan), np.full(len(cx), np.nan)
     if not len(lines) or outline.is_empty:
         return zr, zl
-    key = np.round(cx * Q).astype(np.int64) * 10_000_000_000 + np.round(cy * Q).astype(np.int64)
-    uk, first, inv = np.unique(key, return_index=True, return_inverse=True)
-    pts = shapely.points(cx[first], cy[first])
+    ux, uy, inv = mm_points(cx, cy)
+    pts = shapely.points(ux, uy)
     pi, li = shapely.STRtree(lines).query(pts, predicate="dwithin", distance=RAIL_NEAR)
     if not len(pi):
         return zr, zl
@@ -2929,7 +3039,7 @@ def on_rails(cx, cy, beds, outline):
     shapely.prepare(outline)
     keep = shapely.dwithin(outline, shapely.points(fc[:, 0], fc[:, 1]), 1e-6)
     pi, fc = pi[keep], fc[keep]
-    z, low = np.full(len(uk), np.nan), np.full(len(uk), np.nan)
+    z, low = np.full(len(ux), np.nan), np.full(len(ux), np.nan)
     if len(pi):
         np.fmin.at(z, pi, fc[:, 2])
         np.fmin.at(low, pi, beds.surface_at(fc[:, 0], fc[:, 1]))
@@ -3308,9 +3418,9 @@ def decode(blob, layout, draw=False, area=False):
                 k += 1
         nv += len(got[0])
     V = np.vstack(Vs) if Vs else np.zeros((0, 3))
-    keys, first, inv = np.unique(np.round(V * Q).astype(np.int64), axis=0, return_index=True, return_inverse=True)
+    keys, inv = np.unique(np.round(V * Q).astype(np.int64), axis=0, return_inverse=True)
     inv = inv.ravel()
-    V = V[first]
+    V = keys / Q  # (a border vertex's copies from two tiles: the grid's point, not the first tile's, #865)
     out = {c: inv[np.vstack(f)] if f else np.zeros((0, 3), np.int64) for c, f in by.items()}
     extra = ()
     for name, want in (("draw", draw), ("area", area)):
@@ -3507,6 +3617,9 @@ def write(ln, built, rep):
     if bad:
         raise SystemExit(f"line {ln}: the ground file does not decode to the built mesh: {bad}")
     t_trip = time.time() - t0
+    # (the survey's level-1 areas (lineN.dtm.json) the ground holds as a street over a passage: src/groundDraw.js
+    # buildDtm draws no slab of theirs, #824)
+    layout["covered"] = [int(i) for i in built.get("covered") or []]
     layout["provenance"] = sources.stamp("ground_mesh.py", {
         "ground": sources.single("terrain", "ipr-dtm", int(len(built["F"])), "triangles: the city mesh (IPR), the survey, "
                                  "the beds, the building plots, welded")})

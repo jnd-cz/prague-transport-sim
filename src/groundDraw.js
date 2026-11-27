@@ -276,8 +276,11 @@ export function buildDtm(group, ground) {
   const color = {};
   for (const [k, v] of Object.entries(DTM_COLORS)) color[k] = new THREE.Color(v).toArray();
   const keepSurfaceRanges = /[?&](keepgeo|bot)\b/.test(location.search);
+  // (a level-1 street the ground holds as the cover over a passage is drawn by the ground: no slab of its own over it,
+  // whose colour and ragged outline stood as blotches on Národní divadlo's bridgehead, tools/covers.py, #824)
+  const covered = new Set(ground.tiles?.layout?.covered || []);
   for (const [areaId, a] of dtm.areas.entries()) {
-    if (!(a.l > 0)) continue;
+    if (!(a.l > 0) || covered.has(a.sourceId)) continue;
     // (surveyed walls are drawn as surveyed: a quay wall's area runs from its foot line to its top
     // line, a battered face; a wall top is flat, and its sides come from the steps below)
     // (a median under OSM's grass is grass behind its kerbs: `s`, tools/zps_medians.py, #555)

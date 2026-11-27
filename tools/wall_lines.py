@@ -296,7 +296,22 @@ def straight(S, d, a, b):
     return [(i, j, j != b) for i, j in zip(cuts, cuts[1:]) if d[j] - d[i] >= PIECE]
 
 
-def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None, own=None):
+def over_open_ground(S, lidar):
+    """Which of sampled points S (sample()) stand STEP or more over IPR's raster on both sides of their line, read FIT m
+    off each (the median, through any wall): a parapet over open ground. On a road bridge over Plzeňská by Motol, line 9
+    (-6430, -1326), the parapets' lines stand at 285.9 m and the raster has the road under the deck, 7 m down on both
+    sides; the strip between a parapet's two faces read the line's own height, and the step to the road made upright
+    faces from the road up to the deck along both of its edges, 8 m tall (#824)."""
+    z = S[:, 2]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        side = [np.nanmedian(np.stack([np.asarray(lidar(S[:, 0] + sign * S[:, 3] * o, S[:, 1] + sign * S[:, 4] * o), float)
+                                       for o in FIT]), 0) for sign in (1.0, -1.0)]
+    with np.errstate(invalid="ignore"):
+        return (z - side[0] >= STEP) & (z - side[1] >= STEP)
+
+
+def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None, own=None, raised=()):
     """The stretches of polylines ([(n, 3) arrays]): [{"p": (m, 2), "zl", "gl", "zr", "gr": (m,)}]. others: more lines
     a side's readings stop at (the survey's wall areas' outlines). meeting: the lines (their indexes) whose two ends
     stand on other walls (an abutment's line between its wing walls' corners, ground_mesh.abutments): an end's
@@ -312,7 +327,9 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None, ow
     own height, level across (the stairs' own heights; IPR read inside a flight lies on the steps below or above), and
     the stretch carries it as `stairs`. The other side steps from it only where IPR STAIRS_NEAR m out already has
     STAIRS_SEEN of that step: read FIT m out and carried back by its slope, a bank rising a metre off the Dobeška
-    stairs' curb (line 17 (-1203, -4790)) stood 1.1 m over them at their side, the raster 0.05 m."""
+    stairs' curb (line 17 (-1203, -4790)) stood 1.1 m over them at their side, the raster 0.05 m.
+    raised: the lines (their indexes) the survey has at level 1 and above: where one stands over open ground
+    (over_open_ground) it is a parapet, and no stretch."""
     out = []
     walls = segments(list(lines) + list(others))
     for n_line, p in enumerate(lines):
@@ -342,7 +359,10 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None, ow
             for q in (zl, gl, zr, gr):
                 q[0], q[-1] = q[1], q[-2]
         d = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(S[:, 0]), np.diff(S[:, 1])))])
-        for a, b, turns in (q for r in runs(np.abs(zl - zr) >= STEP, d) for q in straight(S, d, *r)):
+        step = np.abs(zl - zr) >= STEP
+        if n_line in raised:
+            step &= ~over_open_ground(S, lidar)
+        for a, b, turns in (q for r in runs(step, d) for q in straight(S, d, *r)):
             v = [np.array(q[a:b + 1], float) for q in (zl, gl, zr, gr)]
             if turns:  # (the point at the turn is read square to the line past it: the one before it stands for it)
                 for q in v:
@@ -364,11 +384,12 @@ def of_lines(lines, lidar, others=(), meeting=(), heights=None, outside=None, ow
     return out
 
 
-def source_lines(ln, root=ROOT, box=None):
-    """The survey's wall lines of line ln at level 0 and above ([(n, 3)]), those reaching a box (x0, y0, x1, y1) where one is given."""
+def source_lines(ln, root=ROOT, box=None, levels=False):
+    """The survey's wall lines of line ln at level 0 and above ([(n, 3)]), those reaching a box (x0, y0, x1, y1) where
+    one is given; levels: (the lines, each one's level)."""
     path = os.path.join(root, "data", f"line{ln}.zps.json")
     if not os.path.exists(path):
-        return []
+        return ([], []) if levels else []
     # (kept while the file is the same one: a line's street squares each ask for their own box, #786)
     key = (path, os.path.getmtime(path))
     if source_lines.kept[0] != key:
@@ -378,15 +399,18 @@ def source_lines(ln, root=ROOT, box=None):
         k = d["kinds"].index(KIND) if KIND in d["kinds"] else None
         for r in d["lines"] if k is not None else ():
             # (level 0 and above: a walled ramp's sides are surveyed at level 1, the Modřany viaduct's, line 17 (-2385, -9250),
-            # with the ground stepping 5 m across them; a bridge's parapet at level 1 has no step in the raster and makes no
-            # stretch. Underground levels are left out)
+            # with the ground stepping 5 m across them; a bridge's parapet at level 1 and above makes no stretch where it
+            # stands over open ground, of_lines `raised`. Underground levels are left out)
             if r[0] != k or r[1] < 0:
                 continue
             p = np.array([[v if v is not None else np.nan for v in r[i:i + 3]] for i in range(3, len(r), 3)], float)
             if len(p) >= 2:
-                lines.append(p)
+                lines.append((p, int(r[1])))
         source_lines.kept = (key, lines)
-    return [p for p in source_lines.kept[1] if _reaches(p, box)]
+    kept = [(p, lv) for p, lv in source_lines.kept[1] if _reaches(p, box)]
+    if levels:
+        return [p for p, _ in kept], [lv for _, lv in kept]
+    return [p for p, _ in kept]
 
 
 source_lines.kept = (None, [])
@@ -574,7 +598,7 @@ def stretches(ln, root=ROOT, box=None, lidar=None, extra=(), stairs=None):
         box = (box[0] - FIT[-1], box[1] - FIT[-1], box[2] + FIT[-1], box[3] + FIT[-1])
     # (extra: more lines taken as wall lines, ground_mesh.abutments, #763)
     lidar = lidar or ipr_lidar()
-    src, areas = source_lines(ln, root, box), wall_outlines(ln, root, box)
+    (src, lv), areas = source_lines(ln, root, box, levels=True), wall_outlines(ln, root, box)
     # (the survey's strips where it has no wall line, #770; Geoportal's walls where it has neither, #765)
     walls, sides = strip_lines(ln, root, box, src + areas, lidar)
     known = src + wall_outlines(ln, root, box, strips=True) + [p for p, g in zip(*strips(ln, root, box)) if g]
@@ -582,7 +606,7 @@ def stretches(ln, root=ROOT, box=None, lidar=None, extra=(), stairs=None):
     lines = src + walls + geo
     out = of_lines(lines + list(extra), lidar, areas, set(range(len(lines), len(lines) + len(extra))),
                    {len(src) + len(walls) + k: h for k, h in enumerate(hs)},
-                   {len(src) + k: v for k, v in enumerate(sides) if v})
+                   {len(src) + k: v for k, v in enumerate(sides) if v}, raised={k for k, v in enumerate(lv) if v >= 1})
     if stairs is not None and len(stairs[0]):
         out += of_lines(stairs[0], lidar, lines + list(extra) + areas, own=dict(enumerate(stairs[1])))
     return out

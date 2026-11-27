@@ -243,6 +243,43 @@ class Many(unittest.TestCase):
         self.assertEqual(lines[0], "4 places, 2 at once, the longest first")
 
 
+class Judge(unittest.TestCase):
+    def report(self, root, name, rings):
+        os.makedirs(os.path.join(root, "reports", "places", name))
+        with open(os.path.join(root, "reports", "places", name, "place.json"), "w", encoding="utf-8") as f:
+            json.dump({"place": name, "rings": rings} if rings else {"place": name}, f)
+
+    def rings(self, n=0):
+        return {"vertices": {"only built": n, "only written": n}, "triangles": {"only built": 2 * n, "only written": 0},
+                "points at another height": {"points": n, "max cm": 3.5 if n else 0}}
+
+    def test_the_set_holds_only_when_each_place_is_the_same_with_one_ring_more(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.report(d, "a", self.rings())
+            self.report(d, "b", self.rings())
+            out = []
+            self.assertEqual(gpl.judge(["a", "b"], root=d, log=out.append), 0)
+            self.assertIn("2 of 2 the same", out[0])
+            self.report(d, "c", self.rings(3))
+            self.report(d, "d", None)  # (built without --rings)
+            out = []
+            self.assertEqual(gpl.judge(["a", "b", "c", "d", "e"], root=d, log=out.append), 1)
+            self.assertIn("2 of 5 the same", out[0])
+            self.assertIn("c: 6 / 0 triangles and 3 / 3 vertices in one build only, 3 points at another height (max 3.5 cm)", out[0])
+            self.assertIn("d: no report with one ring more", out[0])
+            self.assertIn("e: no report", out[0])
+
+    def test_a_report_from_before_the_run_is_not_its(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.report(d, "a", self.rings())
+            self.assertEqual(gpl.judge(["a"], since=time.time() + 60, root=d, log=lambda s: None), 1)
+
+    def test_a_rule_that_is_not_one_stops_before_anything_builds(self):
+        with self.assertRaises(SystemExit) as e:
+            gpl.main(["--rule", "walls,nope"])
+        self.assertIn("no rule nope", str(e.exception))
+
+
 class Sections(unittest.TestCase):
     def profile(self, heights):
         d = np.arange(len(heights)) * gpl.SECTION_STEP

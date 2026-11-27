@@ -379,6 +379,21 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   163.1-169.8 m at Troja (50.1139 N, 14.4290 E, 334 m from the track), a pit in the 2009-2013 lidar (Trojský most
   and the Blanka tunnel were built there 2010-2014), where IPR's 2023 lidar reads 180.1-187.0 m: the floor fills
   them from their neighbours at line 17's next `build_line.py`.
+- **IPR's 2023 lidar has pits in the streets** (#867): a few metres across, vertical sides, flat floors 1-14 m down,
+  in the survey's level-0 roads and sidewalks, where DMR 5G (2009-2013) has level street: open excavations or shafts
+  at the flight, most likely. The scan of 2026-11-26 (the five lines' tiles, data of 2026-11-23): 30 road and sidewalk
+  pits the ground showed 0.5 m or more deep (Táboritská 3.7 m, Platnéřská 3.1 m); of the roads' and sidewalks' pits
+  2 m or more deep, 30 of 34 are absent from DMR 5G, while the 'paved' areas (yards, forecourts) hold real sunken
+  parts too (22 in both lidars). `tools/ipr_pits.py` fills those under the streets from their rim (its docstring has
+  the rule; paved ones and those 13-16 m long only where DMR 5G is level, the user's answer 1; those off the survey
+  stay, answer 2) into `data/ipr.fills.json`, which every `IprDtm` reads (`fill`; `city_terrain.read_ipr` too): 272
+  pits, 4,161 cells on the five lines' survey of 2026-11-23. `dtm.py` and `open_track.py` run before the fills in the
+  build and read the raster as it is (`IprDtm(fills=None)`). `tools/bench/street_pits.py` counts what is left. Of the
+  scan's 30 and the two at a kerb (Bělohorská 13.9 m, Škrétova 5 x 13 m), 26 fill and 6 stay: five mostly, or deep
+  only, off the survey ((-5192, -1347) 12 x 9, (-592, -248) 48 % in the sidewalk, (1202, -8833), (-793, -8952),
+  (4886, -3115)), one where the survey's own outline lies 1.2 m under the rim, near the pit's floor ((2005, -2299)). Many
+  more street pits stay with their reason in the file's `kept`: a rim on no plane (kerbs, terraces: 547), the survey's
+  level apart (185), no rim of their class (114).
 - **ČÚZK DMR 5G**: bare-earth lidar (embankments over underpasses are in it), 2 m TIN raster; the coarse
   10 m grid of a line, and the city mesh's fallback inside the city where IPR has no data.
 - **Prague DTM / ZPS survey** (street areas, kerbs, points): every district a line's 80 m corridor touches
@@ -619,6 +634,22 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   deck's underside. The lines' check `groundUnderDecks` found it (0 → 2 places), not the place's sections, which
   lay beside the ramp. Such an area's corners under a span that the street surface puts 2 m or more over the lidar lie
   on the lidar (`ground_mesh.off_the_deck`); the place's steep faces fell from 75.9 to 4.8 m².
+- **Under decks that are not ours** (#824, measured 2026-11-26 on places, main e040f22's build against the branch's).
+  The user's notes of 2026-11-22 on line 9, from batch C. Since then:
+  - A bridge's parapets are wall lines at level 1 or 2, and IPR has no bridge in it: by Motol (line 9 (-6430,
+    -1326), deck 5881 at level 2, 285.9 m) the raster is Plzeňská 7 m down on both sides of each parapet. The strip
+    between a parapet's two faces reads the line's own height, and the step to the road made upright faces from the
+    road to the deck along both of the deck's edges. A wall line of level 1 or above standing 0.7 m or more over the
+    raster on both sides (read 2.5-4 m off) makes no stretch (`wall_lines.over_open_ground`); a walled ramp's side has
+    the ramp's top beside it and keeps its stretch. Motol's walls over 0.3 m: 358.2 → 78.1 m, the largest step
+    along the road under the deck 7.58 → 0.01 m.
+  - A street under any of the survey's areas of level 1 and above but a roof, or within 1.5 m of one, goes through
+    `off_the_deck` as under our spans (`ground_mesh.under_decks`). The hump under Slánská's road bridge (line 9
+    (-8253, -1375), deck 9317) is gone in batch D's file already; there the parapet's stretch had held the ground at
+    the deck's south-west corner, and without it the street surface stood 3.7 m over the raster 0.5 m outside the
+    deck. Within 1.5 m (a wall's hold) it lies on the raster again.
+  - A car on a road that is no bridge stands on the ground file's own surface (`src/terrain.js` `at`, the file's
+    lookup), so the car under Slánská's bridge stood on the hump.
 - **Abutments: the wall the survey does not have** (#763, measured 2026-11-19). Where a deck lands, the survey's wing
   walls along the ramp are wall lines; the abutment's face under the deck is not. At the Modřany viaduct (line 17
   (-2393, -9247)) the two wing walls' lines turn by 0.5 m at the face's corners and run on along the street at its
@@ -668,6 +699,27 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   (0.29) and the walls over 0.3 m in its 80 m square fall from 99.2 to 40.3 m. The old limit's reason was the
   page's drape (a yard on its 2 m terrain in 5 m triangles: 8 cm waves the street check read); the ground file lays
   lidar ground in 5 m cells of the city mesh, and the lines' `streetWaviness` comes with the batch.
+- **A lawn at a sidewalk's edge is no kerb** (#770, measured 2026-11-26 on the published ground of batch D). A lawn
+  or a yard on the lidar and a sidewalk on its street surface part by 0.05-0.3 m at their shared edge, and the weld
+  took the pair for a road at a kerb (`STEP`'s 3 cm): an upright face along the edge, a dark line at a grazing angle
+  (the user's note from Královka, line 23, 2026-11-26: "faint black lines on the ground [...] on both sides in the
+  green grassy area too"). Within 45 m of (-2890, 140): 234 m of such faces of 3-30 cm between grass and sidewalk,
+  100 m between grass and the tram's area, 83 m between sidewalk and the tram's area. IPR has the same difference
+  a metre either side (12 of 13 faces within 5 cm) and, at 1 m a cell, cannot tell a kerb from a bank; the user:
+  "the only raised areas with kerb above track seem to be the stop platforms. Other raise areas like the green
+  patches rise with smoother slope". The weld now lets a lidar corner within `MEET_STEP` of a raised top corner take
+  the edge's height (`ground_mesh.weld`); its face rises to the lawn's own ground from there. In the 1.5 km square
+  round the loop 13,299 lidar corners stood over 3 cm off a raised edge and meet it (5,454 over 10 cm). What stays:
+  a difference over 0.3 m; the faces between grass and the tram's area, which are the bed 0.10-0.18 m under the
+  street surface on the loop's other tracks (#539's kind); a branch track's bed against the route's in a switch
+  (#732).
+  - **The shift fades into the lawn** (`ground_mesh.meet_lidar`, over `MEET_FADE`, an area's corners from its own
+    edge corners). Moved at its edge corner alone, a lawn stood as a sliver wherever one of its 5 m lattice corners
+    lay near the border: at (-2889.000, 144.000), 4.6 cm inside the border corner welded to the tram's area, 7 cm
+    over it, two slivers at 57-67 degrees running out along the lattice's lines for 3.7 and 4.7 m. The page draws
+    the ground double-sided, and such a sliver's back side shows as a dotted dark line at a grazing angle (the
+    user's second picture, the grass strip from the cab; the drawing side is on #734). A section across it: a
+    largest step of 0.09 m on the published ground, 0.03 m faded.
 - **A parking area is such a yard** (#800, measured 2026-11-21 on ground batch C). It has heights on its outline only,
   from the survey's lines in height class 5 (a mean error of 0.35 m). The bay along Vinohradská's north carriageway
   (line 9 s 15360-15420, area 3091, 822 m², 0.42 m at p95) shares one such line with the sidewalk behind it; one
@@ -800,6 +852,26 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   wells of an underground entrance that the survey has no stairs for (the largest by lines 9 and 22, (-309,
   -1236), 43 m2: level with the sidewalk now, a pit 6 m deep before). Not covered: a
   deck the survey has at level 1 (#449), and the ramps and stairs' wells beside a passage (#786, #447).
+- **A level-1 street over a passage** (#824, measured 2026-11-26). Where the passage is at grade with the streets it
+  leads to, the survey has the street over it at level 1 and the passage at level 0, their outlines one point for
+  point: Národní divadlo's bridgehead (line 9 (-625, -585), road 24 and sidewalks 151-156 at 193.2 m) over
+  Divadelní's underpass (OSM's tunnel, maxheight 4.4; its roads 18, 16, 17 at 187.6-188 m). The ground lay on the
+  floor, a pit 5 m deep across Národní, and the page drew the level-1 areas as slabs over it. The user, 2026-11-23:
+  "for now we draw the ground as in 783 with future update waiting in 449 to draw the actual low ground for all the
+  underpasses and then put invented deck cover over them". A level-1 area is a cover by the same rules, judged apart
+  from level 0 (judged together, a bridge's cut joined two level-0 covers' and ran past 15 m: line 17 (-226, 752),
+  line 22 (2746, -2584) lost theirs), but not a survey `deck` or an area half on one: under Slánská's bridge OSM
+  has a footway in a tunnel, and the railway bridge over the tram's street on line 22 (5490, -3591) is a slot
+  within 15 m of footways in a tunnel; as a cover it buried the track. The corners of the ground whose triangle lies
+  under a level-1 cover take its plane, read within 5 cm (a corner on the outline the passage shares with the
+  street fell outside the street's triangles by a fraction of a mm: a notch 5 m deep at the cover's edge). The
+  ground file lists the level-1 areas it holds (`covered`), and the page draws no slab of theirs
+  (`src/groundDraw.js` `buildDtm`). Eight such covers on the five lines (`tools/covers.py`'s text names them):
+  Národní divadlo, Wilsonova over the route's tram tunnel by Hlavní nádraží, U Kina's road and cycleway under the
+  tram's and the railway's bridges, a platform over Simbirská and Turkmenská, and three pedestrian underpasses.
+  Two of them close a road under them until #449 (U Kina's service road, Simbirská and Turkmenská), as Divadelní
+  is closed under Národní; the user, asked whether to keep them or cover only footways and the tram's streets
+  (PR #873, 2026-11-26): "Ok keep all 8". Národní's largest step along the street 5.11 → 0.07 m.
 - **A paved strip is a wall for the sidewalk beside it** (#786, measured 2026-11-21). The survey has many a
   retaining wall and parapet as a paved area 0.2-0.5 m across and nothing else: no wall area, no `Zeď` line. What
   kept a sidewalk off IPR's smear at a wall (#653: the cells along a wall held at its level, a street corner on its
