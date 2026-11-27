@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Check and render the four IPR shelter models without loading a line."""
+"""Check and render the nine IPR shelter models without loading a line."""
 
 import argparse
 import faulthandler
@@ -20,12 +20,12 @@ ROOT = Path(__file__).resolve().parents[1]
 CHECK = """async () => {
   const THREE = await import('three');
   const { makeIprShelter } = await import('/src/shelters.js');
-  const variants = ['P.5', 'P.6', 'P.7', 'P.11'];
+  const variants = ['P.1', 'P.2', 'P.3', 'P.4', 'P.12', 'P.5', 'P.6', 'P.7', 'P.11'];
   const levels = ['near', 'middle', 'far'];
   const name = 'Palackého náměstí\\n(nábřeží)';
   const width = 376, height = 180;
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-  renderer.setSize(width * 3, height * 5);
+  renderer.setSize(width * 3, height * (variants.length + 1));
   renderer.setScissorTest(true);
   const sheet = document.createElement('main');
   sheet.append(renderer.domElement);
@@ -56,8 +56,7 @@ CHECK = """async () => {
   const wall = new THREE.Mesh(new THREE.BoxGeometry(5.45, 3.04, .15),
     new THREE.MeshStandardMaterial({ color: 0xbec2c0, roughness: 1 }));
   wall.position.set(0, 1.52, -.929 - .075);
-  const probe = new THREE.Raycaster(new THREE.Vector3(.25, 1.35, 0), new THREE.Vector3(0, 0, -1));
-  const fasciaProbe = new THREE.Raycaster(new THREE.Vector3(.25, 2.13, 0), new THREE.Vector3(0, 0, -1));
+  const rearRay = (x, y) => new THREE.Raycaster(new THREE.Vector3(x, y, 0), new THREE.Vector3(0, 0, -1));
 
   const results = variants.map((variant, row) => levels.map((level, col) => {
     const model = makeIprShelter(variant, level, name);
@@ -67,11 +66,15 @@ CHECK = """async () => {
     const triangles = model.children.reduce((n, { geometry: g }) => n + (g.index ?? g.attributes.position).count / 3, 0);
     const types = model.children.map(mesh => mesh.name);
     const endPanes = model.children.filter(mesh => mesh.name === 'end-glass').map(mesh => mesh.geometry.parameters.width);
-    const rearWall = probe.intersectObject(model, true).some(hit => hit.object.name === 'rear-glass');
-    const openingUnderFascia = fasciaProbe.intersectObject(model, true).length === 0;
+    const standardPassage = variant === 'P.2' || variant === 'P.4';
+    const gap = standardPassage ? -1.20 : .25;
+    const rearWall = rearRay(gap, 1.35).intersectObject(model, true).some(hit => hit.object.name === 'rear-glass');
+    const openingUnderFascia = rearRay(gap, 2.13).intersectObject(model, true).length === 0;
+    const passagePost = rearRay(-.61, 1.35).intersectObject(model.getObjectByName('frame')).length > 0;
     const seat = model.getObjectByName('seats');
     const seatXs = seat ? Array.from(seat.geometry.attributes.position.array).filter((x, i) => i % 3 === 0) : [];
     const twoBays = seatXs.some(x => x < -.65) && seatXs.some(x => x > .65) && seatXs.every(x => Math.abs(x) > .1);
+    const seatClear = seatXs.every(x => x > -.55);
     const sign = model.getObjectByName('stop-name');
     const signBounds = new THREE.Box3().setFromObject(sign);
     const centre = signBounds.getCenter(new THREE.Vector3());
@@ -93,18 +96,19 @@ CHECK = """async () => {
     scene.add(model);
     const backing = variant === 'P.11' ? wall : floor;
     scene.add(backing);
-    renderer.setViewport(width * col, height * (4 - row), width, height);
-    renderer.setScissor(width * col + 2, height * (4 - row) + 2, width - 4, height - 4);
+    renderer.setViewport(width * col, height * (variants.length - row), width, height);
+    renderer.setScissor(width * col + 2, height * (variants.length - row) + 2, width - 4, height - 4);
     renderer.render(scene, camera);
     const calls = renderer.info.render.calls - 1;  // one backing surface
     scene.remove(model, backing);
     return { variant, level, size, min: bounds.min.toArray(), max: bounds.max.toArray(),
-      triangles, calls, types, rearWall, endPanes, twoBays, twoLinesFit, faces, labelOptional, openingUnderFascia };
+      triangles, calls, types, rearWall, endPanes, twoBays, twoLinesFit, faces, labelOptional, openingUnderFascia,
+      passagePost, seatClear };
   }));
 
   const detail = new THREE.OrthographicCamera(-1.25, 1.25, .59, -.59, .1, 20);
   for (const [col, [variant, side, caption]] of [
-    ['P.5', 1, 'P.5 · front'], ['P.5', -1, 'P.5 · street side'], ['P.11', 1, 'P.11 · outward face'],
+    ['P.1', 1, 'P.1 · front'], ['P.1', -1, 'P.1 · street side'], ['P.11', 1, 'P.11 · outward face'],
   ].entries()) {
     const model = makeIprShelter(variant, 'near', name);
     const sign = new THREE.Box3().setFromObject(model.getObjectByName('stop-name')).getCenter(new THREE.Vector3());
@@ -116,9 +120,37 @@ CHECK = """async () => {
     renderer.setScissor(width * col + 2, 18, width - 4, height - 20);
     renderer.render(scene, detail);
     scene.remove(model, wall);
-    label(caption, width * (col + .5), height * 5 - 8);
+    label(caption, width * (col + .5), height * (variants.length + 1) - 8);
   }
-  return results;
+
+  // Test the rendering contract for the feature layer with two independently named stops.
+  // Keep their alpha-blended surfaces sorted as separate objects.
+  const pair = ['Palackého náměstí', 'Kobylisy'].map(stop => makeIprShelter('P.1', 'near', stop));
+  pair[0].position.x = -2.15;
+  pair[1].position.x = 2.15;
+  const target = new THREE.WebGLRenderTarget(220, 96);
+  renderer.setScissorTest(false);
+  renderer.setRenderTarget(target);
+  scene.add(...pair);
+  renderer.render(scene, camera);
+  const separate = renderer.info.render.calls;
+  const trianglesBefore = renderer.info.render.triangles;
+  const opaque = pair[0].children.filter(mesh => !mesh.material.transparent);
+  for (const mesh of opaque) {
+    const instances = new THREE.InstancedMesh(mesh.geometry, mesh.material, pair.length);
+    pair.forEach((model, i) => {
+      instances.setMatrixAt(i, model.matrix);
+      model.remove(model.getObjectByName(mesh.name));
+    });
+    scene.add(instances);
+  }
+  renderer.render(scene, camera);
+  const instanced = renderer.info.render.calls;
+  const sameTriangleCount = renderer.info.render.triangles === trianglesBefore;
+  const differentNames = pair[0].getObjectByName('stop-name').material.map !== pair[1].getObjectByName('stop-name').material.map;
+  renderer.setRenderTarget(null);
+  target.dispose();
+  return { results, pair: { separate, instanced, differentNames, sameTriangleCount } };
 }"""
 
 HTML = """<!doctype html><style>
@@ -144,21 +176,21 @@ def main():
         threading.Thread(target=server.serve_forever, daemon=True).start()
         url = f"http://127.0.0.1:{server.server_port}/__shelters.html"
         browser, _ = gpu.launch(p)
-        page = browser.new_page(viewport={"width": 1202, "height": 946})
+        page = browser.new_page(viewport={"width": 1202, "height": 1846})
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         importmap = re.search(r'<script type="importmap">.*?</script>',
                               (ROOT / "index.html").read_text(encoding="utf-8"), re.S)[0]
         page.route(url, lambda route: route.fulfill(content_type="text/html", body=HTML + importmap))
         page.goto(url)
-        variants = page.evaluate(CHECK)
+        measured = page.evaluate(CHECK)
         if args.preview:
             page.screenshot(path=args.preview)
         browser.close()
         server.shutdown()
     assert not errors, errors
 
-    for row in variants:
+    for row in measured["results"]:
         variant = row[0]["variant"]
         counts = [model["triangles"] for model in row]
         calls = [model["calls"] for model in row]
@@ -166,19 +198,29 @@ def main():
         assert calls[0] >= calls[1] >= calls[2] and calls[0] <= 12, row
         for model in row:
             wall = variant == "P.11"
+            island = variant == "P.12"
+            extended = variant in {"P.5", "P.6", "P.7"}
+            citylight = variant in {"P.1", "P.2", "P.5", "P.6"}
+            standard_passage = variant in {"P.2", "P.4"}
             w, h, d = model["size"]
-            assert abs(w - (4.040 if wall else 7.080)) < .001 and abs(d - 1.858) < .001, model
+            assert abs(w - (7.080 if extended else 4.040)) < .001, model
+            assert abs(d - (1.438 if island else 1.858)) < .001, model
             assert abs(model["max"][1] - 2.455) < .001, model
             assert (h < .72 and model["min"][1] >= 1.75) if wall else abs(model["min"][1]) < .001, model
             assert model["types"].count("frame") == 1 and model["types"].count("canopy") == 1, model
-            assert model["twoBays"] == (not wall) and ("seats" in model["types"]) == (not wall), model
-            assert ("citylight" in model["types"]) == (variant in {"P.5", "P.6"}), model
-            assert model["rearWall"] == (variant in {"P.6", "P.7"}), model
-            assert model["endPanes"] == ([] if wall else [.58, .58] if variant == "P.7" else [1.08]), model
+            assert model["twoBays"] == extended and ("seats" in model["types"]) == (not (wall or island)), model
+            assert ("citylight" in model["types"]) == citylight, model
+            assert model["rearWall"] == (variant in {"P.1", "P.3", "P.6", "P.7", "P.12"}), model
+            assert model["endPanes"] == ([] if wall or island else [1.08] if citylight else [.58, .58]), model
             assert model["twoLinesFit"] and model["labelOptional"] and model["faces"] == [True, not wall], model
-            if variant == "P.5":
+            if standard_passage or variant == "P.5":
                 assert model["openingUnderFascia"], model
+            if standard_passage:
+                assert model["passagePost"] and model["seatClear"], model
         print(f"{variant}: {counts} triangles, {calls} draw calls with a stop label")
+    pair = measured["pair"]
+    assert pair == {"separate": 18, "instanced": 15, "differentNames": True, "sameTriangleCount": True}, pair
+    print("Two differently named near P.1 shelters: 18 to 15 draw calls with opaque instancing")
 
 
 if __name__ == "__main__":
