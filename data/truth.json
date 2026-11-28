@@ -29,7 +29,8 @@
   "groundRules": "reference: the rules tools/ground_mesh.py holds (crossing_pieces, rail_band, on_rails) and checks (heads_check)",
   "groundPlaces": "tools/ground_place.py: the places a ground change is built and measured at (#757)",
   "openTrackReview": "tools/track_styles.py (open_answers: the style between the two points); tools/open_track.py (no card again)",
-  "stairsReview": "tools/stairs_review.py (an answered place gets no card); reference for the stairs rules of #447 in tools/ground_mesh.py until they read it"
+  "stairsReview": "tools/stairs_review.py (an answered place gets no card); reference for the stairs rules of #447 in tools/ground_mesh.py until they read it",
+  "sidewalkWallsReview": "tools/sidewalk_walls_review.py (an answered place gets no card); reference for the street surface's hold at walls (tools/street_profile.py sidewalks, #653) until it reads it"
  },
  "t3PhotoModel": [
   {
@@ -7031,6 +7032,62 @@
      "why": "the sidewalk runs on at the rim's level; batch E's corners on the rim fell 3.4 m into the well: the largest step 2.33 m, on the branch 0.31 m (the rim's own outline wobbles 0.3-1 m)"
     }
    ]
+  },
+  "road-at-a-walls-foot": {
+   "line": "17",
+   "at": [
+    -594.7,
+    -2879.0
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the road along the retaining wall under Vyšehrad's rock south of the tunnel on line 17 (50.06100, 14.41858): the wall (area 1997) 1.12 m across in plan, its foot at the road's 187.2 m, its top 193.3 m. The road surface follows IPR, whose raster spreads the wall's face over 1-1.5 m: batch E's road (area 741) rose 1.2 m in its last 0.5 m to the foot (188.43 m 0.05 m out). The road keeps its own surface from past the smear beside every wall up to 2.5 m across now, not only up to 1 m (off_the_smear)",
+   "source": "the scan of 2026-11-27 on batch E's ground (tools/bench/street_at_walls.py): 67 road corners off along wall 1997, #653",
+   "sections": [
+    {
+     "name": "square to the wall from 4 m out on the road to its foot",
+     "from": [
+      -598.56,
+      -2880.05
+     ],
+     "to": [
+      -594.75,
+      -2879.01
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the road lies level to the wall's foot: 187.15-187.2 m from 4 m out to 0.5 m on the street surface and the lidar alike; batch E's ground rose to 188.43 m at the foot"
+    }
+   ]
+  },
+  "road-at-a-stair-well": {
+   "line": "17",
+   "at": [
+    -1665.6,
+    -9080.4
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "a road beside the stair well of stairs 7778 on line 17 (50.00445, 14.41557): the stairs' side along the road (area 7103) is surveyed at the road's 212.1 m and the steps go down beside it to 208.4 m. The road surface follows IPR, whose raster spreads the well over the road's last metre and a half: built by the tools of 68124a5 the road fell from 211.24 m 0.5 m out to 209.57 m at the rim. A road keeps its own surface from past the smear beside a stair well now, as beside a wall (off_the_smear, stairs_edges)",
+   "source": "the stairs sites of the street-corner count (tools/bench/street_at_walls.py) built by 68124a5's tools, 2026-11-28: 13 road corners off at stairs 7778, #653",
+   "sections": [
+    {
+     "name": "square to the stairs' side from 4 m out on the road to the rim",
+     "from": [
+      -1669.01,
+      -9078.3
+     ],
+     "to": [
+      -1665.66,
+      -9080.4
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the road lies level to the rim: IPR reads 212.11-212.13 m from 4 m out to 1 m, its own outline 212.08 m at the rim; the raster's 209.9-211.5 m in the last 0.5 m is its smear of the well"
+    }
+   ]
   }
  },
  "openTrackReview": {
@@ -7483,6 +7540,322 @@
     ],
     "kind": "flight",
     "source": "user, stairs review (reports/review/stairs-17.json), 2026-11-22 (#447)"
+   }
+  ]
+ },
+ "sidewalkWallsReview": {
+  "note": "The user's answers to the review of sidewalks at a wall (reports/review/sidewalk-walls-N.json, tools/sidewalk_walls_review.py, #653): at which level the walkway meets the wall where the survey's heights there and IPR's lidar part. `place` is the sidewalk's edge on the wall's line, `inside` IPR's reading 1.5 m in on the sidewalk's side (lat, lon), `survey` and `lidar` the heights the card showed there (m); `level` is lidar, survey, no walkway, or unsure (which no rule reads).",
+  "answers": [
+   {
+    "id": "sidewalk-wall-50.00523-14.43297",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0052335,
+     14.4329747
+    ],
+    "inside": [
+     50.0052464,
+     14.4329808
+    ],
+    "survey": 276.51,
+    "lidar": 279.91,
+    "level": "unsure",
+    "note": "there's a ramp between wall and stairs on the other side, well visible from ortophoto",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-17.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.00661-14.42963",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0066113,
+     14.4296321
+    ],
+    "inside": [
+     50.0066232,
+     14.4296418
+    ],
+    "survey": 259.49,
+    "lidar": 264.77,
+    "level": "unsure",
+    "note": "there's both ramp and stairs there, best seen from street view https://maps.app.goo.gl/xXkiCtadhCeQNyy19",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-17.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.00982-14.40276",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0098201,
+     14.4027568
+    ],
+    "inside": [
+     50.0098176,
+     14.4027363
+    ],
+    "survey": 198.56,
+    "lidar": 195.06,
+    "level": "unsure",
+    "note": "upright wall from tram corridor down to sidewalk level at kerb's level, see street view https://maps.app.goo.gl/PGjYndZvf3N8nNA68",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-17.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.02240-14.40366",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0224036,
+     14.4036637
+    ],
+    "inside": [
+     50.0224047,
+     14.4036429
+    ],
+    "survey": 196.47,
+    "lidar": 197.9,
+    "level": "lidar",
+    "note": "the stop platform is on top, at platform's kerb height, looks mostly correct, closest to blue pin. The ramp from street level leading to the stop has some terrain issues",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-17.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.06548-14.30486",
+    "lines": [
+     "9"
+    ],
+    "place": [
+     50.0654801,
+     14.3048648
+    ],
+    "inside": [
+     50.0654666,
+     14.3048643
+    ],
+    "survey": 358.54,
+    "lidar": 360.06,
+    "level": "unsure",
+    "note": "there's walkway under solid slab of concrete roof which is covered by building model in game",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-9.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.06605-14.41766",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0660528,
+     14.4176603
+    ],
+    "inside": [
+     50.0660648,
+     14.4176699
+    ],
+    "survey": 220.91,
+    "lidar": 214.43,
+    "level": "lidar",
+    "note": "a sidewalk on both sides of the wall: a cobbled path along the tall wall's foot, a cobbled walkway along the parapet on its top",
+    "source": "maintainer, #899 (asked whether a sidewalk runs at the wall's foot at about 214.5 m; answered with photos of both)"
+   },
+   {
+    "id": "sidewalk-wall-50.06981-14.41437",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.069807,
+     14.414373
+    ],
+    "inside": [
+     50.0698054,
+     14.4143522
+    ],
+    "survey": 192.36,
+    "lidar": 188.62,
+    "level": "unsure",
+    "note": "similar case to řašínovo nábřeží, see ortophoto",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-17.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.07169-14.41394",
+    "lines": [
+     "9",
+     "17"
+    ],
+    "place": [
+     50.0716918,
+     14.4139419
+    ],
+    "inside": [
+     50.0716906,
+     14.413921
+    ],
+    "survey": 192.93,
+    "lidar": 187.98,
+    "level": "unsure",
+    "note": "the blue pin is still to high, under the wall the ground is flat and level, so same height as the bike path up to wall's foot",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-9.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.07825-14.34042",
+    "lines": [
+     "22"
+    ],
+    "place": [
+     50.0782515,
+     14.3404153
+    ],
+    "inside": [
+     50.0782642,
+     14.3404082
+    ],
+    "survey": 373.05,
+    "lidar": 368.27,
+    "level": "unsure",
+    "note": "there is a long ramp down to a underpass, other side of wall has sidewalk which looks mostly correct",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-22.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.08009-14.41353",
+    "lines": [
+     "9",
+     "17",
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0800941,
+     14.4135277
+    ],
+    "inside": [
+     50.0801002,
+     14.4135464
+    ],
+    "survey": 188.5,
+    "lidar": 190.88,
+    "level": "lidar",
+    "note": "the wall here is at the same level as the sidewalk, which is protected from the ledge by railing",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-9.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.08546-14.38244",
+    "lines": [
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0854646,
+     14.3824366
+    ],
+    "inside": [
+     50.0854515,
+     14.3824417
+    ],
+    "survey": 297.7,
+    "lidar": 294.32,
+    "level": "unsure",
+    "note": "another ramp down to underpass, visible from ortophoto",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-22.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.08645-14.40247",
+    "lines": [
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0864517,
+     14.4024725
+    ],
+    "inside": [
+     50.0864457,
+     14.4024537
+    ],
+    "survey": 202.16,
+    "lidar": 207.71,
+    "level": "unsure",
+    "note": "blue pin sits in between, there fairly flat footpath at the top next to a wall and staircase, good overview in ortophoto",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-22.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.09184-14.40525",
+    "lines": [
+     "22",
+     "23"
+    ],
+    "place": [
+     50.0918391,
+     14.4052491
+    ],
+    "inside": [
+     50.0918526,
+     14.4052492
+    ],
+    "survey": 240.6,
+    "lidar": 242.82,
+    "level": "unsure",
+    "note": "fairly plat plane next to the wall, at the pin there's stairwell",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-22.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.09266-14.47869",
+    "lines": [
+     "37"
+    ],
+    "place": [
+     50.0926581,
+     14.4786929
+    ],
+    "inside": [
+     50.0926714,
+     14.4786894
+    ],
+    "survey": 270.93,
+    "lidar": 272.33,
+    "level": "unsure",
+    "note": "from what I see there's steady sidewalk plane across the street, connected to the house too, best seen at the streetview https://maps.app.goo.gl/9b1LNQ939RWMq5U96",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-37.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.09704-14.43518",
+    "lines": [
+     "17"
+    ],
+    "place": [
+     50.0970404,
+     14.4351825
+    ],
+    "inside": [
+     50.0970535,
+     14.4351774
+    ],
+    "survey": 190.17,
+    "lidar": 194.21,
+    "level": "unsure",
+    "note": "two staircases, pin shows lower level next to underpass, see ortophoto",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-17.json), 2026-11-28 (#653)"
+   },
+   {
+    "id": "sidewalk-wall-50.10682-14.54819",
+    "lines": [
+     "37"
+    ],
+    "place": [
+     50.1068155,
+     14.5481884
+    ],
+    "inside": [
+     50.1068289,
+     14.5481859
+    ],
+    "survey": 241.62,
+    "lidar": 235.67,
+    "level": "unsure",
+    "note": "same case as řašínovo nábřežtí, flat walkway at kerb's level up to the wall, with exception to the stairs down for underpass",
+    "source": "user, review of sidewalks at a wall (reports/review/sidewalk-walls-37.json), 2026-11-28 (#653)"
    }
   ]
  }

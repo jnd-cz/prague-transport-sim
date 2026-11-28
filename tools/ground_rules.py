@@ -51,7 +51,7 @@ RULES = {
                    "vysehrad-tunnel-mouths"],
     },
     "walls": {
-        "what": "walls: the survey's lines, faces and strips, a wall's sides and its foot and top (#697, #765, #770, #786)",
+        "what": "walls: the survey's lines, faces and strips, a wall's sides and its foot and top (#653, #697, #765, #770, #786)",
         "code": ["wall_lines.*", "ground_mesh.hold_at_walls", "ground_mesh.wall_areas", "ground_mesh.outline_edges",
                  "ground_mesh.turning", "ground_mesh.out_of", "ground_mesh.own_side", "ground_mesh._sides",
                  "ground_mesh.across_outline", "ground_mesh.wall_width", "ground_mesh.two_sided", "ground_mesh.wall_like",
@@ -63,7 +63,7 @@ RULES = {
                    "wall-end-in-a-path", "sidewalk-under-a-road-wall", "sidewalk-on-a-quay-wall", "branik-platform-ramps",
                    "cerny-kun-platform-wall", "modranska-skola-ramp", "na-vapence-garage-ramp", "modrany-viaduct-ramps",
                    "garden-beds", "zizkov-wall-at-the-kerb", "motol-wall-at-the-kerb", "wall-above-a-lower-walkway",
-                   "hlavni-nadrazi-under-the-magistrala", "motol-bridge-parapets"],
+                   "hlavni-nadrazi-under-the-magistrala", "motol-bridge-parapets", "road-at-a-walls-foot"],
     },
     "kerbs": {
         "what": "kerbs: raised edges, lowered kerbs, belts, parking bays (#606, #638, #800)",
@@ -87,11 +87,11 @@ RULES = {
                    "zizkov-depot-paving", "rasinovo-quay", "belohorska-grass-track"],
     },
     "stairs": {
-        "what": "flights of stairs and ramps: their steps, sides and ends (#447, #653, #786)",
+        "what": "flights of stairs and ramps: their steps, sides and ends, and a road beside a stair well (#447, #653, #786)",
         "code": ["ground_mesh.flight", "ground_mesh.climbs", "ground_mesh.StairsHeights", "ground_mesh.stairs_sides",
-                 "ground_mesh.STAIRS*", "ground_mesh.survey_edges", "ground_mesh.RISER*"],
+                 "ground_mesh.STAIRS*", "ground_mesh.survey_edges", "ground_mesh.RISER*", "ground_mesh.stairs_edges"],
         "places": ["stairs-reversed-ramp", "stairs-beside-a-building", "stairs-not-there", "stairs-belvedere-wall",
-                   "stairs-dobeska", "krejcarek-ramp", "branik-platform-ramps"],
+                   "stairs-dobeska", "krejcarek-ramp", "branik-platform-ramps", "road-at-a-stair-well"],
     },
     "platforms": {
         "what": "platforms: level along the track, their walls and kerbs (#776, #786)",
