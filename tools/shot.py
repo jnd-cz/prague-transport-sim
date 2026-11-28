@@ -66,11 +66,17 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+class Site(http.server.ThreadingHTTPServer):
+    # (the page asks for its modules all at once: the default backlog of 5 refuses some while the machine is busy with
+    # other jobs, and the page then says its code did not load; tools/serve.py's server has the same 128)
+    request_queue_size = 128
+
+
 @contextmanager
 def site(root, overlay=None):
     # The kernel reserves this ephemeral socket before any browser is started.
     handler = type('Overlaid', (Quiet,), {'overlay': str(overlay)}) if overlay else Quiet
-    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(handler, directory=str(root)))
+    server = Site(('127.0.0.1', 0), functools.partial(handler, directory=str(root)))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

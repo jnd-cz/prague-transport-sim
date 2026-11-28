@@ -26,6 +26,7 @@ from playwright.sync_api import Error as PlaywrightError, sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gpu  # noqa: E402
 from shot import site  # noqa: E402
+from test_perf import BLACK  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -144,6 +145,7 @@ def pages(context, url, line, fails):
         fails.append(f"the menu's antialiasing off: {s}")
     # the automatic scale on a shift whose every frame is held to 40 ms: a step down draws 960 x 540, the frames are
     # no shorter for it, so the step is taken back and the scale stays
+    page.evaluate(BLACK)  # (under SLOW's wait, so that it reads back right after the page's frame)
     page.evaluate(SLOW)
     page.check("#optAuto")
     page.click("#btnStart")
@@ -152,9 +154,13 @@ def pages(context, url, line, fails):
         page.wait_for_function("window.gfx.auto.length === 2 && window.renderer.getContext().drawingBufferWidth === 1280", timeout=60000)
     except PlaywrightError:
         pass
-    auto = page.evaluate("({ log: window.gfx.auto, scale: window.gfx.scale })")
+    page.wait_for_timeout(300)  # (the frames after the step back)
+    auto = page.evaluate("({ log: window.gfx.auto, scale: window.gfx.scale, black: window.blackFrames, drawn: window.drawnFrames })")
     if [e["why"] for e in auto["log"]] != ["slow", "no faster: back"] or auto["scale"] != 1:
         fails.append(f"the automatic scale on 40 ms frames: {auto}")
+    # (a step resizes the canvas, which clears it: before the frame's draw, so that no frame is left black)
+    if auto["black"] or not auto["drawn"] > 50:
+        fails.append(f"the automatic scale's steps left {auto['black']} of {auto['drawn']} drawn frames black")
     if errors:
         fails.append(f"page errors: {errors}")
     page.close()

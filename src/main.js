@@ -185,6 +185,9 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.antialias, log
 const autoScale = new AutoScale();
 GFX.auto = autoScale.log;
 let scaleSet = setting('scale');
+// A change of the scale during a shift waits for the next frame's start (`rescale`, run in frame()): resizing the
+// canvas clears it, and done after a frame's draw it showed that frame black (the tablet, #705).
+let rescale = null;
 function applyScale() {
   GFX.scale = GFX.fixed ? 1 : scaleSet === 'auto' ? autoScale.scale : +scaleSet;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, GFX.maxPixelRatio) * GFX.scale);
@@ -236,9 +239,11 @@ const sun = new THREE.DirectionalLight(0xfff1dc, 1.6);
 sun.position.set(-300, 500, 200);
 scene.add(sun);
 
+let needDraw = false; // (a resized canvas is cleared: the frame after it draws, idle or not)
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
+  needDraw = true;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
@@ -804,7 +809,7 @@ $('btnPerfRef').addEventListener('click', () => {
 });
 function perfTestStep(now) {
   if (!perfTest || !game || game.finished) {
-    if (perfTest?.phase === 'windows') { applyScale(); resize(); }
+    if (perfTest?.phase === 'windows') rescale = () => { applyScale(); resize(); };
     perfTest = null;
     return;
   }
@@ -825,10 +830,13 @@ function perfTestStep(now) {
     const k = Math.floor((now - pt.t3) / PT_WIN), half = k % 2 === 0;
     if (k !== pt.k) {
       pt.k = k;
-      applyScale();
-      if (k < PT_WINS && half) renderer.setPixelRatio(renderer.getPixelRatio() / 2);
-      resize();
-      if (k < PT_WINS && half) pt.size = [canvas.width, canvas.height];
+      const halve = k < PT_WINS && half;
+      rescale = () => {
+        applyScale();
+        if (halve) renderer.setPixelRatio(renderer.getPixelRatio() / 2);
+        resize();
+        if (halve) pt.size = [canvas.width, canvas.height];
+      };
     }
     if (k >= PT_WINS) { finishPerfTest(); return; }
     pt.half = half;
@@ -1265,6 +1273,7 @@ function frame(now) {
   // (the page's own time in this frame, and of it the game's steps and the draws' calls, for the frame log: src/perf.js)
   const began = performance.now();
   let logged = null, simMs = 0, drawMs = 0;
+  if (rescale) { const turn = rescale; rescale = null; turn(); }
   const span = Math.max(0, Math.min(SPAN_MAX, (now - last) / 1000));
   const dt = Math.min(STEP_MAX, span); // (the camera, weather, sound and HUD: one step a frame)
   let simmed = 0;
@@ -1326,8 +1335,9 @@ function frame(now) {
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   const lazy = idle();
-  const draw = window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS;
+  const draw = window.headless ? now - lastDraw > 1000 : !lazy || needDraw || now - lastDraw > IDLE_MS;
   if (draw) {
+    needDraw = false;
     // (the movers between the last two steps, as our tram; back where the steps left them after the draw, below)
     if (game && !inspect.active && !window.headless) between.show(Math.min(1, carry / STEP));
     // (the right mirror's camera, posed for this frame while the mirror is shown: the people it shows near the tram are
@@ -1361,7 +1371,7 @@ function frame(now) {
       const log = !perfTest || perfTest.phase === 'warm' || perfTest.phase === 'run' ? perfLog : perfTest.log || null;
       logged = log?.frame(now, tram.s, renderer.info.render, simmed) ? log : null;
       // (the automatic render scale reads the same frames, but a performance test's: it measures at one scale)
-      if (scaleSet === 'auto' && !GFX.fixed && !perfTest && autoScale.frame(now) !== null) { applyScale(); resize(); }
+      if (scaleSet === 'auto' && !GFX.fixed && !perfTest && autoScale.frame(now) !== null) rescale = () => { applyScale(); resize(); };
     }
   }
   if (perfTest) perfTestStep(now);
