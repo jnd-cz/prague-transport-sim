@@ -108,7 +108,7 @@ RULES = {
                  "ground_mesh.BRIDGE_NEAR", "ground_mesh.MOUTH_FIT"],
         "places": ["hlavni-nadrazi-under-the-magistrala", "vysehrad-tunnel-mouths", "street-over-an-underpass",
                    "krejcarek-abutment", "modrany-viaduct-ramps", "slanska-street-under-a-bridge",
-                   "narodni-divadlo-bridgehead", "motol-bridge-parapets"],
+                   "narodni-divadlo-bridgehead", "motol-bridge-parapets", "stairs-well-beside-a-cover"],
     },
     "plots": {
         "what": "plots, lawns, yards and beds in a sidewalk: their heights, terraces, pits and thin strips, a lawn at a raised edge (#638, #663, #696, #738, #764, #770)",

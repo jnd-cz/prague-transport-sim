@@ -1072,9 +1072,17 @@ class UnderADeck(unittest.TestCase):
         D = {"areas": [sq("deck", 0, 1), sq("road", 20, 2), sq("roof", 40, 1), sq("road", 60, 0)]}
         x, y = np.array([5.0, 25.0, 45.0, 65.0, 15.0, 11.0]), np.full(6, 5.0)
         got = gm.under_decks(D, shapely.box(-10, -10, 80, 20), x, y)
-        # (and under its edge, DECK_EDGE: the Slánská deck's south-west corner, 0.5 m outside its outline)
+        # (and under a deck's edge, DECK_EDGE: the Slánská deck's south-west corner, 0.5 m outside its outline)
         self.assertEqual(got.tolist(), [True, True, False, False, False, True])
         self.assertFalse(gm.under_decks(D, shapely.box(30, -10, 80, 20), x[2:], y[2:]).any())
+        # (and round a level-1 street; but a point on a stairs' outline there is under no edge: the rim of the stairs'
+        # well beside a cover over a passage, line 37 (9264.8, 957.8), #653. Under the street it is under it)
+        px, py = np.array([19.0, 31.0]), np.full(2, 5.0)
+        self.assertEqual(gm.under_decks(D, shapely.box(-10, -10, 80, 20), px, py).tolist(), [True, True])
+        D["areas"].append({"c": "stairs", "l": 0, "r": [[31, 2, 1.0], [34, 2, 1.0], [34, 8, 1.0], [31, 8, 1.0]]})
+        self.assertEqual(gm.under_decks(D, shapely.box(-10, -10, 80, 20), px, py).tolist(), [True, False])
+        D["areas"][-1]["r"] = [[29, 2, 1.0], [34, 2, 1.0], [34, 8, 1.0], [29, 8, 1.0]]
+        self.assertTrue(gm.under_decks(D, shapely.box(-10, -10, 80, 20), np.array([29.0]), np.array([5.0])).all())
 
     def test_the_trams_area_under_a_cover_lies_at_the_rails(self):
         # (#788: in a tunnel of the route, off the rock: a corner of the tram's area 4 m over the rails beside it at

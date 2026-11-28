@@ -1142,16 +1142,35 @@ def under_decks(D, box, x, y):
     337.3 to 349.6 m, a hump of faces 2-6 m tall (#824). The street surface reads the deck's level up to its edge,
     where the parapet's wall line held the ground at its low side until a parapet over open ground made no stretch
     (wall_lines.over_open_ground): at the Slánská deck's south-west corner, (-8276.9, -1440.7), the street stood 3.8 m
-    over the raster 0.5 m outside the deck."""
-    up = [shapely.Polygon([q[:2] for q in a["r"]]) for a in D["areas"]
-          if a.get("l", 0) >= 1 and a.get("c") != "roof" and len(a.get("r") or []) >= 3]
-    up = [g if g.is_valid else shapely.make_valid(g) for g in up]
-    up = shapely.union_all([g for g in up if g.intersects(box.buffer(DECK_EDGE))]) if up else None
-    if up is None or up.is_empty:
+    over the raster 0.5 m outside the deck. And at a passage's portal under a cover (covers.py), where the street
+    surface runs smoothly from the cover down to the floor: Národní divadlo, line 9 (-623.0, -570.9), 190.9 m over the
+    floor's 188.25 without the edge.
+    A point on a level-0 stairs' outline is under the edge of none: the raster there reads the stairs' well, and the
+    edge took the rim of the stairs down to the underpass beside a cover, line 37 (9264.8, 957.8), the sidewalk at
+    239.4 m, down to the well, 236.0 m: a notch 3.4 m deep (#653). The stairs' rules hold such a corner."""
+    up = []
+    for a in D["areas"]:
+        if a.get("l", 0) >= 1 and a.get("c") != "roof" and len(a.get("r") or []) >= 3:
+            g = shapely.Polygon([q[:2] for q in a["r"]])
+            g = g if g.is_valid else shapely.make_valid(g)
+            if g.intersects(box.buffer(DECK_EDGE)):
+                up.append(g)
+    if not up:
         return np.zeros(np.shape(x), bool)
-    up = up.buffer(DECK_EDGE)
-    shapely.prepare(up)
-    return shapely.contains_xy(up, x, y)
+    g = shapely.union_all(up)
+    shapely.prepare(g)
+    edge = g.buffer(DECK_EDGE)
+    shapely.prepare(edge)
+    out = shapely.contains_xy(g, x, y)
+    near = ~out & shapely.contains_xy(edge, x, y)
+    if near.any():
+        rims = [shapely.LineString([q[:2] for q in a["r"]] + [a["r"][0][:2]]) for a in D["areas"]
+                if a.get("c") == "stairs" and a.get("l", 0) == 0 and len(a.get("r") or []) >= 3]
+        rims = [r for r in rims if r.intersects(edge)]
+        if rims:
+            k = np.flatnonzero(near)
+            near[k] = ~shapely.dwithin(shapely.union_all(rims), shapely.points(np.asarray(x)[k], np.asarray(y)[k]), WALL_ON)
+    return out | near
 
 
 def hold_at_walls(cx, cy, tx, ty, z, eligible, walls, deck=None, street=None):

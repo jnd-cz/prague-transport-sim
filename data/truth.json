@@ -7003,6 +7003,34 @@
      "why": "one street over the passage, 193.1-193.3 m, a kerb at most (the user's decision: the street as the ground, #783's way). Batch C's file fell 5 m into the raster's floor between x -629 and -621"
     }
    ]
+  },
+  "stairs-well-beside-a-cover": {
+   "line": "37",
+   "at": [
+    9264.8,
+    957.8
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the rim of the stairs (area 4863) down to a pedestrian underpass beside the street over it on line 37 (50.10719, 14.54781), the street a level-1 cover since #824: the sidewalk's (area 4668) corners on the rim at s 20.4-21.2 m along the stairs' outline stood at 236.0 m, the raster's well, under the rim's 239.5-239.7 m: #824's deck edge (1.5 m round any level-1 area) put them on the lidar (batch E's file). A corner on a stairs' outline is under no edge now (under_decks)",
+   "source": "the scan of 2026-11-27 on batch E's ground (tools/bench/street_at_walls.py), #653",
+   "sections": [
+    {
+     "name": "along the sidewalk 0.3 m off the stairs' rim, 3.6 m",
+     "from": [
+      9265.38,
+      958.41
+     ],
+     "to": [
+      9262.17,
+      956.77
+     ],
+     "expect": {
+      "largest step m": 0.4
+     },
+     "why": "the sidewalk runs on at the rim's level; batch E's corners on the rim fell 3.4 m into the well: the largest step 2.33 m, on the branch 0.31 m (the rim's own outline wobbles 0.3-1 m)"
+    }
+   ]
   }
  },
  "openTrackReview": {

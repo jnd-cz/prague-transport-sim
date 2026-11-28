@@ -900,6 +900,32 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   Two of them close a road under them until #449 (U Kina's service road, Simbirská and Turkmenská), as Divadelní
   is closed under Národní; all 8 are kept rather than covering only footways and the tram's streets (maintainer,
   PR #873). Národní's largest step along the street 5.11 → 0.07 m.
+- **A street corner at a wall, against its own street** (#653, measured 2026-11-27 on batch E's ground). A wall's
+  outline carries its top along the foot too, and so does a street's outline where it runs along the top's line
+  (Hořejší nábřeží, line 9 (-1029, -533): the street at the foot, 187.5 m; both outlines 193.8 m), so a street
+  corner judged against the outline's height counted wrongly where it lay at the foot. `tools/bench/street_at_walls.py`
+  judges each against its own street 0.5 m in and its own outline's height: off both by over 0.3 m on line 9 121,
+  17 345, 22 107, 23 101, 37 32 of 4,940-16,406 corners on such outlines. Krejcárek's ramp (the issue's case) has
+  none. The count cannot see a step a street's own outline heights make between its corners (it takes a corner at
+  its own outline's height as right), so a rule is judged on places' sections, not on it alone. What was off:
+  - *A deck's edge took a stair well's rim*: #824's 1.5 m round any level-1 area reached round a cover over a
+    passage and put the rim of the stairs' well beside it on the raster's well, line 37 (9264.8, 957.8), 3.4 m down;
+    a corner on a level-0 stairs' outline is under no edge, the stairs' rules hold it (`ground_mesh.under_decks`).
+    Place `stairs-well-beside-a-cover`: the largest step along the rim 2.33 → 0.31 m. The edge stays round every
+    other level-1 area: kept to a survey `deck`'s alone, the portals of passages under covers stood 2.4-3.7 m over
+    their floors (Národní divadlo, line 9 (-623.0, -570.9), 190.9 m over 188.25; U Kina, line 17 (-2510, -9057)),
+    where the street surface runs smoothly from the cover down to the floor. Of the walls and structures rules' 25
+    places 22 are the same as main's build; at Letná (276.8, 796.0) and above Mánes's bridgehead (-567.5, -49.7) a
+    stairs' foot no longer drops into the raster 1.9-5 m under the stairs.
+  - Tried and not taken: a corner on a wall's or stairs' outline at its own area's outline height where its street
+    2 m in (past the smear) agrees within 0.3 m (`own_side` reads 0.75 m out, inside a tall wall's smear). The count
+    fell (line 22 (-2197, 767) 20 → 0, line 17 (-1666, -9080) 13 → 0), but the sections along those two roads grew
+    worse (largest step 0.87 → 1.57 m, 0.69 → 1.14 m) and points moved at 26 of the walls and structures rules' 27
+    places, up to 6 m: a street's outline along a wall mixes the foot's heights and the top's.
+  - Left: a sidewalk the survey draws down a quay wall's face as a sliver, its edge sloping from the top to the foot
+    (Palackého most, line 17 (-725.3, -1255.0), sidewalk 843 from 194.84 to 188.48 m over 4.8 m): its corners take
+    the smeared street surface, a lip up the wall; stair wells to underpasses (line 37 (9260, 966)) and the
+    sidewalk round them (line 9 (-1035, -455)).
 - **A paved strip is a wall for the sidewalk beside it** (#786, measured 2026-11-21). The survey has many a
   retaining wall and parapet as a paved area 0.2-0.5 m across and nothing else: no wall area, no `Zeď` line. What
   kept a sidewalk off IPR's smear at a wall (#653: the cells along a wall held at its level, a street corner on its
