@@ -54,8 +54,8 @@ try:
           C = new Ceilings(); slab(C, 4.32);
           W = makeWire([track(0, 200)], C, N);
           check(near(W.over(1.5, 0, 200), 4.32 - WIRE_UNDER), 'under the bridge the wire is WIRE_UNDER m under it');
-          // (the track's vertices under the slab: x = 0 to 4.5)
-          check(near(W.over(104.5, 0, 200), 4.32 - WIRE_UNDER + 100 * WIRE_GRADE, 0.001) && near(W.over(-97, 0, 200), 4.32 - WIRE_UNDER + 97 * WIRE_GRADE, 0.001), '100 m past the bridge it has risen 0.4 m, both ways');
+          // (the track is read every 0.5 m: its low points run from x = -0.5 to 4.5)
+          check(near(W.over(104.5, 0, 200), 4.32 - WIRE_UNDER + 100 * WIRE_GRADE, 0.001) && near(W.over(-96.5, 0, 200), 4.32 - WIRE_UNDER + 96 * WIRE_GRADE, 0.001), '100 m past the bridge it has risen 0.4 m, both ways');
           check(W.over(400, 0, 200) === N, 'back at the normal height 400 m on');
           check(W.drops.length === 1 && W.drops[0].under === 4.32 && W.drops[0].wire === 4.17 && W.drops[0].reach === 293 && W.impossible.length === 0, 'the place is listed with its heights and its reach: ' + JSON.stringify(W.drops));
 
@@ -75,7 +75,16 @@ try:
           W = makeWire([track(0, 200)], C, N);
           check(W.over(1.5, 0, 200) === N && W.drops.length === 0 && W.impossible.length === 1 && W.impossible[0].under === 3.83, 'a structure 3.83 m over the rails: ' + JSON.stringify(W.impossible));
           check(WIRE_MIN + WIRE_UNDER > 3.83 && COLLECTOR === 1, 'the figures the cases stand on');
-          return '6 wire cases pass';
+
+          // 7. a street that comes down to the bridge at 6 %: before the bridge the wire is no higher than under it
+          const sloped = (() => { const smooth = [], zs = []; for (let x = -60; x <= 60; x += 1.5) { smooth.push([x, 0]); zs.push(200 - 0.06 * x); } return {smooth, z: zs}; })();
+          C = new Ceilings(); for (let x = 0; x <= 4; x += 0.4) for (let y = -5; y <= 5; y += 0.4) C.add(x, y, 204.5);
+          W = makeWire([sloped], C, N);
+          const at = (x) => 200 - 0.06 * x + W.over(x, 0, 200 - 0.06 * x);
+          check(at(0) <= 204.5 - WIRE_UNDER + 1e-6 && at(2) <= 204.5 - WIRE_UNDER + 1e-6, 'under the bridge, under it');
+          check(at(-1.5) <= 204.5 - WIRE_UNDER + 0.01 && at(-3) <= 204.5 - WIRE_UNDER + 0.02, 'a vertex 1.5 and 3 m before the bridge, the rails 9 and 18 cm higher: the wire stays under the bridge: ' + at(-1.5).toFixed(3) + ' ' + at(-3).toFixed(3));
+          check(W.over(-40, 0, 202.4) > W.over(-3, 0, 200.18), 'and rises over the rails farther up the street');
+          return '7 wire cases pass';
         }'''))
         browser.close()
 finally:

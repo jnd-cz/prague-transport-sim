@@ -198,6 +198,45 @@ const CLASS_COLORS = {
   glass: ['#ffffff', '#e6eef4', '#dfe6e0'],
 };
 
+// The contact wire's height under the bridge models (src/wire.js, #71), before anything is cut or drawn under them: what
+// of the models stands over a track's collector (within COLLECTOR m of a drawn track, WIRE_FROM m or more over its
+// rails), sampled every 0.4 m; the wire of every track passes under it, and the trams' space in a model ends at the
+// wire. Sets and returns ground.wire.
+export function bridgeWire(data, ground) {
+  const geo = data.geo.buildings, arr = geo.arr, q = geo.q;
+  const ceilings = new Ceilings();
+  if (ground.trackDist && ground.trackAt) {
+    for (const ch of geo.chunks) {
+      if (!ch.k) continue;
+      const [ox, oy, oz] = ch.o;
+      let v = ch.v;
+      for (const [bi, count] of ch.b.entries()) {
+        if (ch.k[bi] === 1) {
+          for (let t = v; t < v + count; t += 3) {
+            const P = [0, 1, 2].map((k) => [ox + arr[(t + k) * 3] * q, oy + arr[(t + k) * 3 + 1] * q, oz + arr[(t + k) * 3 + 2] * q]);
+            const e = Math.max(Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1], P[1][2] - P[0][2]), Math.hypot(P[2][0] - P[0][0], P[2][1] - P[0][1], P[2][2] - P[0][2]));
+            if (ground.trackDist((P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3) > COLLECTOR + 0.5 + e) continue;
+            const n = Math.max(1, Math.ceil(e / 0.4));
+            for (let i = 0; i < n; i++) for (let j = 0; i + j < n; j++) {
+              const bu = (i + 1 / 3) / n, bv = (j + 1 / 3) / n, bw = 1 - bu - bv;
+              const x = bw * P[0][0] + bu * P[1][0] + bv * P[2][0], y = bw * P[0][1] + bu * P[1][1] + bv * P[2][1];
+              if (ground.trackDist(x, y) > COLLECTOR + 0.1) continue;
+              const z = bw * P[0][2] + bu * P[1][2] + bv * P[2][2], zr = ground.trackAt(x, y);
+              if (z > zr + WIRE_FROM && z < zr + CONTACT_WIRE + 1) ceilings.add(x, y, z);
+            }
+          }
+        }
+        v += count;
+      }
+    }
+  }
+  ground.wire = makeWire(data.tracks, ceilings, CONTACT_WIRE);
+  const place = (d) => `(${d.x}, ${d.y}) a structure ${d.under} m over the rails`;
+  if (ground.wire.drops.length) console.log(`contact wire: lower at ${ground.wire.drops.length} places: ` + ground.wire.drops.map((d) => `${place(d)}, the wire ${d.wire} m, back to ${CONTACT_WIRE} m within ${d.reach} m`).join('; '));
+  if (ground.wire.impossible.length) console.log(`contact wire: ${ground.wire.impossible.length} places lower than a collector reaches, the wire left as it is and the model cut: ` + ground.wire.impossible.map(place).join('; '));
+  return ground.wire;
+}
+
 export function buildLod2(group, data, route, ground) {
   const geo = data.geo.buildings, arr = geo.arr, q = geo.q;
   const side = GFX.side; // (both faces, or ?gfx=front the front ones only, to measure what the back ones cost: #705)
@@ -297,39 +336,7 @@ export function buildLod2(group, data, route, ground) {
     if (!lmMats.has(m)) lmMats.set(m, landmarkHaze(weatherize(m.clone(), m.userData.weather)));
     return lmMats.get(m);
   };
-  // The contact wire's height under the bridge models (src/wire.js, #71), before anything is cut: what of the models
-  // stands over a track's collector (within COLLECTOR m of a drawn track, WIRE_FROM m or more over its rails), sampled
-  // every 0.4 m; the wire of every track passes under it, and the trams' space above ends at the wire.
-  const ceilings = new Ceilings();
-  if (ground.trackDist && ground.trackAt) {
-    for (const ch of geo.chunks) {
-      if (!ch.k) continue;
-      const [ox, oy, oz] = ch.o;
-      let v = ch.v;
-      for (const [bi, count] of ch.b.entries()) {
-        if (ch.k[bi] === 1) {
-          for (let t = v; t < v + count; t += 3) {
-            const P = [0, 1, 2].map((k) => [ox + arr[(t + k) * 3] * q, oy + arr[(t + k) * 3 + 1] * q, oz + arr[(t + k) * 3 + 2] * q]);
-            const e = Math.max(Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1], P[1][2] - P[0][2]), Math.hypot(P[2][0] - P[0][0], P[2][1] - P[0][1], P[2][2] - P[0][2]));
-            if (ground.trackDist((P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3) > COLLECTOR + 0.5 + e) continue;
-            const n = Math.max(1, Math.ceil(e / 0.4));
-            for (let i = 0; i < n; i++) for (let j = 0; i + j < n; j++) {
-              const bu = (i + 1 / 3) / n, bv = (j + 1 / 3) / n, bw = 1 - bu - bv;
-              const x = bw * P[0][0] + bu * P[1][0] + bv * P[2][0], y = bw * P[0][1] + bu * P[1][1] + bv * P[2][1];
-              if (ground.trackDist(x, y) > COLLECTOR + 0.1) continue;
-              const z = bw * P[0][2] + bu * P[1][2] + bv * P[2][2], zr = ground.trackAt(x, y);
-              if (z > zr + WIRE_FROM && z < zr + CONTACT_WIRE + 1) ceilings.add(x, y, z);
-            }
-          }
-        }
-        v += count;
-      }
-    }
-  }
-  ground.wire = makeWire(data.tracks, ceilings, CONTACT_WIRE);
-  const place = (d) => `(${d.x}, ${d.y}) a structure ${d.under} m over the rails`;
-  if (ground.wire.drops.length) console.log(`contact wire: lower at ${ground.wire.drops.length} places: ` + ground.wire.drops.map((d) => `${place(d)}, the wire ${d.wire} m, back to ${CONTACT_WIRE} m within ${d.reach} m`).join('; '));
-  if (ground.wire.impossible.length) console.log(`contact wire: ${ground.wire.impossible.length} places lower than a collector reaches, the wire left as it is and the model cut: ` + ground.wire.impossible.map(place).join('; '));
+  if (!ground.wire) bridgeWire(data, ground);
   for (const ch of geo.chunks) {
     const [ox, oy, oz] = ch.o;
     const walls = {}, wallsL = {};

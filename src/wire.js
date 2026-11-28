@@ -16,6 +16,7 @@ export const WIRE_MIN = 3.9;       // m: the wire is never lower over the rails:
 // 1 in 250 at the network's 50 km/h, the gentlest it asks for at any speed driven here; 1 in 75 is its absolute limit.
 export const WIRE_GRADE = 1 / 250;
 const SAME_LEVEL = 3;              // m: a low point lowers the wires of tracks within this of its own rail height
+const LOW_STEP = 0.5, BESIDE = 6;  // m: the tracks are read for structures this often; within BESIDE m of a low point the wire keeps its height, not its height over the rails
 const CELL = 0.5, FAR = 512;
 
 // The structures' points over the tracks, by 0.5 m cell (each point once to 0.1 m in plan and 5 cm in height): what a
@@ -61,13 +62,18 @@ export function makeWire(tracks, ceilings, normal) {
   let low = [];
   const far = new Map();
   if (ceilings.count) {
+    // (every LOW_STEP m along each track, not at its vertices alone: a structure's edge is met within half a metre)
     for (const t of tracks) {
       for (let i = 0; i < t.smooth.length; i++) {
-        const [x, y] = t.smooth[i], zr = t.z[i];
-        const c = ceilings.lowest(x, y, zr + WIRE_FROM, zr + normal + WIRE_UNDER);
-        if (c === null) continue;
-        const h = Math.max(WIRE_MIN, c - zr - WIRE_UNDER);
-        if (h < normal - 0.005) low.push({ x, y, zr, h, under: c - zr });
+        const a = t.smooth[i], b = t.smooth[Math.min(i + 1, t.smooth.length - 1)], za = t.z[i], zb = t.z[Math.min(i + 1, t.smooth.length - 1)];
+        const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / LOW_STEP));
+        for (let k = 0; k < n; k++) {
+          const u = k / n, x = a[0] + (b[0] - a[0]) * u, y = a[1] + (b[1] - a[1]) * u, zr = za + (zb - za) * u;
+          const c = ceilings.lowest(x, y, zr + WIRE_FROM, zr + normal + WIRE_UNDER);
+          if (c === null) continue;
+          const h = Math.max(WIRE_MIN, c - zr - WIRE_UNDER);
+          if (h < normal - 0.005) low.push({ x, y, zr, h, under: c - zr });
+        }
       }
     }
   }
@@ -96,7 +102,12 @@ export function makeWire(tracks, ceilings, normal) {
       for (let iy = gy - 1; iy <= gy + 1; iy++) {
         for (const p of far.get(ix * 2000003 + iy) || []) {
           if (Math.abs(p.zr - zr) > SAME_LEVEL + 0.08 * (Math.abs(p.x - x) + Math.abs(p.y - y))) continue;
-          const v = p.h + Math.hypot(p.x - x, p.y - y) * WIRE_GRADE;
+          const d = Math.hypot(p.x - x, p.y - y);
+          let v = p.h + d * WIRE_GRADE;
+          // (beside the structure the wire is no higher than under it, whatever the rails do: on a street that comes
+          // down to a bridge the rails before it stand higher, and a wire as high over them ran into the bridge's
+          // face; the maintainer, #71)
+          if (d < BESIDE) v = Math.max(WIRE_MIN, Math.min(v, p.zr + p.h - zr + d * WIRE_GRADE));
           if (v < h) h = v;
         }
       }

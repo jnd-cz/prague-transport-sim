@@ -10,15 +10,20 @@ import { FootprintIndex, SegmentIndex } from './worldMesh.js';
 // carriageway and the sidewalk), or on a wall rosette where a building stands close to the
 // track. Where one side has no place for an anchor (a square, a junction) a single pole with
 // a bracket arm carries the wires. Poles are closer together on curves.
+const DELTA_RISE = 0.45, DELTA_HALF = 1.0; // m: a delta's top over the contact wire, and its legs' ends fore and aft of it
 export function buildCatenary(group, data, route, ground, trackDist) {
   const wire = [], W = ground.wire;
   const wireAt = (x, y, zr) => (W ? W.over(x, y, zr) : CONTACT_WIRE);
   for (const t of data.tracks) {
     const line = t.smooth, z = t.z;
-    for (let i = 0; i < line.length - 1; i += 2) {
-      const j = Math.min(line.length - 1, i + 2);
-      wire.push(new THREE.Vector3(line[i][0], z[i] + wireAt(line[i][0], line[i][1], z[i]), -line[i][1]),
-        new THREE.Vector3(line[j][0], z[j] + wireAt(line[j][0], line[j][1], z[j]), -line[j][1]));
+    // (a piece every second vertex, 3 m; every vertex where the wire is lower than normal, so that it follows the rails
+    // closely under a structure)
+    for (let i = 0; i < line.length - 1; ) {
+      const hi = wireAt(line[i][0], line[i][1], z[i]);
+      let j = Math.min(line.length - 1, i + 2), hj = wireAt(line[j][0], line[j][1], z[j]);
+      if (j > i + 1 && (hi < CONTACT_WIRE - 0.01 || hj < CONTACT_WIRE - 0.01)) { j = i + 1; hj = wireAt(line[j][0], line[j][1], z[j]); }
+      wire.push(new THREE.Vector3(line[i][0], z[i] + hi, -line[i][1]), new THREE.Vector3(line[j][0], z[j] + hj, -line[j][1]));
+      i = j;
     }
   }
   // vehicle carriageways (poles stand outside them) and building footprints (rosettes)
@@ -118,13 +123,22 @@ export function buildCatenary(group, data, route, ground, trackDist) {
       const za = top(a), zb = b.end ? za - 0.25 : top(b);
       cat.attach.push(za - 0.4, zb - 0.4); // (read by the lints: where the span hangs)
       wire.push(new THREE.Vector3(a.x, za - 0.4, -a.y), new THREE.Vector3(b.x, zb - 0.4, -b.y));
-      // droppers down to each contact wire under the span
+      // each contact wire under the span hangs on a delta: a hanger down from the span to the delta's top, DELTA_RISE m
+      // over the wire, and two legs from there to the wire DELTA_HALF m fore and aft. (It was one dropper straight down
+      // to 5.6 m over our rails: 0.26 m short of the wire, and more or less over a track standing at another height;
+      // the maintainer, #71: "The top holding wire ends short of the power wire", and a delta in its place.)
       for (const lat of tracksLat) {
         const c = route.offset(s, lat);
         const t = (lat - a.sl) / (b.sl - a.sl || 1);
         const zs = za - 0.4 + (zb - za) * Math.max(0, Math.min(1, t));
-        // (down to 0.26 m over the contact wire, which is lower near a structure)
-        wire.push(new THREE.Vector3(c.x, zs, -c.y), new THREE.Vector3(c.x, z + wireAt(c.x, c.y, z) + 0.26, -c.y));
+        const on = (x, y) => { const zt = ground.trackAt ? ground.trackAt(x, y) : z; return zt + wireAt(x, y, zt); };
+        const zw = on(c.x, c.y), tz = Math.min(zw + DELTA_RISE, (zs + zw) / 2);
+        const apex = new THREE.Vector3(c.x, tz, -c.y);
+        wire.push(new THREE.Vector3(c.x, zs, -c.y), apex);
+        for (const k of [-1, 1]) {
+          const ex = c.x + k * DELTA_HALF * here.hx, ey = c.y + k * DELTA_HALF * here.hy;
+          wire.push(apex, new THREE.Vector3(ex, on(ex, ey), -ey));
+        }
       }
     }
   }
