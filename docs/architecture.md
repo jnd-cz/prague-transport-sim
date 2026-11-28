@@ -135,7 +135,7 @@ game and the traffic still make their own meshes.
 
 Ranked by impact versus cost:
 1. **Sound:** `src/audio.js` synthesises the tram (motor, rolling, rail joints, flange squeal, bell,
-   doors), but it is very simplified and does not sound like a real T3 (user, 2026-10-24).
+   doors), but it is very simplified and does not sound like a real T3 (maintainer, 2026-10-24).
    - **The tram itself:** move from pure synthesis to recorded or sampled sources layered by speed and
      load: the traction motor and its accelerator and resistor-stepping steps, gear whine, the
      motor-generator and its fans (the T3 has no compressor), the brakes, door mechanisms, bogie noise over switches and joints, and the

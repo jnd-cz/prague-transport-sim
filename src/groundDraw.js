@@ -68,10 +68,9 @@ export function flushDtm(ground) {
   // surface there. (On line 37's Krejcárek viaduct the survey's tram areas along the deck's edge, 1.5-4.4 m right of our
   // track, stepped up to 0.9-1.3 m over the rails half a metre out from it: their triangles stood over the deck as grey
   // slabs, #549.) The same holds for the walkways on the deck: on line 17's track-only bridge at Modřanská škola the
-  // survey's paved strip 0.61 m over the rails is the parapet wall (the user, 2026-11-14, #549: "looks like bridge
-  // parapet wall"). On a deck with a carriageway a sidewalk standing more than DECK_OVER m over the rails is laid to an
-  // ordinary kerb, KERB m over the deck: Čechův most's, 0.66-0.73 m in the survey, is "normal sidewalk slightly higher
-  // than road plus rails, there's railing on the edge" (the user, 2026-11-14).
+  // survey's paved strip 0.61 m over the rails is the parapet wall (maintainer, #549). On a deck with a carriageway a sidewalk standing more than DECK_OVER m over the rails is laid to an
+  // ordinary kerb, KERB m over the deck: Čechův most's, 0.66-0.73 m in the survey, is an ordinary sidewalk a little
+  // over the road and rails, with a railing at its edge (maintainer, #549).
   // A deck that carries only track (no level-1 carriageway of the survey within 8 m of the route on that span) is flat at
   // the track's level: every vertex of its tram areas within 8 m is laid there, the walkways beside the bed with them (the
   // user, 2026-11-14, #549, on the Krejcárek viaduct: "There is open ballast track in the middle, walkway a bit lower and
@@ -281,6 +280,59 @@ export function buildDtm(group, ground) {
   // (a level-1 street the ground holds as the cover over a passage is drawn by the ground: no slab of its own over it,
   // whose colour and ragged outline stood as blotches on Národní divadlo's bridgehead, tools/covers.py, #824)
   const covered = new Set(ground.tiles?.layout?.covered || []);
+  // A bridge's outline in the survey (class deck) is one coarse area under everything the bridge carries, its heights
+  // those of its edges: its top is not drawn where another area of a structure (but a roof) lies over or under it within
+  // OUTLINE_REACH m, a slab of its own. Drawn whole, it stood 0.02-0.5 m over the carriageway and the sidewalks on
+  // 5,732 of its 8,940 m2 on Trojský most and within 1.5 cm of them on 1,059 m2 more, in patches (line 17, the
+  // maintainer's notes of 2026-11-27, #13). Its triangles are cut to OUTLINE_EDGE m along an area's border, by their centres.
+  const OUTLINE_REACH = 3, OUTLINE_COARSE = 4, OUTLINE_EDGE = 0.5, OC = 4;
+  const carried = new Map(); // (the structures' other triangles by OC m cell)
+  for (const a of dtm.areas) {
+    if (!(a.l > 0) || a.c === 'deck' || a.c === 'roof') continue;
+    for (const t of a.mesh) {
+      const xs = [t[0][0], t[1][0], t[2][0]], ys = [t[0][1], t[1][1], t[2][1]];
+      for (let ix = Math.floor(Math.min(...xs) / OC); ix <= Math.floor(Math.max(...xs) / OC); ix++) {
+        for (let iy = Math.floor(Math.min(...ys) / OC); iy <= Math.floor(Math.max(...ys) / OC); iy++) {
+          const k = ix * 100003 + iy;
+          if (!carried.has(k)) carried.set(k, []);
+          carried.get(k).push(t);
+        }
+      }
+    }
+  }
+  const streetAt = (v) => {
+    for (const [A, B, C] of carried.get(Math.floor(v[0] / OC) * 100003 + Math.floor(v[1] / OC)) || []) {
+      const d = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
+      if (Math.abs(d) < 1e-9) continue;
+      const u = ((B[0] - v[0]) * (C[1] - v[1]) - (B[1] - v[1]) * (C[0] - v[0])) / d, w = ((C[0] - v[0]) * (A[1] - v[1]) - (C[1] - v[1]) * (A[0] - v[0])) / d;
+      if (u < -1e-6 || w < -1e-6 || u + w > 1 + 1e-6) continue;
+      if (Math.abs(u * A[2] + w * B[2] + (1 - u - w) * C[2] - v[2]) <= OUTLINE_REACH) return true;
+    }
+    return false;
+  };
+  const mid = (u, v) => [(u[0] + v[0]) / 2, (u[1] + v[1]) / 2, (u[2] + v[2]) / 2];
+  const plan = (u, v) => Math.hypot(u[0] - v[0], u[1] - v[1]);
+  const outline = { areas: 0, drawn: 0, cut: 0 }; // (m2 in plan, window.game.ground.dtm.outline)
+  const clearOf = (p, q, r, out, depth = 0) => {
+    const e0 = plan(p, q), e1 = plan(q, r), e2 = plan(r, p), e = Math.max(e0, e1, e2);
+    const area = Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])) / 2;
+    const ce = [(p[0] + q[0] + r[0]) / 3, (p[1] + q[1] + r[1]) / 3, (p[2] + q[2] + r[2]) / 3];
+    if (e <= OUTLINE_EDGE || depth >= 16) {
+      if (streetAt(ce)) outline.cut += area; else { outline.drawn += area; out.push([p, q, r]); }
+      return;
+    }
+    if (e <= OUTLINE_COARSE) {
+      let n = 0;
+      for (const v of [p, q, r, mid(p, q), mid(q, r), mid(r, p), ce]) if (streetAt(v)) n++;
+      if (n === 7) { outline.cut += area; return; }
+      if (n === 0) { outline.drawn += area; out.push([p, q, r]); return; }
+    }
+    if (e1 === e) [p, q, r] = [q, r, p];
+    else if (e2 === e) [p, q, r] = [r, p, q];
+    const m = mid(p, q); // (p-q the longest edge)
+    clearOf(p, m, r, out, depth + 1);
+    clearOf(m, q, r, out, depth + 1);
+  };
   for (const [areaId, a] of dtm.areas.entries()) {
     if (!(a.l > 0) || covered.has(a.sourceId)) continue;
     // (surveyed walls are drawn as surveyed: a quay wall's area runs from its foot line to its top
@@ -307,9 +359,14 @@ export function buildDtm(group, ground) {
           if (mz > zr + 0.4) under = Math.max(0.3, Math.min(slab, mz - zr - 5.0));
         }
       }
-      cg.tri(c, W(p[0], p[1], fz(p) + lift), W(q[0], q[1], fz(q) + lift), W(r[0], r[1], fz(r) + lift), null, col);
+      if (a.c === 'deck') {
+        const top = [];
+        clearOf(p, q, r, top);
+        for (const [u, v, w] of top) cg.tri(c, W(u[0], u[1], u[2] + lift), W(v[0], v[1], v[2] + lift), W(w[0], w[1], w[2] + lift), null, col);
+      } else cg.tri(c, W(p[0], p[1], fz(p) + lift), W(q[0], q[1], fz(q) + lift), W(r[0], r[1], fz(r) + lift), null, col);
       if (slab) cg.tri(c, W(p[0], p[1], p[2] - under), W(r[0], r[1], r[2] - under), W(q[0], q[1], q[2] - under), null, col);
     }
+    if (a.c === 'deck') outline.areas++;
     if (keepSurfaceRanges) (c.surfaceRanges ||= []).push([startFace, c.pos.length / 9, a.c, a.l, areaId]);
     // kerbs (ground level) or slab sides (level 1) along every ring
     const drop = slab || (a.c === 'sidewalk' || a.c === 'island' || a.c === 'median' || a.c === 'platform' ? 0.18 : 0);
@@ -323,6 +380,7 @@ export function buildDtm(group, ground) {
       }
     });
   }
+  dtm.outline = { areas: outline.areas, drawn: Math.round(outline.drawn), cut: Math.round(outline.cut) };
   buildParapets(cgs.other, dtm.parapets || [], color.wall);
   for (const [kind, cg] of Object.entries(cgs)) cg.build(group, 'dtm', kind);
 }

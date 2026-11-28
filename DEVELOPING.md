@@ -265,21 +265,58 @@ the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the dep
 minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
 the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 
+**Where a frame's time goes, without the GPU's timer** (#705: Firefox has none, and most weak machines' results
+come from it; `tools/feedback.py --perf` shows each):
+
+- **The page's own time a frame** (`cpuMs`, `cpuP90`; of it the game's steps `cpuSim` and the draws' calls
+  `cpuDraw`), in a shift's summary and a test's result: its scripts from the frame's start to its end. An interval
+  near it is the processor's and no smaller picture shortens it. The reference stretch here (Arc A770, 1280 x
+  720, 2026-11-27): 6.2 ms in Chromium (steps 0.8, draws' calls 4.4), 10.6 ms in Playwright's Firefox (1.4, 7.2).
+- **A draw waited for** (`drawWaitMs`, a test's 3 s after its minute): each frame reads a pixel back, which
+  returns once the GPU has drawn the frame; the time from the draw's first call to that. It holds the draws'
+  calls, so it is the upper bound of the GPU's time, and follows it: in Chromium here the timer's 2.2, 5.5 and
+  12.1 ms a frame (1280 x 720; 7680 x 4320; that with `gfx=log,snowall`) read 4.9, 11.1 and 17.4 ms.
+- **Half the resolution** (`half`, a test's four windows of 3 s after that, in turn at half the resolution each
+  way and at the full one, each window's first 0.5 s left out): the frames a second of both, on the same stretch
+  of route. Equal rates say the pixels are not the limit: Playwright's Firefox here ran the minute at 45.1 frames
+  a second and the windows at 39.9 (640 x 360) and 39.8 (1280 x 720). A display's rate caps both: a machine
+  already at it shows nothing here.
+
 **What the fragments cost** (#705): a weak GPU is short of fragments, not of triangles or draw calls (the testers'
-phone was no faster with both halved). The page's address takes drawing switches, each change alone or several
-(`?gfx=nolog,snowif,front,pr1,noaa`, `src/gfx.js` lists them); a performance test's result and a note's machine
-facts carry the list, the renderer's pixel ratio and whether the canvas is antialiased. Here the frame interval
-cannot see the fragments: on the Arc A770 a frame takes 3.0 ms at pixel ratio 1 and 3.1 ms at 1.75, the CPU's
-time. `tools/frametime.py --ratio 1,6` sets the renderer's ratio in the bench and prints the GPU's own time for a
-frame's draws and its cost per megapixel; 6 is 7680 x 4320, the largest buffer Chromium draws in full (at 8 it cuts
-the buffer: the row is marked and left out of the cost). Line 17, the detailed model, stop 15, ratio 6, GPU time
-of two runs each, 2026-11-27: 10.6 / 10.8 ms as drawn now; 5.9 / 5.7 without the logarithmic depth buffer; 6.1 /
-6.0 with the snow's noise in the shaders only while it snows; 9.6 / 9.6 with front faces only on the ground and the
-buildings; 6.8 / 6.8 without antialiasing; 2.9 / 2.9 without the depth buffer and the noise together, which is what
-the same frame takes at ratio 1 (2.4-3.3 ms: the GPU is then no longer the limit, and front faces on top of the two
-measure nothing more). `tools/shot.py --params gfx=front --ref .` shows what a switch changes in a picture: the
-noise's switch nothing in any weather (the snow's shader is the same text), no logarithmic depth only hairlines
-at edges in four views, front faces the roofs (wound inwards: some vanish, others show their insides).
+phone was no faster with both halved). Two things made every fragment dear, and the page draws without both since
+2026-11-27: the logarithmic depth buffer (three.js then writes each fragment's depth, so the GPU cannot reject a
+hidden fragment before shading it) and the snow's two octaves of noise, which ran in every weather (now compiled
+into a material only while it snows; the snow's first draw compiles them anew, 381 ms once here). The page's address
+takes drawing switches to measure with, each alone or several (`?gfx=log,snowall,front,pr1,noaa`, `src/gfx.js`
+lists them: `log` and `snowall` draw the old way); a performance test's result and a note's machine facts carry the
+list, the renderer's pixel ratio, the render scale and whether the canvas is antialiased, and
+`tools/feedback.py --perf` gives each list its own row.
+
+- **Here** the frame interval cannot see the fragments: on the Arc A770 a frame takes 3.0 ms at pixel ratio 1 and
+  3.1 ms at 1.75, the CPU's time. `tools/frametime.py --ratio 1,6` sets the renderer's ratio in the bench and
+  prints the GPU's own time for a frame's draws and its cost per megapixel; 6 is 7680 x 4320, the largest buffer
+  Chromium draws in full (at 8 it cuts the buffer: the row is marked and left out of the cost). Line 17, the
+  detailed model, stop 15, ratio 6, GPU ms a frame, 2026-11-27: 10.6 the old way (`log,snowall`); 5.7-5.9 with
+  the noise only (`snowall`); 5.9-6.1 with the logarithmic depth only (`log`); 2.9 as drawn now, which is what the frame
+  takes at ratio 1 (the GPU is then no longer the limit); with the old way, 6.8 without antialiasing and 9.6 with
+  front faces only on the ground and the buildings (nothing more once the two are gone; roofs are wound inwards,
+  so `front` is for timing only).
+- **On a tester's integrated GPU** (Intel HD Graphics 400 as Firefox names it, 1699 x 1016; the reference test,
+  2026-11-27): 43.5 frames a second and 32.7 % of frames over 20 ms the old way; 59.4 and 1.0 % without the
+  logarithmic depth; 58.4 and 2.4 % without the noise. Either alone reaches that display's 60 Hz.
+- **Flicker** is what the logarithmic depth buffer was for, and `tools/flicker.py` counts it in motion: the same
+  drive drawn two ways, the pixels that change and come back. At eight places of lines 17 and 22 (cab and chase)
+  the plain buffer has 4-27 flicks a frame of its own, the logarithmic one 33-234: thin dark cracks along the
+  seams of the track bed's triangles, which the plain buffer does not draw. With the near plane put at 1 mm
+  (`--near 0.001`, its calibration) the plain buffer's own flicks rise from 6 to 103 and from 4 to 54: rails
+  against their bed, far windows against their walls. The near plane is 0.3 m and the far one the fog's end (at
+  most 970 m).
+- **The render scale** (the menu; `src/autoscale.js`): automatic, it steps to 75 % and 50 % of the display's
+  pixels along each axis while over a quarter of the driving frames take over 20.5 ms, and takes a step back when
+  the frames got no shorter for it (the CPU, or a display held to 30 frames a second). The performance overlay
+  and a note's machine facts say what it decided. A performance test and `?gfx=pr<n>` hold the scale.
+
+`tools/shot.py --params gfx=log,snowall --ref origin/main` shows what a switch changes in a picture.
 
 **The HUD's cost** (`python -P -E tools/bench/hud.py`, #706): what one update of the HUD changes in the page (0 when
 nothing changed: texts are written only when they change, `src/hud.js` `put`) and how long it takes with the CPU
@@ -422,7 +459,8 @@ python -I tools/datadiff.py --line 17 dtm --ref '5d6c427^'
 ```
 
 `shot.py` writes individual PNGs, a labelled pair and camera/data hashes to `reports/shots/`. The small things drawn near the camera (`src/nearbatch.js`) are refilled round the captured camera before the picture, and the JSON keeps each set's range and drawn count (`near`); two captures of one checkout are the same picture (`tools/test_shot.py`, #689).
-Views: `cab` (default), `chase`, `review`. The tram is paused at `s`, traffic and HUD are hidden;
+Views: `cab` (default), `chase`, `review` (`--drawn`: from above as the game draws the place, without the review's
+surface classes, kerbs, seams and track line over it). The tram is paused at `s`, traffic and HUD are hidden;
 review uses `&at=` at that route point. Both sides use the current view's exact camera, so a changed
 profile cannot move the comparison camera. It starts its own free-port servers, one view at a time.
 The reference defaults to `origin/main`: a git revision is exported temporarily with its published

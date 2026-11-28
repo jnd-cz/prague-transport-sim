@@ -9,9 +9,26 @@ from concurrent.futures import ProcessPoolExecutor
 import ctypes
 import os
 
+MEMINFO = "/proc/meminfo"
+
+
+def meminfo_available_gb(path=MEMINFO):
+    """Linux's MemAvailable in GB, None where the file or the field is missing (Linux before 3.14, macOS). Not
+    SC_AVPHYS_PAGES: that is MemFree, which leaves out the page cache the kernel gives back on demand, so after a
+    build has read a few GB of raw/ it says 1-2 GB on a machine with 20+ GB to spare (#897)."""
+    try:
+        with open(path, encoding="ascii", errors="replace") as f:
+            for row in f:
+                if row.startswith("MemAvailable:"):
+                    return int(row.split()[1]) * 1024 / 1e9  # (kB)
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
 
 def available_gb():
-    """Physical memory free now, in GB (None if unknown)."""
+    """Physical memory free now, in GB (None if unknown): what a new process could take without swapping (Windows'
+    available physical memory counts the standby list; Linux's MemAvailable the page cache)."""
     try:
         if os.name == "nt":
             class MS(ctypes.Structure):
@@ -25,6 +42,9 @@ def available_gb():
             if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m)):
                 return m.ullAvailPhys / 1e9
             return None
+        gb = meminfo_available_gb()
+        if gb is not None:
+            return gb
         return os.sysconf("SC_AVPHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / 1e9
     except (OSError, ValueError, AttributeError):
         return None

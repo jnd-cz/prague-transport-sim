@@ -22,7 +22,8 @@ import { Inspect } from './inspect.js';
 import { Review, parseAt } from './review.js';
 import { Reporter, canvasShot, place, noteError, failNote, addFacts, sendNote } from './report.js';
 import { PerfLog, machine, gpuTimer } from './perf.js';
-import { GFX, gfxQuery } from './gfx.js';
+import { GFX, gfxQuery, setting, setSetting } from './gfx.js';
+import { AutoScale } from './autoscale.js';
 import { TouchControls } from './touch.js';
 import { Gamepad } from './gamepad.js';
 import { runStreetBot, showBotPanel } from './streetbot.js';
@@ -133,7 +134,7 @@ try {
   built[`line${lineId}.network.json`] = data.network;
 }
 // wait for the rest before the build steps, which block the page
-// the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
+// the maintainer's facts (data/truth.json): track styles set how high top of rail stands over the surface
 const truth = await loadHeightFacts();
 // the prebuilt ground (tools/ground_mesh.py, #509): its tiles' lookups decoded in workers while the page goes on (#30).
 // Every line has it: the layers the page built without it went, #510. ?keepgeo and ?bot keep every tile (the checks).
@@ -177,10 +178,20 @@ route.ground = ground;
 
 // ------------------------------------------------------------------ renderer & scene
 const canvas = $('gl');
-// (GFX: the address's drawing switches, each of these alone for a measurement, src/gfx.js, #705)
+// (GFX: the menu's drawing settings and the address's switches, src/gfx.js, #705)
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.antialias, logarithmicDepthBuffer: GFX.logDepth });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, GFX.maxPixelRatio));
+// The render scale: the menu's setting, or what the automatic one chose so far on this page (src/autoscale.js);
+// ?gfx=pr<n> draws at the ratio asked.
+const autoScale = new AutoScale();
+GFX.auto = autoScale.log;
+let scaleSet = setting('scale');
+function applyScale() {
+  GFX.scale = GFX.fixed ? 1 : scaleSet === 'auto' ? autoScale.scale : +scaleSet;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, GFX.maxPixelRatio) * GFX.scale);
+}
+applyScale();
 window.renderer = renderer; // (from the start, also in the menu: performance checks, tools/test_idle.py)
+window.gfx = GFX; // (what the page draws with and what the automatic scale decided; a bench sets .fixed: no scale steps)
 // Out of GPU memory (or the GPU reset), the browser drops the WebGL context. The world's geometry is no
 // longer kept in JS after upload (uploadWorld), so it cannot be rebuilt here: say so and offer a reload
 // instead of a frozen black screen.
@@ -408,15 +419,14 @@ if (carModels) {
 }
 window.cars = cars;
 // the menu's tram models, in the index's order with their names in the menu's language; the first is the default.
-// One not loaded at start downloads when the player picks it (the user, 2026-11-04, of the classic model: "make it
-// available for user's choice to load").
+// One not loaded at start downloads when the player picks it (maintainer, 2026-11-04, of the classic model).
 function modelMenu() {
   const sel = $('optModel'), was = sel.value;
   sel.replaceChildren(...vehicles.map((v) => new Option(vehicleName(v, getLang()), v.id)));
   sel.value = vehicles.some((v) => v.id === was) ? was : vehicles[0]?.id;   // (a package removed: the first again)
 }
 modelMenu();
-// The player's preferred set (#527; the user, 2026-11-11: "I would add optinal preferred set for the player"): the
+// The player's preferred set (maintainer, #527): the
 // vehicle's listed sets, then its numbers by type (a lone number: the second car dealt of its type); remembered per
 // vehicle. Our tram runs as it and no AI tram is dealt it; "any" deals ours like the others.
 const FLEET_KEY = 'tram.fleet';
@@ -447,8 +457,7 @@ function liveryMenu() {
   sel.value = pick === '*' || list.some((l) => l.id === pick) ? pick : '';
 }
 liveryMenu();
-// Our tram's sounds (#636; the user, 2026-11-17: "it's alternative to the default in game sounds but it's shipped
-// with the game"): the vehicle's own (the built-in sounds) or a sound pack for it, shipped or installed; remembered
+// Our tram's sounds (#636; a pack is an alternative to the built-in sounds, shipped with the game): the vehicle's own (the built-in sounds) or a sound pack for it, shipped or installed; remembered
 // per vehicle, played from the next shift's start.
 const SOUNDS_KEY = 'tram.sounds';
 let soundPicks = {};
@@ -486,7 +495,7 @@ function ourSet(dealer, vehicle, cars) {
 }
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
-// The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
+// The run number card behind the windscreen (maintainer, 2026-10-23): the depot's digit and the run's two
 // digits (801 = depot 8, run 01); a tram keeps its run number for its whole time out in service;
 // night and late-evening runs (single cars) are numbered from 51. Prepared for data the line files
 // do not have yet: `data.runs[trip] = { depot, run }` (which run serves each timetable trip, from the
@@ -743,15 +752,27 @@ function offerPerf(el) {
 // The performance test (the menu): a minute of the autopilot on a fixed stretch, so runs on different machines
 // compare: the line's middle stop, the trip nearest 8:00 there (rush hour), dry weather, seed 1, measured after
 // 5 s to settle and from the departure on. It starts 10 s before the departure, not a shift's 40 s, so the wait is
-// short and the minute all driving (the user, 2026-11-11: "autopilot waits half a minute standing for the timetable
-// departure"). The GPU's own time per
+// short and the minute all driving (the autopilot waited half a minute for the departure; maintainer, 2026-11-11). The
+// GPU's own time per
 // frame where the browser has a timer. Two buttons: the line loaded now, and the reference run: line 17 from
 // Palackého náměstí with the detailed model, the heaviest line with surveyed streets, the one result every machine
-// has in common. Its stop is named, not the middle one, so it stays when the route changes (the user, 2026-11-11:
-// "I would keep it fixed there even if later line 17 runs start from another stop like Libuš"). From another line
+// has in common. Its stop is named, not the middle one, so it stays when the route changes, even if line 17's
+// runs later start from another stop such as Libuš (maintainer, 2026-11-11). From another line
 // the reference opens line 17 (?reftest=<the line left>), runs there, and its "Back to the menu" goes back.
 // (window.perfTestMs: a shorter run for tools/test_perf.py)
 const PT_WARM = 5000, PT_LEN = window.perfTestMs || 60000;
+// After the minute, two short stretches that say where a frame's time goes without the GPU's timer (Firefox has
+// none, #705). PT_WAIT: each draw is waited for (a pixel read back, which returns once the GPU has drawn the
+// frame): the time from the draw's first call to the picture done. Then PT_WINS windows of PT_WIN, in turn at half
+// the resolution each way and at the full one (the route's places differ, so the two are measured side by side;
+// each window's first PT_SKIP is left out, the canvas's new size settling): what a smaller picture gains on this
+// machine. Neither stretch is in the minute's numbers.
+const PT_WAIT = Math.min(3000, PT_LEN / 4), PT_WIN = Math.min(3000, PT_LEN / 4), PT_WINS = 4, PT_SKIP = Math.min(500, PT_LEN / 16);
+const onePixel = new Uint8Array(4);
+function waitForDraw() {
+  const gl = renderer.getContext();
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, onePixel);
+}
 const REF_LINE = '17', REF_STOP = 'Palackého náměstí', PT_LEAD = 10;
 let perfTest = null;
 async function startPerfTest(reference = false) {
@@ -782,12 +803,37 @@ $('btnPerfRef').addEventListener('click', () => {
   else location.search = `?line=${REF_LINE}&reftest=${encodeURIComponent(data.line)}${gfxQuery}`;
 });
 function perfTestStep(now) {
-  if (!perfTest || !game || game.finished) { perfTest = null; return; }
-  const el = now - perfTest.t0;
+  if (!perfTest || !game || game.finished) {
+    if (perfTest?.phase === 'windows') { applyScale(); resize(); }
+    perfTest = null;
+    return;
+  }
+  const el = now - perfTest.t0, pt = perfTest;
   // (the minute is measured from the departure: boarding and the doors take ~14 s after the start, 2026-11-11 trace)
   const off = el > PT_WARM && (tram.v > 0.5 || el > PT_WARM + 60000);
   if (perfTest.phase === 'warm' && off) { perfTest.phase = 'run'; perfTest.t1 = now; perfTest.s0 = tram.s; perfLog.reset(perfTest.meta); }
-  else if (perfTest.phase === 'run' && now - perfTest.t1 > PT_LEN) finishPerfTest();
+  else if (pt.phase === 'run' && now - pt.t1 > PT_LEN) {
+    // (the minute's numbers are taken here: the two stretches after it are apart)
+    pt.sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null, driven: Math.round(tram.s - pt.s0), pixelRatio: renderer.getPixelRatio() };
+    pt.phase = 'wait'; pt.t2 = now; pt.wait = { n: 0, sum: 0 };
+  } else if (pt.phase === 'wait' && now - pt.t2 > PT_WAIT) {
+    pt.phase = 'windows'; pt.t3 = now; pt.k = -1;
+    pt.logs = [new PerfLog(), new PerfLog()]; // (the half resolution's windows, the full one's)
+    if (pt.timer) pt.timer.times.length = 0; // (the minute's GPU times are taken; the half windows' from here)
+  }
+  if (pt.phase === 'windows') {
+    const k = Math.floor((now - pt.t3) / PT_WIN), half = k % 2 === 0;
+    if (k !== pt.k) {
+      pt.k = k;
+      applyScale();
+      if (k < PT_WINS && half) renderer.setPixelRatio(renderer.getPixelRatio() / 2);
+      resize();
+      if (k < PT_WINS && half) pt.size = [canvas.width, canvas.height];
+    }
+    if (k >= PT_WINS) { finishPerfTest(); return; }
+    pt.half = half;
+    pt.log = now - pt.t3 - k * PT_WIN > PT_SKIP ? pt.logs[half ? 0 : 1] : null;
+  }
   perfTest?.timer?.poll();
 }
 function finishPerfTest() {
@@ -795,8 +841,13 @@ function finishPerfTest() {
   perfTest = null;
   game.paused = true;
   hud.show(false);
-  const sum = { ...perfLog.summary(), gpuMs: pt.timer?.median() ?? null, driven: Math.round(tram.s - pt.s0),
-    pixelRatio: renderer.getPixelRatio(), ...(GFX.key ? { gfx: GFX.key } : {}) }, m = machine(renderer);
+  const half = pt.logs?.[0].summary(), full = pt.logs?.[1].summary(), r1 = (x) => Math.round(x * 10) / 10;
+  const sum = { ...pt.sum, ...(GFX.key ? { gfx: GFX.key } : {}),
+    // (the draw waited for: ms from its first call to the picture done; the windows at half the resolution, and
+    // the windows between them at the full one to read them against)
+    ...(pt.wait?.n ? { drawWaitMs: r1(pt.wait.sum / pt.wait.n) } : {}),
+    ...(half && full ? { half: { size: pt.size, fps: half.fps, over20: half.over[20], cpuMs: half.cpuMs ?? null, gpuMs: pt.timer?.median() ?? null,
+      full: { fps: full.fps, over20: full.over[20], cpuMs: full.cpuMs ?? null } } } : {}) }, m = machine(renderer);
   // (frames over 20 ms: below a 60 Hz display's rate; a steady 30 fps has nearly all of them there and few over 50:
   // playable, not smooth. The first remote run, Intel HD Graphics 400 in Firefox: 34 fps, 74 % over 20 ms, 0.6 % over 33)
   const verdict = sum.over[20] < 5 ? 'good' : sum.over[50] < 5 ? 'ok' : 'slow';
@@ -807,6 +858,8 @@ function finishPerfTest() {
     <div style="font-size:22px;font-weight:700;margin:8px 0">${t(`pt.${verdict}`)}</div>
     <table class="res">
       ${row('pt.fps', sum.fps)}${row('pt.slow20', `${sum.over[20]} %`)}${row('pt.slow33', `${sum.over[33]} %`)}${row('pt.p90', `${sum.ms.p90} ms`)}
+      ${sum.cpuMs !== undefined ? row('pt.cpu', `${sum.cpuMs} ms`) : ''}${sum.drawWaitMs !== undefined ? row('pt.drawWait', `${sum.drawWaitMs} ms`) : ''}
+      ${sum.half ? row('pt.half', `${sum.half.fps} (${sum.half.size.join(' x ')}); ${t('pt.halfFull')} ${sum.half.full.fps}`) : ''}
       ${sum.gpuMs !== null ? row('pt.gpu', `${sum.gpuMs} ms`) : ''}${row('pt.draws', sum.calls.mean)}
       ${row('pt.tris', `${(sum.triangles.mean / 1e6).toFixed(2)} M`)}${row('pt.gpuName', m.gpu || '?')}${row('pt.screen', `${m.viewport} @${m.dpr}${m.pixelRatio !== m.dpr ? ` (${m.pixelRatio})` : ''}${GFX.key ? ` · gfx ${GFX.key}` : ''}`)}
     </table>
@@ -862,7 +915,7 @@ $('btnToMenu').addEventListener('click', () => {
 
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
-let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, the user, 2026-11-14)
+let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, maintainer, 2026-11-14)
 // the head turned out of a side window, until the screen's edge shows the cab's rear wall past the cab window on the left
 // and reaches the front door's end on the right (src/cabframe.js, #246; it was 1.3 rad both ways)
 const lookMax = () => lookLimits(CAB_FOV, camera.aspect);
@@ -979,8 +1032,8 @@ function control(dir, repeat) {
   if (dir > 0 && eq.parked && eq.pedal.brake === 0) parkedWarn();
   if (!repeat) { eq.tap(dir); pedalKey = { dir, t: 0 }; }
 }
-// advanced: drive asked for while the ratchet holds the brake does nothing; say why (a tester and the user's own try with
-// a pad were held by it, the user, 2026-11-14: "I would perhaps warn the user that parking brake is engaged")
+// advanced: drive asked for while the ratchet holds the brake does nothing; say why (a tester and the maintainer's own try
+// with a pad were held by it, maintainer, 2026-11-14)
 function parkedWarn() {
   const text = t('msg.parked');
   if (game.messages.some((m) => m.text === text)) return;
@@ -1092,7 +1145,7 @@ function updateCamera(dt, t) {
   // the driver's eye is a point of the lead car (#597), over the driver's seat (src/cabframe.js EYE): 1.2 m behind the body's
   // front, 0.32 m left of the centre line, 2.39 m over the rail; it turns with the body and swings out with its front in a
   // curve. (It stood on the track's centre line and looked along the track 4 m ahead of the tram, eased: 33 degrees ahead
-  // of the body in a 20 m curve, the user, 2026-11-14: "starts turning ahead of tram body in curves")
+  // of the body in a 20 m curve: it turned ahead of the tram's body, maintainer, 2026-11-14)
   const lead = tramModel.userData.cars[0];
   lead.updateWorldMatrix(true, false);
   const eye = EYE_AT.set(EYE.x, EYE.h, leadFront() - EYE.back).applyMatrix4(lead.matrixWorld);
@@ -1170,7 +1223,7 @@ let last = performance.now(), hudTimer = 0, lastDraw = 0;
 // frame needs, the rest carried to the next frame. So a seed and the same inputs give the same run at any frame rate
 // (before: the frame's time cut into equal parts of at most 50 ms, 16.7 ms steps at 60 fps against the checks' 33 ms).
 // Up to SPAN_MAX a frame: past that (a stall, a hidden tab coming back, a breakpoint) the game slows rather than run
-// seconds at once; the game keeps real time down to 4 fps (#609: the 50 ms cap alone ran the user's 16 fps perftests
+// seconds at once; the game keeps real time down to 4 fps (#609: the 50 ms cap alone ran the maintainer's 16 fps perftests
 // of 2026-11-15 at 74-80 % of real time). A frame between two steps draws our tram and the camera between them
 // (drawnS), and the cars, the other trams and the game's movers too (src/between.js: recorded after the frame's last
 // two steps, put back after the draw); the walkers are drawn as the last step left them.
@@ -1209,6 +1262,9 @@ window.drawCount = 0; // (draws so far: tools/test_idle.py)
 
 function frame(now) {
   requestAnimationFrame(frame); // first, so an exception in one frame can't stop the loop
+  // (the page's own time in this frame, and of it the game's steps and the draws' calls, for the frame log: src/perf.js)
+  const began = performance.now();
+  let logged = null, simMs = 0, drawMs = 0;
   const span = Math.max(0, Math.min(SPAN_MAX, (now - last) / 1000));
   const dt = Math.min(STEP_MAX, span); // (the camera, weather, sound and HUD: one step a frame)
   let simmed = 0;
@@ -1224,6 +1280,7 @@ function frame(now) {
     between.back(); // (the last draw's poses are gone before anything steps: the steps read some of them)
     if (inspect.active) between.clear(); // (its steps are its own, drawn as they leave the world)
     let step = null; // (the frame's last step's game half: its traffic's focus, src/run.js)
+    const stepsFrom = performance.now();
     steps.forEach((h, i) => {
       const lastStep = i === steps.length - 1, drawn = i >= steps.length - 2;
       sWas = tram.s;
@@ -1237,6 +1294,7 @@ function frame(now) {
         if (!inspect.active && drawn) recordStep(step.go);
       }
     });
+    simMs = performance.now() - stepsFrom;
     if (arcade() && tram.eq.lever !== leverHeard) { audio.emit(tram.eq.lever > leverHeard ? 'notch.up' : 'notch.down'); leverHeard = tram.eq.lever; }
     run.gameView.syncCrowd();
     updateCamera(dt, now / 1000);
@@ -1244,8 +1302,10 @@ function frame(now) {
     updateRain(dt);
     updateSnow(dt, now / 1000);
     if (!inspect.active && step) {
+      const from = performance.now();
       run.stepTraffic(step, camera);
       recordStep(step.go);
+      simMs += performance.now() - from;
     }
     // The shift may have finished during game.update().
     if (game.finished) audio.setActive(false, !inMenu && !game.paused && !(inspect.active && inspect.paused));
@@ -1282,25 +1342,38 @@ function frame(now) {
     // pixels; the software draw took 5-12 cores of a page once a second, #411)
     if (window.headless && window.headlessDraw === false) { scene.updateMatrixWorld(); camera.updateMatrixWorld(); }
     else {
-      const timing = perfTest?.phase === 'run' && perfTest.timer;
+      const timing = (perfTest?.phase === 'run' || (perfTest?.log && perfTest.half)) && perfTest.timer;
       // (a refill redraws the mirror's cached picture too: paused at a shift's start it kept the first frame's, without
       // the trees then around the cab)
       if (world?.userData.near?.update(camera, renderer.domElement.height, scene.fog.far) && window.mirror) window.mirror.last = null;
       if (timing) timing.begin();
+      const from = performance.now();
       drawWorld();
+      // (a performance test's stretch of draws waited for, counted from the draw's first call)
+      if (perfTest?.phase === 'wait') { waitForDraw(); perfTest.wait.n++; perfTest.wait.sum += performance.now() - from; }
+      drawMs = performance.now() - from;
       if (timing) timing.end();
     }
     lastDraw = now; window.drawCount++;
     // (driving only: the menu, a pause and the results draw 4 frames a second, #149)
-    if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) perfLog.frame(now, tram.s, renderer.info.render, simmed);
+    if (game && !lazy && !window.headless && !game.paused && !game.finished && !inspect.active) {
+      // (a performance test's stretches after its minute: the waited draws in no log, the windows in theirs)
+      const log = !perfTest || perfTest.phase === 'warm' || perfTest.phase === 'run' ? perfLog : perfTest.log || null;
+      logged = log?.frame(now, tram.s, renderer.info.render, simmed) ? log : null;
+      // (the automatic render scale reads the same frames, but a performance test's: it measures at one scale)
+      if (scaleSet === 'auto' && !GFX.fixed && !perfTest && autoScale.frame(now) !== null) { applyScale(); resize(); }
+    }
   }
   if (perfTest) perfTestStep(now);
   if (perfOn) updatePerf(now);
   // Present the cached picture even on idle redraws; only active driving refreshes its texture.
   if (draw && mirrorShown()) {
+    const from = performance.now();
     mirror.draw(now, !lazy, poseMirror, tramModel);
+    drawMs += performance.now() - from;
   }
   between.back();
+  if (logged) logged.spent(performance.now() - began, simMs, drawMs);
 }
 
 // Right-hand rear-view mirror (by the front door): a small camera outside the cab looking back
@@ -1371,6 +1444,17 @@ async function replayTo(seed, at) {
 // renderer drew and the JS heap where the browser reports it (Chromium: performance.memory).
 let perfOn = false, perfFrames = 0, perfSince = performance.now(), perfLast = performance.now(), perfWorst = 0;
 $('optPerf').addEventListener('change', () => { perfOn = $('optPerf').checked; $('perf').classList.toggle('hidden', !perfOn); });
+// The menu's drawing settings (src/gfx.js, #705): the render scale applies at once; the antialiasing is the canvas's,
+// given when the page loads, so its change loads the page again (not where the browser keeps no settings: the
+// page would load as it was).
+$('optScale').value = scaleSet;
+$('optScale').addEventListener('change', () => { scaleSet = $('optScale').value; setSetting('scale', scaleSet); applyScale(); resize(); });
+$('optAA').checked = setting('aa') === 'on';
+$('optAA').addEventListener('change', () => {
+  const want = $('optAA').checked ? 'on' : 'off';
+  setSetting('aa', want);
+  if (setting('aa') === want) location.reload(); else $('optAA').checked = !$('optAA').checked;
+});
 function updatePerf(now) {
   perfFrames++;
   perfWorst = Math.max(perfWorst, now - perfLast);
@@ -1379,6 +1463,9 @@ function updatePerf(now) {
   const fps = (perfFrames * 1000) / (now - perfSince), info = renderer.info.render, mem = performance.memory;
   $('perf').textContent = `${fps.toFixed(0)} FPS   ${(1000 / fps).toFixed(1)} ms avg   ${perfWorst.toFixed(0)} ms worst\n`
     + `${info.calls} draw calls   ${(info.triangles / 1e6).toFixed(2)} M triangles`
+    // (what is drawn, and the automatic scale's last decision: src/autoscale.js)
+    + `\n${canvas.width} x ${canvas.height}` + (GFX.scale < 1 ? `   scale ${GFX.scale * 100} %` : '')
+    + (scaleSet === 'auto' && GFX.auto.length ? `   auto: ${GFX.auto.at(-1).why} (${GFX.auto.at(-1).slow} % slow frames)` : '')
     + (mem ? `\nJS heap ${(mem.usedJSHeapSize / 1e6).toFixed(0)} / ${(mem.jsHeapSizeLimit / 1e6).toFixed(0)} MB` : '');
   perfFrames = 0; perfSince = now; perfWorst = 0;
 }

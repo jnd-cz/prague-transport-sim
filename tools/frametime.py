@@ -14,7 +14,7 @@ software, so its times say nothing about a GPU (#205); `--headless` only checks 
 on a quiet machine, the window in front: it waits its turn among the heavy jobs (tools/baseline_store.py).
 Prints a table and writes reports/frametime.json. `--traffic` steps the traffic that many seconds first (its cars in the
 streets, #250), `--stop` measures at that stop of the trip, `--params` adds to the page's address (`boxcars`: the box
-cars instead of the street vehicles' models, to measure the models against them; `gfx=nolog`: a drawing switch of
+cars instead of the street vehicles' models, to measure the models against them; `gfx=log`: a drawing switch of
 src/gfx.js). `--ratio` measures at each of these pixel ratios of the renderer, set by the bench: 1 is the triangles'
 and the draw calls' cost, 1.75 the page's cap (2240 x 1260 drawn), 6 (7680 x 4320) 36 times the fragments; without
 it the page's own ratio.
@@ -129,7 +129,7 @@ def main():
     ap.add_argument("--headless", action="store_true", help="headless, on the GPU where there is one (else SwiftShader): checks the bench runs")
     ap.add_argument("--traffic", type=float, default=0, help="seconds the traffic steps before the measurement (its cars in the streets)")
     ap.add_argument("--stop", type=int, default=0, help="the stop of the trip to measure at (its index in the menu)")
-    ap.add_argument("--params", default="", help="added to the page's address, e.g. boxcars or gfx=nolog")
+    ap.add_argument("--params", default="", help="added to the page's address, e.g. boxcars or gfx=log")
     ap.add_argument("--ratio", default="", help="the renderer's pixel ratios to measure each model at, e.g. 1,1.75,6 (default: the page's own, the display's up to 1.75; 6 makes the fragments the limit on a fast GPU)")
     args = ap.parse_args()
     if not os.path.exists(os.path.join(ROOT, "data", f"line{args.line}.json")):

@@ -243,6 +243,8 @@ tmavé sklo je hra.
 - Automatické výhybky (palubní počítač staví každou výhybku rádiem místo trolejových kontaktů); přehled výkonu
   (FPS, doba snímku, volání kreslení, trojúhelníky, paměť JS); Test výkonu a Referenční test (minuta autopilotu na pevném
   úseku, [Testování](#testování)).
+- Rozlišení obrazu: automaticky (při pomalých snímcích hra sama kreslí méně bodů, a vrátí se zpět, když to nepomohlo),
+  nebo pevně 100 %, 75 % či 50 %; vyhlazování hran jde vypnout (stránka se znovu načte). Obojí si prohlížeč pamatuje.
 - Model tramvaje: podrobný a pohyblivý (spojení „Tatra T3“ od SimonStrikesBack, CC BY 4.0, a „Tatra T3“ od
   Jakuba Váji (conflig), CC BY-NC 4.0, obojí na Sketchfabu; celek CC BY-NC 4.0): dveře, sběrač, brzdová světla
   a čelisti kolejnicových brzd se řídí hrou, druhý vůz soupravy visí na spřáhle; podrobný klasický (samotný model

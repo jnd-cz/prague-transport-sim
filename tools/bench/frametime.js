@@ -52,6 +52,7 @@ export async function run({ model = 't3h', frames = 600, warm = 120, ai = AI, fo
   window.camera.position.set(c.x, g.profile.height(s0 - 15) + 3, -c.y);
   window.camera.lookAt(l.x, g.profile.height(s0 + 40) + 1.5, -l.y);
   if (fov) { window.camera.fov = fov; window.camera.updateProjectionMatrix(); }
+  if (window.gfx) window.gfx.fixed = true; // (no automatic render scale during a measurement: src/autoscale.js)
   if (ratio) { window.renderer.setPixelRatio(ratio); window.dispatchEvent(new Event('resize')); } // (the page's resize sets the size)
   window.camera.updateMatrixWorld();
   const sets = ai.map((d) => {

@@ -8,7 +8,7 @@ excavations or shafts at the time of the 2023 flight, no street the player drive
 deep; 30 of the 34 roads' and sidewalks' pits 2 m or more deep are absent from DMR 5G. A pit in both lidars is a real
 sunken part: of the 133 road, sidewalk and parking pits the rule filled at first (batch E's first build, 2026-11-27,
 #757), DMR 5G has 20 too, among them the garage ramp on Na Vápence (3869, -18), 3.0 m deep, built flat (groundPlaces
-`na-vapence-garage-ramp`; the user, 2026-11-20, #779: "the road ramp from underground parking").
+`na-vapence-garage-ramp`: the road ramp from an underground car park, maintainer, #779).
 
 A **pit** is a connected set of cells at least SKIRT under IPR's grey closing with a disc of radius R cells (the
 cells a 9 m disc cannot reach into), DEEP or more at its deepest, no side over LONG_SIDE (longer ones are trenches,
@@ -18,14 +18,14 @@ area of a STREET class; its class, the class most of them are in. It is **filled
   area other than DEEP_UNDER (an underpass, its stairs: a pit over one may be its open well; a tunnel or the metro under
   the street says nothing of it, and a deck or a roof over it stands on the level-0 area's ground);
 - ON_STREET or more of its cells are street cells, DEEP or more deep at the deepest of them (a pit beside the street,
-  or deep only off it, stays: the user, 2026-11-26, #867: "2 - agree, it matters most on streets where player driver,
-  cars and walkers use");
+  or deep only off it, stays: it matters most on the streets the player's tram, cars and
+  walkers use, maintainer, #867);
 - its rim (the cells RIM m outside, on its own class and in no pit: a kerb beside it steps, the other side is not its
   level) holds MIN_RIM cells or more and lies on a plane within RIM_ROUGH (p90);
 - the survey's own outline heights within SURVEY_NEAR (their plane, survey_level) stand at most SURVEY_OFF under that
   plane and SURVEY_OVER over it (the survey does not put the street down into the pit);
 - DMR 5G at the deepest street cell stands within DMR_LEVEL of the plane (for 'paved' areas, whose yards and
-  forecourts hold 22 sunken parts in both lidars, the user, 2026-11-26, #867: "1 - okay we can do that"; for every
+  forecourts hold 22 sunken parts in both lidars, maintainer, #867; for every
   street class since batch E, #757: a garage ramp, a light well; without DMR 5G there the pit stays).
 Its street cells under the plane take the plane's height; its cells off the survey stay.
 

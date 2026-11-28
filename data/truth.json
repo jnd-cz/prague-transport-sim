@@ -5873,9 +5873,9 @@
      ],
      "expect": {
       "largest step m": 0.1,
-      "rise m at least": 0.25
+      "rise m at least": 0.1
      },
-     "why": "the road climbs 0.3-0.45 m to the rails over its approach; a confirmed corridor read raised right through the crossing would leave a kerb across the road"
+     "why": "the road climbs to the rails over its approach, 0.18 m from the south and 0.14 m from the north since the tracks follow the lidar there (trackHeights radiusAnswers vinohradska-corridor-ground, #876; 0.3-0.45 m before, on DI's heights 0.30 m over the lidar); a confirmed corridor read raised right through the crossing would leave a kerb across the road"
     },
     {
      "name": "along the crossing road from the north carriageway to the rail, s 15659, 8 m",
@@ -5889,7 +5889,7 @@
      ],
      "expect": {
       "largest step m": 0.1,
-      "rise m at least": 0.2
+      "rise m at least": 0.1
      },
      "why": "as from the south"
     }

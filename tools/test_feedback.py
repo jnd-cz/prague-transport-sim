@@ -108,20 +108,25 @@ class NoteTest(unittest.TestCase):
                ("alpha", {"kind": "perftest", "machine": arc, "ua": ff, "version": v("alpha-2"), "perftest": ref(36, 66, 0.4)}),
                ("alpha", {"kind": "perftest", "machine": arc, "ua": ff, "version": v("alpha-1"), "perftest": ref(34.4, 73.8, 0.6)}),
                ("alpha", {"kind": "perftest", "machine": arc, "ua": cr, "version": v("alpha-2"), "perftest": ref(58, 1, 0)}),
-               ("alpha", {"kind": "perftest", "machine": arc, "ua": ff, "version": v("alpha-2"), "perftest": {**run(50, 9, 3), "line": "9"}}),
+               # (the same machine and version with a drawing switch is another measurement: its own row, #705)
+               ("alpha", {"kind": "perftest", "machine": arc, "ua": cr, "version": v("alpha-2"),
+                          "perftest": {**ref(60, 0.5, 0), "gfx": "nolog"}}),
+               ("alpha", {"kind": "perftest", "machine": arc, "ua": ff, "version": v("alpha-2"), "perftest": {**run(50, 9, 3), "line": "9", "cpuMs": 7.4,
+                                       "drawWaitMs": 10.5, "half": {"fps": 39.9, "full": {"fps": 39.8}}}}),
                ("alpha", {"kind": "perf", "ua": "Mozilla/5.0 (Android 17; Mobile) Firefox/159.0", "line": "22", "perf": run(31, 40, 12)}),
                ("alpha", {"kind": "driving", "machine": arc, "perf": run(60, 0, 0)})]  # (a note's log is not a run)
         rows = feedback.perf_table(got)
-        self.assertEqual(len(rows), 6, "\n".join(rows))
+        self.assertEqual(len(rows), 7, "\n".join(rows))
         def row(pattern):
             hits = [r for r in rows[1:] if re.search(pattern, r)]
             self.assertEqual(len(hits), 1, pattern + "\n" + "\n".join(rows))
         # one row per browser and version; the latest run's figures, all from that one run
-        row(r"^Intel Arc A770\s+Firefox\s+reference\s+alpha-2\s+2\s+32\s+84.4%\s+2.8%\s+26$")
-        row(r"^Intel Arc A770\s+Firefox\s+reference\s+alpha-1\s+1\s+34.4\s+73.8%\s+0.6%\s+-$")
-        row(r"^Intel Arc A770\s+Chrome\s+reference\s+alpha-2\s+1\s+58\s+1%\s+0%\s+-$")
-        row(r"^Intel Arc A770\s+Firefox\s+perftest 9\s+alpha-2\s+1\s+50\s+9%\s+3%\s+-$")
-        row(r"^Android\s+Firefox\s+perf 22\s+\?\s+1\s+31\s+40%\s+12%\s+-$")
+        row(r"^Intel Arc A770\s+Firefox\s+reference\s+alpha-2\s+2\s+32\s+84.4%\s+2.8%\s+-\s+-\s+-\s+26$")
+        row(r"^Intel Arc A770\s+Firefox\s+reference\s+alpha-1\s+1\s+34.4\s+73.8%\s+0.6%\s+-\s+-\s+-\s+-$")
+        row(r"^Intel Arc A770\s+Chrome\s+reference\s+alpha-2\s+1\s+58\s+1%\s+0%\s+-\s+-\s+-\s+-$")
+        row(r"^Intel Arc A770\s+Chrome\s+reference\s+alpha-2\s+1\s+60\s+0.5%\s+0%\s+-\s+-\s+-\s+-\s+nolog$")
+        row(r"^Intel Arc A770\s+Firefox\s+perftest 9\s+alpha-2\s+1\s+50\s+9%\s+3%\s+7.4\s+10.5\s+39.9 / 39.8\s+-$")  # (the timer-free measures, where the run has them)
+        row(r"^Android\s+Firefox\s+perf 22\s+\?\s+1\s+31\s+40%\s+12%\s+-\s+-\s+-\s+-$")
 
 
 class Quiet(serve.NoCache):

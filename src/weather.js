@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Weather as a state of the materials, not of the geometry: the world is built once in its dry
 // colours, and the weather sets a few shared shader uniforms (wet, snow, autumn) and recolours the
-// instanced trees. Changing it costs nothing and could happen during a shift.
+// instanced trees. Changing it costs nothing and could happen during a shift, but for the snow coming or going:
+// that compiles the weatherized materials anew (below).
 //   wet:    surfaces darker (a factor per material, in linear colour), rails glossier
 //   snow:   white on faces that point up, patchy (noise); streets slushy and thinner; water and
 //           vertical faces bare
@@ -9,14 +10,15 @@
 import * as THREE from 'three';
 import { GFX } from './gfx.js';
 
-// ?gfx=snowif (src/gfx.js, #705): the snow's code is in a material's shader only while it snows. Without it the
-// two octaves of noise run for every fragment in every weather, with uSnow 0 scaling the result away. A material is
-// compiled anew when the snow comes or goes (a shift's start), not branched on uSnow in the shader: a weak GPU may
-// compute both sides of such a branch, and this GPU's compiler worked the noise's hash out differently inside
-// one, which moved the snow's patches (line 22, s 6330: 7.2 % of a picture's pixels, 2026-11-27).
+// The snow's code is in a material's shader only while it snows (#705). In every weather its two octaves of noise
+// ran for every fragment, with uSnow 0 scaling the result away: about half of the fill cost (DEVELOPING.md, "What
+// the fragments cost"; ?gfx=snowall draws that way again, src/gfx.js). A material is compiled anew when the snow
+// comes or goes (a shift's start), not branched on uSnow in the shader: a weak GPU may compute both sides of such a
+// branch, and this GPU's compiler worked the noise's hash out differently inside one, which moved the snow's
+// patches (line 22, s 6330: 7.2 % of a picture's pixels, 2026-11-27).
 let snowNow = 0;
 const snowMats = new Set(); // the weatherized materials, to compile anew when the snow comes or goes
-const snowCode = () => !GFX.snowBranch || snowNow > 0;
+const snowCode = () => GFX.snowAlways || snowNow > 0;
 
 export const WEATHER_UNIFORMS = {
   uWet: { value: 0 },
@@ -59,7 +61,7 @@ export function weatherize(material, { wet = 1, snow = 0, slush = false, veg = f
   const key = `w${wet.toFixed(2)}s${snow}${slush ? 'l' : ''}${veg ? 'v' : ''}`;
   material.customProgramCacheKey = () => (snowCode() ? key : `${key}n`); // (n: without the snow's code)
   material.userData.weather = { wet, snow, slush, veg };
-  if (GFX.snowBranch) {
+  if (!GFX.snowAlways) {
     snowMats.add(material);
     material.addEventListener('dispose', () => snowMats.delete(material));
   }

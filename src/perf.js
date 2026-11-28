@@ -5,6 +5,12 @@
 // A player's browser keeps vsync on, so the interval between frames stops at the display's rate: the shares of
 // frames over 20 / 33 / 50 ms say whether the machine keeps up, not what a frame costs (tools/frametime.py
 // measures that here, vsync off). The log is a counter per frame: no work in a frame beyond it.
+// Beside the interval it keeps the page's own time in a frame (its scripts, from the frame's start to its end: the
+// game's steps, the scene made ready, the draw calls sent). An interval far over it is spent drawing, in the
+// browser's compositor or waiting for the display, which a smaller picture can shorten; one near it is the CPU's,
+// which it cannot (#705: Firefox has no GPU timer, and most of the weak machines' results come from it).
+// The performance test adds two measures that need no timer either (src/main.js): the draw waited for, and a
+// stretch at half the resolution.
 
 import { GFX } from './gfx.js';
 
@@ -21,6 +27,8 @@ export class PerfLog {
     this.meta = meta;
     this.hist = new Uint32Array(BINS);
     this.n = 0; this.sum = 0; this.sim = 0; this.multi = 0;
+    // (the page's own time in a frame, 1 ms bins; of it the game's steps and the draws' calls)
+    this.own = { n: 0, sum: 0, sim: 0, draw: 0, hist: new Uint32Array(BINS) };
     this.slowAt = new Map(); // route bin -> frames over 33 ms
     this.calls = { sum: 0, max: 0 }; this.tris = { sum: 0, max: 0 };
     this.last = 0;
@@ -29,11 +37,11 @@ export class PerfLog {
   }
 
   // one drawn frame while driving: now (ms), the tram's route position, the renderer's counts, the game time it
-  // stepped (s; several steps when the frame took over 50 ms, #609)
+  // stepped (s; several steps when the frame took over 50 ms, #609). True when the frame was counted.
   frame(now, s, info, sim = null) {
     const dt = now - this.last;
     this.last = now;
-    if (!(dt > 0 && dt < GAP) || document.hidden) return;
+    if (!(dt > 0 && dt < GAP) || document.hidden) return false;
     this.hist[Math.min(BINS - 1, Math.round(dt))]++;
     this.n++; this.sum += dt;
     if (sim !== null) { this.sim += sim * 1000; if (sim > 0.0505) this.multi++; }
@@ -49,15 +57,24 @@ export class PerfLog {
       this.calls.sum += info.calls; this.calls.max = Math.max(this.calls.max, info.calls);
       this.tris.sum += info.triangles; this.tris.max = Math.max(this.tris.max, info.triangles);
     }
+    return true;
+  }
+
+  // a counted frame's own time (ms), at its end, and of it the game's steps and the draws' calls (the scene made
+  // ready and sent, not the GPU's work). A browser may round its clock to 1 ms or coarser: the means hold.
+  spent(ms, sim = 0, draw = 0) {
+    if (!(ms >= 0)) return;
+    this.own.n++; this.own.sum += ms; this.own.sim += sim; this.own.draw += draw;
+    this.own.hist[Math.min(BINS - 1, Math.round(ms))]++;
   }
 
   // a ground tile failed to decode (src/groundFile.js, #711)
   tileFailed() { this.tileFails++; }
 
   // the interval below which a share p of the frames fall (ms)
-  pct(p) {
-    let need = p * this.n, acc = 0;
-    for (let i = 0; i < BINS; i++) if ((acc += this.hist[i]) >= need) return i;
+  pct(p, hist = this.hist, n = this.n) {
+    let need = p * n, acc = 0;
+    for (let i = 0; i < BINS; i++) if ((acc += hist[i]) >= need) return i;
     return BINS - 1;
   }
 
@@ -76,6 +93,9 @@ export class PerfLog {
     return {
       ...this.meta, frames: this.n, seconds: Math.round(this.sum / 100) / 10, fps: Math.round((this.n * 10000) / this.sum) / 10,
       ms: { p50: this.pct(0.5), p90: this.pct(0.9), p99: this.pct(0.99) },
+      // (the page's own time a frame: its mean and the time 9 frames in 10 stay within, ms)
+      ...(this.own.n ? { cpuMs: Math.round((this.own.sum / this.own.n) * 10) / 10, cpuP90: this.pct(0.9, this.own.hist, this.own.n),
+        cpuSim: Math.round((this.own.sim / this.own.n) * 10) / 10, cpuDraw: Math.round((this.own.draw / this.own.n) * 10) / 10 } : {}),
       over: { 20: this.over(20.5), 33: this.over(33.4), 50: this.over(50) },
       // (the game's time against the frames' real time: 1 when it keeps real time; the frames that took several steps, %)
       gameRate: Math.round((this.sim / this.sum) * 1000) / 1000, multiStep: Math.round((this.multi / this.n) * 1000) / 10,
@@ -101,9 +121,12 @@ export function machine(renderer) {
     const gl = renderer.getContext();
     out.webgl2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
     out.pixelRatio = renderer.getPixelRatio();
-    // (what the frames were drawn with: the canvas as the browser gave it, the address's switches, src/gfx.js, #705)
+    // (what the frames were drawn with: the canvas as the browser gave it, the render scale and what the automatic
+    // one decided, the address's switches: src/gfx.js, #705)
     out.antialias = !!gl.getContextAttributes()?.antialias;
     out.logDepth = GFX.logDepth;
+    out.scale = GFX.scale;
+    if (GFX.auto?.length) out.autoScale = GFX.auto;
     if (GFX.key) out.gfx = GFX.key;
     out.maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
