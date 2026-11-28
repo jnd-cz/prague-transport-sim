@@ -9,7 +9,7 @@ Read first: [Coordinates and heights](#coordinates-and-heights) and [Environment
 Sections (`tools/test_readme.py` holds this list to the headings):
 
 - [Coordinates and heights](#coordinates-and-heights)
-- [Sources and their quirks](#sources-and-their-quirks): [OSM](#osm), [PID timetable (GTFS)](#pid-timetable-gtfs), [DI track geometry](#di-track-geometry), [Track heights: the archive, DI and the lidar](#track-heights-the-archive-di-and-the-lidar), [Terrain and the street survey (IPR, ČÚZK, ZPS)](#terrain-and-the-street-survey-ipr-čúzk-zps), [Street design: ČSN 73 6110 (2006, amendment Z1 2010)](#street-design-čsn-73-6110-2006-amendment-z1-2010), [Tram stops: ČSN 73 6425-1 (2007)](#tram-stops-čsn-73-6425-1-2007), [Buildings and structures (Geoportál, Mosty 3D)](#buildings-and-structures-geoportál-mosty-3d)
+- [Sources and their quirks](#sources-and-their-quirks): [OSM](#osm), [PID timetable (GTFS)](#pid-timetable-gtfs), [DI track geometry](#di-track-geometry), [Track heights: the archive, DI and the lidar](#track-heights-the-archive-di-and-the-lidar), [Terrain and the street survey (IPR, ČÚZK, ZPS)](#terrain-and-the-street-survey-ipr-čúzk-zps), [Placed objects: the feature layer (#14)](#placed-objects-the-feature-layer-14), [Street design: ČSN 73 6110 (2006, amendment Z1 2010)](#street-design-čsn-73-6110-2006-amendment-z1-2010), [Tram stops: ČSN 73 6425-1 (2007)](#tram-stops-čsn-73-6425-1-2007), [Buildings and structures (Geoportál, Mosty 3D)](#buildings-and-structures-geoportál-mosty-3d)
 - [The T3 and the network it runs on](#the-t3-and-the-network-it-runs-on)
 - [Heuristics that stand in for missing data](#heuristics-that-stand-in-for-missing-data)
 - [Checks and what they measure](#checks-and-what-they-measure)
