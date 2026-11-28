@@ -2,8 +2,8 @@
 """An issue's session, started and finished the same way every time (#727; AGENTS.md, Start):
 
     python -I tools/session.py start N [--name short-name] [--agent claude|codex] [--fetch-raw]
-    python -I tools/session.py merge N [--discard]      # on the maintainer's word only (AGENTS.md, Merge windows)
-    python -I tools/session.py finish N [--discard]
+    python -I tools/session.py merge N [--discard] [--branch N-...]   # on the maintainer's word only (AGENTS.md)
+    python -I tools/session.py finish N [--discard] [--branch N-...]
 
 start: the issue's worktree beside the main checkout (../<repo>-N) on a new branch N-<short-name> from origin/main
 (the name from the issue's title unless given), the repository's author email in it, the built data from the machine
@@ -18,6 +18,9 @@ you have looked).
 finish (for a PR merged another way): once the branch's PR is merged, the worktree, the local branch and the agent's label go. It refuses while
 the PR is not merged, and while the worktree holds changed or untracked files: it lists them, and --discard removes
 the worktree with them after you have looked.
+
+An issue with two branches (two PRs) refuses both until --branch names one; the agent's label then stays until the
+last of them goes.
 """
 import argparse
 import json
@@ -52,11 +55,36 @@ def folder(n, root=ROOT):
     return os.path.join(os.path.dirname(root), f"{os.path.basename(root)}-{n}")
 
 
-def branch_of(n, run=run):
-    """The local branch of issue n (N-...), or None."""
+def branches_of(n, run=run):
+    """The local branches of issue n (N-...)."""
     out, _ = run("git", "branch", "--list", f"{n}-*", "--format=%(refname:short)")
-    names = [b for b in out.splitlines() if b.strip()]
+    return [b.strip() for b in out.splitlines() if b.strip()]
+
+
+def branch_of(n, run=run, named=None):
+    """The local branch of issue n that a merge or finish takes, or None: the named one, else the only one. An issue
+    split over two branches needs the name (#228's two PRs: merge took the first branch and stopped, #891)."""
+    names = branches_of(n, run)
+    if named:
+        if named not in names:
+            raise SystemExit(f"session: {named} is no local branch of #{n} ({', '.join(names) or 'it has none'})")
+        return named
+    if len(names) > 1:
+        raise SystemExit(f"session: #{n} has {len(names)} branches, {', '.join(names)}: name one with --branch")
     return names[0] if names else None
+
+
+def worktree_of(n, branch, named=None, run=run):
+    """The folder of the branch's worktree: where git has it checked out; else the issue's folder (../<repo>-N), but
+    not for a named branch, whose issue's folder may hold the other one. None: no folder of it."""
+    out, _ = run("git", "worktree", "list", "--porcelain")
+    path = None
+    for ln in out.splitlines():
+        if ln.startswith("worktree "):
+            path = ln[len("worktree "):]
+        elif branch and path and ln == f"branch refs/heads/{branch}":
+            return os.path.normpath(path)
+    return None if named else folder(n)
 
 
 def start(n, name=None, agent="claude", raw=False, run=run, out=print):
@@ -66,8 +94,8 @@ def start(n, name=None, agent="claude", raw=False, run=run, out=print):
     branch, wt = f"{n}-{name or slug(issue['title'])}", folder(n)
     if os.path.exists(wt):
         raise SystemExit(f"session: {wt} exists (a session of #{n} may be at work: python -I tools/board.py)")
-    if have := branch_of(n, run):
-        raise SystemExit(f"session: the branch {have} exists: finish it, or work in a worktree of it")
+    if have := branches_of(n, run):
+        raise SystemExit(f"session: the branch {', '.join(have)} exists: finish it, or work in a worktree of it")
     run("git", "fetch", "-q", "origin", "main")
     run("git", "worktree", "add", "-q", wt, "-b", branch, "origin/main")
     run("git", "config", "user.email", EMAIL, cwd=wt)
@@ -90,14 +118,17 @@ def prs_of(n, branch, run=run):
     return [p for p in every if (p.get("headRefName") or "").startswith(f"{n}-")]
 
 
-def finish(n, discard=False, run=run, out=print):
-    wt, branch = folder(n), branch_of(n, run)
+def finish(n, discard=False, run=run, out=print, named=None):
+    """named: the branch, where the issue has two (--branch)."""
+    branch = branch_of(n, run, named)
+    wt = worktree_of(n, branch, named, run)
+    rest = [b for b in branches_of(n, run) if b != branch]  # (another branch of the issue: its session keeps the label)
     prs = prs_of(n, branch, run)
     if not any(p["state"] == "MERGED" for p in prs) or any(p["state"] == "OPEN" for p in prs):
         raise SystemExit(f"session: {branch or f'#{n} (no local branch)'} has no merged PR or an open one "
                          f"({prs or 'none'}): nothing is removed")
     gone = []
-    if os.path.isdir(wt):
+    if wt and os.path.isdir(wt):
         dirty, _ = run("git", "status", "--short", cwd=wt)
         if dirty and not discard:
             raise SystemExit(f"session: {wt} holds changed or untracked files; look at them, then --discard:\n{dirty}")
@@ -106,21 +137,26 @@ def finish(n, discard=False, run=run, out=print):
     if branch:
         run("git", "branch", "-D", branch)
         gone.append(branch)
-    issue = json.loads(run("gh", "issue", "view", str(n), "--json", "labels")[0])
-    for lab in [x["name"] for x in issue["labels"] if x["name"].startswith("agent:")]:
-        run("gh", "issue", "edit", str(n), "--remove-label", lab)
-    out(f"#{n}: {' and '.join(gone) + ' removed' if gone else 'its worktree and branch were gone already'}, the agent's label taken off")
+    if rest:
+        label = f"the agent's label stays for {', '.join(rest)}"
+    else:
+        issue = json.loads(run("gh", "issue", "view", str(n), "--json", "labels")[0])
+        for lab in [x["name"] for x in issue["labels"] if x["name"].startswith("agent:")]:
+            run("gh", "issue", "edit", str(n), "--remove-label", lab)
+        label = "the agent's label taken off"
+    out(f"#{n}: {' and '.join(gone) + ' removed' if gone else 'its worktree and branch were gone already'}, {label}")
 
 
 PASSED = {"SUCCESS", "SKIPPED", "NEUTRAL"}
 
 
-def merge(n, discard=False, run=run, out=print):
+def merge(n, discard=False, run=run, out=print, named=None):
     """The issue's open PR squash-merged as `<PR title> (#PR)` and the session finished. Everything is checked before
     anything changes: one open PR of the branch, none standing on it, mergeable, its checks passed, the worktree's
     changed and untracked files looked at. gh's own --delete-branch is not used: it removes the worktree with its
-    untracked files at once (#751 and #752, gh 2.103.3)."""
-    wt, branch = folder(n), branch_of(n, run)
+    untracked files at once (#751 and #752, gh 2.103.3). named: the branch, where the issue has two (--branch)."""
+    branch = branch_of(n, run, named)
+    wt = worktree_of(n, branch, named, run)
     if not branch:
         raise SystemExit(f"session: no local branch of #{n}")
     prs = json.loads(run("gh", "pr", "list", "--head", branch, "--state", "open", "--json",
@@ -138,7 +174,7 @@ def merge(n, discard=False, run=run, out=print):
                if (c.get("conclusion") or c.get("state")) not in PASSED]
     if waiting:
         raise SystemExit(f"session: PR #{pr['number']}'s checks have not passed: {', '.join(waiting)}")
-    if os.path.isdir(wt):
+    if wt and os.path.isdir(wt):
         dirty, _ = run("git", "status", "--short", cwd=wt)
         if dirty and not discard:
             raise SystemExit(f"session: {wt} holds changed or untracked files; look at them, then --discard:\n{dirty}")
@@ -146,7 +182,7 @@ def merge(n, discard=False, run=run, out=print):
         run("gh", "pr", "ready", str(pr["number"]))
     run("gh", "pr", "merge", str(pr["number"]), "--squash", "--subject", f"{pr['title']} (#{pr['number']})")
     out(f"PR #{pr['number']} merged as \"{pr['title']} (#{pr['number']})\"")
-    finish(n, discard=True, run=run, out=out)  # (its files were looked at above)
+    finish(n, discard=True, run=run, out=out, named=named)  # (its files were looked at above)
     run("git", "push", "-q", "origin", "--delete", branch, check=False)  # (gone already where GitHub deletes merged branches)
     run("git", "pull", "-q", "--ff-only", check=False)  # (the main checkout, where it is on main and clean)
 
@@ -165,13 +201,15 @@ def main(argv=None):
     m = sub.add_parser("merge")
     m.add_argument("issue", type=int)
     m.add_argument("--discard", action="store_true", help="merge and remove the worktree with its changed and untracked files")
+    for p in (f, m):
+        p.add_argument("--branch", help="which of the issue's branches, where it has two (N-...)")
     a = ap.parse_args(argv)
     if a.cmd == "start":
         start(a.issue, a.name, a.agent, a.fetch_raw)
     elif a.cmd == "merge":
-        merge(a.issue, a.discard)
+        merge(a.issue, a.discard, named=a.branch)
     else:
-        finish(a.issue, a.discard)
+        finish(a.issue, a.discard, named=a.branch)
     return 0
 
 

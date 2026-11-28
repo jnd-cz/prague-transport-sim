@@ -1949,7 +1949,8 @@ D 1/2, the exam sets and the training manual (docs/research/prazsketramvaje/READ
 
 ## Environment (Windows dev machines)
 
-- Python `-I` ignores `PYTHONIOENCODING`: scripts call `sys.stdout.reconfigure(encoding="utf-8")`.
+- Python `-I` and `-E` ignore `PYTHONIOENCODING`: scripts call `sys.stdout.reconfigure(encoding="utf-8")`, and
+  `tools/test_all.py` runs each test with `-X utf8` (#891).
 - Shell heredocs with quotes or backticks break: write scripts to a file.
 - ES modules are cached hard: the dev server sends `no-store`; import tools with `?v=` + `Date.now()`.
 - A full listen backlog refuses connections on Windows (Linux queues them). Python's HTTP server

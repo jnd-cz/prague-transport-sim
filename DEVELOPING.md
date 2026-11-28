@@ -744,7 +744,8 @@ merge (#578 on #575).
 standing on it, mergeable, its checks passed, the worktree's changed and untracked files looked at; then the squash
 as `<PR title> (#PR)`, the worktree, the local and the remote branch removed and the agent's label taken off. gh's
 own `--delete-branch` removes the worktree folder with its untracked files at once (gh 2.103.3, seen at #751 and
-#752: each folder was gone right after its merge).
+#752: each folder was gone right after its merge). An issue split over two branches (#228's two PRs) is merged one
+branch at a time with `--branch N-...`; without it the merge refuses, and the label stays until the last one goes (#891).
 
 **Unattended runs:** an investigation script is committed only when it runs like the other tools: its own server
 on a free port (as `headless.py`), no fixed agent port, a usage line at the top. Without issues allowed, findings

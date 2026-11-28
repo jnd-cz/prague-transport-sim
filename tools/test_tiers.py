@@ -3,6 +3,7 @@
 import glob
 import os
 import sys
+import tempfile
 import unittest
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
@@ -44,6 +45,39 @@ class Rows(unittest.TestCase):
         self.assertEqual(k("tools/bench/redruns.js"), ["simulation"])
         self.assertEqual(k("src/new.js"), ["unplaced"])
 
+    def test_a_bench_goes_by_the_checks_that_load_it(self):
+        # (#891: tools/bench/* was simulation, so a static ground check's change asked for seeds 1-5 on every line)
+        k = lambda *ps: list(tiers.kinds(ps, BUILD))  # noqa: E731
+        self.assertEqual(k("tools/bench/surfaces.js"), ["static check"])
+        self.assertEqual(k("tools/bench/street_pits.py"), ["tool"])  # (run by hand, loaded by no check)
+        self.assertEqual(k("tools/bench/stuck.js"), ["simulation"])  # (through u3.js and redruns.js)
+        self.assertEqual(k("tools/bench/shift.js"), ["simulation"])  # (no check loads it; tools/autopilot.js imports it)
+        c = "\n".join(tiers.commands(tiers.kinds(["tools/bench/surfaces.js", "tools/bench/spacing.js"], BUILD)))
+        self.assertIn("--checks spacing,surfaces --compare", c)
+        self.assertNotIn("--seeds", c)
+        c = "\n".join(tiers.commands(tiers.kinds(["tools/bench/giveway.js"], BUILD)))
+        self.assertIn("-k test_giveway", c)  # (a bench's own test)
+        self.assertIn("--checks giveway --compare", c)
+
+    def test_bench_checks_follow_the_imports_not_the_comments(self):
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "tools", "bench"))
+            files = {
+                "tools/headless.py": 'CALLS = {"a": "const { run } = await import(\'/tools/bench/a.js\'); return run();",\n'
+                                     '         "b": "const { run } = await import(\'/tools/bench/b.js\'); return run(SEED);"}\n'
+                                     'SEEDLESS = {"a"}\n',
+                "tools/bench/a.js": "import { x } from './c.js';\n// const { y } = await import('/tools/bench/d.js');\n",
+                "tools/bench/b.js": "", "tools/bench/c.js": "", "tools/bench/d.js": "", "tools/bench/e.js": "",
+                "tools/run.js": "import { e } from './bench/e.js';\n",
+            }
+            for p, text in files.items():
+                with open(os.path.join(root, p), "w", encoding="utf-8") as f:
+                    f.write(text)
+            loads, seedless, used = tiers.bench_checks(root)
+            self.assertEqual(loads, {"tools/bench/a.js": {"a"}, "tools/bench/c.js": {"a"}, "tools/bench/b.js": {"b"}})
+            self.assertEqual(seedless, {"a"})
+            self.assertEqual(used, {"tools/bench/e.js": {"tools/run.js"}})
+
     def test_the_commands(self):
         c = "\n".join(tiers.commands(tiers.kinds(["src/tram.js"], BUILD)))
         self.assertIn("--checks u3,redruns,stops,traffic,lint,giveway --seeds 1-5 --compare", c)
@@ -52,6 +86,11 @@ class Rows(unittest.TestCase):
         c = "\n".join(tiers.commands(tiers.kinds(["tools/tiers.py", "tools/test_tiers.py"], BUILD)))
         self.assertIn("python -I tools/test_all.py -k test_tiers", c)
         self.assertEqual(c.count("-k test_tiers"), 1)
+        # (a page test runs only with --browser; the runner's own test is test_test_all, #891)
+        c = tiers.commands(tiers.kinds(["tools/test_overview_page.py", "tools/test_all.py"], BUILD))
+        self.assertIn("python -I tools/test_all.py -k test_overview_page --browser", c)
+        self.assertIn("python -I tools/test_all.py -k test_test_all", c)
+        self.assertNotIn("python -I tools/test_all.py -k test_all", c)
         self.assertEqual(tiers.commands(tiers.kinds(["AGENTS.md"], BUILD)), [])
 
     def test_a_ground_change_runs_the_locality_set_and_its_rules_places_not_all(self):

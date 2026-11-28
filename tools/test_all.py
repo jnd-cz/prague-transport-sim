@@ -6,9 +6,9 @@
     python -I tools/test_all.py -k track --list  # only names containing "track"; show the plan
 
 Each test runs with `-I` when everything it imports is in the standard library or in tools/, else with
-`-P -E` (numpy, shapely, pyproj, pyosmium, Pillow live in the user site packages; AGENTS.md). A test
-that starts a browser itself is a browser test. A test whose data is not in this checkout (NEEDS below) is
-skipped and says what it needs. Exit code 1 when a test fails.
+`-P -E` (numpy, shapely, pyproj, pyosmium, Pillow live in the user site packages; AGENTS.md), either in UTF-8
+mode. A test that starts a browser itself is a browser test. A test whose data is not in this checkout (NEEDS
+below) is skipped and says what it needs. Exit code 1 when a test fails.
 """
 import argparse
 import ast
@@ -25,7 +25,6 @@ TOOLS = os.path.join(ROOT, "tools")
 # data/truth.json; snapshot.py data-fetch brings data/, fetch brings raw/)
 NEEDS = {
     "test_audio_pause.py": "data/line23.json",
-    "test_deploy.py": "data/line17.json",  # (deploy refuses unless data/ matches the manifest)
     "test_free_camera.py": "data/line37.json",
     "test_geo_js.py": "raw/proj/cz_cuzk_table_-y-x_3_v1710.tif",
     "test_height_styles.py": "data/line37.json",
@@ -68,6 +67,13 @@ def third_party(test):
     return ext
 
 
+def kind_of(test, ext=None):
+    """How a test runs: "browser" (it starts one), "-P -E" (it needs the user site packages) or "-I"."""
+    ext = third_party(test) if ext is None else ext
+    launches = re.search(r"sync_playwright|chromium\.launch", open(os.path.join(TOOLS, test), encoding="utf-8").read())
+    return "browser" if launches else "-P -E" if ext else "-I"
+
+
 def plan(pattern):
     tests = sorted(f for f in os.listdir(TOOLS) if re.fullmatch(r"test_\w+\.py", f) and f != "test_all.py")
     rows = []
@@ -75,9 +81,7 @@ def plan(pattern):
         if pattern and pattern not in t:
             continue
         ext = third_party(t)
-        launches = re.search(r"sync_playwright|chromium\.launch", open(os.path.join(TOOLS, t), encoding="utf-8").read())
-        kind = "browser" if launches else "-P -E" if ext else "-I"
-        rows.append((t, kind, sorted(ext)))
+        rows.append((t, kind_of(t, ext), sorted(ext)))
     return rows
 
 
@@ -88,6 +92,13 @@ def kill_tree(p):
     else:
         import signal
         os.killpg(p.pid, signal.SIGKILL)
+
+
+def flags(kind):
+    """The interpreter's flags for a test of this kind. -X utf8: its output to our pipe is UTF-8, as on CI's Linux; a
+    commit title with "ř" stopped test_overview_page.py on a cp1252 pipe (#891). PYTHONIOENCODING can't do it: -I and
+    -E ignore the PYTHON* variables."""
+    return ["-I", "-X", "utf8"] if kind == "-I" else ["-P", "-E", "-X", "utf8"]
 
 
 def summary(out):
@@ -125,13 +136,12 @@ def main():
         if need and not os.path.exists(os.path.join(ROOT, need)):
             skipped.append((t, f"needs {need} (python -I tools/snapshot.py {'fetch' if need.startswith('raw/') else 'data-fetch'})"))
             continue
-        flags = ["-I"] if kind == "-I" else ["-P", "-E"]
         t1 = time.time()
         # (its own process group: on a timeout the servers and browsers it started go with it)
-        p = subprocess.Popen([sys.executable, *flags, os.path.join(TOOLS, t)], cwd=ROOT, stdout=subprocess.PIPE,
+        p = subprocess.Popen([sys.executable, *flags(kind), os.path.join(TOOLS, t)], cwd=ROOT, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
                              # (a test that runs a heavy tool's main does not queue behind the real jobs, #280)
-                             env={**os.environ, "PYTHONIOENCODING": "utf-8", "TRAM_HEAVY_NOWAIT": "1"},
+                             env={**os.environ, "TRAM_HEAVY_NOWAIT": "1"},
                              start_new_session=os.name != "nt",
                              creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
         try:
