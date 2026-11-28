@@ -877,6 +877,36 @@ class BesideAThinWall(unittest.TestCase):
         x, y, ty = np.array([5.0]), np.array([20.0]), np.array([19.8])
         self.assertFalse(gm.off_the_smear(gm.thin_walls(D, gm.WALL_WIDE), x, y, x, ty, smeared(x, y - 20), smeared, smeared)[1].any())
 
+    def test_a_road_beside_a_stair_well_keeps_its_surface_too(self):
+        # (#653: stairs 2 m wide along y = 0..2 in a well down to 208.4 m, their side on the road at 212.1 m south of
+        # them; the road's surface smeared down into the well within 1.5 m. The well's rim is read as a wall's: the
+        # corners on the rim and 0.5 m out take the road's own level. A flight at y = 30..32 with the ground level
+        # across its outline is not read, nor are level-1 stairs)
+        D = {"areas": [{"c": "stairs", "l": 0, "r": [[0, 0, 212.1], [10, 0, 212.1], [10, 2, 208.4], [0, 2, 208.4]]},
+                       {"c": "stairs", "l": 1, "r": [[0, 20, 212.1], [10, 20, 212.1], [10, 22, 208.4], [0, 22, 208.4]]},
+                       {"c": "stairs", "l": 0, "r": [[0, 30, 212.1], [10, 30, 212.1], [10, 32, 212.4], [0, 32, 212.4]]},
+                       {"c": "road", "l": 0, "r": [[0, -6, 212.1], [10, -6, 212.1], [10, 0, 212.1], [0, 0, 212.1]]}]}
+
+        def lidar(px, py):
+            px, py = np.asarray(px, float), np.asarray(py, float)
+            return np.where((px > 0) & (px < 10) & (py > 0) & (py < 2), 208.4, 212.1)
+        self.assertEqual(sorted(gm.stairs_edges(D, lidar)[:, :, 1].min(1).tolist()), [0, 0, 0, 2])
+
+        def smeared(px, py):
+            return 212.1 - 2.5 * np.clip(1 + np.asarray(py, float) / 1.5, 0, 1)
+        x, y, ty = np.array([5.0, 5.0]), np.array([0.0, -0.5]), np.array([-0.2, -0.7])
+        z, held = gm.off_the_smear(gm.stairs_edges(D, lidar), x, y, x, ty, smeared(x, y), smeared, smeared, steep=False)
+        self.assertEqual(held.tolist(), [True, True])
+        np.testing.assert_allclose(z, [212.1, 212.1], atol=1e-6)
+        # (a road falling 0.5 m in 1 m out there, a bank's: left, where a wall's reading runs level from 1.5 m out)
+        def bank(px, py):
+            return smeared(px, py) + 0.5 * np.minimum(np.asarray(py, float) + 1.5, 0)
+        args = (gm.stairs_edges(D, lidar), x, y, x, ty, bank(x, y), bank, bank)
+        self.assertEqual((gm.off_the_smear(*args)[1].tolist(), gm.off_the_smear(*args, steep=False)[1].tolist()),
+                         ([True, True], [False, False]))
+        # (a flight standing over the ground beside it is no well: not read)
+        self.assertEqual(len(gm.stairs_edges(D, lambda px, py: 424.2 - lidar(px, py))), 0)
+
     def test_a_sidewalks_edge_over_a_sunk_road_is_such_a_wall(self):
         # (a sidewalk north of y = 0 surveyed at 200.4 m, its kerb edge along a ramp falling east from 200.3 m: the
         # edge from where it stands 0.3 m over a kerb on the ramp, 20 m of 0.25 m pieces less the first 3 m; beside a

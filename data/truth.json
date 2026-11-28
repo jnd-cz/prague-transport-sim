@@ -7060,6 +7060,34 @@
      "why": "the road lies level to the wall's foot: 187.15-187.2 m from 4 m out to 0.5 m on the street surface and the lidar alike; batch E's ground rose to 188.43 m at the foot"
     }
    ]
+  },
+  "road-at-a-stair-well": {
+   "line": "17",
+   "at": [
+    -1665.6,
+    -9080.4
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "a road beside the stair well of stairs 7778 on line 17 (50.00445, 14.41557): the stairs' side along the road (area 7103) is surveyed at the road's 212.1 m and the steps go down beside it to 208.4 m. The road surface follows IPR, whose raster spreads the well over the road's last metre and a half: built by the tools of 68124a5 the road fell from 211.24 m 0.5 m out to 209.57 m at the rim. A road keeps its own surface from past the smear beside a stair well now, as beside a wall (off_the_smear, stairs_edges)",
+   "source": "the stairs sites of the street-corner count (tools/bench/street_at_walls.py) built by 68124a5's tools, 2026-11-28: 13 road corners off at stairs 7778, #653",
+   "sections": [
+    {
+     "name": "square to the stairs' side from 4 m out on the road to the rim",
+     "from": [
+      -1669.01,
+      -9078.3
+     ],
+     "to": [
+      -1665.66,
+      -9080.4
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the road lies level to the rim: IPR reads 212.11-212.13 m from 4 m out to 1 m, its own outline 212.08 m at the rim; the raster's 209.9-211.5 m in the last 0.5 m is its smear of the well"
+    }
+   ]
   }
  },
  "openTrackReview": {

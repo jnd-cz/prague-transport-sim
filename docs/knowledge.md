@@ -929,6 +929,23 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     217.70 m 0.5 m in; 129 corners on line 17); a wall's end whose edge climbs from the foot to the top in 0.5 m,
     the street past it sharing an outline with the one on the top (Smíchov, line 9 (-1035.2, -459.0), wall 325, up
     to 6 m); stair wells to underpasses (line 37 (9260, 966)) and the sidewalk round them (line 9 (-1035, -455)).
+  - *A road beside a stair well* (2026-11-28): of the count's 271 corners off at stairs on batch E's ground, 37 were
+    road or tram corners (lines 9, 17, 37) and 234 sidewalk corners. IPR's raster smears a well over the road's last
+    1.5 m as it smears a wall's face. `off_the_smear` reads a stairs outline's edges where IPR 0.5 m inside lies 0.7 m
+    or more under IPR 1.5 m outside (`stairs_edges`: 512-2,482 m a line, 9-18 % of the stairs' outlines), and leaves a
+    corner whose road out there is steeper than `ROAD_GRADE` (`steep=False`). Built by the branch's tools: stairs 7778,
+    line 17 (-1665.6, -9080.4), 13 → 4 road corners off (worst 1.67 → 1.46 m; place `road-at-a-stair-well`: off the
+    chord square to the rim 1.6 → 0.04 m); stairs 5763, line 9 (-3699, -1334), 10 → 2 (0.62 → 0.56 m). Tram corners
+    on such a rim keep the tram's level: under the Modřany viaduct, line 17 (-2524.7, -9048.3), 196.05 → 196.53 m (IPR
+    196.42 m on the tram); over the passage at line 37 (9285, 917), whose bridge the ground model leaves out, 235.67 →
+    238.6 m. Every edge of the stairs read, roads on slopes beside flights moved wrongly: a corner at a flight's foot,
+    line 9 (-2813.07, -1401.87), 222.47 m where IPR reads 222.95 m (place `stairs-beside-a-building` failed); a parking
+    area on a bank, line 22 (1857.9, -2311.0), 1.86 m. The 32 places of the walls, stairs and structures rules' sections
+    are as before, the locality set 8 of 8 the same.
+  - Left at stairs: the sidewalks' corners. The street surface holds them (`street_profile.sidewalks`), and a sidewalk
+    round a well whose outline carries the steps' heights wedges down to them (the review's stairs cards). Reading
+    their surface past the smear too (`off_the_smear` after `own_side`) moved them both ways: line 22 (-1350, 83)
+    15 → 19 corners off, line 37's well worst 1.5 → 3.2 m.
   - *The street surface's hold at a wall* (`tools/sidewalk_walls_review.py`, 2026-11-28): of the sidewalk edges on
     walls, stairs and strips that are a wall's face, where the sidewalk runs 2 m in, those whose own height and the
     wall's top and foot near them all lie over 1 m off IPR 1.5 m in: line 9 616 of 6,602 m, 17 1,668 of 13,542, 22 660

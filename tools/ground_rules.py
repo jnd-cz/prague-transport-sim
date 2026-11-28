@@ -87,11 +87,11 @@ RULES = {
                    "zizkov-depot-paving", "rasinovo-quay", "belohorska-grass-track"],
     },
     "stairs": {
-        "what": "flights of stairs and ramps: their steps, sides and ends (#447, #653, #786)",
+        "what": "flights of stairs and ramps: their steps, sides and ends, and a road beside a stair well (#447, #653, #786)",
         "code": ["ground_mesh.flight", "ground_mesh.climbs", "ground_mesh.StairsHeights", "ground_mesh.stairs_sides",
-                 "ground_mesh.STAIRS*", "ground_mesh.survey_edges", "ground_mesh.RISER*"],
+                 "ground_mesh.STAIRS*", "ground_mesh.survey_edges", "ground_mesh.RISER*", "ground_mesh.stairs_edges"],
         "places": ["stairs-reversed-ramp", "stairs-beside-a-building", "stairs-not-there", "stairs-belvedere-wall",
-                   "stairs-dobeska", "krejcarek-ramp", "branik-platform-ramps"],
+                   "stairs-dobeska", "krejcarek-ramp", "branik-platform-ramps", "road-at-a-stair-well"],
     },
     "platforms": {
         "what": "platforms: level along the track, their walls and kerbs (#776, #786)",
