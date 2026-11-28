@@ -134,7 +134,7 @@ try {
   built[`line${lineId}.network.json`] = data.network;
 }
 // wait for the rest before the build steps, which block the page
-// the user's facts (data/truth.json): track styles set how high top of rail stands over the surface
+// the maintainer's facts (data/truth.json): track styles set how high top of rail stands over the surface
 const truth = await loadHeightFacts();
 // the prebuilt ground (tools/ground_mesh.py, #509): its tiles' lookups decoded in workers while the page goes on (#30).
 // Every line has it: the layers the page built without it went, #510. ?keepgeo and ?bot keep every tile (the checks).
@@ -185,6 +185,9 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: GFX.antialias, log
 const autoScale = new AutoScale();
 GFX.auto = autoScale.log;
 let scaleSet = setting('scale');
+// A change of the scale during a shift waits for the next frame's start (`rescale`, run in frame()): resizing the
+// canvas clears it, and done after a frame's draw it showed that frame black (the tablet, #705).
+let rescale = null;
 function applyScale() {
   GFX.scale = GFX.fixed ? 1 : scaleSet === 'auto' ? autoScale.scale : +scaleSet;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, GFX.maxPixelRatio) * GFX.scale);
@@ -236,9 +239,11 @@ const sun = new THREE.DirectionalLight(0xfff1dc, 1.6);
 sun.position.set(-300, 500, 200);
 scene.add(sun);
 
+let needDraw = false; // (a resized canvas is cleared: the frame after it draws, idle or not)
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
+  needDraw = true;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
@@ -419,15 +424,14 @@ if (carModels) {
 }
 window.cars = cars;
 // the menu's tram models, in the index's order with their names in the menu's language; the first is the default.
-// One not loaded at start downloads when the player picks it (the user, 2026-11-04, of the classic model: "make it
-// available for user's choice to load").
+// One not loaded at start downloads when the player picks it (maintainer, 2026-11-04, of the classic model).
 function modelMenu() {
   const sel = $('optModel'), was = sel.value;
   sel.replaceChildren(...vehicles.map((v) => new Option(vehicleName(v, getLang()), v.id)));
   sel.value = vehicles.some((v) => v.id === was) ? was : vehicles[0]?.id;   // (a package removed: the first again)
 }
 modelMenu();
-// The player's preferred set (#527; the user, 2026-11-11: "I would add optinal preferred set for the player"): the
+// The player's preferred set (maintainer, #527): the
 // vehicle's listed sets, then its numbers by type (a lone number: the second car dealt of its type); remembered per
 // vehicle. Our tram runs as it and no AI tram is dealt it; "any" deals ours like the others.
 const FLEET_KEY = 'tram.fleet';
@@ -458,8 +462,7 @@ function liveryMenu() {
   sel.value = pick === '*' || list.some((l) => l.id === pick) ? pick : '';
 }
 liveryMenu();
-// Our tram's sounds (#636; the user, 2026-11-17: "it's alternative to the default in game sounds but it's shipped
-// with the game"): the vehicle's own (the built-in sounds) or a sound pack for it, shipped or installed; remembered
+// Our tram's sounds (#636; a pack is an alternative to the built-in sounds, shipped with the game): the vehicle's own (the built-in sounds) or a sound pack for it, shipped or installed; remembered
 // per vehicle, played from the next shift's start.
 const SOUNDS_KEY = 'tram.sounds';
 let soundPicks = {};
@@ -497,7 +500,7 @@ function ourSet(dealer, vehicle, cars) {
 }
 // the T3 ran in two-car sets on most lines; line 23 is the single-car heritage line
 const lineCars = data.line === '23' ? 1 : 2;
-// The run number card behind the windscreen (user, 2026-10-23): the depot's digit and the run's two
+// The run number card behind the windscreen (maintainer, 2026-10-23): the depot's digit and the run's two
 // digits (801 = depot 8, run 01); a tram keeps its run number for its whole time out in service;
 // night and late-evening runs (single cars) are numbered from 51. Prepared for data the line files
 // do not have yet: `data.runs[trip] = { depot, run }` (which run serves each timetable trip, from the
@@ -754,12 +757,12 @@ function offerPerf(el) {
 // The performance test (the menu): a minute of the autopilot on a fixed stretch, so runs on different machines
 // compare: the line's middle stop, the trip nearest 8:00 there (rush hour), dry weather, seed 1, measured after
 // 5 s to settle and from the departure on. It starts 10 s before the departure, not a shift's 40 s, so the wait is
-// short and the minute all driving (the user, 2026-11-11: "autopilot waits half a minute standing for the timetable
-// departure"). The GPU's own time per
+// short and the minute all driving (the autopilot waited half a minute for the departure; maintainer, 2026-11-11). The
+// GPU's own time per
 // frame where the browser has a timer. Two buttons: the line loaded now, and the reference run: line 17 from
 // Palackého náměstí with the detailed model, the heaviest line with surveyed streets, the one result every machine
-// has in common. Its stop is named, not the middle one, so it stays when the route changes (the user, 2026-11-11:
-// "I would keep it fixed there even if later line 17 runs start from another stop like Libuš"). From another line
+// has in common. Its stop is named, not the middle one, so it stays when the route changes, even if line 17's
+// runs later start from another stop such as Libuš (maintainer, 2026-11-11). From another line
 // the reference opens line 17 (?reftest=<the line left>), runs there, and its "Back to the menu" goes back.
 // (window.perfTestMs: a shorter run for tools/test_perf.py)
 const PT_WARM = 5000, PT_LEN = window.perfTestMs || 60000;
@@ -806,7 +809,7 @@ $('btnPerfRef').addEventListener('click', () => {
 });
 function perfTestStep(now) {
   if (!perfTest || !game || game.finished) {
-    if (perfTest?.phase === 'windows') { applyScale(); resize(); }
+    if (perfTest?.phase === 'windows') rescale = () => { applyScale(); resize(); };
     perfTest = null;
     return;
   }
@@ -827,10 +830,13 @@ function perfTestStep(now) {
     const k = Math.floor((now - pt.t3) / PT_WIN), half = k % 2 === 0;
     if (k !== pt.k) {
       pt.k = k;
-      applyScale();
-      if (k < PT_WINS && half) renderer.setPixelRatio(renderer.getPixelRatio() / 2);
-      resize();
-      if (k < PT_WINS && half) pt.size = [canvas.width, canvas.height];
+      const halve = k < PT_WINS && half;
+      rescale = () => {
+        applyScale();
+        if (halve) renderer.setPixelRatio(renderer.getPixelRatio() / 2);
+        resize();
+        if (halve) pt.size = [canvas.width, canvas.height];
+      };
     }
     if (k >= PT_WINS) { finishPerfTest(); return; }
     pt.half = half;
@@ -917,7 +923,7 @@ $('btnToMenu').addEventListener('click', () => {
 
 // ------------------------------------------------------------------ input
 const input = { deadman: false, sand: false, cutout: false, switchBtn: false };
-let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, the user, 2026-11-14)
+let shiftHeld = false; // the dead-man pedal: Shift held, or a gamepad connected (holding a button all shift tires the hand, maintainer, 2026-11-14)
 // the head turned out of a side window, until the screen's edge shows the cab's rear wall past the cab window on the left
 // and reaches the front door's end on the right (src/cabframe.js, #246; it was 1.3 rad both ways)
 const lookMax = () => lookLimits(CAB_FOV, camera.aspect);
@@ -1034,8 +1040,8 @@ function control(dir, repeat) {
   if (dir > 0 && eq.parked && eq.pedal.brake === 0) parkedWarn();
   if (!repeat) { eq.tap(dir); pedalKey = { dir, t: 0 }; }
 }
-// advanced: drive asked for while the ratchet holds the brake does nothing; say why (a tester and the user's own try with
-// a pad were held by it, the user, 2026-11-14: "I would perhaps warn the user that parking brake is engaged")
+// advanced: drive asked for while the ratchet holds the brake does nothing; say why (a tester and the maintainer's own try
+// with a pad were held by it, maintainer, 2026-11-14)
 function parkedWarn() {
   const text = t('msg.parked');
   if (game.messages.some((m) => m.text === text)) return;
@@ -1152,7 +1158,7 @@ function updateCamera(dt, t) {
   // the driver's eye is a point of the lead car (#597), over the driver's seat (src/cabframe.js EYE): 1.2 m behind the body's
   // front, 0.32 m left of the centre line, 2.39 m over the rail; it turns with the body and swings out with its front in a
   // curve. (It stood on the track's centre line and looked along the track 4 m ahead of the tram, eased: 33 degrees ahead
-  // of the body in a 20 m curve, the user, 2026-11-14: "starts turning ahead of tram body in curves")
+  // of the body in a 20 m curve: it turned ahead of the tram's body, maintainer, 2026-11-14)
   const lead = tramModel.userData.cars[0];
   lead.updateWorldMatrix(true, false);
   const eye = EYE_AT.set(EYE.x, EYE.h, leadFront() - EYE.back).applyMatrix4(lead.matrixWorld);
@@ -1230,7 +1236,7 @@ let last = performance.now(), hudTimer = 0, lastDraw = 0;
 // frame needs, the rest carried to the next frame. So a seed and the same inputs give the same run at any frame rate
 // (before: the frame's time cut into equal parts of at most 50 ms, 16.7 ms steps at 60 fps against the checks' 33 ms).
 // Up to SPAN_MAX a frame: past that (a stall, a hidden tab coming back, a breakpoint) the game slows rather than run
-// seconds at once; the game keeps real time down to 4 fps (#609: the 50 ms cap alone ran the user's 16 fps perftests
+// seconds at once; the game keeps real time down to 4 fps (#609: the 50 ms cap alone ran the maintainer's 16 fps perftests
 // of 2026-11-15 at 74-80 % of real time). A frame between two steps draws our tram and the camera between them
 // (drawnS), and the cars, the other trams and the game's movers too (src/between.js: recorded after the frame's last
 // two steps, put back after the draw); the walkers are drawn as the last step left them.
@@ -1272,6 +1278,7 @@ function frame(now) {
   // (the page's own time in this frame, and of it the game's steps and the draws' calls, for the frame log: src/perf.js)
   const began = performance.now();
   let logged = null, simMs = 0, drawMs = 0;
+  if (rescale) { const turn = rescale; rescale = null; turn(); }
   const span = Math.max(0, Math.min(SPAN_MAX, (now - last) / 1000));
   const dt = Math.min(STEP_MAX, span); // (the camera, weather, sound and HUD: one step a frame)
   let simmed = 0;
@@ -1333,8 +1340,9 @@ function frame(now) {
   // (headless, once a second: every frame, the city drawn in software WebGL took most of a check's CPU,
   // about 9 cores for one page; nothing the checks read depends on drawing, #104)
   const lazy = idle();
-  const draw = window.headless ? now - lastDraw > 1000 : !lazy || now - lastDraw > IDLE_MS;
+  const draw = window.headless ? now - lastDraw > 1000 : !lazy || needDraw || now - lastDraw > IDLE_MS;
   if (draw) {
+    needDraw = false;
     // (the movers between the last two steps, as our tram; back where the steps left them after the draw, below)
     if (game && !inspect.active && !window.headless) between.show(Math.min(1, carry / STEP));
     // (the right mirror's camera, posed for this frame while the mirror is shown: the people it shows near the tram are
@@ -1368,7 +1376,7 @@ function frame(now) {
       const log = !perfTest || perfTest.phase === 'warm' || perfTest.phase === 'run' ? perfLog : perfTest.log || null;
       logged = log?.frame(now, tram.s, renderer.info.render, simmed) ? log : null;
       // (the automatic render scale reads the same frames, but a performance test's: it measures at one scale)
-      if (scaleSet === 'auto' && !GFX.fixed && !perfTest && autoScale.frame(now) !== null) { applyScale(); resize(); }
+      if (scaleSet === 'auto' && !GFX.fixed && !perfTest && autoScale.frame(now) !== null) rescale = () => { applyScale(); resize(); };
     }
   }
   if (perfTest) perfTestStep(now);

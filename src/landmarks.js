@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Landmarks past the fog (#610). The user, 2026-11-15: "hide the small things far away and on the opposite keep the
-// largest building on higher ground so that they can be see as visual landmarks, like in real city".
+// Landmarks past the fog (#610): the small things far away are hidden, the largest buildings on higher ground kept, so
+// that they are seen as landmarks, as in the real city (maintainer, #610).
 // The camera draws to the fog's end (src/main.js applyWeather); a landmark is drawn beyond it, in a lighter haze that
 // ends LANDMARK_STRETCH times farther. Its own meshes in the world (src/buildings.js buildLod2) take that haze near the
 // camera, and a copy of its triangles is drawn first, in a pass of its own from just inside the far plane to the

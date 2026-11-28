@@ -11,6 +11,7 @@ branch changed and prints each kind of change it holds, the files that make it s
 A change of two kinds runs both. A file in no row is listed as such (tools/test_tiers.py holds every file of src/
 to a row): its row is chosen by hand, then added here.
 """
+import ast
 import fnmatch
 import json
 import os
@@ -23,6 +24,7 @@ ROOT = os.path.dirname(TOOLS)
 sys.path.insert(0, TOOLS)
 
 import ground_rules  # noqa: E402 (which places a ground change is tried on, #865)
+import test_all  # noqa: E402 (how a test runs: a page test needs --browser)
 
 SEEDED = "u3,redruns,stops,traffic,lint,giveway"  # (stops rides on the u3 drive, #708; giveway is static, #602)
 STATIC = "lint,surfaces,canted,crossing,spacing,heights"
@@ -69,10 +71,15 @@ KINDS = [
     ("simulation", ("src/traffic.js", "src/waits.js", "src/autopilot.js", "src/tram.js", "src/tr37.js", "src/electric.js",
                     "src/game.js", "src/people.js", "src/streetbot.js", "src/route.js", "src/speedRules.js",
                     "src/consist.js", "src/articulated.js", "src/random.js", "src/geo.js", "src/main.js", "src/run.js",
-                    "tools/traffic_lint.js", "tools/autopilot.js", "tools/bench/*", "src/trafficView.js", "src/platformRules.js",
+                    "tools/traffic_lint.js", "tools/autopilot.js", "src/trafficView.js", "src/platformRules.js",
                     "src/carTypes.js", "src/passengers", "src/passengers/*", "src/passengerView.js"),
      f"--checks {SEEDED} on every line, seeds 1-5, --compare; the tram or the autopilot: also test_traction, "
      "test_electric, test_drives", "the geometry checks"),
+    # (a file of tools/bench/ goes by the checks that load it, bench_checks(): one a seeded check loads is "simulation",
+    # one only seedless checks load is this; one no check loads takes the row of a script that imports it, else it is
+    # a "tool"; #891)
+    ("static check", (), "the checks that load it on every line, --compare; every move needs a reason",
+     "seeded checks, the rebuild"),
     ("tool", ("tools/*",), "the changed tools' tests (tools/test_<tool>.py); the whole suite before the PR is ready", ""),
 ]
 TRAM = ("src/tram.js", "src/tr37.js", "src/electric.js", "src/autopilot.js", "src/consist.js", "tools/autopilot.js")
@@ -93,15 +100,79 @@ def world_tools(root=ROOT):
     return board.build_tools(os.path.join(root, "tools"))
 
 
-def kinds(paths, build=None):
-    """{kind: [paths]} for the changed paths, plus "unplaced" for those of no row (a src/ file, a top-level file)."""
+def js_imports(path, root=ROOT):
+    """The tools/ files a page script imports (`from '…'`, `import('…')`), its comment lines left out."""
+    try:
+        text = open(os.path.join(root, path), encoding="utf-8").read()
+    except OSError:
+        return set()
+    text = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith(("//", "*")))
+    out = set()
+    for a, b in re.findall(r"""from\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]""", text):
+        rel = a or b
+        p = rel[1:] if rel.startswith("/") else os.path.normpath(os.path.join(os.path.dirname(path), rel)).replace(os.sep, "/")
+        if p.startswith("tools/"):
+            out.add(p)
+    return out
+
+
+def check_calls(root=ROOT):
+    """({check: the page call tools/headless.py runs for it}, its seedless checks): its CALLS and SEEDLESS, read
+    without importing it (it reconfigures stdout and reads the machine's setup)."""
+    tree = ast.parse(open(os.path.join(root, "tools", "headless.py"), encoding="utf-8").read())
+    got = {t.id: n.value for n in tree.body if isinstance(n, ast.Assign) for t in n.targets
+           if isinstance(t, ast.Name) and t.id in ("CALLS", "SEEDLESS")}
+    return ast.literal_eval(got["CALLS"]), ast.literal_eval(got["SEEDLESS"])
+
+
+DRIVE = ("u3", "redruns", "stops", "traffic")  # (headless.py DRIVE: the checks its "drive" call serves)
+
+
+def bench_checks(root=ROOT):
+    """(loads, seedless, used) for the files of tools/bench/: loads {file: the checks whose page call loads it, itself
+    or through what it imports}; seedless: headless.py's seedless checks; used {file: the page scripts directly in
+    tools/ that import it, themselves or through another}."""
+    def closure(start):
+        todo, seen = set(start), set()
+        while todo:
+            p = todo.pop()
+            if p not in seen:
+                seen.add(p)
+                todo |= js_imports(p, root)
+        return seen
+
+    calls, seedless = check_calls(root)
+    loads, used = {}, {}
+    for check, call in calls.items():
+        for p in closure(m[1:] for m in re.findall(r"""import\(\s*['"](/tools/[^'"]+)['"]""", call)):
+            if p.startswith("tools/bench/"):
+                loads.setdefault(p, set()).update(DRIVE if check == "drive" else (check,))
+    for n in sorted(os.listdir(os.path.join(root, "tools"))):
+        if n.endswith(".js"):
+            for p in closure(js_imports(f"tools/{n}", root)):
+                if p.startswith("tools/bench/"):
+                    used.setdefault(p, set()).add(f"tools/{n}")
+    return loads, seedless, used
+
+
+def kinds(paths, build=None, benches=None):
+    """{kind: [paths]} for the changed paths, plus "unplaced" for those of no row (a src/ file, a top-level file).
+    benches: bench_checks()'s answer (None: read when a bench changed)."""
     build = world_tools() if build is None else build
     out = {}
     for p in sorted(set(paths)):
         got = [k for k, pats, *_ in KINDS[:-1] if any(fnmatch.fnmatch(p, pat) for pat in pats)]
         if p in build and "ground rule" not in got:
             got.append("world")
-        if not got and p.startswith("tools/") and not p.startswith("tools/bench/"):
+        if p.startswith("tools/bench/") and not got:
+            benches = bench_checks() if benches is None else benches
+            loads, seedless, used = benches
+            if checks := loads.get(p, set()):
+                got = ["simulation"] if checks - seedless else ["static check"]
+            else:  # (loaded by no check: the row of a script that imports it, as tools/autopilot.js imports shift.js)
+                got = [k for k, pats, *_ in KINDS[:-1]
+                       if any(fnmatch.fnmatch(u, pat) for u in sorted(used.get(p, ())) for pat in pats)]
+        if not got and p.startswith("tools/"):
             got = ["tool"]
         for k in got or ["unplaced"]:
             out.setdefault(k, []).append(p)
@@ -127,13 +198,16 @@ def rebuilt_lines(base, root=ROOT):
 
 
 def tests_of(paths, root=ROOT):
-    """tools/test_<tool>.py of each changed tool that has one (a changed test is itself)."""
+    """tools/test_<tool>.py of each changed tool or bench (tools/bench/<name>.py or .js) that has one (a changed test
+    is itself)."""
     out = []
     for p in paths:
         n = os.path.basename(p)
-        if not p.startswith("tools/") or "/" in p[6:] or not n.endswith(".py"):
+        bench = p.startswith("tools/bench/") and "/" not in p[12:] and n.endswith((".py", ".js"))
+        if not bench and (not p.startswith("tools/") or "/" in p[6:] or not n.endswith(".py")):
             continue
-        t = n if n.startswith("test_") else f"test_{n}"
+        # (test_all.py is the runner, not a test: its own is test_test_all.py)
+        t = n if n.startswith("test_") and n != "test_all.py" else f"test_{os.path.splitext(n)[0]}.py"
         if os.path.exists(os.path.join(root, "tools", t)) and t not in out:
             out.append(t)
     return out
@@ -144,7 +218,9 @@ def commands(found, base="origin/main", root=ROOT, ground=None):
     ([module.name]; None: read from the diff against base)."""
     every, out = ",".join(lines(root)), []
     tests = tests_of([p for ps in found.values() for p in ps], root)
-    out += [f"python -I tools/test_all.py -k {t[:-3]}" for t in tests]  # (-k: one name a run)
+    # (-k: one name a run; a page test only with --browser, test_all skips it otherwise, #891)
+    out += [f"python -I tools/test_all.py -k {t[:-3]}" + (" --browser" if test_all.kind_of(t) == "browser" else "")
+            for t in tests]
     if "review" in found:
         out.append("python -P -E tools/test_review.py")
     if "ground rule" in found:
@@ -160,6 +236,10 @@ def commands(found, base="origin/main", root=ROOT, ground=None):
         out.append(f"python -P -E tools/headless.py --lines {every} --checks heights --compare")
     if "drawn geometry" in found:
         out.append(f"python -P -E tools/headless.py --lines {every} --checks {DRAWN} --compare")
+    if "static check" in found:
+        loads = bench_checks(root)[0]
+        checks = sorted({c for p in found["static check"] for c in loads.get(p, ())})
+        out.append(f"python -P -E tools/headless.py --lines {every} --checks {','.join(checks)} --compare")
     if "loading" in found:
         out.append(f"python -P -E tools/headless.py --lines {every} --checks u3 --seeds 1 --player --gpu")
     if "simulation" in found:

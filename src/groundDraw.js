@@ -68,10 +68,9 @@ export function flushDtm(ground) {
   // surface there. (On line 37's Krejcárek viaduct the survey's tram areas along the deck's edge, 1.5-4.4 m right of our
   // track, stepped up to 0.9-1.3 m over the rails half a metre out from it: their triangles stood over the deck as grey
   // slabs, #549.) The same holds for the walkways on the deck: on line 17's track-only bridge at Modřanská škola the
-  // survey's paved strip 0.61 m over the rails is the parapet wall (the user, 2026-11-14, #549: "looks like bridge
-  // parapet wall"). On a deck with a carriageway a sidewalk standing more than DECK_OVER m over the rails is laid to an
-  // ordinary kerb, KERB m over the deck: Čechův most's, 0.66-0.73 m in the survey, is "normal sidewalk slightly higher
-  // than road plus rails, there's railing on the edge" (the user, 2026-11-14).
+  // survey's paved strip 0.61 m over the rails is the parapet wall (maintainer, #549). On a deck with a carriageway a sidewalk standing more than DECK_OVER m over the rails is laid to an
+  // ordinary kerb, KERB m over the deck: Čechův most's, 0.66-0.73 m in the survey, is an ordinary sidewalk a little
+  // over the road and rails, with a railing at its edge (maintainer, #549).
   // A deck that carries only track (no level-1 carriageway of the survey within 8 m of the route on that span) is flat at
   // the track's level: every vertex of its tram areas within 8 m is laid there, the walkways beside the bed with them (the
   // user, 2026-11-14, #549, on the Krejcárek viaduct: "There is open ballast track in the middle, walkway a bit lower and

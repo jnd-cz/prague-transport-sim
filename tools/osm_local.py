@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""OSM from a local extract instead of the public Overpass servers (user, 2026-10-23: build the whole city
-network and keep the servers less loaded).
+"""OSM from a local extract instead of the public Overpass servers (maintainer, 2026-10-23: build the whole
+city network and keep the servers less loaded).
 
 Source: Geofabrik's daily Czech Republic extract (download.geofabrik.de/europe/czech-republic, ODbL), kept
 in raw/osm/. `cut` makes raw/osm/praha.osm.pbf (Prague and a margin, complete ways and relations: every

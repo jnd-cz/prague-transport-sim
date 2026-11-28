@@ -103,6 +103,15 @@ def git(*args):
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, encoding="utf-8", check=True).stdout.strip()
 
 
+def who():
+    """Who deploys, for version.json: git's user.name, or "" where git has none (CI's runner: every deploy test
+    stopped on it, #891)."""
+    try:
+        return git("config", "user.name")
+    except subprocess.CalledProcessError:
+        return ""
+
+
 def target(cfg, name):
     """The config of one target: the top level is "test", a named one takes the top level's keys it does not set."""
     top = {k: v for k, v in cfg.items() if k != "targets"}
@@ -121,11 +130,16 @@ def checks(allow_dirty, public=False):
         raise SystemExit("a public target is deployed only from a commit, never with --dirty")
     if not allow_dirty and git("status", "--porcelain", "--untracked-files=no"):
         raise SystemExit("uncommitted changes: commit them, or --dirty for a test deploy")
-    st = subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "snapshot.py"), "status"], cwd=ROOT,
-                        capture_output=True, text=True)
-    if "0 differences to data/MANIFEST.json" not in st.stdout:
+    if not data_matches():
         raise SystemExit("data/ differs from data/MANIFEST.json: python -I tools/snapshot.py data-fetch")
     return git("rev-parse", "HEAD")
+
+
+def data_matches(root=ROOT):
+    """Whether data/ holds what data/MANIFEST.json names: snapshot.py status's differences, none. (Read from its
+    printed line, "data: 10 differences" held "0 differences" and passed, #891.)"""
+    import snapshot  # (here, not at the top: it reconfigures stdout when imported)
+    return os.path.exists(os.path.join(root, "data", "MANIFEST.json")) and not snapshot.data_diff(root)
 
 
 def packed(rel):
@@ -163,7 +177,7 @@ def site(commit, reports=False, github=True, public=False):
     version = {"commit": commit, "subject": git("log", "-1", "--format=%s", commit),
                "data": {k: man[k] for k in ("snapshot", "built_at_commit", "published", "note") if k in man},
                "deployed": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-               "by": git("config", "user.name")}
+               "by": who()}
     if tag(commit):
         version["tag"] = tag(commit)
     out["version.json"] = json.dumps(version, ensure_ascii=False, indent=1).encode()
