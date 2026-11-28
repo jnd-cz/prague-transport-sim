@@ -182,7 +182,7 @@ class Queue(unittest.TestCase):
         r = subprocess.run(self.heavy("k", "--", sys.executable, "-I", "-c", code, self.locks), env=self.env,
                            capture_output=True, text=True, timeout=60)
         self.assertEqual(r.stdout.strip(), "python 200 True True", r.stderr)  # (the median of the full runs)
-        r = subprocess.run(self.heavy("--history"), env=self.env, capture_output=True, text=True, timeout=60)
+        r = subprocess.run(self.heavy("--history"), env=self.env, capture_output=True, encoding="utf-8", timeout=60)
         self.assertIn("python | 3 | 3.3 | 1.5 | 1.0", r.stdout)
         self.assertRegex(r.stdout, r"ended: k \(python\) at .* after 2 min: idle: …")
 

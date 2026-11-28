@@ -222,4 +222,6 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    if sys.stdout:  # (--history prints the jobs' names and end reasons: "idle: …" was cp1252 on a pipe, #891)
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.exit(main(sys.argv[1:]))
