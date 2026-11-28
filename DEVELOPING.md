@@ -59,11 +59,25 @@ across machines. Steps, as a normal user with sudo (not root):
    claude --version && claude doctor
    claude                  # log in: open the printed URL elsewhere, paste the code back
    ```
-4. **GitHub**: a fine-grained token for this repository only, with Contents, Pull requests and Issues read and
-   write; Actions and Commit statuses read; Workflows read and write only for CI work; everything else no access.
+4. **GitHub**: a fine-grained token for this repository only, under *Repository permissions*:
+
+   | permission | access | for |
+   |---|---|---|
+   | Contents | read and write | push branches (and small doc changes to main) |
+   | Pull requests | read and write | open, update and comment on PRs |
+   | Issues | read and write | comments, labels (`rebuild`, `needs-user`), findings |
+   | Actions | read and write | read CI runs and their logs, rerun or cancel a run |
+   | Commit statuses | read | the checks on a commit |
+   | Workflows | read and write | only for CI work (`.github/workflows/`) |
+   | Metadata | read | (always on) |
+   | everything else | no access | |
+
+   With Contents left on read, `git push` fails with 403 "Permission … denied" although the account owns the
+   repository (the ruleset on main only forbids deletion and force-push); a token's access can be edited in place.
    ```bash
    gh auth login           # GitHub.com, HTTPS, paste the token
-   gh auth setup-git && gh auth status
+   gh auth setup-git && gh auth status   # run setup-git with the gh that stays (it writes that gh's path)
+   git push --dry-run origin main        # "Everything up-to-date" or a ref line: the token can push
    ```
 5. **Clone**, then the store's key and SSH config as in [DATA.md](DATA.md) (one-time setup, steps 1-3). Copy the
    `Host tramdata` block from a machine that has it; check the server's fingerprint on the first `sftp tramdata`
