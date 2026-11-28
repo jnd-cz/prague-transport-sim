@@ -1217,11 +1217,12 @@ export function outlineOverStreets(g, world) {
 // The contact wire under structures (#71, src/wire.js): the places where a structure stands lower over a drawn track than
 // a collector reaches (the wire is left at its normal height there and the model cut for the collector): the model or
 // the track's height is off. `drops`: the places where the wire comes down under a structure, with its height there.
+// `lifts`: the places where a model's underside is lifted to the clearance (from, to over the rails; the clearance).
 function wireUnderStructures(g) {
   const W = g.route.ground?.wire;
   if (!W) return check('wire-under-structures', 0, []);
   const bad = W.impossible.map((d) => ({ x: d.x, y: d.y, mag: d.under, info: `a structure ${d.under} m over the rails, lower than a collector reaches` }));
-  return { ...check('wire-under-structures', W.drops.length + W.impossible.length, bad, (p) => -p.mag), drops: W.drops };
+  return { ...check('wire-under-structures', W.drops.length + W.impossible.length, bad, (p) => -p.mag), drops: W.drops, lifts: W.lifts, undersides: W.undersides };
 }
 
 // Roads passing under our route (OSM maxheight, tools/clearances.py; the profile keeps them as floors):

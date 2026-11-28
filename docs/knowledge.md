@@ -474,6 +474,22 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   under a structure, and the trams' space cut out of a model ends at the wire, so a low bridge is whole. A structure
   lower than a collector reaches is no evidence of a low wire: the wire stays, the model is cut for the collector,
   and the lint lists the place.
+- **A bridge model too low over a track has its underside lifted to the clearance** (#71, `src/wire.js` `CLEARANCE`,
+  `src/buildings.js` `LIFT_FROM`; the maintainer, #71: the rule of the survey's decks at Divadelní, #445, for the
+  models). The models are coarse blocks (20 to 70 triangles a bridge) from photogrammetry of 2001-2008 with a nominal
+  depth, and streets under them were rebuilt since. A model that leaves less than the clearance posted for the way
+  under it, 0.1 m and the wire's gap (0.15 m) comes up to that, as far as 0.3 m of slab stay under its own top there;
+  the wire then passes under what is left, 0.1 m or more over the sign's height. A sign under tram wires shows
+  noticeably less than the wires' height, so that no vehicle comes near them (the maintainer, #71); by how much is
+  not recorded, so 0.1 m is the least and the posted number a lower bound. The clearance is one for a structure: the highest OSM `maxheight` among the car roads and tram
+  tracks within 20 m of its points over the tracks (the line's `headroom`, `tools/headroom.py` in the build's
+  `clearances` step: numeric values of ways not on a bridge and not under the ground), else the legal 4.2 m, for a
+  track as for a road. The highest, because a sign says the structures on its way are no lower, and OSM tags whole
+  ways: U Výstaviště carries its 3.2 m past the bridge in Dukelských hrdinů, whose own tagged way (4.3 m) ends 5 m
+  before the bridge's face, 13 m from the first point over a track. A sign lower than a collector reaches (3.1 m under Výtoň's bridge, 3.2 m in U
+  Výstaviště: streets under low wires) asks for the lowest wire and its gap, 4.05 m.
+  The corners lifted are the model's from 3.0 m over the rails within 12 m of a lifted point over a track; a corner
+  of the model's top stays, so stairs and ramps keep their surface. The lint lists the places as `lifts`.
   The survey's own slabs over a track are thinned to the wire as one piece, sides with them (their thickness is ours).
   Within 6 m of a low point the wire keeps its height, not its height over the rails (a street that comes down to a
   bridge). **The models' undersides are nominal and the models old:** Mosty 3D is photogrammetry of 2001-2008, and its
