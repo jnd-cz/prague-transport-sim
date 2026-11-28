@@ -124,7 +124,10 @@ def perf_table(got):
 
     A row per machine, browser, kind, game version and the address's drawing switches (src/gfx.js: runs with
     different switches are different measurements, #705); its figures are the latest run's, whole (a median per
-    column took fps from one run and the slow frames from another, #350). got is newest first, as notes() gives."""
+    column took fps from one run and the slow frames from another, #350). got is newest first, as notes() gives.
+    CPU ms is the page's own time a frame (src/perf.js): against 1000 / fps it says what a smaller picture can gain.
+    draw ms is a frame's draw waited for, and half / full the frames a second of a performance test's windows at half
+    the resolution and of the full-resolution windows between them (src/main.js, PT_WAIT and PT_WIN)."""
     rows = {}
     for _, n in got:
         p = n.get("perftest") if n.get("kind") == "perftest" else n.get("perf") if n.get("kind") == "perf" else None
@@ -134,11 +137,13 @@ def perf_table(got):
             gfx = p.get("gfx") or (n.get("machine") or {}).get("gfx") or ""
             rows.setdefault((machine(n), browser(n), kind, version(n), gfx), []).append(p)
     pct = lambda p, k: f"{p['over'][k]}%" if p.get("over", {}).get(k) is not None else "-"  # noqa: E731
-    out = [f"{'machine':48} {'browser':8} {'kind':12} {'version':8} {'runs':>4} {'fps':>6} {'>20 ms':>7} {'>33 ms':>7} {'GPU ms':>7}  gfx"]
+    out = [f"{'machine':48} {'browser':8} {'kind':12} {'version':8} {'runs':>4} {'fps':>6} {'>20 ms':>7} {'>33 ms':>7} {'CPU ms':>7} {'draw ms':>7} {'half / full':>11} {'GPU ms':>7}  gfx"]
     for (m, b, k, v, x), ps in sorted(rows.items()):
         p = ps[0]  # (the latest)
-        gpu = p.get("gpuMs")
+        cpu, gpu, wait, half = p.get("cpuMs"), p.get("gpuMs"), p.get("drawWaitMs"), p.get("half")
+        halves = f"{half['fps']} / {half['full']['fps']}" if half and half.get("full") else "-"
         out.append(f"{m[:48]:48} {b:8} {k:12} {v:8} {len(ps):>4} {p['fps']:>6} {pct(p, '20'):>7} {pct(p, '33'):>7} "
+                   f"{cpu if cpu is not None else '-':>7} {wait if wait is not None else '-':>7} {halves:>11} "
                    f"{gpu if gpu is not None else '-':>7}  {x}".rstrip())
     return out
 

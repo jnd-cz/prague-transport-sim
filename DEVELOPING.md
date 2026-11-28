@@ -265,6 +265,23 @@ the browser has `EXT_disjoint_timer_query_webgl2`; it starts 10 s before the dep
 minute is measured from the departure on, all driving. The Reference test is line 17 from Palackého náměstí (by name, not the middle stop) with
 the detailed model. `tools/test_perf.py --runs N` runs it N times here.
 
+**Where a frame's time goes, without the GPU's timer** (#705: Firefox has none, and most weak machines' results
+come from it; `tools/feedback.py --perf` shows each):
+
+- **The page's own time a frame** (`cpuMs`, `cpuP90`; of it the game's steps `cpuSim` and the draws' calls
+  `cpuDraw`), in a shift's summary and a test's result: its scripts from the frame's start to its end. An interval
+  near it is the processor's and no smaller picture shortens it. The reference stretch here (Arc A770, 1280 x
+  720, 2026-11-27): 6.2 ms in Chromium (steps 0.8, draws' calls 4.4), 10.6 ms in Playwright's Firefox (1.4, 7.2).
+- **A draw waited for** (`drawWaitMs`, a test's 3 s after its minute): each frame reads a pixel back, which
+  returns once the GPU has drawn the frame; the time from the draw's first call to that. It holds the draws'
+  calls, so it is the upper bound of the GPU's time, and follows it: in Chromium here the timer's 2.2, 5.5 and
+  12.1 ms a frame (1280 x 720; 7680 x 4320; that with `gfx=log,snowall`) read 4.9, 11.1 and 17.4 ms.
+- **Half the resolution** (`half`, a test's four windows of 3 s after that, in turn at half the resolution each
+  way and at the full one, each window's first 0.5 s left out): the frames a second of both, on the same stretch
+  of route. Equal rates say the pixels are not the limit: Playwright's Firefox here ran the minute at 45.1 frames
+  a second and the windows at 39.9 (640 x 360) and 39.8 (1280 x 720). A display's rate caps both: a machine
+  already at it shows nothing here.
+
 **What the fragments cost** (#705): a weak GPU is short of fragments, not of triangles or draw calls (the testers'
 phone was no faster with both halved). Two things made every fragment dear, and the page draws without both since
 2026-11-27: the logarithmic depth buffer (three.js then writes each fragment's depth, so the GPU cannot reject a
