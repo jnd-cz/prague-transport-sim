@@ -262,7 +262,8 @@ tmavé sklo je hra.
   pro hybrid, T2R 6004 – částečné zvuky: zvonek, výstraha dveří a stykače zrychlovače TR37 nahrané ve voze T2R 6004;
   ostatní zvuky zůstávají vestavěné. Hra si volbu pamatuje pro každý model a hraje ji od začátku další směny.
 - Hlášení zastávek na lince 17 (pilot): vyberte hlas Aoede, Algieba či Sulafat a spuštění 100 m nebo
-  50 m před označníkem či po zastavení. Hlášení je slyšet i v kabině.
+  50 m před označníkem či po zastavení. První hlášení zazní na začátku směny, další se načte u předchozí zastávky.
+  Hlášení je slyšet i v kabině.
 - Vozidla…: balíčky od jiných autorů (tramvaj, nátěr, zvuky nebo vozový park), instalované ze souboru .zip, ze
   složky nebo z adresy, i celý komplet v jednom archivu. Hra každý před nabídnutím zkontroluje (soubory, licenci,
   rozměry modelu a jeho náročnost); odmítnutý ukáže s důvody. Instalované zůstávají jen v tomto prohlížeči a jdou

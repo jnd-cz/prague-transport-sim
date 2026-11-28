@@ -1205,6 +1205,7 @@ export class Game {
       this.pax.ready(Math.round((this.pax.aboard - this.pax.toAlight) * st.alightFrac));
     }
     if (at && !st.arrived) {
+      this.audio.announcements?.preload(st.i + 1);
       st.arrived = true;
       st.arriveClock = this.clock;
       this._comeTo(st);
@@ -1245,6 +1246,7 @@ export class Game {
       return;
     }
     if (passed && !last) {
+      if (!st.arrived) this.audio.announcements?.preload(st.i + 1);
       this._finishStop(st);
       this.nextStop++;
     }

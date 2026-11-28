@@ -6,25 +6,28 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from announcements import OUTPUT, ROOT, VOICES, stop_entries  # noqa: E402
+from announcements import OUTPUT, ROOT, VOICES, announcement_plan  # noqa: E402
 
 
 class AnnouncementPack(unittest.TestCase):
     def test_sentence_order_and_terminus(self):
         names = ["First", "Transfer", "Last"]
         facts = [{"name": "Transfer", "type": "street", "from": "First"}]
-        pattern = [("s1", set()), ("s2", {"metro", "train"}), ("s3", set())]
-        first, transfer, last = stop_entries(names, pattern, facts)
-        self.assertEqual(first["text"], "First. Příští zastávka... Transfer.")
-        self.assertEqual(transfer["text"], "Transfer. Přestup na metro. Přestup na vlak. "
-                                          "Výstup do vozovky. Příští zastávka... Last.")
-        self.assertEqual(last["text"], "Last. Konečná zastávka, prosíme vystupte.")
-        self.assertIsNone(last["next"])
+        pattern = [("s1", set(), False), ("s2", {"metro", "train"}, True), ("s3", set(), False)]
+        (first, transfer, last), clips = announcement_plan(names, pattern, facts)
+        self.assertEqual(first["segments"], ["stop-s1", "next", "stop-s2", "next-request"])
+        self.assertEqual(transfer["segments"], ["stop-s2", "request", "metro", "train", "road", "next", "stop-s3"])
+        self.assertEqual(last["segments"], ["stop-s3", "terminus"])
+        self.assertEqual(clips["stop-s2"]["text"], "Transfer.")
+        self.assertEqual(clips["next-request"]["text"], "Příští zastávka je na znamení.")
+        self.assertEqual(clips["request"]["text"], "Zastávka na znamení.")
 
     def test_reverse_stop_fact_does_not_apply(self):
-        pattern = [("s3", set()), ("s2", set()), ("s1", set())]
+        pattern = [("s3", set(), False), ("s2", set(), False), ("s1", set(), False)]
         facts = [{"name": "Transfer", "type": "street", "from": "First"}]
-        self.assertEqual(list(stop_entries(["Last", "Transfer", "First"], pattern, facts))[1]["clauses"], [])
+        entries, clips = announcement_plan(["Last", "Transfer", "First"], pattern, facts)
+        self.assertNotIn("road", entries[1]["segments"])
+        self.assertNotIn("road", clips)
 
     def test_compiled_assets(self):
         pack = json.loads((OUTPUT / "manifest.json").read_text(encoding="utf-8"))
@@ -32,16 +35,24 @@ class AnnouncementPack(unittest.TestCase):
         self.assertEqual(tuple(pack["voices"]), VOICES)
         self.assertEqual(pack["speakingRate"], 0.85)
         by_name = {s["name"]: s for s in pack["stops"]}
-        self.assertEqual(by_name["Nádraží Holešovice"]["clauses"], ["Přestup na metro.", "Přestup na vlak."])
-        self.assertEqual(by_name["Březiněveská"]["clauses"], ["Výstup do vozovky."])
-        self.assertIsNone(pack["stops"][-1]["next"])
+        self.assertEqual(by_name["Nádraží Holešovice"]["segments"][1:3], ["metro", "train"])
+        self.assertEqual(by_name["Březiněveská"]["segments"][1], "road")
+        self.assertEqual(by_name["Modřanská rokle"]["segments"][-1], "next-request")
+        self.assertEqual(by_name["U Libušského potoka"]["segments"][1], "request")
+        self.assertEqual(pack["stops"][-1]["segments"][-1], "terminus")
         if (ROOT / "data/line17.json").exists():
             line = json.loads((ROOT / "data/line17.json").read_text(encoding="utf-8"))
-            self.assertEqual([s["name"] for s in pack["stops"]], [s["name"] for s in line["stops"]])
-        for stop in pack["stops"]:
-            self.assertEqual(tuple(stop["clips"]), VOICES)
-            for path in stop["clips"].values():
+            self.assertEqual([(s["name"], s["request"]) for s in pack["stops"]],
+                             [(s["name"], s["request"]) for s in line["stops"]])
+        self.assertEqual({key for s in pack["stops"] for key in s["segments"]}, set(pack["segments"]))
+        paths = set()
+        for segment in pack["segments"].values():
+            self.assertEqual(tuple(segment["clips"]), VOICES)
+            for path in segment["clips"].values():
+                self.assertNotIn(path, paths)
                 self.assertGreater((OUTPUT / path).stat().st_size, 1000, path)
+                paths.add(path)
+        self.assertEqual(paths, {p.relative_to(OUTPUT).as_posix() for p in OUTPUT.rglob("*.mp3")})
 
 
 if __name__ == "__main__":

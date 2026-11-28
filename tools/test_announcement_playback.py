@@ -55,16 +55,26 @@ class AnnouncementPlayback(unittest.TestCase):
             page.wait_for_function("window.audio")
             page.click("#start")
             page.evaluate("stops => audio.announcements.prepareRun('17', stops, 1)", self.stops)
+            page.wait_for_function("audio.announcements.current?.i === 1 && audio.announcements.source")
+            page.evaluate("""async () => {
+                const a = audio.announcements;
+                a.preload(3);  // reached stop 2's platform
+                await Promise.all([...a.run.preloads.get(2).values(), ...a.run.preloads.get(3).values()]);
+                const prepared = await a.run.preloads.get(3).get('Algieba');
+                if (prepared.length !== a.run.pack.stops[3].segments.length) throw new Error('Incomplete preload');
+            }""")
+            requests = []
+            page.on("request", lambda request: requests.append(request.url) if request.url.endswith(".mp3") else None)
+            page.context.set_offline(True)
             page.evaluate("""() => {
                 for (const [i, distance] of [[1, 0], [2, 115], [2, 99], [2, 95]]) {
                     audio.announcements.approach(i, distance, distance === 0);
                 }
             }""")
-            page.wait_for_function("audio.announcements.source")
             self.assertEqual(page.evaluate("""() => {
                 const a = audio.announcements;
                 return [a.current.i, a.current.voice, [...a.run.seen]];
-            }"""), [2, "Aoede", [2]])
+            }"""), [1, "Aoede", [1, 2]])
             page.evaluate("audio.setActive(false)")
             self.assertTrue(page.evaluate("!audio.announcements.source && audio.announcements.current.offset >= 0"))
             page.evaluate("audio.setActive(true)")
@@ -81,12 +91,18 @@ class AnnouncementPlayback(unittest.TestCase):
                 a.approach(3, 0, true);
                 a.approach(3, 0, true);
             }""")
-            self.assertEqual(page.evaluate("audio.announcements.run.queue.length"), 1)
+            self.assertEqual(page.evaluate("[...audio.announcements.run.seen]"), [1, 2, 3])
             page.wait_for_function("audio.announcements.current?.voice === 'Algieba' && audio.announcements.source")
+            self.assertEqual(page.evaluate("audio.announcements.current.i"), 3)
+            self.assertEqual(requests, [])
+            page.context.set_offline(False)
             page.select_option("#optAnnouncementVoice", "Sulafat")
-            page.evaluate("i => audio.announcements.approach(i, 0, true)", len(self.stops) - 1)
+            page.evaluate("stops => audio.announcements.prepareRun('17', stops, stops.length - 2)", self.stops)
+            page.wait_for_function("audio.announcements.source")
+            last = len(self.stops) - 1
+            page.evaluate("i => audio.announcements.approach(i, 0, true)", last)
             page.evaluate("audio.setActive(false, true)")
-            page.wait_for_function("audio.announcements.current?.voice === 'Sulafat' && audio.announcements.source")
+            page.wait_for_function("i => audio.announcements.current?.i === i && audio.announcements.source", arg=last)
             page.wait_for_function("!audio.announcements.current", timeout=20000)
             page.evaluate("""stops => {
                 audio.announcements.prepareRun('23', stops, 0);
@@ -109,12 +125,21 @@ class AnnouncementPlayback(unittest.TestCase):
             page.evaluate("window.runSeed = 894")
             page.click("#btnStart")
             page.wait_for_function("game.autopilot && game.audio.active", timeout=120000)
+            page.wait_for_function("game.audio.announcements.current?.i === 27 && game.audio.announcements.source")
             seen_at = page.evaluate(APPROACH, 28)
             self.assertEqual(seen_at["name"], "Nádraží Holešovice")
-            self.assertEqual(seen_at["seen"], [28])
+            self.assertEqual(seen_at["seen"], [27, 28])
             self.assertGreater(seen_at["distance"], 99)
             self.assertLessEqual(seen_at["distance"], 100)
-            page.wait_for_function("game.audio.announcements.current?.voice === 'Sulafat' && game.audio.announcements.source")
+            page.wait_for_function("game.audio.announcements.current?.i === 28 && game.audio.announcements.source")
+            page.evaluate("""async () => {
+                for (let n = 0; n < 9000 && !game.stops[28].arrived; n++) run.step(1 / 30, null, null, false);
+                const voices = game.audio.announcements.run.preloads.get(29);
+                if (!voices || !(await Promise.all(voices.values())).every(Boolean)) {
+                  throw new Error('Arrival at the previous stop did not preload the next announcement');
+                }
+            }""")
+            page.context.set_offline(True)
             page.evaluate("""() => {
                 const timing = document.querySelector('#optAnnouncementDistance');
                 timing.value = '50';
@@ -122,9 +147,11 @@ class AnnouncementPlayback(unittest.TestCase):
             }""")
             ordinary = page.evaluate(APPROACH, 29)
             self.assertEqual(ordinary["name"], "Trojská")
-            self.assertEqual(ordinary["seen"], [28, 29])
+            self.assertEqual(ordinary["seen"], [27, 28, 29])
             self.assertGreater(ordinary["distance"], 49)
             self.assertLessEqual(ordinary["distance"], 50)
+            page.wait_for_function("game.audio.announcements.current?.i === 29 && game.audio.announcements.source")
+            page.context.set_offline(False)
             page.evaluate("""async () => {
                 const timing = document.querySelector('#optAnnouncementDistance');
                 timing.value = '0';
@@ -134,7 +161,7 @@ class AnnouncementPlayback(unittest.TestCase):
             }""")
             terminus = page.evaluate(APPROACH, 36)
             self.assertEqual(terminus["name"], "Vozovna Kobylisy")
-            self.assertEqual(terminus["seen"], [36])
+            self.assertEqual(terminus["seen"], [35, 36])
             self.assertTrue(page.evaluate("game.stops[36].arrived"))
             page.evaluate("game.audio.setActive(false, true)")
             page.wait_for_function("game.audio.announcements.current?.i === 36 && game.audio.announcements.source")

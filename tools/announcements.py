@@ -26,6 +26,9 @@ VOICES = ("Aoede", "Algieba", "Sulafat")
 RATE = 0.85
 ICONS = {"Ma": "metro", "Mb": "metro", "Mc": "metro", "Md": "metro", "Ra": "train", "Sb": "train"}
 CLAUSES = {"metro": "Přestup na metro.", "train": "Přestup na vlak.", "road": "Výstup do vozovky."}
+PHRASES = {**CLAUSES, "request": "Zastávka na znamení.", "next": "Příští zastávka...",
+           "next-request": "Příští zastávka je na znamení.",
+           "terminus": "Konečná zastávka, prosíme vystupte."}
 
 
 def pinned_gtfs():
@@ -47,8 +50,8 @@ def seconds(timestamp):
     return (h * 60 + m) * 60 + s
 
 
-def transfers(archive, names, timetable):
-    """Require every playable trip to agree on platform IDs and relevant transfer icons."""
+def timetable_pattern(archive, names, timetable):
+    """Require every playable trip to agree on platform IDs, transfers and request stops."""
     expected_times = {tuple(trip) for trip in timetable}
     matched = set()
     patterns = set()
@@ -71,14 +74,22 @@ def transfers(archive, names, timetable):
             if times in expected_times:
                 matched.add(times)
                 patterns.add(tuple((row["stop_id"], frozenset(ICONS[icon] for icon in
-                                    re.findall(r"[A-Z][a-z]", row["stop_icons"]) if icon in ICONS)) for row in trip))
+                                    re.findall(r"[A-Z][a-z]", row["stop_icons"]) if icon in ICONS),
+                                    "3" in (row["pickup_type"], row["drop_off_type"])) for row in trip))
     if matched != expected_times or len(patterns) != 1:
         raise ValueError(f"Line {LINE}: {len(matched)}/{len(expected_times)} trips match, {len(patterns)} announcement patterns")
     return patterns.pop()
 
 
-def stop_entries(names, pattern, stop_facts):
-    for index, (name, (stop_id, modes)) in enumerate(zip(names, pattern, strict=True)):
+def announcement_plan(names, pattern, stop_facts):
+    clips = dict(PHRASES)
+    name_ids = {}
+    for name, (stop_id, _, _) in zip(names, pattern, strict=True):
+        key = name_ids.setdefault(name, f"stop-{stop_id}")
+        clips[key] = name + "."
+
+    entries = []
+    for index, (name, (stop_id, modes, request)) in enumerate(zip(names, pattern, strict=True)):
         previous = names[index - 1] if index else None
         next_name = names[index + 1] if index + 1 < len(names) else None
         kinds = set(modes)
@@ -87,11 +98,20 @@ def stop_entries(names, pattern, stop_facts):
                (fact.get("from") == previous if fact.get("from") else fact.get("towards") in ("*", next_name))
                for fact in stop_facts):
             kinds.add("road")
-        clauses = [text for kind, text in CLAUSES.items() if kind in kinds]
-        end = f"Příští zastávka... {next_name}." if next_name else "Konečná zastávka, prosíme vystupte."
-        clips = {voice: f"{voice.lower()}/{stop_id}.mp3" for voice in VOICES}
-        yield {"id": stop_id, "name": name, "next": next_name, "clauses": clauses,
-               "text": " ".join([name + ".", *clauses, end]), "clips": clips}
+        segments = [name_ids[name]]
+        if request:
+            segments.append("request")
+        segments.extend(kind for kind in CLAUSES if kind in kinds)
+        if next_name:
+            segments.extend(("next", name_ids[next_name]))
+            if pattern[index + 1][2]:
+                segments.append("next-request")
+        else:
+            segments.append("terminus")
+        entries.append({"id": stop_id, "name": name, "request": request, "segments": segments})
+    used = {key for stop in entries for key in stop["segments"]}
+    return entries, {key: {"text": text, "clips": {v: f"{v.lower()}/{key}.mp3" for v in VOICES}}
+                     for key, text in clips.items() if key in used}
 
 
 def synthesize(project, token, voice, text):
@@ -118,20 +138,24 @@ def main():
     data = json.loads((ROOT / f"data/line{LINE}.json").read_text(encoding="utf-8"))
     truth = json.loads((ROOT / "data/truth.json").read_text(encoding="utf-8"))
     names = [s["name"] for s in data["stops"]]
-    entries = list(stop_entries(names, transfers(archive, names, data["timetable"]), truth["stops"]))
+    pattern = timetable_pattern(archive, names, data["timetable"])
+    if [r for _, _, r in pattern] != [bool(s.get("request")) for s in data["stops"]]:
+        raise ValueError("PID request flags differ from the built route")
+    entries, segments = announcement_plan(names, pattern, truth["stops"])
     manifest = {
         "line": LINE, "voices": list(VOICES), "speakingRate": RATE,
         "source": {"snapshot": snapshot, "gtfsSha256": source_hash,
-                   "transferIcons": "https://pid.cz/en/opendata/",
+                   "timetable": "https://pid.cz/en/opendata/",
                    "roadway": "data/truth.json stops (maintainer, 2026-10-23)"},
         "synthesis": "Google Cloud Czech Chirp 3 HD",
         "outputTerms": "https://cloud.google.com/text-to-speech/docs/basics",
         "stops": entries,
+        "segments": segments,
     }
     target = OUTPUT / "manifest.json"
     old = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
-    cached = {path: s["text"] for s in old.get("stops", []) for path in s["clips"].values()}
-    pending = [(voice, s["text"], OUTPUT / path) for s in entries for voice, path in s["clips"].items()
+    cached = {path: s["text"] for s in old.get("segments", {}).values() for path in s["clips"].values()}
+    pending = [(voice, s["text"], OUTPUT / path) for s in segments.values() for voice, path in s["clips"].items()
                if not (OUTPUT / path).is_file() or cached.get(path) != s["text"] or old.get("speakingRate") != RATE]
     if pending:
         token = subprocess.run([args.gcloud, "auth", "application-default", "print-access-token"],
@@ -151,7 +175,8 @@ def main():
     with replacing(target, encoding="utf-8") as stream:
         json.dump(manifest, stream, ensure_ascii=False, indent=2)
         stream.write("\n")
-    print(f"Line {LINE}: {len(entries)} stops × {len(VOICES)} voices; synthesized {len(pending)} clips.")
+    print(f"Line {LINE}: {len(entries)} announcements, {len(segments)} segments × {len(VOICES)} voices; "
+          f"synthesized {len(pending)} clips.")
 
 
 if __name__ == "__main__":

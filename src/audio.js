@@ -150,8 +150,10 @@ export class StopAnnouncements {
     this.stopSource();
     this.current = null;
     this.run = String(line) === LINE ? {
-      names: stops.map(stop => stop.name), startStop, queue: [], seen: new Set(),
+      stops, startStop, queue: [], seen: new Set(), segments: new Map(), preloads: new Map(),
+      through: startStop + 1, loadedThrough: startStop - 1,
     } : null;
+    if (this.active) this.startRun();
   }
 
   setAudio(ctx, active, finishing, muted) {
@@ -171,23 +173,25 @@ export class StopAnnouncements {
       }
       return;
     }
-    if (this.run) this.load(this.run);
+    if (active) this.startRun();
     this.play();
   }
 
-  load(run) {
-    if (run.loading) return;
-    run.loading = true;
+  startRun() {
+    const run = this.run;
+    if (!run || run.seen.has(run.startStop)) return;
+    this.announce(run.startStop);
     fetch(PACK).then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     }).then(pack => {
       if (this.run !== run) return;
-      if (pack.line !== LINE || pack.stops.length !== run.names.length ||
-          pack.stops.some((stop, i) => stop.name !== run.names[i])) {
+      if (pack.line !== LINE || pack.stops.length !== run.stops.length || !pack.segments ||
+          pack.stops.some((stop, i) => stop.name !== run.stops[i].name || stop.request !== !!run.stops[i].request)) {
         throw new Error('Announcement pack does not match this route');
       }
       run.pack = pack;
+      this.preload(run.through);
       this.play();
     }).catch(error => {
       if (this.run === run) {
@@ -197,14 +201,56 @@ export class StopAnnouncements {
     });
   }
 
+  preload(i) {
+    const run = this.run;
+    if (!run) return;
+    run.through = Math.min(Math.max(run.through, i), run.stops.length - 1);
+    if (!run.pack) return;
+    // Load all three voices at the previous stop so a voice change needs no new request on approach.
+    for (let j = run.loadedThrough + 1; j <= run.through; j++) {
+      const paths = run.pack.stops[j].segments.map(key => run.pack.segments[key].clips);
+      const voices = new Map(run.pack.voices.map(voice => [voice,
+        Promise.all(paths.map(path => this.loadSegment(run, path[voice]))).catch(error => {
+          if (this.run === run) console.warn('Could not preload the stop announcement', error);
+          return null;
+        }),
+      ]));
+      run.preloads.set(j, voices);
+    }
+    run.loadedThrough = run.through;
+  }
+
+  loadSegment(run, path) {
+    if (!run.segments.has(path)) {
+      const decoded = fetch(new URL(path, PACK)).then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.arrayBuffer();
+      }).then(bytes => this.ctx.decodeAudioData(bytes)).then(buffer => {
+        // Chirp leaves uneven silence around separately recorded phrases. Keep a margin for quiet consonants.
+        const samples = buffer.getChannelData(0);
+        const audible = x => Math.abs(x) >= 0.005;
+        const first = samples.findIndex(audible);
+        if (first < 0) return samples;
+        const margin = Math.round(buffer.sampleRate * 0.065);
+        return samples.subarray(Math.max(0, first - margin), samples.findLastIndex(audible) + margin + 1);
+      });
+      run.segments.set(path, decoded);
+    }
+    return run.segments.get(path);
+  }
+
   approach(i, ahead, at) {
     const run = this.run;
     if (!this.active || !run || i <= run.startStop || run.seen.has(i)) return;
     if (!at && (options.distance === 0 || ahead < 0 || ahead > options.distance)) return;
+    this.announce(i);
+  }
+
+  announce(i) {
+    const run = this.run;
     run.seen.add(i);
     if (options.voice === 'off') return;
     run.queue.push({ i, voice: options.voice });
-    this.load(run);
     this.play();
   }
 
@@ -215,19 +261,22 @@ export class StopAnnouncements {
       const next = run.queue.shift();
       if (!next) return;
       const { i, voice } = next;
-      const path = run.pack.stops[i].clips[voice];
+      const buffers = run.preloads.get(i)?.get(voice);
+      if (!buffers) { this.play(); return; }
       const clip = this.current = { i, voice, offset: 0 };
-      fetch(new URL(path, PACK)).then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.arrayBuffer();
-      }).then(bytes => this.ctx.decodeAudioData(bytes)).then(buffer => {
+      buffers.then(parts => {
         if (this.current !== clip) return;
-        clip.buffer = buffer;
-        this.play();
-      }).catch(error => {
-        if (this.current !== clip) return;
-        console.warn('Could not play the stop announcement', error);
-        this.current = null;
+        if (parts) {
+          // One buffer keeps the segment boundaries sample-accurate and resumes at the same point after pause.
+          const gap = Math.round(this.ctx.sampleRate * 0.09);
+          const length = parts.reduce((sum, part) => sum + part.length, gap * (parts.length - 1));
+          clip.buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+          let offset = 0;
+          for (const part of parts) {
+            clip.buffer.copyToChannel(part, 0, offset);
+            offset += part.length + gap;
+          }
+        } else this.current = null;
         this.play();
       });
       return;
