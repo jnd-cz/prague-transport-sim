@@ -474,6 +474,14 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   under a structure, and the trams' space cut out of a model ends at the wire, so a low bridge is whole. A structure
   lower than a collector reaches is no evidence of a low wire: the wire stays, the model is cut for the collector,
   and the lint lists the place.
+  The survey's own slabs over a track are thinned to the wire as one piece, sides with them (their thickness is ours).
+  Within 6 m of a low point the wire keeps its height, not its height over the rails (a street that comes down to a
+  bridge). **The models' undersides are nominal and the models old:** Mosty 3D is photogrammetry of 2001-2008, and its
+  slabs run 0.5-1.0 m under a measured top (Výtoň's railway bridge: top 5.3 m, underside 4.3 m over the rails). The two
+  bridges after Výstaviště on line 17 stand over track heights of 2023 (numeric DI, the archive's records of 2023 and the
+  lidar agree): the one at s 16900-17000 was rebuilt since (its model: top 4.7 m, underside 4.14 m over today's rails),
+  under the one at s 17400-17450 the street may have been lowered (the maintainer, #71). OSM's `maxheight` under them:
+  4.3 and 3.2 m; under Výtoň's 3.1 m.
 - **A bridge's outline in the survey (class `deck`) is no surface** (#13, `src/groundDraw.js` `buildDtm`, the lint
   `outlineOverStreets`). It is one coarse area under everything the bridge carries, with heights only along its edges
   (the parapet's or the kerb's), and the page laid it with an offset of its own. Drawn as a slab like the streets on
