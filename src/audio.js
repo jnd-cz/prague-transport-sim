@@ -92,18 +92,20 @@ function railImpactBuffer(ctx, noise, [body, rail, ring], offset) {
   return buffer;
 }
 
-// Recorded Czech announcements for the one-line pilot (#894).
-const LINE = '17';
-const PACK = new URL('../assets/announcements/17/manifest.json', import.meta.url);
+// The shared Czech announcement catalogue (#894).
+const PACK = new URL('../assets/announcements/manifest.json', import.meta.url);
+const CLIP_CACHE = 'tram-announcement-audio-';
 const VOICES = ['Aoede', 'Algieba', 'Sulafat', 'off'];
 const BROWSER_VOICE = 'browser';
 const DISTANCES = [100, 50, 0];
-const options = { voice: VOICES[0], distance: DISTANCES[0] };
+const options = { voice: VOICES[0], distance: DISTANCES[0], volume: 100 };
 try {
   const voice = localStorage.getItem('tram.announcementVoice');
   const distance = localStorage.getItem('tram.announcementDistance');
+  const volume = localStorage.getItem('tram.announcementVolume');
   if (VOICES.includes(voice) || voice === BROWSER_VOICE) options.voice = voice;
   if (distance !== null && DISTANCES.includes(+distance)) options.distance = +distance;
+  if (volume !== null && +volume >= 0 && +volume <= 100) options.volume = +volume;
 } catch { /* storage unavailable */ }
 
 function czechSpeechVoice() {
@@ -120,17 +122,21 @@ export function initAnnouncementMenu(getLang, onLangChange) {
   const line = document.getElementById('selLine');
   const voice = document.getElementById('optAnnouncementVoice');
   const distance = document.getElementById('optAnnouncementDistance');
+  const volume = document.getElementById('optAnnouncementVolume');
   for (const value of VOICES) voice.add(new Option(value, value));
   for (const value of DISTANCES) distance.add(new Option(String(value), String(value)));
   const off = voice.options[VOICES.indexOf('off')];
   const browser = new Option('', BROWSER_VOICE);
   distance.value = String(options.distance);
-  const rows = [voice.closest('label'), distance.closest('label')];
-  const visibility = () => { for (const row of rows) row.hidden = line.value !== LINE; };
+  volume.value = String(options.volume);
+  const rows = [voice.closest('label'), distance.closest('label'), volume.closest('label')];
+  const showVolume = () => { rows[2].querySelector('output').value = `${volume.value}%`; };
+  const visibility = () => { for (const row of rows) row.hidden = !line.value; };
   const translate = () => {
     const cs = getLang() === 'cs';
     rows[0].querySelector('span').textContent = cs ? 'Hlas hlášení' : 'Announcement voice';
     rows[1].querySelector('span').textContent = cs ? 'Spuštění hlášení' : 'Announcement timing';
+    rows[2].querySelector('span').textContent = cs ? 'Hlasitost hlášení' : 'Announcement volume';
     off.text = cs ? 'Vypnuto' : 'Off';
     const native = czechSpeechVoice();
     if (native) {
@@ -148,6 +154,12 @@ export function initAnnouncementMenu(getLang, onLangChange) {
     options.distance = +distance.value;
     try { localStorage.setItem('tram.announcementDistance', distance.value); } catch { /* storage unavailable */ }
   });
+  volume.addEventListener('input', () => {
+    options.volume = +volume.value;
+    showVolume();
+    try { localStorage.setItem('tram.announcementVolume', volume.value); } catch { /* storage unavailable */ }
+  });
+  showVolume();
   translate();
   onLangChange(translate);
   globalThis.speechSynthesis?.addEventListener('voiceschanged', translate);
@@ -155,6 +167,38 @@ export function initAnnouncementMenu(getLang, onLangChange) {
   // main populates the line menu after loading the world.
   new MutationObserver(visibility).observe(line, { childList: true });
   line.addEventListener('change', visibility);
+}
+
+function callsForRun(pack, line, stops) {
+  const verified = pack.lines[line];
+  if (verified?.length === stops.length && verified.every((stop, i) =>
+    stop.name === stops[i].name && stop.request === !!stops[i].request)) return verified.map(stop => stop.segments);
+  // A changed itinerary can reuse known names. Directional notes require a verified platform sequence.
+  const names = new Map(Object.values(pack.lines).flatMap(calls => calls.map(stop => [stop.name, stop.segments[0]])));
+  return stops.map((stop, i) => {
+    const name = names.get(stop.name);
+    if (!name) return [];
+    const segments = stop.request ? [name, 'request'] : [name];
+    const next = stops[i + 1];
+    if (!next) segments.push('terminus');
+    else if (names.has(next.name)) {
+      segments.push('next', names.get(next.name));
+      if (next.request) segments.push('next-request');
+    }
+    return segments;
+  });
+}
+
+async function openClipCache(version) {
+  if (!globalThis.caches || !version) return null;
+  const name = CLIP_CACHE + version;
+  try {
+    const cache = await caches.open(name);
+    for (const old of await caches.keys()) {
+      if (old.startsWith(CLIP_CACHE) && old !== name) void caches.delete(old).catch(() => {});
+    }
+    return cache;
+  } catch { return null; }
 }
 
 export class StopAnnouncements {
@@ -169,8 +213,8 @@ export class StopAnnouncements {
     this.stopSource();
     this.stopSpeech();
     this.current = null;
-    this.run = String(line) === LINE ? {
-      stops, startStop, queue: [], seen: new Set(), segments: new Map(), preloads: new Map(),
+    this.run = stops[startStop] ? {
+      line: String(line), stops, startStop, queue: [], seen: new Set(), segments: new Map(), preloads: new Map(),
       through: startStop + 1, loadedThrough: startStop - 1,
     } : null;
     if (this.active) this.startRun();
@@ -183,7 +227,7 @@ export class StopAnnouncements {
       this.output = ctx.createGain();
       this.output.connect(ctx.destination);
     }
-    this.output.gain.value = muted ? 0 : 0.6;
+    this.output.gain.value = muted ? 0 : 0.6 * options.volume / 100;
     this.active = active;
     this.playing = active || finishing;
     this.muted = muted;
@@ -218,10 +262,8 @@ export class StopAnnouncements {
       return response.json();
     }).then(pack => {
       if (this.run !== run) return;
-      if (pack.line !== LINE || pack.stops.length !== run.stops.length || !pack.segments ||
-          pack.stops.some((stop, i) => stop.name !== run.stops[i].name || stop.request !== !!run.stops[i].request)) {
-        throw new Error('Announcement pack does not match this route');
-      }
+      if (!pack.lines || !pack.segments) throw new Error('Invalid announcement catalogue');
+      run.calls = callsForRun(pack, run.line, run.stops);
       run.pack = pack;
       this.preload(run.through);
       this.play();
@@ -241,7 +283,8 @@ export class StopAnnouncements {
     if (!run.pack || voice === BROWSER_VOICE || voice === 'off') return;
     // Load all three voices at the previous stop so a voice change needs no new request on approach.
     for (let j = run.loadedThrough + 1; j <= run.through; j++) {
-      const paths = run.pack.stops[j].segments.map(key => run.pack.segments[key].clips);
+      const paths = run.calls[j].map(key => run.pack.segments[key].clips);
+      if (!paths.length) continue;
       const voices = new Map(run.pack.voices.map(voice => [voice,
         Promise.all(paths.map(path => this.loadSegment(run, path[voice]))).catch(error => {
           if (this.run === run) console.warn('Could not preload the stop announcement', error);
@@ -255,8 +298,15 @@ export class StopAnnouncements {
 
   loadSegment(run, path) {
     if (!run.segments.has(path)) {
-      const decoded = fetch(new URL(path, PACK)).then(response => {
+      run.cache ??= openClipCache(run.pack.audioVersion);
+      const url = new URL(path, PACK);
+      url.searchParams.set('v', run.pack.audioVersion);
+      const decoded = run.cache.then(async cache => {
+        const cached = await cache?.match(url.href).catch(() => null);
+        if (cached) return cached.arrayBuffer();
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (cache) void cache.put(url.href, response.clone()).catch(() => {});
         return response.arrayBuffer();
       }).then(bytes => this.ctx.decodeAudioData(bytes)).then(buffer => {
         // Chirp leaves uneven silence around separately recorded phrases. Keep a margin for quiet consonants.
@@ -348,15 +398,20 @@ export class StopAnnouncements {
       return;
     }
     const { pack } = this.run;
-    const text = pack.stops[clip.i].segments.map(key => {
+    const text = this.run.calls[clip.i].map(key => {
       const segment = pack.segments[key];
       return segment.spoken ?? segment.text;
     }).join(' ');
+    if (!text) {
+      this.current = null;
+      this.play();
+      return;
+    }
     const utterance = this.utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = voice;
     utterance.lang = voice.lang;
     utterance.rate = pack.speakingRate;
-    utterance.volume = 0.6;
+    utterance.volume = options.volume / 100;
     utterance.onend = utterance.onerror = () => {
       if (this.utterance !== utterance) return;
       this.utterance = null;

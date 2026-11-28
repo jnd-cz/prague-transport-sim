@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Check the announcement text rules and the compiled line 17 voice pack."""
+"""Check announcement wording, route coverage and the shared recordings."""
 import json
 from pathlib import Path
 import sys
@@ -16,11 +16,12 @@ class AnnouncementPack(unittest.TestCase):
         pattern = [("s1", set(), False), ("s2", {"metro", "train"}, True), ("s3", set(), False)]
         pronunciations = {"Transfer": {"spoken": "Spoken"}}
         (first, transfer, last), clips = announcement_plan(names, pattern, facts, pronunciations)
-        self.assertEqual(first["segments"], ["stop-s1", "next", "stop-s2", "next-request"])
-        self.assertEqual(transfer["segments"], ["stop-s2", "request", "metro", "train", "road", "next", "stop-s3"])
-        self.assertEqual(last["segments"], ["stop-s3", "terminus"])
-        self.assertEqual(clips["stop-s2"]["text"], "Transfer.")
-        self.assertEqual(clips["stop-s2"]["spoken"], "Spoken.")
+        a, b, c = (s["segments"][0] for s in (first, transfer, last))
+        self.assertEqual(first["segments"], [a, "next", b, "next-request"])
+        self.assertEqual(transfer["segments"], [b, "request", "metro", "train", "road", "next", c])
+        self.assertEqual(last["segments"], [c, "terminus"])
+        self.assertEqual(clips[b]["text"], "Transfer.")
+        self.assertEqual(clips[b]["spoken"], "Spoken.")
         self.assertEqual(clips["next-request"]["text"], "Příští zastávka je na znamení.")
         self.assertEqual(clips["request"]["text"], "Zastávka na znamení.")
 
@@ -37,10 +38,11 @@ class AnnouncementPack(unittest.TestCase):
 
     def test_compiled_assets(self):
         pack = json.loads((OUTPUT / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(pack["line"], "17")
+        lines = pack["lines"]
+        self.assertEqual(set(lines), {"9", "17", "22", "23", "37"})
         self.assertEqual(tuple(pack["voices"]), VOICES)
         self.assertEqual(pack["speakingRate"], 0.85)
-        by_name = {s["name"]: s for s in pack["stops"]}
+        by_name = {s["name"]: s for s in lines["17"]}
         self.assertEqual(by_name["Nádraží Holešovice"]["segments"][1:3], ["metro", "train"])
         self.assertNotIn("road", by_name["Březiněveská"]["segments"])
         key = by_name["Strossmayerovo náměstí"]["segments"][0]
@@ -48,12 +50,21 @@ class AnnouncementPack(unittest.TestCase):
         self.assertEqual(pack["segments"][key]["spoken"], "Štrosmajerovo náměstí.")
         self.assertEqual(by_name["Modřanská rokle"]["segments"][-1], "next-request")
         self.assertEqual(by_name["U Libušského potoka"]["segments"][1], "request")
-        self.assertEqual(pack["stops"][-1]["segments"][-1], "terminus")
-        if (ROOT / "data/line17.json").exists():
-            line = json.loads((ROOT / "data/line17.json").read_text(encoding="utf-8"))
-            self.assertEqual([(s["name"], s["request"]) for s in pack["stops"]],
-                             [(s["name"], s["request"]) for s in line["stops"]])
-        self.assertEqual({key for s in pack["stops"] for key in s["segments"]}, set(pack["segments"]))
+        self.assertEqual(lines["9"][29]["name"], "Nákladové nádraží Žižkov")
+        self.assertIn("next", lines["9"][29]["segments"])
+        used, names = set(), {}
+        for number, stops in lines.items():
+            self.assertEqual(stops[-1]["segments"][-1], "terminus")
+            path = ROOT / f"data/line{number}.json"
+            if path.exists():
+                line = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual([(s["name"], s["request"]) for s in stops],
+                                 [(s["name"], s["request"]) for s in line["stops"]])
+            for stop in stops:
+                key = stop["segments"][0]
+                self.assertEqual(names.setdefault(stop["name"], key), key)
+                used.update(stop["segments"])
+        self.assertEqual(used, set(pack["segments"]))
         paths = set()
         for segment in pack["segments"].values():
             self.assertEqual(tuple(segment["clips"]), VOICES)

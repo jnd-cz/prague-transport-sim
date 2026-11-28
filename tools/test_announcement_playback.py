@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sys
 import unittest
+from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright
 
@@ -17,6 +18,7 @@ FIXTURE = """<!doctype html><html lang="en"><button id="start">Start</button>
 <select id="selLine"><option>17</option></select>
 <label hidden><span></span><select id="optAnnouncementVoice"></select></label>
 <label hidden><span></span><select id="optAnnouncementDistance"></select></label>
+<label hidden><span></span><input id="optAnnouncementVolume" type="range" min="0" max="100" step="5"><output></output></label>
 <script type="module">
 import { TramAudio, initAnnouncementMenu } from '/src/audio.js';
 initAnnouncementMenu(() => 'en', () => {});
@@ -55,7 +57,8 @@ class AnnouncementPlayback(unittest.TestCase):
     def setUpClass(cls):
         cls.server, cls.url = serve(0)
         cls.addClassCleanup(stop_server, cls.server)
-        cls.stops = json.loads((OUTPUT / "manifest.json").read_text(encoding="utf-8"))["stops"]
+        cls.lines = json.loads((OUTPUT / "manifest.json").read_text(encoding="utf-8"))["lines"]
+        cls.stops = cls.lines["17"]
 
     def test_browser_czech_voice(self):
         with sync_playwright() as pw:
@@ -65,7 +68,7 @@ class AnnouncementPlayback(unittest.TestCase):
             path = "/announcement-browser-voice"
             page.route(self.url + path, lambda route: route.fulfill(body=FIXTURE, content_type="text/html"))
             mp3 = []
-            page.on("request", lambda request: mp3.append(request.url) if request.url.endswith(".mp3") else None)
+            page.on("request", lambda request: mp3.append(request.url) if urlsplit(request.url).path.endswith(".mp3") else None)
             page.goto(self.url + path)
             page.wait_for_function("window.audio")
             option = page.locator('#optAnnouncementVoice option[value="browser"]')
@@ -80,12 +83,14 @@ class AnnouncementPlayback(unittest.TestCase):
             page.click("#start")
             page.evaluate("stops => audio.announcements.prepareRun('17', stops, 24)", self.stops)
             page.wait_for_function("spoken.length === 1")
-            self.assertEqual(page.evaluate("[spoken[0].text, spoken[0].voice.name, spoken[0].rate]"),
-                             ["Čechův most. Příští zastávka... Štrosmajerovo náměstí.", "Local Czech", 0.85])
+            self.assertEqual(page.evaluate("[spoken[0].text, spoken[0].voice.name, spoken[0].rate, spoken[0].volume]"),
+                             ["Čechův most. Příští zastávka... Štrosmajerovo náměstí.", "Local Czech", 0.85, 1])
             page.evaluate("audio.setActive(false)")
             self.assertTrue(page.evaluate("!audio.announcements.utterance"))
+            page.locator("#optAnnouncementVolume").evaluate("el => { el.value = '45'; el.dispatchEvent(new Event('input')); }")
             page.evaluate("audio.setActive(true)")
             self.assertEqual(page.evaluate("spoken.length"), 2)
+            self.assertEqual(page.evaluate("spoken.at(-1).volume"), 0.45)
             page.evaluate("""() => {
                 spoken.at(-1).onend();
                 audio.announcements.preload(26);
@@ -99,6 +104,38 @@ class AnnouncementPlayback(unittest.TestCase):
             self.assertEqual(mp3, [])
             page.evaluate("setVoices([{name: 'English', lang: 'en-GB'}])")
             self.assertEqual(option.count(), 0)
+            browser.close()
+
+    def test_shared_cache_and_changed_itinerary(self):
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            path = "/announcement-cache"
+            page.route(self.url + path, lambda route: route.fulfill(body=FIXTURE, content_type="text/html"))
+            page.goto(self.url + path)
+            page.wait_for_function("window.audio")
+            page.click("#start")
+            for number, stops in self.lines.items():
+                page.evaluate("([number, stops]) => audio.announcements.prepareRun(number, stops, stops.length - 2)",
+                              [number, stops])
+                page.wait_for_function("audio.announcements.source")
+                self.assertEqual(page.evaluate("audio.announcements.run.calls.at(-1).at(-1)"), "terminus")
+                page.wait_for_function("""async () => {
+                    const run = audio.announcements.run;
+                    const cache = await run.cache;
+                    if (!cache) return false;
+                    const keys = new Set((await cache.keys()).map(request => new URL(request.url).pathname));
+                    return [...run.segments.keys()].every(path => keys.has('/assets/announcements/' + path));
+                }""")
+            page.reload()
+            page.wait_for_function("window.audio")
+            page.click("#start")
+            mp3 = []
+            page.on("request", lambda request: mp3.append(request.url) if urlsplit(request.url).path.endswith(".mp3") else None)
+            page.evaluate("stops => audio.announcements.prepareRun('diversion', stops, 0)", self.stops[-2:])
+            page.wait_for_function("audio.announcements.source")
+            self.assertEqual(page.evaluate("audio.announcements.run.calls[0].includes('next')"), True)
+            self.assertEqual(mp3, [])
             browser.close()
 
     def test_audio_lifecycle_and_settings(self):
@@ -117,10 +154,10 @@ class AnnouncementPlayback(unittest.TestCase):
                 a.preload(3);  // reached stop 2's platform
                 await Promise.all([...a.run.preloads.get(2).values(), ...a.run.preloads.get(3).values()]);
                 const prepared = await a.run.preloads.get(3).get('Algieba');
-                if (prepared.length !== a.run.pack.stops[3].segments.length) throw new Error('Incomplete preload');
+                if (prepared.length !== a.run.calls[3].length) throw new Error('Incomplete preload');
             }""")
             requests = []
-            page.on("request", lambda request: requests.append(request.url) if request.url.endswith(".mp3") else None)
+            page.on("request", lambda request: requests.append(request.url) if urlsplit(request.url).path.endswith(".mp3") else None)
             page.context.set_offline(True)
             page.evaluate("""() => {
                 for (const [i, distance] of [[1, 0], [2, 115], [2, 99], [2, 95]]) {
@@ -160,12 +197,12 @@ class AnnouncementPlayback(unittest.TestCase):
             page.evaluate("audio.setActive(false, true)")
             page.wait_for_function("i => audio.announcements.current?.i === i && audio.announcements.source", arg=last)
             page.wait_for_function("!audio.announcements.current", timeout=20000)
-            page.evaluate("""stops => {
-                audio.announcements.prepareRun('23', stops, 0);
+            page.evaluate("""() => {
+                audio.announcements.prepareRun('unknown', [{name: 'Uncatalogued stop'}], 0);
                 audio.setActive(true);
-                audio.announcements.approach(1, 0, true);
-            }""", self.stops)
-            self.assertTrue(page.evaluate("!audio.announcements.run && !audio.announcements.source"))
+            }""")
+            page.wait_for_function("audio.announcements.run?.pack")
+            self.assertTrue(page.evaluate("!audio.announcements.source && !audio.announcements.run.calls[0].length"))
             browser.close()
 
     @unittest.skipUnless((ROOT / "data/line17.json").exists(), "needs the built line 17 data")
