@@ -16,6 +16,67 @@ python -I tools/snapshot.py data-fetch     # data/ to play and tune the game (~1
 python -I tools/snapshot.py fetch          # raw/ to build the world (~4.3 GB, the pinned source snapshot)
 ```
 
+### A Linux build machine (Debian 13 VPS)
+
+A second machine for what needs CPU and memory, not a GPU: world builds (`rebuild.py`, `ground_mesh.py` 21 GB,
+`city_terrain.py` 15 GB), the place loop, tool tests, unattended sessions. 8+ cores and 32+ GB. It has no GPU: page
+tests run on SwiftShader (slow, right answers), frame time means nothing there, and seeded compares stay on the
+machine that holds main's baselines. `heavy.py` queues per machine; the `rebuild` label is on GitHub and holds
+across machines. Steps, as a normal user with sudo (not root):
+
+1. **Packages** (Debian's own Python 3.13; `python-is-python3` lets the docs' `python` commands run as written):
+   ```bash
+   sudo apt update
+   sudo apt install -y git curl tmux gh python-is-python3 python3-pip python3-venv \
+       python3-pyosmium python3-pyproj python3-shapely python3-numpy python3-scipy python3-pil
+   python -m pip install --user --break-system-packages pydelatin==0.4.0 playwright lameenc
+   python -m playwright install --with-deps chromium
+   python -P -E -c "import osmium, pyproj, shapely, numpy, scipy, PIL, pydelatin; print('ok')"
+   ```
+   (Debian refuses `pip install --user` into its Python; `--break-system-packages` only lets it write
+   `~/.local`.)
+2. **Clock and environment.** The night window (23:00-07:00) is the machine's local time. `/tmp` is erased at boot,
+   and `heavy.py`'s queue and history live under the temp folder: `TMPDIR=/var/tmp` keeps the history.
+   ```bash
+   sudo timedatectl set-timezone Europe/Prague
+   echo 'export TRAMDATA_CACHE="$HOME/tramdata-cache"' >> ~/.bashrc
+   echo 'export TMPDIR=/var/tmp' >> ~/.bashrc
+   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc && mkdir -p "$TRAMDATA_CACHE"
+   ```
+3. **Claude Code**, signed in through a link opened on another device:
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash
+   claude --version && claude doctor
+   claude                  # log in: open the printed URL elsewhere, paste the code back
+   ```
+4. **GitHub**: a fine-grained token for this repository only, with Contents, Pull requests and Issues read and
+   write; Actions and Commit statuses read; Workflows read and write only for CI work; everything else no access.
+   ```bash
+   gh auth login           # GitHub.com, HTTPS, paste the token
+   gh auth setup-git && gh auth status
+   ```
+5. **Clone**, then the store's key and SSH config as in [DATA.md](DATA.md) (one-time setup, steps 1-3). Copy the
+   `Host tramdata` block from a machine that has it; check the server's fingerprint on the first `sftp tramdata`
+   against that machine's (`ssh-keygen -lF "[host]:port"`).
+   ```bash
+   git clone https://github.com/jnd-cz/prague-transport-sim ~/transport-game && cd ~/transport-game
+   git config user.name "<name>"
+   git config user.email "2506000+jnd-cz@users.noreply.github.com"
+   chmod 600 ~/.ssh/config
+   python -I tools/snapshot.py fetch && python -I tools/snapshot.py data-fetch
+   ```
+6. **Check**: `python -I tools/board.py`, `python -I tools/test_all.py`, then one line's build through the queue.
+   `free -h`: the builds read the `available` column (`sysinfo.available_gb`, MemAvailable, #897), not `free`.
+7. **Sessions from the phone**: Claude Code in tmux with Remote Control; the session shows in the Claude app.
+   ```bash
+   tmux new -s tram        # Ctrl+B D leaves it running; tmux attach -t tram comes back
+   cd ~/transport-game && claude remote-control
+   ```
+
+On Linux a job's stop ends what it started by walking the process tree; a `kill -9` of `heavy.py` itself leaves
+its children running (no Job Object there).
+
 ## Rebuild the line data
 
 Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from its local extract
