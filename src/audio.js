@@ -92,9 +92,355 @@ function railImpactBuffer(ctx, noise, [body, rail, ring], offset) {
   return buffer;
 }
 
+// The shared Czech announcement catalogue (#894).
+const PACK = new URL('../assets/announcements/manifest.json', import.meta.url);
+const CLIP_CACHE = 'tram-announcement-audio-';
+const VOICES = ['Aoede', 'Algieba', 'Sulafat', 'off'];
+const BROWSER_VOICE = 'browser';
+const DISTANCES = [100, 50, 0];
+const options = { voice: VOICES[0], distance: DISTANCES[0], volume: 100 };
+try {
+  const voice = localStorage.getItem('tram.announcementVoice');
+  const distance = localStorage.getItem('tram.announcementDistance');
+  const volume = localStorage.getItem('tram.announcementVolume');
+  if (VOICES.includes(voice) || voice === BROWSER_VOICE) options.voice = voice;
+  if (distance !== null && DISTANCES.includes(+distance)) options.distance = +distance;
+  if (volume !== null && +volume >= 0 && +volume <= 100) options.volume = +volume;
+} catch { /* storage unavailable */ }
+
+function czechSpeechVoice() {
+  if (typeof globalThis.SpeechSynthesisUtterance !== 'function') return null;
+  const voices = globalThis.speechSynthesis?.getVoices().filter(voice => /^cs(?:[-_]|$)/i.test(voice.lang));
+  return voices?.find(voice => voice.default) ?? voices?.find(voice => voice.localService) ?? voices?.[0];
+}
+
+function selectedAnnouncementVoice() {
+  return options.voice === BROWSER_VOICE && !czechSpeechVoice() ? VOICES[0] : options.voice;
+}
+
+export function initAnnouncementMenu(getLang, onLangChange) {
+  const line = document.getElementById('selLine');
+  const voice = document.getElementById('optAnnouncementVoice');
+  const distance = document.getElementById('optAnnouncementDistance');
+  const volume = document.getElementById('optAnnouncementVolume');
+  for (const value of VOICES) voice.add(new Option(value, value));
+  for (const value of DISTANCES) distance.add(new Option(String(value), String(value)));
+  const off = voice.options[VOICES.indexOf('off')];
+  const browser = new Option('', BROWSER_VOICE);
+  distance.value = String(options.distance);
+  volume.value = String(options.volume);
+  const rows = [voice.closest('label'), distance.closest('label'), volume.closest('label')];
+  const showVolume = () => { rows[2].querySelector('output').value = `${volume.value}%`; };
+  const visibility = () => { for (const row of rows) row.hidden = !line.value; };
+  const translate = () => {
+    const cs = getLang() === 'cs';
+    rows[0].querySelector('span').textContent = cs ? 'Hlas hlášení' : 'Announcement voice';
+    rows[1].querySelector('span').textContent = cs ? 'Spuštění hlášení' : 'Announcement timing';
+    rows[2].querySelector('span').textContent = cs ? 'Hlasitost hlášení' : 'Announcement volume';
+    off.text = cs ? 'Vypnuto' : 'Off';
+    const native = czechSpeechVoice();
+    if (native) {
+      browser.text = `${cs ? 'Český hlas prohlížeče' : 'Browser Czech voice'} (${native.name})`;
+      if (!browser.parentNode) voice.add(browser, off);
+    } else browser.remove();
+    voice.value = selectedAnnouncementVoice();
+    for (const opt of distance.options) opt.text = +opt.value ? `${opt.value} m` : cs ? 'Při zastavení' : 'On arrival';
+  };
+  voice.addEventListener('change', () => {
+    options.voice = voice.value;
+    try { localStorage.setItem('tram.announcementVoice', options.voice); } catch { /* storage unavailable */ }
+  });
+  distance.addEventListener('change', () => {
+    options.distance = +distance.value;
+    try { localStorage.setItem('tram.announcementDistance', distance.value); } catch { /* storage unavailable */ }
+  });
+  volume.addEventListener('input', () => {
+    options.volume = +volume.value;
+    showVolume();
+    try { localStorage.setItem('tram.announcementVolume', volume.value); } catch { /* storage unavailable */ }
+  });
+  showVolume();
+  translate();
+  onLangChange(translate);
+  globalThis.speechSynthesis?.addEventListener('voiceschanged', translate);
+  visibility();
+  // main populates the line menu after loading the world.
+  new MutationObserver(visibility).observe(line, { childList: true });
+  line.addEventListener('change', visibility);
+}
+
+function callsForRun(pack, line, stops) {
+  const verified = pack.lines[line];
+  if (verified?.length === stops.length && verified.every((stop, i) =>
+    stop.name === stops[i].name && stop.request === !!stops[i].request)) return verified.map(stop => stop.segments);
+  // A changed itinerary can reuse known names. Directional notes require a verified platform sequence.
+  const names = new Map(Object.values(pack.lines).flatMap(calls => calls.map(stop => [stop.name, stop.segments[0]])));
+  return stops.map((stop, i) => {
+    const name = names.get(stop.name);
+    if (!name) return [];
+    const segments = stop.request ? [name, 'request'] : [name];
+    const next = stops[i + 1];
+    if (!next) segments.push('terminus');
+    else if (names.has(next.name)) {
+      segments.push('next', names.get(next.name));
+      if (next.request) segments.push('next-request');
+    }
+    return segments;
+  });
+}
+
+async function openClipCache(version) {
+  if (!globalThis.caches || !version) return null;
+  const name = CLIP_CACHE + version;
+  try {
+    const cache = await caches.open(name);
+    for (const old of await caches.keys()) {
+      if (old.startsWith(CLIP_CACHE) && old !== name) void caches.delete(old).catch(() => {});
+    }
+    return cache;
+  } catch { return null; }
+}
+
+export class StopAnnouncements {
+  constructor() {
+    this.run = null;
+    this.current = null;
+    this.source = null;
+    this.playing = false;
+  }
+
+  prepareRun(line, stops, startStop) {
+    this.stopSource();
+    this.stopSpeech();
+    this.current = null;
+    this.run = stops[startStop] ? {
+      line: String(line), stops, startStop, queue: [], seen: new Set(), segments: new Map(), preloads: new Map(),
+      through: startStop + 1, loadedThrough: startStop - 1,
+    } : null;
+    if (this.active) this.startRun();
+  }
+
+  setAudio(ctx, active, finishing, muted) {
+    if (!ctx) return;
+    if (!this.output) {
+      this.ctx = ctx;
+      this.output = ctx.createGain();
+      this.output.connect(ctx.destination);
+    }
+    this.output.gain.value = muted ? 0 : 0.6 * options.volume / 100;
+    this.active = active;
+    this.playing = active || finishing;
+    this.muted = muted;
+    if (muted && this.run) {
+      this.run.queue = this.run.queue.filter(clip => clip.voice !== BROWSER_VOICE);
+      if (this.current?.voice === BROWSER_VOICE) {
+        this.stopSpeech();
+        this.current = null;
+      }
+    }
+    if (!this.playing) {
+      this.stopSpeech();
+      if (this.source) {
+        this.current.offset += this.ctx.currentTime - this.current.started;
+        this.stopSource();
+      }
+      return;
+    }
+    if (active) {
+      this.startRun();
+      if (this.run) this.preload(this.run.through);
+    }
+    this.play();
+  }
+
+  startRun() {
+    const run = this.run;
+    if (!run || run.seen.has(run.startStop)) return;
+    this.announce(run.startStop);
+    fetch(PACK).then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    }).then(pack => {
+      if (this.run !== run) return;
+      if (!pack.lines || !pack.segments) throw new Error('Invalid announcement catalogue');
+      run.calls = callsForRun(pack, run.line, run.stops);
+      run.pack = pack;
+      this.preload(run.through);
+      this.play();
+    }).catch(error => {
+      if (this.run === run) {
+        this.run = null;
+        console.warn('Could not load the stop announcements', error);
+      }
+    });
+  }
+
+  preload(i) {
+    const run = this.run;
+    if (!run) return;
+    run.through = Math.min(Math.max(run.through, i), run.stops.length - 1);
+    const voice = selectedAnnouncementVoice();
+    if (!run.pack || voice === BROWSER_VOICE || voice === 'off') return;
+    // Load all three voices at the previous stop so a voice change needs no new request on approach.
+    for (let j = run.loadedThrough + 1; j <= run.through; j++) {
+      const paths = run.calls[j].map(key => run.pack.segments[key].clips);
+      if (!paths.length) continue;
+      const voices = new Map(run.pack.voices.map(voice => [voice,
+        Promise.all(paths.map(path => this.loadSegment(run, path[voice]))).catch(error => {
+          if (this.run === run) console.warn('Could not preload the stop announcement', error);
+          return null;
+        }),
+      ]));
+      run.preloads.set(j, voices);
+    }
+    run.loadedThrough = run.through;
+  }
+
+  loadSegment(run, path) {
+    if (!run.segments.has(path)) {
+      run.cache ??= openClipCache(run.pack.audioVersion);
+      const url = new URL(path, PACK);
+      url.searchParams.set('v', run.pack.audioVersion);
+      const decoded = run.cache.then(async cache => {
+        const cached = await cache?.match(url.href).catch(() => null);
+        if (cached) return cached.arrayBuffer();
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (cache) void cache.put(url.href, response.clone()).catch(() => {});
+        return response.arrayBuffer();
+      }).then(bytes => this.ctx.decodeAudioData(bytes)).then(buffer => {
+        // Chirp leaves uneven silence around separately recorded phrases. Keep a margin for quiet consonants.
+        const samples = buffer.getChannelData(0);
+        const audible = x => Math.abs(x) >= 0.005;
+        const first = samples.findIndex(audible);
+        if (first < 0) return samples;
+        const margin = Math.round(buffer.sampleRate * 0.065);
+        return samples.subarray(Math.max(0, first - margin), samples.findLastIndex(audible) + margin + 1);
+      });
+      run.segments.set(path, decoded);
+    }
+    return run.segments.get(path);
+  }
+
+  approach(i, ahead, at) {
+    const run = this.run;
+    if (!this.active || !run || i <= run.startStop || run.seen.has(i)) return;
+    if (!at && (options.distance === 0 || ahead < 0 || ahead > options.distance)) return;
+    this.announce(i);
+  }
+
+  announce(i) {
+    const run = this.run;
+    run.seen.add(i);
+    const voice = selectedAnnouncementVoice();
+    if (voice === 'off' || (voice === BROWSER_VOICE && this.muted)) return;
+    run.queue.push({ i, voice });
+    this.play();
+  }
+
+  play() {
+    const run = this.run;
+    if (!this.playing || !run?.pack || this.source || this.utterance) return;
+    if (!this.current) {
+      const next = run.queue.shift();
+      if (!next) return;
+      const { i, voice } = next;
+      if (voice === BROWSER_VOICE) {
+        this.current = next;
+        this.playSpeech(next);
+        return;
+      }
+      const buffers = run.preloads.get(i)?.get(voice);
+      if (!buffers) { this.play(); return; }
+      const clip = this.current = { i, voice, offset: 0 };
+      buffers.then(parts => {
+        if (this.current !== clip) return;
+        if (parts) {
+          // One buffer keeps the segment boundaries sample-accurate and resumes at the same point after pause.
+          const gap = Math.round(this.ctx.sampleRate * 0.09);
+          const length = parts.reduce((sum, part) => sum + part.length, gap * (parts.length - 1));
+          clip.buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+          let offset = 0;
+          for (const part of parts) {
+            clip.buffer.copyToChannel(part, 0, offset);
+            offset += part.length + gap;
+          }
+        } else this.current = null;
+        this.play();
+      });
+      return;
+    }
+    const clip = this.current;
+    if (clip.voice === BROWSER_VOICE) {
+      this.playSpeech(clip);
+      return;
+    }
+    if (!clip.buffer) return;
+    const source = this.source = this.ctx.createBufferSource();
+    source.buffer = clip.buffer;
+    source.connect(this.output);
+    clip.started = this.ctx.currentTime;
+    source.onended = () => {
+      if (this.source !== source) return;
+      source.disconnect();
+      this.source = null;
+      this.current = null;
+      this.play();
+    };
+    source.start(0, Math.min(clip.offset, clip.buffer.duration));
+  }
+
+  playSpeech(clip) {
+    const voice = czechSpeechVoice();
+    if (!voice || this.muted) {
+      this.current = null;
+      this.play();
+      return;
+    }
+    const { pack } = this.run;
+    const text = this.run.calls[clip.i].map(key => {
+      const segment = pack.segments[key];
+      return segment.spoken ?? segment.text;
+    }).join(' ');
+    if (!text) {
+      this.current = null;
+      this.play();
+      return;
+    }
+    const utterance = this.utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+    utterance.rate = pack.speakingRate;
+    utterance.volume = options.volume / 100;
+    utterance.onend = utterance.onerror = () => {
+      if (this.utterance !== utterance) return;
+      this.utterance = null;
+      this.current = null;
+      this.play();
+    };
+    globalThis.speechSynthesis.speak(utterance);
+  }
+
+  stopSpeech() {
+    if (!this.utterance) return;
+    // Mobile engines can end paused speech. Restart the current announcement when the shift resumes.
+    this.utterance = null;
+    globalThis.speechSynthesis.cancel();
+  }
+
+  stopSource() {
+    if (!this.source) return;
+    const source = this.source;
+    this.source = null;
+    source.stop();
+    source.disconnect();
+  }
+}
+
 export class TramAudio {
   constructor() {
     this.ctx = null;
+    this.announcements = new StopAnnouncements();
     this.muted = false;
     this.active = false;
     this.finishing = false;
@@ -113,6 +459,7 @@ export class TramAudio {
     this.master = ctx.createGain();
     this.master.gain.value = this.active && !this.muted ? 0.6 : 0;
     this.master.connect(ctx.destination);
+    this.announcements.setAudio(ctx, this.active, this.finishing, this.muted);
 
     // noise buffer shared by several voices
     const len = ctx.sampleRate * 2;
@@ -212,6 +559,7 @@ export class TramAudio {
   setMuted(m) {
     if (this.muted === m) return;
     this.muted = m;
+    this.announcements.setAudio(this.ctx, this.active, this.finishing, this.muted);
     this._fade(this.active && !m ? 0.6 : 0, 0.05);
   }
 
@@ -222,6 +570,7 @@ export class TramAudio {
     if (this.active && !on) this.epoch++;
     this.active = on;
     this.finishing = finishing;
+    this.announcements.setAudio(this.ctx, on, finishing, this.muted);
     if (!on) this.contactorEvents.length = 0;
     this._fade(on && !this.muted ? 0.6 : 0, finishing && !this.muted ? 1.3 : 0.05);
   }

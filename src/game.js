@@ -159,6 +159,7 @@ export class Game {
     st.arrived = true;
     st.arriveClock = this.clock;
     this._comeTo(st);
+    audio.announcements?.prepareRun(data.line, this.stops, opts.startStop);
   }
 
   // ------------------------------------------------------------------ setup
@@ -1195,6 +1196,7 @@ export class Game {
     }
     tram.passengers = this.pax.aboard;
     if (!st) return;
+    this.audio.announcements?.approach(st.i, st.target - tram.s, at);
 
     // (#249 step 4: the stop near, those to alight there get up and go to their doors' doorway places, so that they are out first
     // when the doors open; arrival takes the same ones: src/passengers/consist.js ready)
@@ -1203,6 +1205,7 @@ export class Game {
       this.pax.ready(Math.round((this.pax.aboard - this.pax.toAlight) * st.alightFrac));
     }
     if (at && !st.arrived) {
+      this.audio.announcements?.preload(st.i + 1);
       st.arrived = true;
       st.arriveClock = this.clock;
       this._comeTo(st);
@@ -1243,6 +1246,7 @@ export class Game {
       return;
     }
     if (passed && !last) {
+      if (!st.arrived) this.audio.announcements?.preload(st.i + 1);
       this._finishStop(st);
       this.nextStop++;
     }

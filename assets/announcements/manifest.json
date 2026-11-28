@@ -1,0 +1,2979 @@
+{
+  "voices": [
+    "Aoede",
+    "Algieba",
+    "Sulafat"
+  ],
+  "speakingRate": 0.85,
+  "source": {
+    "snapshot": "2026-11-18",
+    "gtfsSha256": "ee5ae6af310c12384c1f9de78c18a0975265c6353bec79c9f937453e2bf8e818",
+    "timetable": "https://pid.cz/en/opendata/",
+    "roadway": "data/truth.json stops (maintainer, 2026-10-23 and 2026-11-28)",
+    "pronunciations": "data/truth.json announcementPronunciations (maintainer, 2026-11-28)"
+  },
+  "synthesis": "Google Cloud Czech Chirp 3 HD",
+  "outputTerms": "https://cloud.google.com/text-to-speech/docs/basics",
+  "lines": {
+    "9": [
+      {
+        "id": "U612Z3P",
+        "name": "Sídliště Řepy",
+        "request": false,
+        "segments": [
+          "stop-84a71f467937bd31",
+          "next",
+          "stop-1ad0324a4aec74d9"
+        ]
+      },
+      {
+        "id": "U47Z1P",
+        "name": "Blatiny",
+        "request": false,
+        "segments": [
+          "stop-1ad0324a4aec74d9",
+          "next",
+          "stop-67db543003617f66"
+        ]
+      },
+      {
+        "id": "U236Z1P",
+        "name": "Slánská",
+        "request": false,
+        "segments": [
+          "stop-67db543003617f66",
+          "next",
+          "stop-b10d45d9aee06a95"
+        ]
+      },
+      {
+        "id": "U113Z1P",
+        "name": "Hlušičkova",
+        "request": false,
+        "segments": [
+          "stop-b10d45d9aee06a95",
+          "next",
+          "stop-d32bc8debbc0054a",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U395Z1P",
+        "name": "Krematorium Motol",
+        "request": true,
+        "segments": [
+          "stop-d32bc8debbc0054a",
+          "request",
+          "next",
+          "stop-2ea5c964a2461ec2"
+        ]
+      },
+      {
+        "id": "U394Z1P",
+        "name": "Motol",
+        "request": false,
+        "segments": [
+          "stop-2ea5c964a2461ec2",
+          "next",
+          "stop-c69a0a01f34dda3d"
+        ]
+      },
+      {
+        "id": "U865Z1P",
+        "name": "Vozovna Motol",
+        "request": false,
+        "segments": [
+          "stop-c69a0a01f34dda3d",
+          "next",
+          "stop-1df00704d8294903",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U567Z1P",
+        "name": "Hotel Golf",
+        "request": true,
+        "segments": [
+          "stop-1df00704d8294903",
+          "request",
+          "next",
+          "stop-0ea905639e0076df",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U580Z1P",
+        "name": "Poštovka",
+        "request": true,
+        "segments": [
+          "stop-0ea905639e0076df",
+          "request",
+          "next",
+          "stop-94c6a7e8c792f5df"
+        ]
+      },
+      {
+        "id": "U289Z1P",
+        "name": "Kotlářka",
+        "request": false,
+        "segments": [
+          "stop-94c6a7e8c792f5df",
+          "next",
+          "stop-b4063d3e4dd74007"
+        ]
+      },
+      {
+        "id": "U240Z1P",
+        "name": "Kavalírka",
+        "request": false,
+        "segments": [
+          "stop-b4063d3e4dd74007",
+          "next",
+          "stop-a0e80952f6335558"
+        ]
+      },
+      {
+        "id": "U254Z1P",
+        "name": "Klamovka",
+        "request": false,
+        "segments": [
+          "stop-a0e80952f6335558",
+          "next",
+          "stop-67e7b9a334deb372"
+        ]
+      },
+      {
+        "id": "U805Z1P",
+        "name": "U Zvonu",
+        "request": false,
+        "segments": [
+          "stop-67e7b9a334deb372",
+          "next",
+          "stop-1c220e819c5479ad"
+        ]
+      },
+      {
+        "id": "U25Z1P",
+        "name": "Bertramka",
+        "request": false,
+        "segments": [
+          "stop-1c220e819c5479ad",
+          "next",
+          "stop-ce50dbcb95f8c047"
+        ]
+      },
+      {
+        "id": "U1040Z1P",
+        "name": "Anděl",
+        "request": false,
+        "segments": [
+          "stop-ce50dbcb95f8c047",
+          "metro",
+          "next",
+          "stop-5165be7be38bf241"
+        ]
+      },
+      {
+        "id": "U4Z1P",
+        "name": "Arbesovo náměstí",
+        "request": false,
+        "segments": [
+          "stop-5165be7be38bf241",
+          "next",
+          "stop-e414e18a1db2e252"
+        ]
+      },
+      {
+        "id": "U481Z1P",
+        "name": "Švandovo divadlo",
+        "request": false,
+        "segments": [
+          "stop-e414e18a1db2e252",
+          "next",
+          "stop-62c11de16821e412"
+        ]
+      },
+      {
+        "id": "U809Z2P",
+        "name": "Újezd",
+        "request": false,
+        "segments": [
+          "stop-62c11de16821e412",
+          "next",
+          "stop-76798cdc572111b9"
+        ]
+      },
+      {
+        "id": "U483Z1P",
+        "name": "Národní divadlo",
+        "request": false,
+        "segments": [
+          "stop-76798cdc572111b9",
+          "next",
+          "stop-b771f02044011c43"
+        ]
+      },
+      {
+        "id": "U539Z1P",
+        "name": "Národní třída",
+        "request": false,
+        "segments": [
+          "stop-b771f02044011c43",
+          "metro",
+          "next",
+          "stop-486d384facfb36c2"
+        ]
+      },
+      {
+        "id": "U997Z2P",
+        "name": "Lazarská",
+        "request": false,
+        "segments": [
+          "stop-486d384facfb36c2",
+          "next",
+          "stop-282cce5ec8b759f1"
+        ]
+      },
+      {
+        "id": "U484Z2P",
+        "name": "Vodičkova",
+        "request": false,
+        "segments": [
+          "stop-282cce5ec8b759f1",
+          "next",
+          "stop-8d2eac4cac2cd16a"
+        ]
+      },
+      {
+        "id": "U1072Z2P",
+        "name": "Václavské náměstí",
+        "request": false,
+        "segments": [
+          "stop-8d2eac4cac2cd16a",
+          "metro",
+          "next",
+          "stop-073615c19474f638"
+        ]
+      },
+      {
+        "id": "U203Z2P",
+        "name": "Jindřišská",
+        "request": false,
+        "segments": [
+          "stop-073615c19474f638",
+          "next",
+          "stop-6c90f1664d4081d8"
+        ]
+      },
+      {
+        "id": "U142Z2P",
+        "name": "Hlavní nádraží",
+        "request": false,
+        "segments": [
+          "stop-6c90f1664d4081d8",
+          "metro",
+          "train",
+          "next",
+          "stop-e2544d24006b1258"
+        ]
+      },
+      {
+        "id": "U172Z2P",
+        "name": "Viktoria Žižkov",
+        "request": false,
+        "segments": [
+          "stop-e2544d24006b1258",
+          "next",
+          "stop-ed269d1e57599cf2"
+        ]
+      },
+      {
+        "id": "U339Z2P",
+        "name": "Lipanská",
+        "request": false,
+        "segments": [
+          "stop-ed269d1e57599cf2",
+          "next",
+          "stop-ded0c8bb6ec1fc77"
+        ]
+      },
+      {
+        "id": "U516Z2P",
+        "name": "Olšanské náměstí",
+        "request": false,
+        "segments": [
+          "stop-ded0c8bb6ec1fc77",
+          "next",
+          "stop-c0389b25aba564d2"
+        ]
+      },
+      {
+        "id": "U586Z2P",
+        "name": "Olšanská",
+        "request": false,
+        "segments": [
+          "stop-c0389b25aba564d2",
+          "next",
+          "stop-05c671866689ca2d"
+        ]
+      },
+      {
+        "id": "U469Z4P",
+        "name": "Nákladové nádraží Žižkov",
+        "request": false,
+        "segments": [
+          "stop-05c671866689ca2d",
+          "next",
+          "stop-62786d8df6adb732"
+        ]
+      },
+      {
+        "id": "U373Z1P",
+        "name": "Mezi Hřbitovy",
+        "request": false,
+        "segments": [
+          "stop-62786d8df6adb732",
+          "next",
+          "stop-308bbcc601fd00b1"
+        ]
+      },
+      {
+        "id": "U921Z3P",
+        "name": "Želivského",
+        "request": false,
+        "segments": [
+          "stop-308bbcc601fd00b1",
+          "metro",
+          "next",
+          "stop-562b61cfb56e4d4c"
+        ]
+      },
+      {
+        "id": "U515Z1P",
+        "name": "Olšanské hřbitovy",
+        "request": false,
+        "segments": [
+          "stop-562b61cfb56e4d4c",
+          "next",
+          "stop-69bd9530f6bfa3fe"
+        ]
+      },
+      {
+        "id": "U118Z1P",
+        "name": "Flora",
+        "request": false,
+        "segments": [
+          "stop-69bd9530f6bfa3fe",
+          "next",
+          "stop-952f82e10fb5a5f4"
+        ]
+      },
+      {
+        "id": "U518Z1P",
+        "name": "Orionka",
+        "request": false,
+        "segments": [
+          "stop-952f82e10fb5a5f4",
+          "road",
+          "next",
+          "stop-c8a89dc5e524dc5b"
+        ]
+      },
+      {
+        "id": "U540Z1P",
+        "name": "Perunova",
+        "request": false,
+        "segments": [
+          "stop-c8a89dc5e524dc5b",
+          "next",
+          "stop-274824a0ceac83c1"
+        ]
+      },
+      {
+        "id": "U851Z1P",
+        "name": "Vinohradská vodárna",
+        "request": false,
+        "segments": [
+          "stop-274824a0ceac83c1",
+          "road",
+          "next",
+          "stop-38eafe8f107a5c63"
+        ]
+      },
+      {
+        "id": "U744Z1P",
+        "name": "Šumavská",
+        "request": false,
+        "segments": [
+          "stop-38eafe8f107a5c63",
+          "next",
+          "stop-bc2b6428375822a8"
+        ]
+      },
+      {
+        "id": "U476Z1P",
+        "name": "Náměstí Míru",
+        "request": false,
+        "segments": [
+          "stop-bc2b6428375822a8",
+          "metro",
+          "next",
+          "stop-f98a249b73d5ca2a"
+        ]
+      },
+      {
+        "id": "U190Z1P",
+        "name": "I. P. Pavlova",
+        "request": false,
+        "segments": [
+          "stop-f98a249b73d5ca2a",
+          "next",
+          "stop-a8c8dcfb8e8c4d57"
+        ]
+      },
+      {
+        "id": "U739Z1P",
+        "name": "Štěpánská",
+        "request": false,
+        "segments": [
+          "stop-a8c8dcfb8e8c4d57",
+          "next",
+          "stop-bc91db9ea9d28999"
+        ]
+      },
+      {
+        "id": "U237Z3P",
+        "name": "Karlovo náměstí",
+        "request": false,
+        "segments": [
+          "stop-bc91db9ea9d28999",
+          "next",
+          "stop-582bd09748165129"
+        ]
+      },
+      {
+        "id": "U237Z4P",
+        "name": "Moráň",
+        "request": false,
+        "segments": [
+          "stop-582bd09748165129",
+          "next",
+          "stop-212a2fa901a024ca"
+        ]
+      },
+      {
+        "id": "U237Z6P",
+        "name": "Palackého náměstí",
+        "request": false,
+        "segments": [
+          "stop-212a2fa901a024ca",
+          "next",
+          "stop-f4d501e80be07ca6"
+        ]
+      },
+      {
+        "id": "U901Z2P",
+        "name": "Zborovská",
+        "request": false,
+        "segments": [
+          "stop-f4d501e80be07ca6",
+          "next",
+          "stop-ce50dbcb95f8c047"
+        ]
+      },
+      {
+        "id": "U1040Z2P",
+        "name": "Anděl",
+        "request": false,
+        "segments": [
+          "stop-ce50dbcb95f8c047",
+          "next",
+          "stop-1c220e819c5479ad"
+        ]
+      },
+      {
+        "id": "U25Z2P",
+        "name": "Bertramka",
+        "request": false,
+        "segments": [
+          "stop-1c220e819c5479ad",
+          "next",
+          "stop-67e7b9a334deb372"
+        ]
+      },
+      {
+        "id": "U805Z2P",
+        "name": "U Zvonu",
+        "request": false,
+        "segments": [
+          "stop-67e7b9a334deb372",
+          "next",
+          "stop-a0e80952f6335558"
+        ]
+      },
+      {
+        "id": "U254Z2P",
+        "name": "Klamovka",
+        "request": false,
+        "segments": [
+          "stop-a0e80952f6335558",
+          "next",
+          "stop-b4063d3e4dd74007"
+        ]
+      },
+      {
+        "id": "U240Z2P",
+        "name": "Kavalírka",
+        "request": false,
+        "segments": [
+          "stop-b4063d3e4dd74007",
+          "next",
+          "stop-94c6a7e8c792f5df"
+        ]
+      },
+      {
+        "id": "U289Z2P",
+        "name": "Kotlářka",
+        "request": false,
+        "segments": [
+          "stop-94c6a7e8c792f5df",
+          "next",
+          "stop-0ea905639e0076df",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U580Z2P",
+        "name": "Poštovka",
+        "request": true,
+        "segments": [
+          "stop-0ea905639e0076df",
+          "request",
+          "next",
+          "stop-1df00704d8294903",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U567Z2P",
+        "name": "Hotel Golf",
+        "request": true,
+        "segments": [
+          "stop-1df00704d8294903",
+          "request",
+          "next",
+          "stop-c69a0a01f34dda3d"
+        ]
+      },
+      {
+        "id": "U865Z2P",
+        "name": "Vozovna Motol",
+        "request": false,
+        "segments": [
+          "stop-c69a0a01f34dda3d",
+          "next",
+          "stop-2ea5c964a2461ec2"
+        ]
+      },
+      {
+        "id": "U394Z2P",
+        "name": "Motol",
+        "request": false,
+        "segments": [
+          "stop-2ea5c964a2461ec2",
+          "next",
+          "stop-d32bc8debbc0054a",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U395Z2P",
+        "name": "Krematorium Motol",
+        "request": true,
+        "segments": [
+          "stop-d32bc8debbc0054a",
+          "request",
+          "next",
+          "stop-b10d45d9aee06a95"
+        ]
+      },
+      {
+        "id": "U113Z2P",
+        "name": "Hlušičkova",
+        "request": false,
+        "segments": [
+          "stop-b10d45d9aee06a95",
+          "next",
+          "stop-67db543003617f66"
+        ]
+      },
+      {
+        "id": "U236Z2P",
+        "name": "Slánská",
+        "request": false,
+        "segments": [
+          "stop-67db543003617f66",
+          "next",
+          "stop-1ad0324a4aec74d9"
+        ]
+      },
+      {
+        "id": "U47Z2P",
+        "name": "Blatiny",
+        "request": false,
+        "segments": [
+          "stop-1ad0324a4aec74d9",
+          "next",
+          "stop-84a71f467937bd31"
+        ]
+      },
+      {
+        "id": "U612Z2P",
+        "name": "Sídliště Řepy",
+        "request": false,
+        "segments": [
+          "stop-84a71f467937bd31",
+          "terminus"
+        ]
+      }
+    ],
+    "17": [
+      {
+        "id": "U945Z1P",
+        "name": "Levského",
+        "request": false,
+        "segments": [
+          "stop-d96c3881ffd8e868",
+          "next",
+          "stop-c191bcb265acf7ec"
+        ]
+      },
+      {
+        "id": "U946Z1P",
+        "name": "Sídliště Modřany",
+        "request": false,
+        "segments": [
+          "stop-c191bcb265acf7ec",
+          "next",
+          "stop-9b774b9fb237f67f"
+        ]
+      },
+      {
+        "id": "U947Z1P",
+        "name": "Modřanská rokle",
+        "request": false,
+        "segments": [
+          "stop-9b774b9fb237f67f",
+          "next",
+          "stop-d81734c62e896322",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U948Z1P",
+        "name": "U Libušského potoka",
+        "request": true,
+        "segments": [
+          "stop-d81734c62e896322",
+          "request",
+          "next",
+          "stop-fe59c25310cf42ad"
+        ]
+      },
+      {
+        "id": "U929Z1P",
+        "name": "Poliklinika Modřany",
+        "request": false,
+        "segments": [
+          "stop-fe59c25310cf42ad",
+          "next",
+          "stop-2fd784769054bac3",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U1006Z1P",
+        "name": "Čechova čtvrť",
+        "request": true,
+        "segments": [
+          "stop-2fd784769054bac3",
+          "request",
+          "next",
+          "stop-372f74fd49b4adb4"
+        ]
+      },
+      {
+        "id": "U388Z1P",
+        "name": "Nádraží Modřany",
+        "request": false,
+        "segments": [
+          "stop-372f74fd49b4adb4",
+          "train",
+          "next",
+          "stop-e2bdbc90d44b594e",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U76Z1P",
+        "name": "Modřanská škola",
+        "request": true,
+        "segments": [
+          "stop-e2bdbc90d44b594e",
+          "request",
+          "next",
+          "stop-c0bd4e94d770a557",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U19Z1P",
+        "name": "Belárie",
+        "request": true,
+        "segments": [
+          "stop-c0bd4e94d770a557",
+          "request",
+          "next",
+          "stop-c0b92e46f3c1e40b",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U2731Z1P",
+        "name": "Hodkovičky",
+        "request": true,
+        "segments": [
+          "stop-c0b92e46f3c1e40b",
+          "request",
+          "next",
+          "stop-03532adebf77a937",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U71Z1P",
+        "name": "Černý kůň",
+        "request": true,
+        "segments": [
+          "stop-03532adebf77a937",
+          "request",
+          "next",
+          "stop-f79501d5662a6b8c"
+        ]
+      },
+      {
+        "id": "U449Z1P",
+        "name": "Nádraží Braník",
+        "request": false,
+        "segments": [
+          "stop-f79501d5662a6b8c",
+          "train",
+          "next",
+          "stop-6cb64c9af5d50127",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U387Z1P",
+        "name": "Pobřežní cesta",
+        "request": true,
+        "segments": [
+          "stop-6cb64c9af5d50127",
+          "request",
+          "next",
+          "stop-ec75ac2ff9d3c99e"
+        ]
+      },
+      {
+        "id": "U614Z1P",
+        "name": "Přístaviště",
+        "request": false,
+        "segments": [
+          "stop-ec75ac2ff9d3c99e",
+          "next",
+          "stop-3fba04d7c09d8140"
+        ]
+      },
+      {
+        "id": "U110Z1P",
+        "name": "Dvorce",
+        "request": false,
+        "segments": [
+          "stop-3fba04d7c09d8140",
+          "next",
+          "stop-3ada33977ad970f7"
+        ]
+      },
+      {
+        "id": "U303Z1P",
+        "name": "Kublov",
+        "request": false,
+        "segments": [
+          "stop-3ada33977ad970f7",
+          "next",
+          "stop-bc4e2751504fa913"
+        ]
+      },
+      {
+        "id": "U583Z1P",
+        "name": "Podolská vodárna",
+        "request": false,
+        "segments": [
+          "stop-bc4e2751504fa913",
+          "next",
+          "stop-3b182e37a9f5bc62"
+        ]
+      },
+      {
+        "id": "U878Z1P",
+        "name": "Výtoň",
+        "request": false,
+        "segments": [
+          "stop-3b182e37a9f5bc62",
+          "next",
+          "stop-212a2fa901a024ca"
+        ]
+      },
+      {
+        "id": "U237Z7P",
+        "name": "Palackého náměstí",
+        "request": false,
+        "segments": [
+          "stop-212a2fa901a024ca",
+          "metro",
+          "next",
+          "stop-a86bcbb1dcbfd663"
+        ]
+      },
+      {
+        "id": "U208Z1P",
+        "name": "Jiráskovo náměstí",
+        "request": false,
+        "segments": [
+          "stop-a86bcbb1dcbfd663",
+          "next",
+          "stop-76798cdc572111b9"
+        ]
+      },
+      {
+        "id": "U483Z5P",
+        "name": "Národní divadlo",
+        "request": false,
+        "segments": [
+          "stop-76798cdc572111b9",
+          "next",
+          "stop-f3cd9a79a5522006"
+        ]
+      },
+      {
+        "id": "U221Z2P",
+        "name": "Karlovy lázně",
+        "request": false,
+        "segments": [
+          "stop-f3cd9a79a5522006",
+          "next",
+          "stop-7652c51cda3ac7be"
+        ]
+      },
+      {
+        "id": "U703Z2P",
+        "name": "Staroměstská",
+        "request": false,
+        "segments": [
+          "stop-7652c51cda3ac7be",
+          "metro",
+          "next",
+          "stop-ec9f4dec31fa313a"
+        ]
+      },
+      {
+        "id": "U593Z2P",
+        "name": "Právnická fakulta",
+        "request": false,
+        "segments": [
+          "stop-ec9f4dec31fa313a",
+          "next",
+          "stop-6d758c841564f0d3"
+        ]
+      },
+      {
+        "id": "U68Z2P",
+        "name": "Čechův most",
+        "request": false,
+        "segments": [
+          "stop-6d758c841564f0d3",
+          "next",
+          "stop-80aed900b37f125e"
+        ]
+      },
+      {
+        "id": "U717Z4P",
+        "name": "Strossmayerovo náměstí",
+        "request": false,
+        "segments": [
+          "stop-80aed900b37f125e",
+          "next",
+          "stop-a33400e21ac97490"
+        ]
+      },
+      {
+        "id": "U841Z2P",
+        "name": "Veletržní palác",
+        "request": false,
+        "segments": [
+          "stop-a33400e21ac97490",
+          "next",
+          "stop-45903d08b9238164"
+        ]
+      },
+      {
+        "id": "U532Z2P",
+        "name": "Výstaviště",
+        "request": false,
+        "segments": [
+          "stop-45903d08b9238164",
+          "train",
+          "next",
+          "stop-01423a1352131d14"
+        ]
+      },
+      {
+        "id": "U115Z2P",
+        "name": "Nádraží Holešovice",
+        "request": false,
+        "segments": [
+          "stop-01423a1352131d14",
+          "metro",
+          "train",
+          "next",
+          "stop-1aad0990b6a25fc2"
+        ]
+      },
+      {
+        "id": "U765Z2P",
+        "name": "Trojská",
+        "request": false,
+        "segments": [
+          "stop-1aad0990b6a25fc2",
+          "next",
+          "stop-7d2e4b08f1905461"
+        ]
+      },
+      {
+        "id": "U447Z2P",
+        "name": "Nad Trojou",
+        "request": false,
+        "segments": [
+          "stop-7d2e4b08f1905461",
+          "next",
+          "stop-0df24afe3859cb27"
+        ]
+      },
+      {
+        "id": "U139Z2P",
+        "name": "Hercovka",
+        "request": false,
+        "segments": [
+          "stop-0df24afe3859cb27",
+          "next",
+          "stop-fb53dd60d2ac07f0"
+        ]
+      },
+      {
+        "id": "U249Z2P",
+        "name": "Ke Stírce",
+        "request": false,
+        "segments": [
+          "stop-fb53dd60d2ac07f0",
+          "next",
+          "stop-f42f19268bf0d341"
+        ]
+      },
+      {
+        "id": "U675Z2P",
+        "name": "Kobylisy",
+        "request": false,
+        "segments": [
+          "stop-f42f19268bf0d341",
+          "metro",
+          "next",
+          "stop-38944465f83fcfb0"
+        ]
+      },
+      {
+        "id": "U718Z2P",
+        "name": "Březiněveská",
+        "request": false,
+        "segments": [
+          "stop-38944465f83fcfb0",
+          "next",
+          "stop-d39421da176c48aa",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U333Z2P",
+        "name": "Líbeznická",
+        "request": true,
+        "segments": [
+          "stop-d39421da176c48aa",
+          "request",
+          "next",
+          "stop-38864b775c6a7422"
+        ]
+      },
+      {
+        "id": "U864Z2P",
+        "name": "Vozovna Kobylisy",
+        "request": false,
+        "segments": [
+          "stop-38864b775c6a7422",
+          "terminus"
+        ]
+      }
+    ],
+    "22": [
+      {
+        "id": "U31Z1P",
+        "name": "Bílá Hora",
+        "request": false,
+        "segments": [
+          "stop-77a62417dc52b70a",
+          "next",
+          "stop-a8a3da496f48fbd6"
+        ]
+      },
+      {
+        "id": "U364Z1P",
+        "name": "Malý Břevnov",
+        "request": false,
+        "segments": [
+          "stop-a8a3da496f48fbd6",
+          "next",
+          "stop-a372eda03a517b76"
+        ]
+      },
+      {
+        "id": "U610Z1P",
+        "name": "Obora Hvězda",
+        "request": false,
+        "segments": [
+          "stop-a372eda03a517b76",
+          "next",
+          "stop-35a36130319798bd"
+        ]
+      },
+      {
+        "id": "U872Z1P",
+        "name": "Vypich",
+        "request": false,
+        "segments": [
+          "stop-35a36130319798bd",
+          "next",
+          "stop-1ac94886a591010c",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U636Z1P",
+        "name": "Říčanova",
+        "request": true,
+        "segments": [
+          "stop-1ac94886a591010c",
+          "request",
+          "next",
+          "stop-68bbd51de24e9c9f"
+        ]
+      },
+      {
+        "id": "U994Z1P",
+        "name": "Břevnovský klášter",
+        "request": false,
+        "segments": [
+          "stop-68bbd51de24e9c9f",
+          "next",
+          "stop-d5ff0b667020ee5d"
+        ]
+      },
+      {
+        "id": "U778Z1P",
+        "name": "U Kaštanu",
+        "request": false,
+        "segments": [
+          "stop-d5ff0b667020ee5d",
+          "next",
+          "stop-7a420027559b2bc9"
+        ]
+      },
+      {
+        "id": "U103Z1P",
+        "name": "Drinopol",
+        "request": false,
+        "segments": [
+          "stop-7a420027559b2bc9",
+          "next",
+          "stop-9bcf756b54b08b34"
+        ]
+      },
+      {
+        "id": "U366Z1P",
+        "name": "Marjánka",
+        "request": false,
+        "segments": [
+          "stop-9bcf756b54b08b34",
+          "next",
+          "stop-68c098542e8ac1f1"
+        ]
+      },
+      {
+        "id": "U362Z1P",
+        "name": "Malovanka",
+        "request": false,
+        "segments": [
+          "stop-68c098542e8ac1f1",
+          "next",
+          "stop-f9e44fbf0a53c8f3"
+        ]
+      },
+      {
+        "id": "U531Z1P",
+        "name": "Pohořelec",
+        "request": false,
+        "segments": [
+          "stop-f9e44fbf0a53c8f3",
+          "next",
+          "stop-220b321f95bfc085"
+        ]
+      },
+      {
+        "id": "U46Z1P",
+        "name": "Brusnice",
+        "request": false,
+        "segments": [
+          "stop-220b321f95bfc085",
+          "next",
+          "stop-a3da26a9363ff738"
+        ]
+      },
+      {
+        "id": "U598Z1P",
+        "name": "Pražský hrad",
+        "request": false,
+        "segments": [
+          "stop-a3da26a9363ff738",
+          "next",
+          "stop-8880185638fba769"
+        ]
+      },
+      {
+        "id": "U20Z1P",
+        "name": "Královský letohrádek",
+        "request": false,
+        "segments": [
+          "stop-8880185638fba769",
+          "next",
+          "stop-ba62bb8b8cb9ea1b"
+        ]
+      },
+      {
+        "id": "U360Z1P",
+        "name": "Malostranská",
+        "request": false,
+        "segments": [
+          "stop-ba62bb8b8cb9ea1b",
+          "metro",
+          "next",
+          "stop-63eab88d8c2b54c5"
+        ]
+      },
+      {
+        "id": "U361Z1P",
+        "name": "Malostranské náměstí",
+        "request": false,
+        "segments": [
+          "stop-63eab88d8c2b54c5",
+          "next",
+          "stop-b5b6af06bcc48298"
+        ]
+      },
+      {
+        "id": "U138Z1P",
+        "name": "Pražské Jezulátko",
+        "request": false,
+        "segments": [
+          "stop-b5b6af06bcc48298",
+          "next",
+          "stop-62c11de16821e412"
+        ]
+      },
+      {
+        "id": "U809Z1P",
+        "name": "Újezd",
+        "request": false,
+        "segments": [
+          "stop-62c11de16821e412",
+          "next",
+          "stop-76798cdc572111b9"
+        ]
+      },
+      {
+        "id": "U483Z1P",
+        "name": "Národní divadlo",
+        "request": false,
+        "segments": [
+          "stop-76798cdc572111b9",
+          "next",
+          "stop-b771f02044011c43"
+        ]
+      },
+      {
+        "id": "U539Z1P",
+        "name": "Národní třída",
+        "request": false,
+        "segments": [
+          "stop-b771f02044011c43",
+          "metro",
+          "next",
+          "stop-bc91db9ea9d28999"
+        ]
+      },
+      {
+        "id": "U237Z2P",
+        "name": "Karlovo náměstí",
+        "request": false,
+        "segments": [
+          "stop-bc91db9ea9d28999",
+          "metro",
+          "next",
+          "stop-a8c8dcfb8e8c4d57"
+        ]
+      },
+      {
+        "id": "U739Z2P",
+        "name": "Štěpánská",
+        "request": false,
+        "segments": [
+          "stop-a8c8dcfb8e8c4d57",
+          "next",
+          "stop-f98a249b73d5ca2a"
+        ]
+      },
+      {
+        "id": "U190Z2P",
+        "name": "I. P. Pavlova",
+        "request": false,
+        "segments": [
+          "stop-f98a249b73d5ca2a",
+          "metro",
+          "next",
+          "stop-bc2b6428375822a8"
+        ]
+      },
+      {
+        "id": "U476Z2P",
+        "name": "Náměstí Míru",
+        "request": false,
+        "segments": [
+          "stop-bc2b6428375822a8",
+          "metro",
+          "next",
+          "stop-439e86e569d54cf4"
+        ]
+      },
+      {
+        "id": "U354Z2P",
+        "name": "Jana Masaryka",
+        "request": false,
+        "segments": [
+          "stop-439e86e569d54cf4",
+          "next",
+          "stop-c60b5bef375bfa97"
+        ]
+      },
+      {
+        "id": "U301Z2P",
+        "name": "Krymská",
+        "request": false,
+        "segments": [
+          "stop-c60b5bef375bfa97",
+          "next",
+          "stop-27cb9b7a0c0336c0"
+        ]
+      },
+      {
+        "id": "U627Z2P",
+        "name": "Ruská",
+        "request": false,
+        "segments": [
+          "stop-27cb9b7a0c0336c0",
+          "next",
+          "stop-15ea28a4e8780de6"
+        ]
+      },
+      {
+        "id": "U391Z2P",
+        "name": "Vršovické náměstí",
+        "request": false,
+        "segments": [
+          "stop-15ea28a4e8780de6",
+          "next",
+          "stop-e5a9bdf7639b88a9"
+        ]
+      },
+      {
+        "id": "U67Z2P",
+        "name": "Čechovo náměstí",
+        "request": false,
+        "segments": [
+          "stop-e5a9bdf7639b88a9",
+          "next",
+          "stop-7d010e1ce1f23584"
+        ]
+      },
+      {
+        "id": "U269Z2P",
+        "name": "Koh-i-noor",
+        "request": false,
+        "segments": [
+          "stop-7d010e1ce1f23584",
+          "next",
+          "stop-b351af3fe6427d47"
+        ]
+      },
+      {
+        "id": "U680Z2P",
+        "name": "Slavia - Nádraží Eden",
+        "request": false,
+        "segments": [
+          "stop-b351af3fe6427d47",
+          "train",
+          "next",
+          "stop-af1f44a59b76774f"
+        ]
+      },
+      {
+        "id": "U473Z2P",
+        "name": "Kubánské náměstí",
+        "request": false,
+        "segments": [
+          "stop-af1f44a59b76774f",
+          "next",
+          "stop-271f23bee12d8bc9"
+        ]
+      },
+      {
+        "id": "U605Z2P",
+        "name": "Průběžná",
+        "request": false,
+        "segments": [
+          "stop-271f23bee12d8bc9",
+          "next",
+          "stop-744765b8d00abe9b"
+        ]
+      },
+      {
+        "id": "U599Z2P",
+        "name": "Na Hroudě",
+        "request": false,
+        "segments": [
+          "stop-744765b8d00abe9b",
+          "next",
+          "stop-5a3179cde594440d"
+        ]
+      },
+      {
+        "id": "U459Z2P",
+        "name": "Staré Strašnice",
+        "request": false,
+        "segments": [
+          "stop-5a3179cde594440d",
+          "next",
+          "stop-d3cb7fd59ea46e14"
+        ]
+      },
+      {
+        "id": "U618Z2P",
+        "name": "Radošovická",
+        "request": false,
+        "segments": [
+          "stop-d3cb7fd59ea46e14",
+          "next",
+          "stop-eb9a38c9351c7c9a",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U584Z2P",
+        "name": "Dubečská",
+        "request": true,
+        "segments": [
+          "stop-eb9a38c9351c7c9a",
+          "request",
+          "next",
+          "stop-2e0d5b4f8dcdb9be"
+        ]
+      },
+      {
+        "id": "U2781Z2P",
+        "name": "Nádraží Zahradní Město",
+        "request": false,
+        "segments": [
+          "stop-2e0d5b4f8dcdb9be",
+          "train",
+          "next",
+          "stop-75ba2da385d34d75"
+        ]
+      },
+      {
+        "id": "U889Z2P",
+        "name": "Zahradní Město",
+        "request": false,
+        "segments": [
+          "stop-75ba2da385d34d75",
+          "terminus"
+        ]
+      }
+    ],
+    "23": [
+      {
+        "id": "U362Z7P",
+        "name": "Královka",
+        "request": false,
+        "segments": [
+          "stop-c9dfb3badedf7804",
+          "next",
+          "stop-68c098542e8ac1f1"
+        ]
+      },
+      {
+        "id": "U362Z1P",
+        "name": "Malovanka",
+        "request": false,
+        "segments": [
+          "stop-68c098542e8ac1f1",
+          "next",
+          "stop-157a3fa219253d13"
+        ]
+      },
+      {
+        "id": "U140Z3P",
+        "name": "Hládkov",
+        "request": false,
+        "segments": [
+          "stop-157a3fa219253d13",
+          "next",
+          "stop-220b321f95bfc085"
+        ]
+      },
+      {
+        "id": "U46Z1P",
+        "name": "Brusnice",
+        "request": false,
+        "segments": [
+          "stop-220b321f95bfc085",
+          "next",
+          "stop-a3da26a9363ff738"
+        ]
+      },
+      {
+        "id": "U598Z1P",
+        "name": "Pražský hrad",
+        "request": false,
+        "segments": [
+          "stop-a3da26a9363ff738",
+          "next",
+          "stop-8880185638fba769"
+        ]
+      },
+      {
+        "id": "U20Z1P",
+        "name": "Královský letohrádek",
+        "request": false,
+        "segments": [
+          "stop-8880185638fba769",
+          "next",
+          "stop-ba62bb8b8cb9ea1b"
+        ]
+      },
+      {
+        "id": "U360Z1P",
+        "name": "Malostranská",
+        "request": false,
+        "segments": [
+          "stop-ba62bb8b8cb9ea1b",
+          "metro",
+          "next",
+          "stop-63eab88d8c2b54c5"
+        ]
+      },
+      {
+        "id": "U361Z1P",
+        "name": "Malostranské náměstí",
+        "request": false,
+        "segments": [
+          "stop-63eab88d8c2b54c5",
+          "next",
+          "stop-b5b6af06bcc48298"
+        ]
+      },
+      {
+        "id": "U138Z1P",
+        "name": "Pražské Jezulátko",
+        "request": false,
+        "segments": [
+          "stop-b5b6af06bcc48298",
+          "next",
+          "stop-62c11de16821e412"
+        ]
+      },
+      {
+        "id": "U809Z1P",
+        "name": "Újezd",
+        "request": false,
+        "segments": [
+          "stop-62c11de16821e412",
+          "next",
+          "stop-76798cdc572111b9"
+        ]
+      },
+      {
+        "id": "U483Z1P",
+        "name": "Národní divadlo",
+        "request": false,
+        "segments": [
+          "stop-76798cdc572111b9",
+          "next",
+          "stop-b771f02044011c43"
+        ]
+      },
+      {
+        "id": "U539Z1P",
+        "name": "Národní třída",
+        "request": false,
+        "segments": [
+          "stop-b771f02044011c43",
+          "metro",
+          "next",
+          "stop-486d384facfb36c2"
+        ]
+      },
+      {
+        "id": "U997Z2P",
+        "name": "Lazarská",
+        "request": false,
+        "segments": [
+          "stop-486d384facfb36c2",
+          "next",
+          "stop-282cce5ec8b759f1"
+        ]
+      },
+      {
+        "id": "U484Z2P",
+        "name": "Vodičkova",
+        "request": false,
+        "segments": [
+          "stop-282cce5ec8b759f1",
+          "next",
+          "stop-8d2eac4cac2cd16a"
+        ]
+      },
+      {
+        "id": "U1072Z2P",
+        "name": "Václavské náměstí",
+        "request": false,
+        "segments": [
+          "stop-8d2eac4cac2cd16a",
+          "metro",
+          "next",
+          "stop-073615c19474f638"
+        ]
+      },
+      {
+        "id": "U203Z2P",
+        "name": "Jindřišská",
+        "request": false,
+        "segments": [
+          "stop-073615c19474f638",
+          "next",
+          "stop-05990bcf5095b071"
+        ]
+      },
+      {
+        "id": "U480Z4P",
+        "name": "Masarykovo nádraží",
+        "request": false,
+        "segments": [
+          "stop-05990bcf5095b071",
+          "metro",
+          "train",
+          "next",
+          "stop-27e9d031702bc26c"
+        ]
+      },
+      {
+        "id": "U32Z2P",
+        "name": "Bílá labuť",
+        "request": false,
+        "segments": [
+          "stop-27e9d031702bc26c",
+          "terminus"
+        ]
+      }
+    ],
+    "37": [
+      {
+        "id": "U694Z1P",
+        "name": "Spojovací",
+        "request": false,
+        "segments": [
+          "stop-7c77671bd41ad3fd",
+          "next",
+          "stop-ae9dd3ee71e09c06"
+        ]
+      },
+      {
+        "id": "U266Z1P",
+        "name": "Kněžská luka",
+        "request": false,
+        "segments": [
+          "stop-ae9dd3ee71e09c06",
+          "next",
+          "stop-0f412be51f54bbba"
+        ]
+      },
+      {
+        "id": "U180Z1P",
+        "name": "Chmelnice",
+        "request": false,
+        "segments": [
+          "stop-0f412be51f54bbba",
+          "next",
+          "stop-d44218d55720aab5"
+        ]
+      },
+      {
+        "id": "U714Z1P",
+        "name": "Strážní",
+        "request": false,
+        "segments": [
+          "stop-d44218d55720aab5",
+          "next",
+          "stop-a700cbf11c355c6d"
+        ]
+      },
+      {
+        "id": "U837Z1P",
+        "name": "Vozovna Žižkov",
+        "request": false,
+        "segments": [
+          "stop-a700cbf11c355c6d",
+          "next",
+          "stop-1a17bbddbaaabd0b"
+        ]
+      },
+      {
+        "id": "U512Z1P",
+        "name": "Ohrada",
+        "request": false,
+        "segments": [
+          "stop-1a17bbddbaaabd0b",
+          "next",
+          "stop-c5beac9b64522752",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U1074Z1P",
+        "name": "Krejcárek",
+        "request": true,
+        "segments": [
+          "stop-c5beac9b64522752",
+          "request",
+          "next",
+          "stop-849dd3a0ccdbe40c"
+        ]
+      },
+      {
+        "id": "U529Z2P",
+        "name": "Palmovka",
+        "request": false,
+        "segments": [
+          "stop-849dd3a0ccdbe40c",
+          "next",
+          "stop-c164b6cba7bd9104"
+        ]
+      },
+      {
+        "id": "U12Z2P",
+        "name": "Balabenka",
+        "request": false,
+        "segments": [
+          "stop-c164b6cba7bd9104",
+          "next",
+          "stop-1b2e4475fd2ce4d7"
+        ]
+      },
+      {
+        "id": "U1075Z2P",
+        "name": "Ocelářská",
+        "request": false,
+        "segments": [
+          "stop-1b2e4475fd2ce4d7",
+          "next",
+          "stop-11564dcca561254c"
+        ]
+      },
+      {
+        "id": "U348Z2P",
+        "name": "Arena Libeň jih",
+        "request": false,
+        "segments": [
+          "stop-11564dcca561254c",
+          "next",
+          "stop-22a4df6f8dd189b3"
+        ]
+      },
+      {
+        "id": "U134Z2P",
+        "name": "Nádraží Libeň",
+        "request": false,
+        "segments": [
+          "stop-22a4df6f8dd189b3",
+          "next",
+          "stop-4dbc44ed1bae7ed4"
+        ]
+      },
+      {
+        "id": "U1401Z2P",
+        "name": "Kabešova",
+        "request": false,
+        "segments": [
+          "stop-4dbc44ed1bae7ed4",
+          "next",
+          "stop-eac7f92ca3c2a672"
+        ]
+      },
+      {
+        "id": "U691Z2P",
+        "name": "Podkovářská",
+        "request": false,
+        "segments": [
+          "stop-eac7f92ca3c2a672",
+          "next",
+          "stop-a7aba674bd0e399a",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U775Z2P",
+        "name": "U Elektry",
+        "request": true,
+        "segments": [
+          "stop-a7aba674bd0e399a",
+          "request",
+          "next",
+          "stop-42269d3651fe9196",
+          "next-request"
+        ]
+      },
+      {
+        "id": "U755Z2P",
+        "name": "Nademlejnská",
+        "request": true,
+        "segments": [
+          "stop-42269d3651fe9196",
+          "request",
+          "next",
+          "stop-ab2066d75f5f3231"
+        ]
+      },
+      {
+        "id": "U144Z2P",
+        "name": "Starý Hloubětín",
+        "request": false,
+        "segments": [
+          "stop-ab2066d75f5f3231",
+          "next",
+          "stop-f21c5a11e0d76b30"
+        ]
+      },
+      {
+        "id": "U135Z2P",
+        "name": "Hloubětín",
+        "request": false,
+        "segments": [
+          "stop-f21c5a11e0d76b30",
+          "next",
+          "stop-8177f9d546d5b70a"
+        ]
+      },
+      {
+        "id": "U652Z2P",
+        "name": "Sídliště Hloubětín",
+        "request": false,
+        "segments": [
+          "stop-8177f9d546d5b70a",
+          "next",
+          "stop-e8b8d3541ac7990f"
+        ]
+      },
+      {
+        "id": "U72Z2P",
+        "name": "Lehovec",
+        "request": false,
+        "segments": [
+          "stop-e8b8d3541ac7990f",
+          "terminus"
+        ]
+      }
+    ]
+  },
+  "segments": {
+    "metro": {
+      "text": "Přestup na metro.",
+      "clips": {
+        "Aoede": "aoede/metro.mp3",
+        "Algieba": "algieba/metro.mp3",
+        "Sulafat": "sulafat/metro.mp3"
+      }
+    },
+    "next": {
+      "text": "Příští zastávka...",
+      "clips": {
+        "Aoede": "aoede/next.mp3",
+        "Algieba": "algieba/next.mp3",
+        "Sulafat": "sulafat/next.mp3"
+      }
+    },
+    "next-request": {
+      "text": "Příští zastávka je na znamení.",
+      "clips": {
+        "Aoede": "aoede/next-request.mp3",
+        "Algieba": "algieba/next-request.mp3",
+        "Sulafat": "sulafat/next-request.mp3"
+      }
+    },
+    "request": {
+      "text": "Zastávka na znamení.",
+      "clips": {
+        "Aoede": "aoede/request.mp3",
+        "Algieba": "algieba/request.mp3",
+        "Sulafat": "sulafat/request.mp3"
+      }
+    },
+    "road": {
+      "text": "Výstup do vozovky.",
+      "clips": {
+        "Aoede": "aoede/road.mp3",
+        "Algieba": "algieba/road.mp3",
+        "Sulafat": "sulafat/road.mp3"
+      }
+    },
+    "stop-01423a1352131d14": {
+      "text": "Nádraží Holešovice.",
+      "clips": {
+        "Aoede": "aoede/stop-01423a1352131d14.mp3",
+        "Algieba": "algieba/stop-01423a1352131d14.mp3",
+        "Sulafat": "sulafat/stop-01423a1352131d14.mp3"
+      }
+    },
+    "stop-03532adebf77a937": {
+      "text": "Černý kůň.",
+      "clips": {
+        "Aoede": "aoede/stop-03532adebf77a937.mp3",
+        "Algieba": "algieba/stop-03532adebf77a937.mp3",
+        "Sulafat": "sulafat/stop-03532adebf77a937.mp3"
+      }
+    },
+    "stop-05990bcf5095b071": {
+      "text": "Masarykovo nádraží.",
+      "clips": {
+        "Aoede": "aoede/stop-05990bcf5095b071.mp3",
+        "Algieba": "algieba/stop-05990bcf5095b071.mp3",
+        "Sulafat": "sulafat/stop-05990bcf5095b071.mp3"
+      }
+    },
+    "stop-05c671866689ca2d": {
+      "text": "Nákladové nádraží Žižkov.",
+      "clips": {
+        "Aoede": "aoede/stop-05c671866689ca2d.mp3",
+        "Algieba": "algieba/stop-05c671866689ca2d.mp3",
+        "Sulafat": "sulafat/stop-05c671866689ca2d.mp3"
+      }
+    },
+    "stop-073615c19474f638": {
+      "text": "Jindřišská.",
+      "clips": {
+        "Aoede": "aoede/stop-073615c19474f638.mp3",
+        "Algieba": "algieba/stop-073615c19474f638.mp3",
+        "Sulafat": "sulafat/stop-073615c19474f638.mp3"
+      }
+    },
+    "stop-0df24afe3859cb27": {
+      "text": "Hercovka.",
+      "clips": {
+        "Aoede": "aoede/stop-0df24afe3859cb27.mp3",
+        "Algieba": "algieba/stop-0df24afe3859cb27.mp3",
+        "Sulafat": "sulafat/stop-0df24afe3859cb27.mp3"
+      }
+    },
+    "stop-0ea905639e0076df": {
+      "text": "Poštovka.",
+      "clips": {
+        "Aoede": "aoede/stop-0ea905639e0076df.mp3",
+        "Algieba": "algieba/stop-0ea905639e0076df.mp3",
+        "Sulafat": "sulafat/stop-0ea905639e0076df.mp3"
+      }
+    },
+    "stop-0f412be51f54bbba": {
+      "text": "Chmelnice.",
+      "clips": {
+        "Aoede": "aoede/stop-0f412be51f54bbba.mp3",
+        "Algieba": "algieba/stop-0f412be51f54bbba.mp3",
+        "Sulafat": "sulafat/stop-0f412be51f54bbba.mp3"
+      }
+    },
+    "stop-11564dcca561254c": {
+      "text": "Arena Libeň jih.",
+      "clips": {
+        "Aoede": "aoede/stop-11564dcca561254c.mp3",
+        "Algieba": "algieba/stop-11564dcca561254c.mp3",
+        "Sulafat": "sulafat/stop-11564dcca561254c.mp3"
+      }
+    },
+    "stop-157a3fa219253d13": {
+      "text": "Hládkov.",
+      "clips": {
+        "Aoede": "aoede/stop-157a3fa219253d13.mp3",
+        "Algieba": "algieba/stop-157a3fa219253d13.mp3",
+        "Sulafat": "sulafat/stop-157a3fa219253d13.mp3"
+      }
+    },
+    "stop-15ea28a4e8780de6": {
+      "text": "Vršovické náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-15ea28a4e8780de6.mp3",
+        "Algieba": "algieba/stop-15ea28a4e8780de6.mp3",
+        "Sulafat": "sulafat/stop-15ea28a4e8780de6.mp3"
+      }
+    },
+    "stop-1a17bbddbaaabd0b": {
+      "text": "Ohrada.",
+      "clips": {
+        "Aoede": "aoede/stop-1a17bbddbaaabd0b.mp3",
+        "Algieba": "algieba/stop-1a17bbddbaaabd0b.mp3",
+        "Sulafat": "sulafat/stop-1a17bbddbaaabd0b.mp3"
+      }
+    },
+    "stop-1aad0990b6a25fc2": {
+      "text": "Trojská.",
+      "clips": {
+        "Aoede": "aoede/stop-1aad0990b6a25fc2.mp3",
+        "Algieba": "algieba/stop-1aad0990b6a25fc2.mp3",
+        "Sulafat": "sulafat/stop-1aad0990b6a25fc2.mp3"
+      }
+    },
+    "stop-1ac94886a591010c": {
+      "text": "Říčanova.",
+      "clips": {
+        "Aoede": "aoede/stop-1ac94886a591010c.mp3",
+        "Algieba": "algieba/stop-1ac94886a591010c.mp3",
+        "Sulafat": "sulafat/stop-1ac94886a591010c.mp3"
+      }
+    },
+    "stop-1ad0324a4aec74d9": {
+      "text": "Blatiny.",
+      "clips": {
+        "Aoede": "aoede/stop-1ad0324a4aec74d9.mp3",
+        "Algieba": "algieba/stop-1ad0324a4aec74d9.mp3",
+        "Sulafat": "sulafat/stop-1ad0324a4aec74d9.mp3"
+      }
+    },
+    "stop-1b2e4475fd2ce4d7": {
+      "text": "Ocelářská.",
+      "clips": {
+        "Aoede": "aoede/stop-1b2e4475fd2ce4d7.mp3",
+        "Algieba": "algieba/stop-1b2e4475fd2ce4d7.mp3",
+        "Sulafat": "sulafat/stop-1b2e4475fd2ce4d7.mp3"
+      }
+    },
+    "stop-1c220e819c5479ad": {
+      "text": "Bertramka.",
+      "clips": {
+        "Aoede": "aoede/stop-1c220e819c5479ad.mp3",
+        "Algieba": "algieba/stop-1c220e819c5479ad.mp3",
+        "Sulafat": "sulafat/stop-1c220e819c5479ad.mp3"
+      }
+    },
+    "stop-1df00704d8294903": {
+      "text": "Hotel Golf.",
+      "clips": {
+        "Aoede": "aoede/stop-1df00704d8294903.mp3",
+        "Algieba": "algieba/stop-1df00704d8294903.mp3",
+        "Sulafat": "sulafat/stop-1df00704d8294903.mp3"
+      }
+    },
+    "stop-212a2fa901a024ca": {
+      "text": "Palackého náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-212a2fa901a024ca.mp3",
+        "Algieba": "algieba/stop-212a2fa901a024ca.mp3",
+        "Sulafat": "sulafat/stop-212a2fa901a024ca.mp3"
+      }
+    },
+    "stop-220b321f95bfc085": {
+      "text": "Brusnice.",
+      "clips": {
+        "Aoede": "aoede/stop-220b321f95bfc085.mp3",
+        "Algieba": "algieba/stop-220b321f95bfc085.mp3",
+        "Sulafat": "sulafat/stop-220b321f95bfc085.mp3"
+      }
+    },
+    "stop-22a4df6f8dd189b3": {
+      "text": "Nádraží Libeň.",
+      "clips": {
+        "Aoede": "aoede/stop-22a4df6f8dd189b3.mp3",
+        "Algieba": "algieba/stop-22a4df6f8dd189b3.mp3",
+        "Sulafat": "sulafat/stop-22a4df6f8dd189b3.mp3"
+      }
+    },
+    "stop-271f23bee12d8bc9": {
+      "text": "Průběžná.",
+      "clips": {
+        "Aoede": "aoede/stop-271f23bee12d8bc9.mp3",
+        "Algieba": "algieba/stop-271f23bee12d8bc9.mp3",
+        "Sulafat": "sulafat/stop-271f23bee12d8bc9.mp3"
+      }
+    },
+    "stop-274824a0ceac83c1": {
+      "text": "Vinohradská vodárna.",
+      "clips": {
+        "Aoede": "aoede/stop-274824a0ceac83c1.mp3",
+        "Algieba": "algieba/stop-274824a0ceac83c1.mp3",
+        "Sulafat": "sulafat/stop-274824a0ceac83c1.mp3"
+      }
+    },
+    "stop-27cb9b7a0c0336c0": {
+      "text": "Ruská.",
+      "clips": {
+        "Aoede": "aoede/stop-27cb9b7a0c0336c0.mp3",
+        "Algieba": "algieba/stop-27cb9b7a0c0336c0.mp3",
+        "Sulafat": "sulafat/stop-27cb9b7a0c0336c0.mp3"
+      }
+    },
+    "stop-27e9d031702bc26c": {
+      "text": "Bílá labuť.",
+      "clips": {
+        "Aoede": "aoede/stop-27e9d031702bc26c.mp3",
+        "Algieba": "algieba/stop-27e9d031702bc26c.mp3",
+        "Sulafat": "sulafat/stop-27e9d031702bc26c.mp3"
+      }
+    },
+    "stop-282cce5ec8b759f1": {
+      "text": "Vodičkova.",
+      "clips": {
+        "Aoede": "aoede/stop-282cce5ec8b759f1.mp3",
+        "Algieba": "algieba/stop-282cce5ec8b759f1.mp3",
+        "Sulafat": "sulafat/stop-282cce5ec8b759f1.mp3"
+      }
+    },
+    "stop-2e0d5b4f8dcdb9be": {
+      "text": "Nádraží Zahradní Město.",
+      "clips": {
+        "Aoede": "aoede/stop-2e0d5b4f8dcdb9be.mp3",
+        "Algieba": "algieba/stop-2e0d5b4f8dcdb9be.mp3",
+        "Sulafat": "sulafat/stop-2e0d5b4f8dcdb9be.mp3"
+      }
+    },
+    "stop-2ea5c964a2461ec2": {
+      "text": "Motol.",
+      "clips": {
+        "Aoede": "aoede/stop-2ea5c964a2461ec2.mp3",
+        "Algieba": "algieba/stop-2ea5c964a2461ec2.mp3",
+        "Sulafat": "sulafat/stop-2ea5c964a2461ec2.mp3"
+      }
+    },
+    "stop-2fd784769054bac3": {
+      "text": "Čechova čtvrť.",
+      "clips": {
+        "Aoede": "aoede/stop-2fd784769054bac3.mp3",
+        "Algieba": "algieba/stop-2fd784769054bac3.mp3",
+        "Sulafat": "sulafat/stop-2fd784769054bac3.mp3"
+      }
+    },
+    "stop-308bbcc601fd00b1": {
+      "text": "Želivského.",
+      "clips": {
+        "Aoede": "aoede/stop-308bbcc601fd00b1.mp3",
+        "Algieba": "algieba/stop-308bbcc601fd00b1.mp3",
+        "Sulafat": "sulafat/stop-308bbcc601fd00b1.mp3"
+      }
+    },
+    "stop-35a36130319798bd": {
+      "text": "Vypich.",
+      "clips": {
+        "Aoede": "aoede/stop-35a36130319798bd.mp3",
+        "Algieba": "algieba/stop-35a36130319798bd.mp3",
+        "Sulafat": "sulafat/stop-35a36130319798bd.mp3"
+      }
+    },
+    "stop-372f74fd49b4adb4": {
+      "text": "Nádraží Modřany.",
+      "clips": {
+        "Aoede": "aoede/stop-372f74fd49b4adb4.mp3",
+        "Algieba": "algieba/stop-372f74fd49b4adb4.mp3",
+        "Sulafat": "sulafat/stop-372f74fd49b4adb4.mp3"
+      }
+    },
+    "stop-38864b775c6a7422": {
+      "text": "Vozovna Kobylisy.",
+      "clips": {
+        "Aoede": "aoede/stop-38864b775c6a7422.mp3",
+        "Algieba": "algieba/stop-38864b775c6a7422.mp3",
+        "Sulafat": "sulafat/stop-38864b775c6a7422.mp3"
+      }
+    },
+    "stop-38944465f83fcfb0": {
+      "text": "Březiněveská.",
+      "clips": {
+        "Aoede": "aoede/stop-38944465f83fcfb0.mp3",
+        "Algieba": "algieba/stop-38944465f83fcfb0.mp3",
+        "Sulafat": "sulafat/stop-38944465f83fcfb0.mp3"
+      }
+    },
+    "stop-38eafe8f107a5c63": {
+      "text": "Šumavská.",
+      "clips": {
+        "Aoede": "aoede/stop-38eafe8f107a5c63.mp3",
+        "Algieba": "algieba/stop-38eafe8f107a5c63.mp3",
+        "Sulafat": "sulafat/stop-38eafe8f107a5c63.mp3"
+      }
+    },
+    "stop-3ada33977ad970f7": {
+      "text": "Kublov.",
+      "clips": {
+        "Aoede": "aoede/stop-3ada33977ad970f7.mp3",
+        "Algieba": "algieba/stop-3ada33977ad970f7.mp3",
+        "Sulafat": "sulafat/stop-3ada33977ad970f7.mp3"
+      }
+    },
+    "stop-3b182e37a9f5bc62": {
+      "text": "Výtoň.",
+      "clips": {
+        "Aoede": "aoede/stop-3b182e37a9f5bc62.mp3",
+        "Algieba": "algieba/stop-3b182e37a9f5bc62.mp3",
+        "Sulafat": "sulafat/stop-3b182e37a9f5bc62.mp3"
+      }
+    },
+    "stop-3fba04d7c09d8140": {
+      "text": "Dvorce.",
+      "clips": {
+        "Aoede": "aoede/stop-3fba04d7c09d8140.mp3",
+        "Algieba": "algieba/stop-3fba04d7c09d8140.mp3",
+        "Sulafat": "sulafat/stop-3fba04d7c09d8140.mp3"
+      }
+    },
+    "stop-42269d3651fe9196": {
+      "text": "Nademlejnská.",
+      "clips": {
+        "Aoede": "aoede/stop-42269d3651fe9196.mp3",
+        "Algieba": "algieba/stop-42269d3651fe9196.mp3",
+        "Sulafat": "sulafat/stop-42269d3651fe9196.mp3"
+      }
+    },
+    "stop-439e86e569d54cf4": {
+      "text": "Jana Masaryka.",
+      "clips": {
+        "Aoede": "aoede/stop-439e86e569d54cf4.mp3",
+        "Algieba": "algieba/stop-439e86e569d54cf4.mp3",
+        "Sulafat": "sulafat/stop-439e86e569d54cf4.mp3"
+      }
+    },
+    "stop-45903d08b9238164": {
+      "text": "Výstaviště.",
+      "clips": {
+        "Aoede": "aoede/stop-45903d08b9238164.mp3",
+        "Algieba": "algieba/stop-45903d08b9238164.mp3",
+        "Sulafat": "sulafat/stop-45903d08b9238164.mp3"
+      }
+    },
+    "stop-486d384facfb36c2": {
+      "text": "Lazarská.",
+      "clips": {
+        "Aoede": "aoede/stop-486d384facfb36c2.mp3",
+        "Algieba": "algieba/stop-486d384facfb36c2.mp3",
+        "Sulafat": "sulafat/stop-486d384facfb36c2.mp3"
+      }
+    },
+    "stop-4dbc44ed1bae7ed4": {
+      "text": "Kabešova.",
+      "clips": {
+        "Aoede": "aoede/stop-4dbc44ed1bae7ed4.mp3",
+        "Algieba": "algieba/stop-4dbc44ed1bae7ed4.mp3",
+        "Sulafat": "sulafat/stop-4dbc44ed1bae7ed4.mp3"
+      }
+    },
+    "stop-5165be7be38bf241": {
+      "text": "Arbesovo náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-5165be7be38bf241.mp3",
+        "Algieba": "algieba/stop-5165be7be38bf241.mp3",
+        "Sulafat": "sulafat/stop-5165be7be38bf241.mp3"
+      }
+    },
+    "stop-562b61cfb56e4d4c": {
+      "text": "Olšanské hřbitovy.",
+      "clips": {
+        "Aoede": "aoede/stop-562b61cfb56e4d4c.mp3",
+        "Algieba": "algieba/stop-562b61cfb56e4d4c.mp3",
+        "Sulafat": "sulafat/stop-562b61cfb56e4d4c.mp3"
+      }
+    },
+    "stop-582bd09748165129": {
+      "text": "Moráň.",
+      "clips": {
+        "Aoede": "aoede/stop-582bd09748165129.mp3",
+        "Algieba": "algieba/stop-582bd09748165129.mp3",
+        "Sulafat": "sulafat/stop-582bd09748165129.mp3"
+      }
+    },
+    "stop-5a3179cde594440d": {
+      "text": "Staré Strašnice.",
+      "clips": {
+        "Aoede": "aoede/stop-5a3179cde594440d.mp3",
+        "Algieba": "algieba/stop-5a3179cde594440d.mp3",
+        "Sulafat": "sulafat/stop-5a3179cde594440d.mp3"
+      }
+    },
+    "stop-62786d8df6adb732": {
+      "text": "Mezi Hřbitovy.",
+      "clips": {
+        "Aoede": "aoede/stop-62786d8df6adb732.mp3",
+        "Algieba": "algieba/stop-62786d8df6adb732.mp3",
+        "Sulafat": "sulafat/stop-62786d8df6adb732.mp3"
+      }
+    },
+    "stop-62c11de16821e412": {
+      "text": "Újezd.",
+      "clips": {
+        "Aoede": "aoede/stop-62c11de16821e412.mp3",
+        "Algieba": "algieba/stop-62c11de16821e412.mp3",
+        "Sulafat": "sulafat/stop-62c11de16821e412.mp3"
+      }
+    },
+    "stop-63eab88d8c2b54c5": {
+      "text": "Malostranské náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-63eab88d8c2b54c5.mp3",
+        "Algieba": "algieba/stop-63eab88d8c2b54c5.mp3",
+        "Sulafat": "sulafat/stop-63eab88d8c2b54c5.mp3"
+      }
+    },
+    "stop-67db543003617f66": {
+      "text": "Slánská.",
+      "clips": {
+        "Aoede": "aoede/stop-67db543003617f66.mp3",
+        "Algieba": "algieba/stop-67db543003617f66.mp3",
+        "Sulafat": "sulafat/stop-67db543003617f66.mp3"
+      }
+    },
+    "stop-67e7b9a334deb372": {
+      "text": "U Zvonu.",
+      "clips": {
+        "Aoede": "aoede/stop-67e7b9a334deb372.mp3",
+        "Algieba": "algieba/stop-67e7b9a334deb372.mp3",
+        "Sulafat": "sulafat/stop-67e7b9a334deb372.mp3"
+      }
+    },
+    "stop-68bbd51de24e9c9f": {
+      "text": "Břevnovský klášter.",
+      "clips": {
+        "Aoede": "aoede/stop-68bbd51de24e9c9f.mp3",
+        "Algieba": "algieba/stop-68bbd51de24e9c9f.mp3",
+        "Sulafat": "sulafat/stop-68bbd51de24e9c9f.mp3"
+      }
+    },
+    "stop-68c098542e8ac1f1": {
+      "text": "Malovanka.",
+      "clips": {
+        "Aoede": "aoede/stop-68c098542e8ac1f1.mp3",
+        "Algieba": "algieba/stop-68c098542e8ac1f1.mp3",
+        "Sulafat": "sulafat/stop-68c098542e8ac1f1.mp3"
+      }
+    },
+    "stop-69bd9530f6bfa3fe": {
+      "text": "Flora.",
+      "clips": {
+        "Aoede": "aoede/stop-69bd9530f6bfa3fe.mp3",
+        "Algieba": "algieba/stop-69bd9530f6bfa3fe.mp3",
+        "Sulafat": "sulafat/stop-69bd9530f6bfa3fe.mp3"
+      }
+    },
+    "stop-6c90f1664d4081d8": {
+      "text": "Hlavní nádraží.",
+      "clips": {
+        "Aoede": "aoede/stop-6c90f1664d4081d8.mp3",
+        "Algieba": "algieba/stop-6c90f1664d4081d8.mp3",
+        "Sulafat": "sulafat/stop-6c90f1664d4081d8.mp3"
+      }
+    },
+    "stop-6cb64c9af5d50127": {
+      "text": "Pobřežní cesta.",
+      "clips": {
+        "Aoede": "aoede/stop-6cb64c9af5d50127.mp3",
+        "Algieba": "algieba/stop-6cb64c9af5d50127.mp3",
+        "Sulafat": "sulafat/stop-6cb64c9af5d50127.mp3"
+      }
+    },
+    "stop-6d758c841564f0d3": {
+      "text": "Čechův most.",
+      "clips": {
+        "Aoede": "aoede/stop-6d758c841564f0d3.mp3",
+        "Algieba": "algieba/stop-6d758c841564f0d3.mp3",
+        "Sulafat": "sulafat/stop-6d758c841564f0d3.mp3"
+      }
+    },
+    "stop-744765b8d00abe9b": {
+      "text": "Na Hroudě.",
+      "clips": {
+        "Aoede": "aoede/stop-744765b8d00abe9b.mp3",
+        "Algieba": "algieba/stop-744765b8d00abe9b.mp3",
+        "Sulafat": "sulafat/stop-744765b8d00abe9b.mp3"
+      }
+    },
+    "stop-75ba2da385d34d75": {
+      "text": "Zahradní Město.",
+      "clips": {
+        "Aoede": "aoede/stop-75ba2da385d34d75.mp3",
+        "Algieba": "algieba/stop-75ba2da385d34d75.mp3",
+        "Sulafat": "sulafat/stop-75ba2da385d34d75.mp3"
+      }
+    },
+    "stop-7652c51cda3ac7be": {
+      "text": "Staroměstská.",
+      "clips": {
+        "Aoede": "aoede/stop-7652c51cda3ac7be.mp3",
+        "Algieba": "algieba/stop-7652c51cda3ac7be.mp3",
+        "Sulafat": "sulafat/stop-7652c51cda3ac7be.mp3"
+      }
+    },
+    "stop-76798cdc572111b9": {
+      "text": "Národní divadlo.",
+      "clips": {
+        "Aoede": "aoede/stop-76798cdc572111b9.mp3",
+        "Algieba": "algieba/stop-76798cdc572111b9.mp3",
+        "Sulafat": "sulafat/stop-76798cdc572111b9.mp3"
+      }
+    },
+    "stop-77a62417dc52b70a": {
+      "text": "Bílá Hora.",
+      "clips": {
+        "Aoede": "aoede/stop-77a62417dc52b70a.mp3",
+        "Algieba": "algieba/stop-77a62417dc52b70a.mp3",
+        "Sulafat": "sulafat/stop-77a62417dc52b70a.mp3"
+      }
+    },
+    "stop-7a420027559b2bc9": {
+      "text": "Drinopol.",
+      "clips": {
+        "Aoede": "aoede/stop-7a420027559b2bc9.mp3",
+        "Algieba": "algieba/stop-7a420027559b2bc9.mp3",
+        "Sulafat": "sulafat/stop-7a420027559b2bc9.mp3"
+      }
+    },
+    "stop-7c77671bd41ad3fd": {
+      "text": "Spojovací.",
+      "clips": {
+        "Aoede": "aoede/stop-7c77671bd41ad3fd.mp3",
+        "Algieba": "algieba/stop-7c77671bd41ad3fd.mp3",
+        "Sulafat": "sulafat/stop-7c77671bd41ad3fd.mp3"
+      }
+    },
+    "stop-7d010e1ce1f23584": {
+      "text": "Koh-i-noor.",
+      "clips": {
+        "Aoede": "aoede/stop-7d010e1ce1f23584.mp3",
+        "Algieba": "algieba/stop-7d010e1ce1f23584.mp3",
+        "Sulafat": "sulafat/stop-7d010e1ce1f23584.mp3"
+      }
+    },
+    "stop-7d2e4b08f1905461": {
+      "text": "Nad Trojou.",
+      "clips": {
+        "Aoede": "aoede/stop-7d2e4b08f1905461.mp3",
+        "Algieba": "algieba/stop-7d2e4b08f1905461.mp3",
+        "Sulafat": "sulafat/stop-7d2e4b08f1905461.mp3"
+      }
+    },
+    "stop-80aed900b37f125e": {
+      "text": "Strossmayerovo náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-80aed900b37f125e.mp3",
+        "Algieba": "algieba/stop-80aed900b37f125e.mp3",
+        "Sulafat": "sulafat/stop-80aed900b37f125e.mp3"
+      },
+      "spoken": "Štrosmajerovo náměstí."
+    },
+    "stop-8177f9d546d5b70a": {
+      "text": "Sídliště Hloubětín.",
+      "clips": {
+        "Aoede": "aoede/stop-8177f9d546d5b70a.mp3",
+        "Algieba": "algieba/stop-8177f9d546d5b70a.mp3",
+        "Sulafat": "sulafat/stop-8177f9d546d5b70a.mp3"
+      }
+    },
+    "stop-849dd3a0ccdbe40c": {
+      "text": "Palmovka.",
+      "clips": {
+        "Aoede": "aoede/stop-849dd3a0ccdbe40c.mp3",
+        "Algieba": "algieba/stop-849dd3a0ccdbe40c.mp3",
+        "Sulafat": "sulafat/stop-849dd3a0ccdbe40c.mp3"
+      }
+    },
+    "stop-84a71f467937bd31": {
+      "text": "Sídliště Řepy.",
+      "clips": {
+        "Aoede": "aoede/stop-84a71f467937bd31.mp3",
+        "Algieba": "algieba/stop-84a71f467937bd31.mp3",
+        "Sulafat": "sulafat/stop-84a71f467937bd31.mp3"
+      }
+    },
+    "stop-8880185638fba769": {
+      "text": "Královský letohrádek.",
+      "clips": {
+        "Aoede": "aoede/stop-8880185638fba769.mp3",
+        "Algieba": "algieba/stop-8880185638fba769.mp3",
+        "Sulafat": "sulafat/stop-8880185638fba769.mp3"
+      }
+    },
+    "stop-8d2eac4cac2cd16a": {
+      "text": "Václavské náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-8d2eac4cac2cd16a.mp3",
+        "Algieba": "algieba/stop-8d2eac4cac2cd16a.mp3",
+        "Sulafat": "sulafat/stop-8d2eac4cac2cd16a.mp3"
+      }
+    },
+    "stop-94c6a7e8c792f5df": {
+      "text": "Kotlářka.",
+      "clips": {
+        "Aoede": "aoede/stop-94c6a7e8c792f5df.mp3",
+        "Algieba": "algieba/stop-94c6a7e8c792f5df.mp3",
+        "Sulafat": "sulafat/stop-94c6a7e8c792f5df.mp3"
+      }
+    },
+    "stop-952f82e10fb5a5f4": {
+      "text": "Orionka.",
+      "clips": {
+        "Aoede": "aoede/stop-952f82e10fb5a5f4.mp3",
+        "Algieba": "algieba/stop-952f82e10fb5a5f4.mp3",
+        "Sulafat": "sulafat/stop-952f82e10fb5a5f4.mp3"
+      }
+    },
+    "stop-9b774b9fb237f67f": {
+      "text": "Modřanská rokle.",
+      "clips": {
+        "Aoede": "aoede/stop-9b774b9fb237f67f.mp3",
+        "Algieba": "algieba/stop-9b774b9fb237f67f.mp3",
+        "Sulafat": "sulafat/stop-9b774b9fb237f67f.mp3"
+      }
+    },
+    "stop-9bcf756b54b08b34": {
+      "text": "Marjánka.",
+      "clips": {
+        "Aoede": "aoede/stop-9bcf756b54b08b34.mp3",
+        "Algieba": "algieba/stop-9bcf756b54b08b34.mp3",
+        "Sulafat": "sulafat/stop-9bcf756b54b08b34.mp3"
+      }
+    },
+    "stop-a0e80952f6335558": {
+      "text": "Klamovka.",
+      "clips": {
+        "Aoede": "aoede/stop-a0e80952f6335558.mp3",
+        "Algieba": "algieba/stop-a0e80952f6335558.mp3",
+        "Sulafat": "sulafat/stop-a0e80952f6335558.mp3"
+      }
+    },
+    "stop-a33400e21ac97490": {
+      "text": "Veletržní palác.",
+      "clips": {
+        "Aoede": "aoede/stop-a33400e21ac97490.mp3",
+        "Algieba": "algieba/stop-a33400e21ac97490.mp3",
+        "Sulafat": "sulafat/stop-a33400e21ac97490.mp3"
+      }
+    },
+    "stop-a372eda03a517b76": {
+      "text": "Obora Hvězda.",
+      "clips": {
+        "Aoede": "aoede/stop-a372eda03a517b76.mp3",
+        "Algieba": "algieba/stop-a372eda03a517b76.mp3",
+        "Sulafat": "sulafat/stop-a372eda03a517b76.mp3"
+      }
+    },
+    "stop-a3da26a9363ff738": {
+      "text": "Pražský hrad.",
+      "clips": {
+        "Aoede": "aoede/stop-a3da26a9363ff738.mp3",
+        "Algieba": "algieba/stop-a3da26a9363ff738.mp3",
+        "Sulafat": "sulafat/stop-a3da26a9363ff738.mp3"
+      }
+    },
+    "stop-a700cbf11c355c6d": {
+      "text": "Vozovna Žižkov.",
+      "clips": {
+        "Aoede": "aoede/stop-a700cbf11c355c6d.mp3",
+        "Algieba": "algieba/stop-a700cbf11c355c6d.mp3",
+        "Sulafat": "sulafat/stop-a700cbf11c355c6d.mp3"
+      }
+    },
+    "stop-a7aba674bd0e399a": {
+      "text": "U Elektry.",
+      "clips": {
+        "Aoede": "aoede/stop-a7aba674bd0e399a.mp3",
+        "Algieba": "algieba/stop-a7aba674bd0e399a.mp3",
+        "Sulafat": "sulafat/stop-a7aba674bd0e399a.mp3"
+      }
+    },
+    "stop-a86bcbb1dcbfd663": {
+      "text": "Jiráskovo náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-a86bcbb1dcbfd663.mp3",
+        "Algieba": "algieba/stop-a86bcbb1dcbfd663.mp3",
+        "Sulafat": "sulafat/stop-a86bcbb1dcbfd663.mp3"
+      }
+    },
+    "stop-a8a3da496f48fbd6": {
+      "text": "Malý Břevnov.",
+      "clips": {
+        "Aoede": "aoede/stop-a8a3da496f48fbd6.mp3",
+        "Algieba": "algieba/stop-a8a3da496f48fbd6.mp3",
+        "Sulafat": "sulafat/stop-a8a3da496f48fbd6.mp3"
+      }
+    },
+    "stop-a8c8dcfb8e8c4d57": {
+      "text": "Štěpánská.",
+      "clips": {
+        "Aoede": "aoede/stop-a8c8dcfb8e8c4d57.mp3",
+        "Algieba": "algieba/stop-a8c8dcfb8e8c4d57.mp3",
+        "Sulafat": "sulafat/stop-a8c8dcfb8e8c4d57.mp3"
+      }
+    },
+    "stop-ab2066d75f5f3231": {
+      "text": "Starý Hloubětín.",
+      "clips": {
+        "Aoede": "aoede/stop-ab2066d75f5f3231.mp3",
+        "Algieba": "algieba/stop-ab2066d75f5f3231.mp3",
+        "Sulafat": "sulafat/stop-ab2066d75f5f3231.mp3"
+      }
+    },
+    "stop-ae9dd3ee71e09c06": {
+      "text": "Kněžská luka.",
+      "clips": {
+        "Aoede": "aoede/stop-ae9dd3ee71e09c06.mp3",
+        "Algieba": "algieba/stop-ae9dd3ee71e09c06.mp3",
+        "Sulafat": "sulafat/stop-ae9dd3ee71e09c06.mp3"
+      }
+    },
+    "stop-af1f44a59b76774f": {
+      "text": "Kubánské náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-af1f44a59b76774f.mp3",
+        "Algieba": "algieba/stop-af1f44a59b76774f.mp3",
+        "Sulafat": "sulafat/stop-af1f44a59b76774f.mp3"
+      }
+    },
+    "stop-b10d45d9aee06a95": {
+      "text": "Hlušičkova.",
+      "clips": {
+        "Aoede": "aoede/stop-b10d45d9aee06a95.mp3",
+        "Algieba": "algieba/stop-b10d45d9aee06a95.mp3",
+        "Sulafat": "sulafat/stop-b10d45d9aee06a95.mp3"
+      }
+    },
+    "stop-b351af3fe6427d47": {
+      "text": "Slavia - Nádraží Eden.",
+      "clips": {
+        "Aoede": "aoede/stop-b351af3fe6427d47.mp3",
+        "Algieba": "algieba/stop-b351af3fe6427d47.mp3",
+        "Sulafat": "sulafat/stop-b351af3fe6427d47.mp3"
+      }
+    },
+    "stop-b4063d3e4dd74007": {
+      "text": "Kavalírka.",
+      "clips": {
+        "Aoede": "aoede/stop-b4063d3e4dd74007.mp3",
+        "Algieba": "algieba/stop-b4063d3e4dd74007.mp3",
+        "Sulafat": "sulafat/stop-b4063d3e4dd74007.mp3"
+      }
+    },
+    "stop-b5b6af06bcc48298": {
+      "text": "Pražské Jezulátko.",
+      "clips": {
+        "Aoede": "aoede/stop-b5b6af06bcc48298.mp3",
+        "Algieba": "algieba/stop-b5b6af06bcc48298.mp3",
+        "Sulafat": "sulafat/stop-b5b6af06bcc48298.mp3"
+      }
+    },
+    "stop-b771f02044011c43": {
+      "text": "Národní třída.",
+      "clips": {
+        "Aoede": "aoede/stop-b771f02044011c43.mp3",
+        "Algieba": "algieba/stop-b771f02044011c43.mp3",
+        "Sulafat": "sulafat/stop-b771f02044011c43.mp3"
+      }
+    },
+    "stop-ba62bb8b8cb9ea1b": {
+      "text": "Malostranská.",
+      "clips": {
+        "Aoede": "aoede/stop-ba62bb8b8cb9ea1b.mp3",
+        "Algieba": "algieba/stop-ba62bb8b8cb9ea1b.mp3",
+        "Sulafat": "sulafat/stop-ba62bb8b8cb9ea1b.mp3"
+      }
+    },
+    "stop-bc2b6428375822a8": {
+      "text": "Náměstí Míru.",
+      "clips": {
+        "Aoede": "aoede/stop-bc2b6428375822a8.mp3",
+        "Algieba": "algieba/stop-bc2b6428375822a8.mp3",
+        "Sulafat": "sulafat/stop-bc2b6428375822a8.mp3"
+      }
+    },
+    "stop-bc4e2751504fa913": {
+      "text": "Podolská vodárna.",
+      "clips": {
+        "Aoede": "aoede/stop-bc4e2751504fa913.mp3",
+        "Algieba": "algieba/stop-bc4e2751504fa913.mp3",
+        "Sulafat": "sulafat/stop-bc4e2751504fa913.mp3"
+      }
+    },
+    "stop-bc91db9ea9d28999": {
+      "text": "Karlovo náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-bc91db9ea9d28999.mp3",
+        "Algieba": "algieba/stop-bc91db9ea9d28999.mp3",
+        "Sulafat": "sulafat/stop-bc91db9ea9d28999.mp3"
+      }
+    },
+    "stop-c0389b25aba564d2": {
+      "text": "Olšanská.",
+      "clips": {
+        "Aoede": "aoede/stop-c0389b25aba564d2.mp3",
+        "Algieba": "algieba/stop-c0389b25aba564d2.mp3",
+        "Sulafat": "sulafat/stop-c0389b25aba564d2.mp3"
+      }
+    },
+    "stop-c0b92e46f3c1e40b": {
+      "text": "Hodkovičky.",
+      "clips": {
+        "Aoede": "aoede/stop-c0b92e46f3c1e40b.mp3",
+        "Algieba": "algieba/stop-c0b92e46f3c1e40b.mp3",
+        "Sulafat": "sulafat/stop-c0b92e46f3c1e40b.mp3"
+      }
+    },
+    "stop-c0bd4e94d770a557": {
+      "text": "Belárie.",
+      "clips": {
+        "Aoede": "aoede/stop-c0bd4e94d770a557.mp3",
+        "Algieba": "algieba/stop-c0bd4e94d770a557.mp3",
+        "Sulafat": "sulafat/stop-c0bd4e94d770a557.mp3"
+      }
+    },
+    "stop-c164b6cba7bd9104": {
+      "text": "Balabenka.",
+      "clips": {
+        "Aoede": "aoede/stop-c164b6cba7bd9104.mp3",
+        "Algieba": "algieba/stop-c164b6cba7bd9104.mp3",
+        "Sulafat": "sulafat/stop-c164b6cba7bd9104.mp3"
+      }
+    },
+    "stop-c191bcb265acf7ec": {
+      "text": "Sídliště Modřany.",
+      "clips": {
+        "Aoede": "aoede/stop-c191bcb265acf7ec.mp3",
+        "Algieba": "algieba/stop-c191bcb265acf7ec.mp3",
+        "Sulafat": "sulafat/stop-c191bcb265acf7ec.mp3"
+      }
+    },
+    "stop-c5beac9b64522752": {
+      "text": "Krejcárek.",
+      "clips": {
+        "Aoede": "aoede/stop-c5beac9b64522752.mp3",
+        "Algieba": "algieba/stop-c5beac9b64522752.mp3",
+        "Sulafat": "sulafat/stop-c5beac9b64522752.mp3"
+      }
+    },
+    "stop-c60b5bef375bfa97": {
+      "text": "Krymská.",
+      "clips": {
+        "Aoede": "aoede/stop-c60b5bef375bfa97.mp3",
+        "Algieba": "algieba/stop-c60b5bef375bfa97.mp3",
+        "Sulafat": "sulafat/stop-c60b5bef375bfa97.mp3"
+      }
+    },
+    "stop-c69a0a01f34dda3d": {
+      "text": "Vozovna Motol.",
+      "clips": {
+        "Aoede": "aoede/stop-c69a0a01f34dda3d.mp3",
+        "Algieba": "algieba/stop-c69a0a01f34dda3d.mp3",
+        "Sulafat": "sulafat/stop-c69a0a01f34dda3d.mp3"
+      }
+    },
+    "stop-c8a89dc5e524dc5b": {
+      "text": "Perunova.",
+      "clips": {
+        "Aoede": "aoede/stop-c8a89dc5e524dc5b.mp3",
+        "Algieba": "algieba/stop-c8a89dc5e524dc5b.mp3",
+        "Sulafat": "sulafat/stop-c8a89dc5e524dc5b.mp3"
+      }
+    },
+    "stop-c9dfb3badedf7804": {
+      "text": "Královka.",
+      "clips": {
+        "Aoede": "aoede/stop-c9dfb3badedf7804.mp3",
+        "Algieba": "algieba/stop-c9dfb3badedf7804.mp3",
+        "Sulafat": "sulafat/stop-c9dfb3badedf7804.mp3"
+      }
+    },
+    "stop-ce50dbcb95f8c047": {
+      "text": "Anděl.",
+      "clips": {
+        "Aoede": "aoede/stop-ce50dbcb95f8c047.mp3",
+        "Algieba": "algieba/stop-ce50dbcb95f8c047.mp3",
+        "Sulafat": "sulafat/stop-ce50dbcb95f8c047.mp3"
+      }
+    },
+    "stop-d32bc8debbc0054a": {
+      "text": "Krematorium Motol.",
+      "clips": {
+        "Aoede": "aoede/stop-d32bc8debbc0054a.mp3",
+        "Algieba": "algieba/stop-d32bc8debbc0054a.mp3",
+        "Sulafat": "sulafat/stop-d32bc8debbc0054a.mp3"
+      }
+    },
+    "stop-d39421da176c48aa": {
+      "text": "Líbeznická.",
+      "clips": {
+        "Aoede": "aoede/stop-d39421da176c48aa.mp3",
+        "Algieba": "algieba/stop-d39421da176c48aa.mp3",
+        "Sulafat": "sulafat/stop-d39421da176c48aa.mp3"
+      }
+    },
+    "stop-d3cb7fd59ea46e14": {
+      "text": "Radošovická.",
+      "clips": {
+        "Aoede": "aoede/stop-d3cb7fd59ea46e14.mp3",
+        "Algieba": "algieba/stop-d3cb7fd59ea46e14.mp3",
+        "Sulafat": "sulafat/stop-d3cb7fd59ea46e14.mp3"
+      }
+    },
+    "stop-d44218d55720aab5": {
+      "text": "Strážní.",
+      "clips": {
+        "Aoede": "aoede/stop-d44218d55720aab5.mp3",
+        "Algieba": "algieba/stop-d44218d55720aab5.mp3",
+        "Sulafat": "sulafat/stop-d44218d55720aab5.mp3"
+      }
+    },
+    "stop-d5ff0b667020ee5d": {
+      "text": "U Kaštanu.",
+      "clips": {
+        "Aoede": "aoede/stop-d5ff0b667020ee5d.mp3",
+        "Algieba": "algieba/stop-d5ff0b667020ee5d.mp3",
+        "Sulafat": "sulafat/stop-d5ff0b667020ee5d.mp3"
+      }
+    },
+    "stop-d81734c62e896322": {
+      "text": "U Libušského potoka.",
+      "clips": {
+        "Aoede": "aoede/stop-d81734c62e896322.mp3",
+        "Algieba": "algieba/stop-d81734c62e896322.mp3",
+        "Sulafat": "sulafat/stop-d81734c62e896322.mp3"
+      }
+    },
+    "stop-d96c3881ffd8e868": {
+      "text": "Levského.",
+      "clips": {
+        "Aoede": "aoede/stop-d96c3881ffd8e868.mp3",
+        "Algieba": "algieba/stop-d96c3881ffd8e868.mp3",
+        "Sulafat": "sulafat/stop-d96c3881ffd8e868.mp3"
+      }
+    },
+    "stop-ded0c8bb6ec1fc77": {
+      "text": "Olšanské náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-ded0c8bb6ec1fc77.mp3",
+        "Algieba": "algieba/stop-ded0c8bb6ec1fc77.mp3",
+        "Sulafat": "sulafat/stop-ded0c8bb6ec1fc77.mp3"
+      }
+    },
+    "stop-e2544d24006b1258": {
+      "text": "Viktoria Žižkov.",
+      "clips": {
+        "Aoede": "aoede/stop-e2544d24006b1258.mp3",
+        "Algieba": "algieba/stop-e2544d24006b1258.mp3",
+        "Sulafat": "sulafat/stop-e2544d24006b1258.mp3"
+      }
+    },
+    "stop-e2bdbc90d44b594e": {
+      "text": "Modřanská škola.",
+      "clips": {
+        "Aoede": "aoede/stop-e2bdbc90d44b594e.mp3",
+        "Algieba": "algieba/stop-e2bdbc90d44b594e.mp3",
+        "Sulafat": "sulafat/stop-e2bdbc90d44b594e.mp3"
+      }
+    },
+    "stop-e414e18a1db2e252": {
+      "text": "Švandovo divadlo.",
+      "clips": {
+        "Aoede": "aoede/stop-e414e18a1db2e252.mp3",
+        "Algieba": "algieba/stop-e414e18a1db2e252.mp3",
+        "Sulafat": "sulafat/stop-e414e18a1db2e252.mp3"
+      }
+    },
+    "stop-e5a9bdf7639b88a9": {
+      "text": "Čechovo náměstí.",
+      "clips": {
+        "Aoede": "aoede/stop-e5a9bdf7639b88a9.mp3",
+        "Algieba": "algieba/stop-e5a9bdf7639b88a9.mp3",
+        "Sulafat": "sulafat/stop-e5a9bdf7639b88a9.mp3"
+      }
+    },
+    "stop-e8b8d3541ac7990f": {
+      "text": "Lehovec.",
+      "clips": {
+        "Aoede": "aoede/stop-e8b8d3541ac7990f.mp3",
+        "Algieba": "algieba/stop-e8b8d3541ac7990f.mp3",
+        "Sulafat": "sulafat/stop-e8b8d3541ac7990f.mp3"
+      }
+    },
+    "stop-eac7f92ca3c2a672": {
+      "text": "Podkovářská.",
+      "clips": {
+        "Aoede": "aoede/stop-eac7f92ca3c2a672.mp3",
+        "Algieba": "algieba/stop-eac7f92ca3c2a672.mp3",
+        "Sulafat": "sulafat/stop-eac7f92ca3c2a672.mp3"
+      }
+    },
+    "stop-eb9a38c9351c7c9a": {
+      "text": "Dubečská.",
+      "clips": {
+        "Aoede": "aoede/stop-eb9a38c9351c7c9a.mp3",
+        "Algieba": "algieba/stop-eb9a38c9351c7c9a.mp3",
+        "Sulafat": "sulafat/stop-eb9a38c9351c7c9a.mp3"
+      }
+    },
+    "stop-ec75ac2ff9d3c99e": {
+      "text": "Přístaviště.",
+      "clips": {
+        "Aoede": "aoede/stop-ec75ac2ff9d3c99e.mp3",
+        "Algieba": "algieba/stop-ec75ac2ff9d3c99e.mp3",
+        "Sulafat": "sulafat/stop-ec75ac2ff9d3c99e.mp3"
+      }
+    },
+    "stop-ec9f4dec31fa313a": {
+      "text": "Právnická fakulta.",
+      "clips": {
+        "Aoede": "aoede/stop-ec9f4dec31fa313a.mp3",
+        "Algieba": "algieba/stop-ec9f4dec31fa313a.mp3",
+        "Sulafat": "sulafat/stop-ec9f4dec31fa313a.mp3"
+      }
+    },
+    "stop-ed269d1e57599cf2": {
+      "text": "Lipanská.",
+      "clips": {
+        "Aoede": "aoede/stop-ed269d1e57599cf2.mp3",
+        "Algieba": "algieba/stop-ed269d1e57599cf2.mp3",
+        "Sulafat": "sulafat/stop-ed269d1e57599cf2.mp3"
+      }
+    },
+    "stop-f21c5a11e0d76b30": {
+      "text": "Hloubětín.",
+      "clips": {
+        "Aoede": "aoede/stop-f21c5a11e0d76b30.mp3",
+        "Algieba": "algieba/stop-f21c5a11e0d76b30.mp3",
+        "Sulafat": "sulafat/stop-f21c5a11e0d76b30.mp3"
+      }
+    },
+    "stop-f3cd9a79a5522006": {
+      "text": "Karlovy lázně.",
+      "clips": {
+        "Aoede": "aoede/stop-f3cd9a79a5522006.mp3",
+        "Algieba": "algieba/stop-f3cd9a79a5522006.mp3",
+        "Sulafat": "sulafat/stop-f3cd9a79a5522006.mp3"
+      }
+    },
+    "stop-f42f19268bf0d341": {
+      "text": "Kobylisy.",
+      "clips": {
+        "Aoede": "aoede/stop-f42f19268bf0d341.mp3",
+        "Algieba": "algieba/stop-f42f19268bf0d341.mp3",
+        "Sulafat": "sulafat/stop-f42f19268bf0d341.mp3"
+      }
+    },
+    "stop-f4d501e80be07ca6": {
+      "text": "Zborovská.",
+      "clips": {
+        "Aoede": "aoede/stop-f4d501e80be07ca6.mp3",
+        "Algieba": "algieba/stop-f4d501e80be07ca6.mp3",
+        "Sulafat": "sulafat/stop-f4d501e80be07ca6.mp3"
+      }
+    },
+    "stop-f79501d5662a6b8c": {
+      "text": "Nádraží Braník.",
+      "clips": {
+        "Aoede": "aoede/stop-f79501d5662a6b8c.mp3",
+        "Algieba": "algieba/stop-f79501d5662a6b8c.mp3",
+        "Sulafat": "sulafat/stop-f79501d5662a6b8c.mp3"
+      }
+    },
+    "stop-f98a249b73d5ca2a": {
+      "text": "I. P. Pavlova.",
+      "clips": {
+        "Aoede": "aoede/stop-f98a249b73d5ca2a.mp3",
+        "Algieba": "algieba/stop-f98a249b73d5ca2a.mp3",
+        "Sulafat": "sulafat/stop-f98a249b73d5ca2a.mp3"
+      }
+    },
+    "stop-f9e44fbf0a53c8f3": {
+      "text": "Pohořelec.",
+      "clips": {
+        "Aoede": "aoede/stop-f9e44fbf0a53c8f3.mp3",
+        "Algieba": "algieba/stop-f9e44fbf0a53c8f3.mp3",
+        "Sulafat": "sulafat/stop-f9e44fbf0a53c8f3.mp3"
+      }
+    },
+    "stop-fb53dd60d2ac07f0": {
+      "text": "Ke Stírce.",
+      "clips": {
+        "Aoede": "aoede/stop-fb53dd60d2ac07f0.mp3",
+        "Algieba": "algieba/stop-fb53dd60d2ac07f0.mp3",
+        "Sulafat": "sulafat/stop-fb53dd60d2ac07f0.mp3"
+      }
+    },
+    "stop-fe59c25310cf42ad": {
+      "text": "Poliklinika Modřany.",
+      "clips": {
+        "Aoede": "aoede/stop-fe59c25310cf42ad.mp3",
+        "Algieba": "algieba/stop-fe59c25310cf42ad.mp3",
+        "Sulafat": "sulafat/stop-fe59c25310cf42ad.mp3"
+      }
+    },
+    "terminus": {
+      "text": "Konečná zastávka, prosíme vystupte.",
+      "clips": {
+        "Aoede": "aoede/terminus.mp3",
+        "Algieba": "algieba/terminus.mp3",
+        "Sulafat": "sulafat/terminus.mp3"
+      }
+    },
+    "train": {
+      "text": "Přestup na vlak.",
+      "clips": {
+        "Aoede": "aoede/train.mp3",
+        "Algieba": "algieba/train.mp3",
+        "Sulafat": "sulafat/train.mp3"
+      }
+    }
+  },
+  "audioVersion": "0c8581898f3e06c1"
+}

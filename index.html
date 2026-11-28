@@ -97,6 +97,7 @@
   .card .sub { color: var(--dim); margin-bottom: 16px; }
   .row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
   .row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--dim); flex: 1; min-width: 200px; }
+  .row label[hidden] { display: none; }
   select, button { font: inherit; background: #2c3631; color: var(--ink); border: 1px solid #4a5a50; border-radius: 6px; padding: 7px 10px; }
   button.primary { background: #b5161c; border-color: #d43; font-weight: 700; padding: 10px 26px; cursor: pointer; font-size: 16px; }
   button.primary:hover { background: #cf2026; }
@@ -230,6 +231,9 @@
       <label id="fleetRow"><span data-i18n="menu.fleet"></span> <select id="optFleet"></select></label>
       <label id="liveryRow"><span data-i18n="menu.livery"></span> <select id="optLivery"></select></label>
       <label id="soundsRow"><span data-i18n="menu.sounds"></span> <select id="optSounds"></select></label>
+      <label hidden><span></span> <select id="optAnnouncementVoice"></select></label>
+      <label hidden><span></span> <select id="optAnnouncementDistance"></select></label>
+      <label hidden><span></span> <input id="optAnnouncementVolume" type="range" min="0" max="100" step="5" value="100"> <output for="optAnnouncementVolume"></output></label>
       <label><span data-i18n="menu.consist"></span> <select id="optCars"><option value="auto" selected data-i18n="consist.auto"></option><option value="1" data-i18n="consist.1"></option><option value="2" data-i18n="consist.2"></option></select></label>
       <label><span data-i18n="menu.controls"></span> <select id="optControls"><option value="arcade" selected data-i18n="ctl.arcade"></option><option value="advanced" data-i18n="ctl.advanced"></option></select></label>
       <label><span data-i18n="menu.temp"></span> <select id="optTemp"><option value="live" selected data-i18n="temp.live"></option><option value="winter" data-i18n="temp.winter"></option><option value="autumn" data-i18n="temp.autumn"></option><option value="summer" data-i18n="temp.summer"></option></select></label>
@@ -303,5 +307,10 @@ function noCode() {
 }
 </script>
 <script type="module" src="src/main.js" onerror="noCode()"></script>
+<script type="module">
+  import { initAnnouncementMenu } from './src/audio.js';
+  import { getLang, onLangChange } from './src/i18n.js';
+  initAnnouncementMenu(getLang, onLangChange);
+</script>
 </body>
 </html>
