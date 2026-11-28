@@ -6,6 +6,7 @@ import { rng } from './random.js';
 import { STREET_BELOW } from './heights.js';
 import { tramClearance } from './tram.js';
 import { CONTACT_WIRE } from './models.js';
+import { Ceilings, makeWire, headroomAt, COLLECTOR, WIRE_FROM, SLAB_LEFT } from './wire.js';
 import { LANDMARK_TALL, LANDMARK_HIGH, LANDMARK_RISE, landmarkHaze, textureMean } from './landmarks.js';
 import { weatherize } from './weather.js';
 import { GFX } from './gfx.js';
@@ -118,7 +119,11 @@ const MODEL_REACH = 1.5;  // m: ... its corners from there up to this far over t
 // route, 1,229 m2 at Jiráskův most's junction (carriageway 657, sidewalk 219, island 109), 500 m2 at Štefánikův,
 // 434 m2 at Most Legií, as light slabs over the carriageway and the crossings.
 const MODEL_NEAR = 40, STREET_REACH = 1.5;
-const MODEL_SIDE = 0.1, BODY_TOP = 3.6, COLLECTOR = 1.0, COLLECTOR_OVER = 0.1; // m: the trams' space cut out of a model (envelope, below)
+const MODEL_SIDE = 0.1, BODY_TOP = WIRE_FROM, COLLECTOR_OVER = 0.1; // m: the trams' space cut out of a model (envelope, below; COLLECTOR: src/wire.js)
+// A model's underside lifted to the clearance (src/wire.js CLEARANCE, #71): its corners from LIFT_FROM m over the rails
+// (lower is an abutment or a pier's foot) within the wire rule's reach of a lifted point. TOP_OVER: how far up the
+// models are read over a track for their tops.
+const LIFT_FROM = 3.0, TOP_OVER = 30;
 const ROAD_CLEAR = 4.5, DECK_ROADS = ['road', 'parking', 'cycle']; // m: the vehicles' space over a surveyed deck's carriageway
 const MODEL_STREETS = new Set(['road', 'sidewalk', 'island', 'median', 'tram', 'parking', 'cycle', 'platform', 'paved']);
 const ROOF_COLORS = ['#8c4a32', '#7a3f2c', '#5f5a55', '#6d6862', '#9a5638', '#4f4b47'].map((c) => new THREE.Color(c));
@@ -197,6 +202,50 @@ const CLASS_COLORS = {
   glass: ['#ffffff', '#e6eef4', '#dfe6e0'],
 };
 
+// The contact wire's height under the bridge models (src/wire.js, #71), before anything is cut or drawn under them: what
+// of the models stands over a track's collector (within COLLECTOR m of a drawn track, WIRE_FROM m or more over its
+// rails), sampled every 0.4 m; the wire of every track passes under it, and the trams' space in a model ends at the
+// wire. A model that leaves less than the clearance posted for the way under it (data.headroom, tools/clearances.py;
+// the legal height where nothing is posted) counts as lifted to it, as buildLod2 then lifts it (LIFT_FROM, below).
+// Sets and returns ground.wire.
+export function bridgeWire(data, ground) {
+  const geo = data.geo.buildings, arr = geo.arr, q = geo.q;
+  const ceilings = new Ceilings();
+  if (ground.trackDist && ground.trackAt) {
+    for (const ch of geo.chunks) {
+      if (!ch.k) continue;
+      const [ox, oy, oz] = ch.o;
+      let v = ch.v;
+      for (const [bi, count] of ch.b.entries()) {
+        if (ch.k[bi] === 1) {
+          for (let t = v; t < v + count; t += 3) {
+            const P = [0, 1, 2].map((k) => [ox + arr[(t + k) * 3] * q, oy + arr[(t + k) * 3 + 1] * q, oz + arr[(t + k) * 3 + 2] * q]);
+            const e = Math.max(Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1], P[1][2] - P[0][2]), Math.hypot(P[2][0] - P[0][0], P[2][1] - P[0][1], P[2][2] - P[0][2]));
+            if (ground.trackDist((P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3) > COLLECTOR + 0.5 + e) continue;
+            const n = Math.max(1, Math.ceil(e / 0.4));
+            for (let i = 0; i < n; i++) for (let j = 0; i + j < n; j++) {
+              const bu = (i + 1 / 3) / n, bv = (j + 1 / 3) / n, bw = 1 - bu - bv;
+              const x = bw * P[0][0] + bu * P[1][0] + bv * P[2][0], y = bw * P[0][1] + bu * P[1][1] + bv * P[2][1];
+              if (ground.trackDist(x, y) > COLLECTOR + 0.1) continue;
+              const z = bw * P[0][2] + bu * P[1][2] + bv * P[2][2], zr = ground.trackAt(x, y);
+              // (to TOP_OVER m up: a model's top over a point says how far its underside can be lifted)
+              if (z > zr + WIRE_FROM && z < zr + TOP_OVER) ceilings.add(x, y, z, zr);
+            }
+          }
+        }
+        v += count;
+      }
+    }
+  }
+  ceilings.lift(headroomAt(data.headroom));
+  ground.wire = makeWire(data.tracks, ceilings, CONTACT_WIRE);
+  const place = (d) => `(${d.x}, ${d.y}) a structure ${d.under} m over the rails`;
+  if (ground.wire.lifts.length) console.log(`bridge models: the underside lifted to the clearance at ${ground.wire.lifts.length} places: ` + ground.wire.lifts.map((d) => `(${d.x}, ${d.y}) from ${d.from} to ${d.to} m over the rails (clearance ${d.mh} m)`).join('; '));
+  if (ground.wire.drops.length) console.log(`contact wire: lower at ${ground.wire.drops.length} places: ` + ground.wire.drops.map((d) => `${place(d)}, the wire ${d.wire} m, back to ${CONTACT_WIRE} m within ${d.reach} m`).join('; '));
+  if (ground.wire.impossible.length) console.log(`contact wire: ${ground.wire.impossible.length} places lower than a collector reaches, the wire left as it is and the model cut: ` + ground.wire.impossible.map(place).join('; '));
+  return ground.wire;
+}
+
 export function buildLod2(group, data, route, ground) {
   const geo = data.geo.buildings, arr = geo.arr, q = geo.q;
   const side = GFX.side; // (both faces, or ?gfx=front the front ones only, to measure what the back ones cost: #705)
@@ -219,7 +268,7 @@ export function buildLod2(group, data, route, ground) {
   data.buildings.forEach((b, i) => { osm.entries[i].kind = b.k; });
   const counts = {};
   const roofMat = weatherize(new THREE.MeshLambertMaterial({ vertexColors: true, side }), { snow: GROUND_SNOW });
-  let bIndex = 0, lifted = 0, total = 0;
+  let bIndex = 0, lifted = 0, total = 0, undersides = 0;
   // the car roads on bridges: a bridge model is cut out over them too (half their width, 0.4-4.5 m over
   // their surface; parapet blocks 1.2-1.7 m over the deck stood in the lanes, the lint deckClip)
   const bridgeRoads = new Map(), RC = 20;
@@ -262,7 +311,8 @@ export function buildLod2(group, data, route, ground) {
   // The space a tram takes on each track (ours, and the opposite one at its offset), cut out of a bridge model: the car
   // body, the half width a T3 sweeps there (src/tram.js tramClearance less its margin) and MODEL_SIDE m, from just over
   // the rail heads up to BODY_TOP m, and the collector, COLLECTOR m a side from there to COLLECTOR_OVER m over the
-  // contact wire (the lint's mounted-clear-of-tram takes the same two boxes). No wider: the cut was 3 m past each track
+  // contact wire there (ground.wire, src/wire.js: lower under a structure, so that a bridge lower than the wire's normal
+  // height is not cut, #71; the lint's mounted-clear-of-tram takes the same two boxes). No wider: the cut was 3 m past each track
   // and 5.8 m high, and took 314 m2 of faces off Trojský most's arch, whose legs come no nearer than 1.62 m to a track's
   // axis at the body's height and pass 5.50 m over the rails at their lowest (line 17 s 17970; the maintainer, #13:
   // the model kept whole). For a point: how far it lies inside each face of each box, m (left, right, floor, ceiling
@@ -274,9 +324,10 @@ export function buildLod2(group, data, route, ground) {
     if (n.d > Math.abs(o) + 3.5) return E;
     const q = route.at(n.s), l = q.hx * (y - q.y) - q.hy * (x - q.x), hw = tramClearance(route, n.s) - 0.25 + MODEL_SIDE;
     for (let i = 0; i < (o ? 2 : 1); i++) {
-      const a = i ? o : 0, h = z - ground.profile.heightAt(n.s, a), d = l - a, k = i * 8;
+      const a = i ? o : 0, zr = ground.profile.heightAt(n.s, a), h = z - zr, d = l - a, k = i * 8;
+      const c = i ? route.offset(n.s, o) : q, wire = ground.wire ? ground.wire.over(c.x, c.y, zr) : CONTACT_WIRE;
       E[k] = d + hw; E[k + 1] = hw - d; E[k + 2] = h - 0.02; E[k + 3] = BODY_TOP - h;
-      E[k + 4] = d + COLLECTOR; E[k + 5] = COLLECTOR - d; E[k + 6] = h - BODY_TOP; E[k + 7] = CONTACT_WIRE + COLLECTOR_OVER - h;
+      E[k + 4] = d + COLLECTOR; E[k + 5] = COLLECTOR - d; E[k + 6] = h - BODY_TOP; E[k + 7] = wire + COLLECTOR_OVER - h;
     }
     return E;
   };
@@ -294,6 +345,7 @@ export function buildLod2(group, data, route, ground) {
     if (!lmMats.has(m)) lmMats.set(m, landmarkHaze(weatherize(m.clone(), m.userData.weather)));
     return lmMats.get(m);
   };
+  if (!ground.wire) bridgeWire(data, ground);
   for (const ch of geo.chunks) {
     const [ox, oy, oz] = ch.o;
     const walls = {}, wallsL = {};
@@ -331,6 +383,30 @@ export function buildLod2(group, data, route, ground) {
           const P = [0, 1, 2].map((k) => [xs[t + k], ys[t + k], zs[t + k]]);
           if (near(t)) split(P[0], P[1], P[2], 0);
           else out.push(...P);
+        }
+        // The underside lifted to the clearance where the model leaves less over a track (src/wire.js CLEARANCE, #71):
+        // each corner between LIFT_FROM m over the rails and the height asked for comes up to it, or to SLAB_LEFT m
+        // under the model's own top there, whichever is lower. A corner of the top stays (its top is itself), so a
+        // stair or a ramp keeps its surface.
+        const Wr = ground.wire;
+        if (Wr.lifts.length) {
+          const L = out.map((p) => { const l = Wr.liftAt(p[0], p[1]); return l && p[2] >= l.zr + LIFT_FROM && p[2] < l.to ? l : null; });
+          if (L.some(Boolean)) {
+            const tops = new Ceilings(); // (the model's own points near the lifted places, every 0.3 m)
+            for (let t = 0; t < out.length; t += 3) {
+              const [a, b, c] = [out[t], out[t + 1], out[t + 2]];
+              const n = Math.max(1, Math.ceil(Math.max(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), Math.hypot(c[0] - a[0], c[1] - a[1], c[2] - a[2])) / 0.3));
+              for (let i = 0; i <= n; i++) for (let j = 0; i + j <= n; j++) {
+                const bu = i / n, bv = j / n, bw = 1 - bu - bv, x = bw * a[0] + bu * b[0] + bv * c[0], y = bw * a[1] + bu * b[1] + bv * c[1];
+                if (Wr.liftAt(x, y)) tops.add(x, y, bw * a[2] + bu * b[2] + bv * c[2]);
+              }
+            }
+            for (let i = 0; i < out.length; i++) {
+              if (!L[i]) continue;
+              const p = out[i], z = Math.min(L[i].to, tops.highest(p[0], p[1], 0.45) - SLAB_LEFT);
+              if (z > p[2]) { out[i] = [p[0], p[1], z]; undersides++; }
+            }
+          }
         }
         // The trams' space (envelope, above) is cut out of the model along its own faces (#13: a clean cut, not dropped
         // triangles): a triangle that reaches into one of its boxes is clipped at the box's two sides, its floor and its
@@ -522,6 +598,8 @@ export function buildLod2(group, data, route, ground) {
   if (lmPos.length) group.userData.landmarks = { pos: lmPos, nor: lmNor, col: lmCol, list: lmList, baseMed: Math.round(baseMed) };
   console.log(`landmarks: ${lmCount} buildings, ${lmPos.length / 9} triangles (line's ground ${Math.round(baseMed)} m)`);
   console.log(`LOD2 buildings: ${total} (${lifted} spanning the track)`, counts);
+  if (undersides) console.log(`bridge models: ${undersides} corners of undersides lifted to the clearance`);
+  ground.wire.undersides = undersides;
 }
 
 const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2];

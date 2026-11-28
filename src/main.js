@@ -1096,6 +1096,11 @@ const orbit = { yaw: 0, pitch: 0, k: 1, drag: 0 }, ORBIT_EL = 0.3;
   canvas.addEventListener('contextmenu', (e) => { if (on()) e.preventDefault(); });
 }
 
+// the contact wire's height over the rails above a set's first car (src/wire.js)
+function wireOverCar(model) {
+  const W = ground.wire, c = model.userData.cars?.[0]?.position;
+  return W && W.low.length && c ? W.over(c.x, -c.z, c.y) : CONTACT_WIRE;
+}
 // the menu's preview camera over the route (x, y): 40 m back of s and 6 m to the side
 function previewSpot(s) {
   const p = route.at(s - 40), h = route.heading(s);
@@ -1114,11 +1119,11 @@ function placeTram(s) {
   // each car rests on its two bogies, so it follows curves and pitches with the gradient
   placeConsist(tramModel, s, (q) => { const p = route.at(q); return [p.x, p.y, profile.height(q), route.rollAt(q)]; });
   if (!game) return;
-  // the doors, the brake lamps and the track-brake shoes from the game; the collector on the wire (one height over
-  // the rail everywhere in the data, src/world.js); the indicators and the high beams
+  // the doors, the brake lamps and the track-brake shoes from the game; the collector on the wire (over the first car,
+  // lower under a structure: ground.wire, src/wire.js, #71); the indicators and the high beams
   const braking = tram.brake > 500, clock = game.clock;
   if (pilot) lamps.indicate = indicating(lamps.turns, lamps.kerb, tram.s, tram.v, braking);
-  poseT3(tramModel, { doors: game.otherDoorsOpenness, front: game.frontDoorOpenness, braking, track: tram.trackMagnets, collector: CONTACT_WIRE - RAIL_TOP,
+  poseT3(tramModel, { doors: game.otherDoorsOpenness, front: game.frontDoorOpenness, braking, track: tram.trackMagnets, collector: wireOverCar(tramModel) - RAIL_TOP,
     indicate: lamps.indicate, clock, highBeam: lamps.high || lamps.held });
   // the indicators' relay ticks in the cab as they go on and off
   const sig = signalsAt(lamps.indicate, clock), lit = sig.left || sig.right;

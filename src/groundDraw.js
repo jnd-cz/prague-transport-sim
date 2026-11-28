@@ -154,6 +154,7 @@ function buildParapets(cg, parapets, col) {
 // (by weather: carriageways get slush, footways and the rest trodden snow, lawns all of it; all but
 // lawns and water 0.8 darker when wet)
 const DTM_KIND = { road: 'street', parking: 'street', tram: 'street', cycle: 'street', green: 'green', water: 'water' };
+const SLAB_OVER = 0.15, SLAB_MIN = 0.1; // m: a survey slab's underside over the contact wire, and the thinnest a slab is drawn
 // The ground file's draw classes as the page colours them (#509): the colours of the layers they replace (the terrain's
 // land cover in buildTerrain, the survey's DTM_COLORS, the beds' styles, the kerbs' sides), and the material groups
 const TERRAIN_HEX = { '': '#8d8c80', grass: '#6f8a4e', wood: '#566f3c', water: '#5d7f95' };
@@ -346,17 +347,35 @@ export function buildDtm(group, ground) {
     const slab = a.l > 0 ? (a.c === 'roof' ? 0.3 : a.t ?? 1.0) : 0;
     const lift = a.l > 0 ? 0.02 : DTM_LIFT[a.c] ?? 0.03;
     const fz = (v) => v[2];
+    // (the area's thickness over the tracks: the wire is ground.wire's, src/wire.js, #71, lower under a bridge model, read
+    // at each triangle's corners, the middles of its sides and its centre where they lie within 1.5 m of a drawn track)
+    let thin = slab;
+    if (slab && ground.trackDist && ground.trackAt) {
+      const Wr = ground.wire, mid = (u, v) => [(u[0] + v[0]) / 2, (u[1] + v[1]) / 2, (u[2] + v[2]) / 2];
+      for (const [p, q, r] of a.mesh) {
+        for (const v of [p, q, r, mid(p, q), mid(q, r), mid(r, p), [(p[0] + q[0] + r[0]) / 3, (p[1] + q[1] + r[1]) / 3, (p[2] + q[2] + r[2]) / 3]]) {
+          if (ground.trackDist(v[0], v[1]) > 1.5) continue;
+          const zr = ground.trackAt(v[0], v[1]);
+          if (v[2] < zr + 3) continue; // (a deck the track runs on, or beside it)
+          thin = Math.max(SLAB_MIN, Math.min(thin, v[2] - zr - (Wr ? Wr.over(v[0], v[1], zr) : 5.34) - SLAB_OVER));
+        }
+      }
+    }
     for (const [p, q, r] of a.mesh) {
-      // a structure over our track (a railway bridge) keeps its underside above the catenary (5 m
-      // over the rails: the slab gets thinner there); anything lower inside the space the tram
-      // sweeps (±3 m, 0.4 m up) is not drawn, as for the bridge models
-      let under = slab;
+      // A structure over a track (a railway bridge) keeps its underside over the contact wire: the survey has a
+      // structure's top, and its slab's thickness is ours (1 m unless the build says, a.t), so an area over a track is as
+      // thin as leaves SLAB_OVER m between the wire and its underside, to SLAB_MIN m (`thin`, above: one thickness for the
+      // area, its sides with it). (It was 5 m over our rails for triangles whose centre lay within 3 m of our route, and
+      // the sides kept the whole metre: before Nádraží Holešovice, line 17, the wire ran into the slab's face; the
+      // maintainer, #71.) Anything lower inside the space the tram sweeps (±3 m of our route, from 0.4 m over the rails to
+      // the wire) is not drawn, as for the bridge models.
+      const under = thin;
       if (slab) {
         const mx = (p[0] + q[0] + r[0]) / 3, my = (p[1] + q[1] + r[1]) / 3, n = ground.route.nearest(mx, my);
+        const Wr = ground.wire, wireOver = (x, y, zr) => zr + (Wr ? Wr.over(x, y, zr) : 5.34);
         if (n && n.d < 3) {
           const zr = ground.profile.height(n.s), mz = (p[2] + q[2] + r[2]) / 3; // (top of rail)
-          if (mz > zr + 0.4 && mz < zr + 5.3) { dtm.inEnvelope = (dtm.inEnvelope || 0) + 1; continue; }
-          if (mz > zr + 0.4) under = Math.max(0.3, Math.min(slab, mz - zr - 5.0));
+          if (mz > zr + 0.4 && mz < wireOver(mx, my, zr) + SLAB_OVER) { dtm.inEnvelope = (dtm.inEnvelope || 0) + 1; continue; }
         }
       }
       if (a.c === 'deck') {
@@ -369,7 +388,7 @@ export function buildDtm(group, ground) {
     if (a.c === 'deck') outline.areas++;
     if (keepSurfaceRanges) (c.surfaceRanges ||= []).push([startFace, c.pos.length / 9, a.c, a.l, areaId]);
     // kerbs (ground level) or slab sides (level 1) along every ring
-    const drop = slab || (a.c === 'sidewalk' || a.c === 'island' || a.c === 'median' || a.c === 'platform' ? 0.18 : 0);
+    const drop = (slab && thin) || (a.c === 'sidewalk' || a.c === 'island' || a.c === 'median' || a.c === 'platform' ? 0.18 : 0);
     if (!drop) continue;
     const side = a.l > 0 ? col : new THREE.Color('#8e8a82').toArray();
     [a.ring, ...a.holes].forEach((ring, ri) => {

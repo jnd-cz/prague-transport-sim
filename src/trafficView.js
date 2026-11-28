@@ -107,6 +107,9 @@ export class TrafficView {
     placeConsist(m, t.s, (q) => { const p = route.at(q); return [p.x, p.y, trackZ(q, p), route.rollAt(q)]; });
     const way = T.lampWays[route === T.route ? 'ahead' : 'back'], braking = !!t.braking;
     const lamps = { braking, indicate: indicating(way.turns, way.kerb, t.s, t.v, braking), clock: T.game.clock + 0.17 * (t.id % 4) };
+    // (the collector on the wire where it is lower near a structure, src/wire.js, #71)
+    const W = T.ground.wire, c0 = u.cars[0].position;
+    if (W?.low.length) lamps.collector = W.over(c0.x, -c0.z, c0.y);
     if (u.kind === 'simple') {
       poseT3(m, lamps);
       if (u.variant === 'T3M') setNextStop(m, way.stops.find((st) => st.s > t.s - 2)?.name ?? null);

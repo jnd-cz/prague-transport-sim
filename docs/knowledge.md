@@ -465,6 +465,39 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   underside 1.2 m apart, and Libeň's railway areas lie about 1 m under the top: a piece keeps its offset from the top,
   the nearest face flipped between the two.
   The rails, not our track profile, check the decks: `line_heights.py` runs after `dtm.py` and reads its sidecar.
+- **The contact wire comes down under a low structure** (#71, `src/wire.js`, the lint `wireUnderStructures`). What of the
+  bridge models stands within 1.0 m of a drawn track's axis from 3.6 m over its rails is over the collector; the wire
+  passes 0.15 m under the lowest of it, never lower than 3.9 m (the T3's collector reaches down to 3.89 m,
+  `assets/t3h/rig.json`), and rises back at 1 in 250 (Yarra Trams' CE-019-ST-0032, 4.11.4: at most 1 in 5 x the speed in
+  km/h, at 50 km/h). Every wire within reach on the same level comes down with it (the maintainer, #71: at Výtoň "the
+  whole overhead network gets noticeably low"). The collectors follow the wire, the span wires and poles are left out
+  under a structure, and the trams' space cut out of a model ends at the wire, so a low bridge is whole. A structure
+  lower than a collector reaches is no evidence of a low wire: the wire stays, the model is cut for the collector,
+  and the lint lists the place.
+- **A bridge model too low over a track has its underside lifted to the clearance** (#71, `src/wire.js` `CLEARANCE`,
+  `src/buildings.js` `LIFT_FROM`; the maintainer, #71: the rule of the survey's decks at Divadelní, #445, for the
+  models). The models are coarse blocks (20 to 70 triangles a bridge) from photogrammetry of 2001-2008 with a nominal
+  depth, and streets under them were rebuilt since. A model that leaves less than the clearance posted for the way
+  under it, 0.1 m and the wire's gap (0.15 m) comes up to that, as far as 0.3 m of slab stay under its own top there;
+  the wire then passes under what is left, 0.1 m or more over the sign's height. A sign under tram wires shows
+  noticeably less than the wires' height, so that no vehicle comes near them (the maintainer, #71); by how much is
+  not recorded, so 0.1 m is the least and the posted number a lower bound. The clearance is one for a structure: the highest OSM `maxheight` among the car roads and tram
+  tracks within 20 m of its points over the tracks (the line's `headroom`, `tools/headroom.py` in the build's
+  `clearances` step: numeric values of ways not on a bridge and not under the ground), else the legal 4.2 m, for a
+  track as for a road. The highest, because a sign says the structures on its way are no lower, and OSM tags whole
+  ways: U Výstaviště carries its 3.2 m past the bridge in Dukelských hrdinů, whose own tagged way (4.3 m) ends 5 m
+  before the bridge's face, 13 m from the first point over a track. A sign lower than a collector reaches (3.1 m under Výtoň's bridge, 3.2 m in U
+  Výstaviště: streets under low wires) asks for the lowest wire and its gap, 4.05 m.
+  The corners lifted are the model's from 3.0 m over the rails within 12 m of a lifted point over a track; a corner
+  of the model's top stays, so stairs and ramps keep their surface. The lint lists the places as `lifts`.
+  The survey's own slabs over a track are thinned to the wire as one piece, sides with them (their thickness is ours).
+  Within 6 m of a low point the wire keeps its height, not its height over the rails (a street that comes down to a
+  bridge). **The models' undersides are nominal and the models old:** Mosty 3D is photogrammetry of 2001-2008, and its
+  slabs run 0.5-1.0 m under a measured top (Výtoň's railway bridge: top 5.3 m, underside 4.3 m over the rails). The two
+  bridges after Výstaviště on line 17 stand over track heights of 2023 (numeric DI, the archive's records of 2023 and the
+  lidar agree): the one at s 16900-17000 was rebuilt since (its model: top 4.7 m, underside 4.14 m over today's rails),
+  under the one at s 17400-17450 the street may have been lowered (the maintainer, #71). OSM's `maxheight` under them:
+  4.3 and 3.2 m; under Výtoň's 3.1 m.
 - **A bridge's outline in the survey (class `deck`) is no surface** (#13, `src/groundDraw.js` `buildDtm`, the lint
   `outlineOverStreets`). It is one coarse area under everything the bridge carries, with heights only along its edges
   (the parapet's or the kerb's), and the page laid it with an offset of its own. Drawn as a slab like the streets on

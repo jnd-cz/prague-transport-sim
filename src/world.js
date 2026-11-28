@@ -7,7 +7,7 @@ import { RAIL_HEAD, BED_BELOW } from './heights.js';
 import { preparePedestrianCrossings } from './pedestrianCrossings.js';
 import { NearBatches } from './nearbatch.js';
 import { weatherize, wetFactor, WEATHER_UNIFORMS, WEATHER_LOOK } from './weather.js';
-import { buildLod2, buildOsmBuildings } from './buildings.js';
+import { bridgeWire, buildLod2, buildOsmBuildings } from './buildings.js';
 import { buildCatenary } from './catenary.js';
 import { STYLE_BED_HEX, attachGround, buildDtm, flushDtm } from './groundDraw.js';
 import { buildRoads, buildZebras } from './streets.js';
@@ -314,6 +314,8 @@ export async function buildWorld(scene, data, route, ground, onPart = null) {
   await mark('terrain mesh');
   if (ground.dtm) fitDtmToMouths(ground.dtm, mouths);
   ground.dtm?.seal(); // (the survey's heights are final from here: its lookups from typed arrays, #244, #245)
+  // (the contact wire's height under the bridge models first: the survey's slabs over a track hang no lower, #71)
+  if (data.geo?.buildings?.arr) bridgeWire(data, ground);
   if (ground.dtm) buildDtm(group, ground);
   await mark('DTM streets');
 

@@ -107,6 +107,7 @@ LAYERS = {
     "signals": ("osm", "rule:placement"),
     "speeds": ("truth", "osm", "rule:curvature"),  # a posted speed the maintainer saw over OSM's maxspeed (#612)
     "clearances": ("osm", "rule:assumed"),  # OSM maxheight, else the default per kind
+    "headroom": ("osm",),  # the clearance posted for the way that runs under a structure with the track (#71)
     "crossings": ("osm",),  # where roads and paths cross the tracks (#24)
     "areas": ("osm",),  # water, green, landuse
 }

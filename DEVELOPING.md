@@ -211,7 +211,7 @@ Run alone, `build_line`, `dtm`, `line_heights` and `import_track_heights` wait t
 |---|---|---|
 | `platforms` | `lineN.json` | tram platforms of both directions: PID GTFS positions, names and lines, OSM shapes where mapped (`--fetch` re-reads them from the snapshot's extract) |
 | `osm_speeds` | `lineN.json` | posted speeds and dedicated track: the speed limits and banked curves |
-| `clearances` | `lineN.json` | roads passing under the route with their OSM `maxheight` (the profile keeps the track over them) |
+| `clearances` | `lineN.json` | roads passing under the route with their OSM `maxheight` (the profile keeps the track over them); the clearances posted for the ways along the tracks (`headroom`, `tools/headroom.py`: the page lifts a bridge model's underside to them, #71) |
 | `dtm_points` | `lineN.dtmpoints.json` | street furniture from the archived technical map |
 | `osm_signals` | `lineN.signals.json` | line 17 only, until the placement rules (#22): OSM traffic signals |
 | `osm_validate` | `lineN.validate.json` | every line: a check of the line against OSM |
