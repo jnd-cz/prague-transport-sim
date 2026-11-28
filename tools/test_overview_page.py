@@ -111,4 +111,6 @@ def main():
 
 
 if __name__ == "__main__":
+    # (it prints main's commit title: #871's "ř" stopped it on a cp1252 pipe, as overview.py reconfigures for, #891)
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     main()

@@ -16,6 +16,90 @@ python -I tools/snapshot.py data-fetch     # data/ to play and tune the game (~1
 python -I tools/snapshot.py fetch          # raw/ to build the world (~4.3 GB, the pinned source snapshot)
 ```
 
+### A Linux build machine (Debian 13 VPS)
+
+A second machine for what needs CPU and memory, not a GPU: world builds (`rebuild.py`, `ground_mesh.py` 21 GB,
+`city_terrain.py` 15 GB), the place loop, tool tests, unattended sessions. 8+ cores and 32+ GB. It has no GPU: page
+tests run on SwiftShader (slow, right answers), frame time means nothing there, and seeded compares stay on the
+machine that holds main's baselines. `heavy.py` queues per machine; the `rebuild` label is on GitHub and holds
+across machines. Steps, as a normal user with sudo (not root):
+
+1. **Packages** (Debian's own Python 3.13; `python-is-python3` lets the docs' `python` commands run as written):
+   ```bash
+   sudo apt update
+   sudo apt install -y git curl tmux python-is-python3 python3-pip python3-venv \
+       python3-pyosmium python3-pyproj python3-shapely python3-numpy python3-scipy python3-pil
+   python -m pip install --user --break-system-packages pydelatin==0.4.0 brotli playwright lameenc
+   python -m playwright install --with-deps chromium
+   python -P -E -c "import osmium, pyproj, shapely, numpy, scipy, PIL, pydelatin, brotli; print('ok')"
+   ```
+   (Debian refuses `pip install --user` into its Python; `--break-system-packages` only lets it write
+   `~/.local`.) **`gh` from GitHub's own packages, not Debian's:** Debian 13's gh 2.46 has no `blockedBy` field, so
+   `board.py`'s issue list fails and it says "GitHub not reachable" (Windows had 2.103.3; 2.106.0 works):
+   ```bash
+   curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+       | sudo tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null
+   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg]" \
+       "https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+   sudo apt update && sudo apt install -y gh && gh --version
+   ```
+   Without sudo, the release's `gh` binary in `~/.local/bin` does too (updated by hand).
+2. **Clock and environment.** The night window (23:00-07:00) is the machine's local time. `/tmp` is erased at boot,
+   and `heavy.py`'s queue and history live under the temp folder: `TMPDIR=/var/tmp` keeps the history.
+   ```bash
+   sudo timedatectl set-timezone Europe/Prague
+   echo 'export TRAMDATA_CACHE="$HOME/tramdata-cache"' >> ~/.bashrc
+   echo 'export TMPDIR=/var/tmp' >> ~/.bashrc
+   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc && mkdir -p "$TRAMDATA_CACHE"
+   ```
+3. **Claude Code**, signed in through a link opened on another device:
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash
+   claude --version && claude doctor
+   claude                  # log in: open the printed URL elsewhere, paste the code back
+   ```
+4. **GitHub**: a fine-grained token for this repository only, under *Repository permissions*:
+
+   | permission | access | for |
+   |---|---|---|
+   | Contents | read and write | push branches (and small doc changes to main) |
+   | Pull requests | read and write | open, update and comment on PRs |
+   | Issues | read and write | comments, labels (`rebuild`, `needs-user`), findings |
+   | Actions | read and write | read CI runs and their logs, rerun or cancel a run |
+   | Commit statuses | read | the checks on a commit |
+   | Workflows | read and write | only for CI work (`.github/workflows/`) |
+   | Metadata | read | (always on) |
+   | everything else | no access | |
+
+   With Contents left on read, `git push` fails with 403 "Permission … denied" although the account owns the
+   repository (the ruleset on main only forbids deletion and force-push); a token's access can be edited in place.
+   ```bash
+   gh auth login           # GitHub.com, HTTPS, paste the token
+   gh auth setup-git && gh auth status   # run setup-git with the gh that stays (it writes that gh's path)
+   git push --dry-run origin main        # "Everything up-to-date" or a ref line: the token can push
+   ```
+5. **Clone**, then the store's key and SSH config as in [DATA.md](DATA.md) (one-time setup, steps 1-3). Copy the
+   `Host tramdata` block from a machine that has it; check the server's fingerprint on the first `sftp tramdata`
+   against that machine's (`ssh-keygen -lF "[host]:port"`).
+   ```bash
+   git clone https://github.com/jnd-cz/prague-transport-sim ~/transport-game && cd ~/transport-game
+   git config user.name "<name>"
+   git config user.email "2506000+jnd-cz@users.noreply.github.com"
+   chmod 600 ~/.ssh/config
+   python -I tools/snapshot.py fetch && python -I tools/snapshot.py data-fetch
+   ```
+6. **Check**: `python -I tools/board.py`, `python -I tools/test_all.py`, then one line's build through the queue.
+   `free -h`: the builds read the `available` column (`sysinfo.available_gb`, MemAvailable, #897), not `free`.
+7. **Sessions from the phone**: Claude Code in tmux with Remote Control; the session shows in the Claude app.
+   ```bash
+   tmux new -s tram        # Ctrl+B D leaves it running; tmux attach -t tram comes back
+   cd ~/transport-game && claude remote-control
+   ```
+
+On Linux a job's stop ends what it started by walking the process tree; a `kill -9` of `heavy.py` itself leaves
+its children running (no Job Object there).
+
 ## Rebuild the line data
 
 Every build reads the pinned source snapshot in `raw/` (DATA.md); OSM comes from its local extract
@@ -744,7 +828,8 @@ merge (#578 on #575).
 standing on it, mergeable, its checks passed, the worktree's changed and untracked files looked at; then the squash
 as `<PR title> (#PR)`, the worktree, the local and the remote branch removed and the agent's label taken off. gh's
 own `--delete-branch` removes the worktree folder with its untracked files at once (gh 2.103.3, seen at #751 and
-#752: each folder was gone right after its merge).
+#752: each folder was gone right after its merge). An issue split over two branches (#228's two PRs) is merged one
+branch at a time with `--branch N-...`; without it the merge refuses, and the label stays until the last one goes (#891).
 
 **Unattended runs:** an investigation script is committed only when it runs like the other tools: its own server
 on a free port (as `headless.py`), no fixed agent port, a usage line at the top. Without issues allowed, findings

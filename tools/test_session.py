@@ -16,10 +16,11 @@ import session  # noqa: E402
 class Fake:
     """A runner that records the commands and answers the reads."""
 
-    def __init__(self, issue=None, branches="", prs=None, dirty="", stacked=None):
+    def __init__(self, issue=None, branches="", prs=None, dirty="", stacked=None, worktrees=""):
         self.issue = issue or {"title": "Checks: the stops check rides with the drive", "state": "OPEN",
                                "labels": [{"name": "lane:tooling"}, {"name": "agent:claude"}]}
         self.branches, self.prs, self.dirty, self.seen, self.stacked = branches, prs or [], dirty, [], stacked or []
+        self.worktrees = worktrees  # (git worktree list --porcelain)
 
     def __call__(self, *cmd, cwd=session.ROOT, check=True):
         self.seen.append(cmd)
@@ -27,6 +28,8 @@ class Fake:
             return json.dumps(self.issue), 0
         if cmd[:3] == ("git", "branch", "--list"):
             return self.branches, 0
+        if cmd[:3] == ("git", "worktree", "list"):
+            return self.worktrees, 0
         if cmd[:3] == ("gh", "pr", "merge"):
             for p in self.prs:
                 p["state"] = "MERGED"
@@ -184,6 +187,41 @@ class Merge(unittest.TestCase):
             self.assertFalse(r.ran("gh", "pr", "ready") or r.ran("gh", "pr", "merge") or r.ran("git", "worktree", "remove"), what)
         with self.assertRaises(SystemExit):
             session.merge(708, run=Fake(branches=""))
+
+    def test_an_issue_with_two_branches_merges_the_one_named(self):
+        """#228 had two PRs on two branches; merge 228 took the first and stopped on its conflict (#891)."""
+        two = "708-stops-with-drive\n708-game-view"
+        other = os.path.join(self.tmp.name, "other")
+        os.mkdir(other)
+        trees = (f"worktree {session.ROOT}\nHEAD 1\nbranch refs/heads/main\n\n"
+                 f"worktree {self.tmp.name}\nHEAD 2\nbranch refs/heads/708-stops-with-drive\n\n"
+                 f"worktree {other}\nHEAD 3\nbranch refs/heads/708-game-view\n")
+        r = Fake(branches=two, prs=[self.pr()], worktrees=trees)
+        with self.assertRaises(SystemExit) as e:
+            session.merge(708, run=r)
+        self.assertIn("708-stops-with-drive, 708-game-view: name one with --branch", str(e.exception))
+        self.assertFalse(r.ran("gh", "pr", "list") or r.ran("gh", "pr", "merge"))
+        with self.assertRaises(SystemExit):
+            session.merge(708, run=r, named="709-other")
+        self.assertFalse(r.ran("gh", "pr", "merge"))
+        said = []
+        session.merge(708, run=r, out=said.append, named="708-game-view")
+        self.assertEqual(r.ran("gh", "pr", "list", "--head")[0][4], "708-game-view")
+        self.assertEqual(r.ran("git", "worktree", "remove")[0][-1], os.path.normpath(other))  # (its own, not the issue's folder)
+        self.assertEqual([c[-1] for c in r.ran("git", "branch", "-D")], ["708-game-view"])
+        self.assertEqual(r.ran("git", "push")[0][-1], "708-game-view")
+        self.assertFalse(r.ran("gh", "issue", "edit"), "the other branch's session keeps the label")
+        self.assertIn("label stays for 708-stops-with-drive", said[-1])
+
+    def test_a_named_branch_in_no_worktree_leaves_the_issues_folder(self):
+        # (the issue's folder holds the other branch: a finish of the named one must not remove it)
+        r = Fake(branches="708-stops-with-drive\n708-game-view", prs=[{"number": 744, "state": "MERGED"}],
+                 worktrees=f"worktree {self.tmp.name}\nHEAD 2\nbranch refs/heads/708-stops-with-drive\n")
+        session.finish(708, run=r, out=lambda s: None, named="708-game-view")
+        self.assertFalse(r.ran("git", "worktree", "remove"))
+        self.assertEqual(r.ran("git", "branch", "-D")[0][-1], "708-game-view")
+        with self.assertRaises(SystemExit):
+            session.finish(708, run=r)  # (two branches, none named)
 
     def test_the_files_listed_are_named_and_discard_goes_on(self):
         r = Fake(branches="708-stops-with-drive", prs=[self.pr(isDraft=False)], dirty="?? reports/708/")
