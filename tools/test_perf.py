@@ -163,6 +163,24 @@ SLOW = """(() => { window.slowFrameMs = MS;
 })()"""
 
 
+# counts the frames the page drew and those left black: after each frame that drew, eight pixels at the canvas's middle
+# read back, all black on a canvas cleared after its draw (a resize clears it: the render scale's steps, #705)
+BLACK = """(() => {
+  if (window.blackFrames !== undefined) return;
+  window.blackFrames = 0; window.drawnFrames = 0;
+  const raf = window.requestAnimationFrame.bind(window), px = new Uint8Array(32);
+  window.requestAnimationFrame = (cb) => raf((t) => {
+    const before = window.drawCount;
+    cb(t);
+    if (window.drawCount === before) return;
+    const gl = window.renderer.getContext();
+    gl.readPixels((gl.drawingBufferWidth >> 1) - 4, gl.drawingBufferHeight >> 1, 8, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    window.drawnFrames++;
+    if (px.every((v, i) => i % 4 === 3 || v === 0)) window.blackFrames++;
+  });
+})()"""
+
+
 def canvas(page):
     return page.evaluate("[document.getElementById('gl').width, document.getElementById('gl').height]")
 
@@ -259,8 +277,11 @@ def main():
             page.evaluate("document.getElementById('btnToMenu').click()")
             page.wait_for_function("!document.getElementById('menu').classList.contains('hidden')", timeout=20000)
             size = canvas(page)
+            page.evaluate(BLACK)
             res = perf_test(page, 120000)
+            page.wait_for_timeout(600)  # (the frames after the test's end: the canvas back at its size, drawn)
             size_after = canvas(page)
+            black = page.evaluate("[window.blackFrames, window.drawnFrames]")
             card = page.text_content("#resultsCard")
             page.click("#ptSend")
             page.wait_for_function("document.getElementById('ptSend').textContent.includes('Sent')", timeout=20000)
@@ -330,6 +351,10 @@ def main():
         fails.append(f"the page's own time {res.get('cpuMs')} ms does not hold its steps {res.get('cpuSim')} and draws {res.get('cpuDraw')}")
     if not (res.get("drawWaitMs") or 0) >= (res.get("cpuDraw") or 1e9) * 0.5:
         fails.append(f"a draw waited for {res.get('drawWaitMs')} ms is under the draws' calls {res.get('cpuDraw')} ms")
+    # (the test changes the canvas's size five times: no frame of it is left black, #705)
+    print(f"frames left black over the test: {black[0]} of {black[1]} drawn")
+    if black[0] or black[1] < 100:
+        fails.append(f"{black[0]} of {black[1]} drawn frames were left black (a canvas resized after its draw)")
     if not (half.get("fps", 0) > 0 and (half.get("full") or {}).get("fps", 0) > 0 and half.get("size") == [size[0] // 2, size[1] // 2]):
         fails.append(f"no windows at half the resolution of {size}: {half}")
     if size_after != size:
