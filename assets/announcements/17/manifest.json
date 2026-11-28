@@ -10,7 +10,8 @@
     "snapshot": "2026-11-18",
     "gtfsSha256": "ee5ae6af310c12384c1f9de78c18a0975265c6353bec79c9f937453e2bf8e818",
     "timetable": "https://pid.cz/en/opendata/",
-    "roadway": "data/truth.json stops (maintainer, 2026-10-23)"
+    "roadway": "data/truth.json stops (maintainer, 2026-10-23 and 2026-11-28)",
+    "pronunciations": "data/truth.json announcementPronunciations (maintainer, 2026-11-28)"
   },
   "synthesis": "Google Cloud Czech Chirp 3 HD",
   "outputTerms": "https://cloud.google.com/text-to-speech/docs/basics",
@@ -383,7 +384,6 @@
       "request": false,
       "segments": [
         "stop-U718Z2P",
-        "road",
         "next",
         "stop-U333Z2P",
         "next-request"
@@ -425,14 +425,6 @@
         "Aoede": "aoede/train.mp3",
         "Algieba": "algieba/train.mp3",
         "Sulafat": "sulafat/train.mp3"
-      }
-    },
-    "road": {
-      "text": "Výstup do vozovky.",
-      "clips": {
-        "Aoede": "aoede/road.mp3",
-        "Algieba": "algieba/road.mp3",
-        "Sulafat": "sulafat/road.mp3"
       }
     },
     "request": {
@@ -673,7 +665,8 @@
         "Aoede": "aoede/stop-U717Z4P.mp3",
         "Algieba": "algieba/stop-U717Z4P.mp3",
         "Sulafat": "sulafat/stop-U717Z4P.mp3"
-      }
+      },
+      "spoken": "Štrosmajerovo náměstí."
     },
     "stop-U841Z2P": {
       "text": "Veletržní palác.",

@@ -14,20 +14,26 @@ class AnnouncementPack(unittest.TestCase):
         names = ["First", "Transfer", "Last"]
         facts = [{"name": "Transfer", "type": "street", "from": "First"}]
         pattern = [("s1", set(), False), ("s2", {"metro", "train"}, True), ("s3", set(), False)]
-        (first, transfer, last), clips = announcement_plan(names, pattern, facts)
+        pronunciations = {"Transfer": {"spoken": "Spoken"}}
+        (first, transfer, last), clips = announcement_plan(names, pattern, facts, pronunciations)
         self.assertEqual(first["segments"], ["stop-s1", "next", "stop-s2", "next-request"])
         self.assertEqual(transfer["segments"], ["stop-s2", "request", "metro", "train", "road", "next", "stop-s3"])
         self.assertEqual(last["segments"], ["stop-s3", "terminus"])
         self.assertEqual(clips["stop-s2"]["text"], "Transfer.")
+        self.assertEqual(clips["stop-s2"]["spoken"], "Spoken.")
         self.assertEqual(clips["next-request"]["text"], "Příští zastávka je na znamení.")
         self.assertEqual(clips["request"]["text"], "Zastávka na znamení.")
 
     def test_reverse_stop_fact_does_not_apply(self):
-        pattern = [("s3", set(), False), ("s2", set(), False), ("s1", set(), False)]
-        facts = [{"name": "Transfer", "type": "street", "from": "First"}]
-        entries, clips = announcement_plan(["Last", "Transfer", "First"], pattern, facts)
+        pattern = [("s1", set(), False), ("s2", set(), False), ("s3", set(), False)]
+        truth = json.loads((ROOT / "data/truth.json").read_text(encoding="utf-8"))
+        names = ["Kobylisy", "Březiněveská", "Líbeznická"]
+        entries, clips = announcement_plan(names, pattern, truth["stops"], {})
         self.assertNotIn("road", entries[1]["segments"])
         self.assertNotIn("road", clips)
+        entries, clips = announcement_plan(names[::-1], pattern[::-1], truth["stops"], {})
+        self.assertIn("road", entries[1]["segments"])
+        self.assertEqual(clips["road"]["text"], "Výstup do vozovky.")
 
     def test_compiled_assets(self):
         pack = json.loads((OUTPUT / "manifest.json").read_text(encoding="utf-8"))
@@ -36,7 +42,10 @@ class AnnouncementPack(unittest.TestCase):
         self.assertEqual(pack["speakingRate"], 0.85)
         by_name = {s["name"]: s for s in pack["stops"]}
         self.assertEqual(by_name["Nádraží Holešovice"]["segments"][1:3], ["metro", "train"])
-        self.assertEqual(by_name["Březiněveská"]["segments"][1], "road")
+        self.assertNotIn("road", by_name["Březiněveská"]["segments"])
+        key = by_name["Strossmayerovo náměstí"]["segments"][0]
+        self.assertEqual(pack["segments"][key]["text"], "Strossmayerovo náměstí.")
+        self.assertEqual(pack["segments"][key]["spoken"], "Štrosmajerovo náměstí.")
         self.assertEqual(by_name["Modřanská rokle"]["segments"][-1], "next-request")
         self.assertEqual(by_name["U Libušského potoka"]["segments"][1], "request")
         self.assertEqual(pack["stops"][-1]["segments"][-1], "terminus")

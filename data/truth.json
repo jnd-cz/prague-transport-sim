@@ -3,7 +3,8 @@
  "readers": {
   "t3PhotoModel": "reference: user appearance requirements for src/t3photo.js (#437); not simulation or world-build inputs",
   "contactorSound": "reference: user listening observations for src/audio.js and src/tr37.js, #590",
-  "stops": "tools/lint.js stopFacts: the stop detector (src/game.js _vienna) scored against the facts of the loaded line",
+  "stops": "tools/lint.js stopFacts scores the stop detector (src/game.js _vienna); tools/announcements.py reads directional roadway stops",
+  "announcementPronunciations": "tools/announcements.py writes the spoken form for recordings and browser synthesis",
   "stopTypes": "reference: what the types in stops mean",
   "postedSpeeds": "tools/osm_speeds.py: a way's posted speed over its OSM maxspeed, keyed by the OSM way id (`osm` is what the way tagged when the fact was recorded, #612)",
   "rules": "reference: signal-not-in-platform is checked by tools/lint.js signalsInPlatforms, consist-coupled by consistAtStops; the facts themselves are not read",
@@ -290,10 +291,11 @@
   },
   {
    "name": "Březiněveská",
-   "from": "Kobylisy",
+   "towards": "Kobylisy",
    "type": "street",
-   "text": "road-level stop: boarding from the carriageway, the red stop post on the sidewalk (placed in OSM)",
-   "source": "user 2026-10-23"
+   "text": "Road-level boarding and exit in the city-centre direction, towards Kobylisy. The red stop post is on the sidewalk.",
+   "quote": "only the direction towards center should have výstup do vozovky",
+   "source": "user 2026-10-23, direction clarified in the #894 playtest on 2026-11-28"
   },
   {
    "name": "Lipanská",
@@ -303,6 +305,13 @@
    "source": "user 2026-11-09 (session on #22)"
   }
  ],
+ "announcementPronunciations": {
+  "Strossmayerovo náměstí": {
+   "spoken": "Štrosmajerovo náměstí",
+   "quote": "custom pronunciation \"Štrosmajerovo náměstí\"",
+   "source": "user, #894 playtest on 2026-11-28"
+  }
+ },
  "rules": [
   {
    "id": "signal-not-in-platform",

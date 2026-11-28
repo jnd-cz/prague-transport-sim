@@ -27,6 +27,18 @@ document.querySelector('#start').onclick = () => {
 };
 </script>"""
 
+SPEECH_FIXTURE = """() => {
+  const synth = new EventTarget();
+  let voices = [];
+  window.spoken = [];
+  window.setVoices = list => { voices = list; synth.dispatchEvent(new Event('voiceschanged')); };
+  synth.getVoices = () => voices;
+  synth.speak = utterance => spoken.push(utterance);
+  synth.cancel = () => spoken.at(-1)?.onerror();
+  Object.defineProperty(window, 'speechSynthesis', {value: synth});
+  window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+}"""
+
 APPROACH = """i => {
   window.headless = true;
   const stop = game.stops[i];
@@ -44,6 +56,50 @@ class AnnouncementPlayback(unittest.TestCase):
         cls.server, cls.url = serve(0)
         cls.addClassCleanup(stop_server, cls.server)
         cls.stops = json.loads((OUTPUT / "manifest.json").read_text(encoding="utf-8"))["stops"]
+
+    def test_browser_czech_voice(self):
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            page.add_init_script(f"({SPEECH_FIXTURE})()")
+            path = "/announcement-browser-voice"
+            page.route(self.url + path, lambda route: route.fulfill(body=FIXTURE, content_type="text/html"))
+            mp3 = []
+            page.on("request", lambda request: mp3.append(request.url) if request.url.endswith(".mp3") else None)
+            page.goto(self.url + path)
+            page.wait_for_function("window.audio")
+            option = page.locator('#optAnnouncementVoice option[value="browser"]')
+            self.assertEqual(option.count(), 0)
+            page.evaluate("""setVoices([
+                {name: 'English', lang: 'en-GB', default: true},
+                {name: 'Online Czech', lang: 'cs-CZ'},
+                {name: 'Local Czech', lang: 'cs-CZ', localService: true},
+            ])""")
+            self.assertEqual(option.text_content(), "Browser Czech voice (Local Czech)")
+            page.select_option("#optAnnouncementVoice", "browser")
+            page.click("#start")
+            page.evaluate("stops => audio.announcements.prepareRun('17', stops, 24)", self.stops)
+            page.wait_for_function("spoken.length === 1")
+            self.assertEqual(page.evaluate("[spoken[0].text, spoken[0].voice.name, spoken[0].rate]"),
+                             ["Čechův most. Příští zastávka... Štrosmajerovo náměstí.", "Local Czech", 0.85])
+            page.evaluate("audio.setActive(false)")
+            self.assertTrue(page.evaluate("!audio.announcements.utterance"))
+            page.evaluate("audio.setActive(true)")
+            self.assertEqual(page.evaluate("spoken.length"), 2)
+            page.evaluate("""() => {
+                spoken.at(-1).onend();
+                audio.announcements.preload(26);
+                audio.announcements.approach(25, 99, false);
+            }""")
+            self.assertTrue(page.evaluate("spoken.at(-1).text.startsWith('Štrosmajerovo náměstí.')"))
+            page.evaluate("audio.setMuted(true)")
+            self.assertTrue(page.evaluate("!audio.announcements.utterance"))
+            page.evaluate("audio.announcements.approach(26, 99, false); audio.setMuted(false)")
+            self.assertEqual(page.evaluate("spoken.length"), 3)
+            self.assertEqual(mp3, [])
+            page.evaluate("setVoices([{name: 'English', lang: 'en-GB'}])")
+            self.assertEqual(option.count(), 0)
+            browser.close()
 
     def test_audio_lifecycle_and_settings(self):
         with sync_playwright() as pw:

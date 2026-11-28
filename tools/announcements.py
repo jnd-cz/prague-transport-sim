@@ -81,21 +81,24 @@ def timetable_pattern(archive, names, timetable):
     return patterns.pop()
 
 
-def announcement_plan(names, pattern, stop_facts):
+def announcement_plan(names, pattern, stop_facts, pronunciations):
     clips = dict(PHRASES)
+    spoken = {}
     name_ids = {}
     for name, (stop_id, _, _) in zip(names, pattern, strict=True):
         key = name_ids.setdefault(name, f"stop-{stop_id}")
         clips[key] = name + "."
+        if name in pronunciations:
+            spoken[key] = pronunciations[name]["spoken"] + "."
 
     entries = []
     for index, (name, (stop_id, modes, request)) in enumerate(zip(names, pattern, strict=True)):
-        previous = names[index - 1] if index else None
         next_name = names[index + 1] if index + 1 < len(names) else None
         kinds = set(modes)
-        # A reported stop type is directional. Apply only the known road-level platform.
+        # Use the same directional stop facts as tools/lint.js stopFacts.
         if any(fact["name"] == name and fact["type"] == "street" and
-               (fact.get("from") == previous if fact.get("from") else fact.get("towards") in ("*", next_name))
+               (fact.get("towards") == "*" or fact.get("from") in names[:index] or
+                fact.get("towards") in names[index + 1:])
                for fact in stop_facts):
             kinds.add("road")
         segments = [name_ids[name]]
@@ -110,8 +113,11 @@ def announcement_plan(names, pattern, stop_facts):
             segments.append("terminus")
         entries.append({"id": stop_id, "name": name, "request": request, "segments": segments})
     used = {key for stop in entries for key in stop["segments"]}
-    return entries, {key: {"text": text, "clips": {v: f"{v.lower()}/{key}.mp3" for v in VOICES}}
-                     for key, text in clips.items() if key in used}
+    segments = {key: {"text": text, "clips": {v: f"{v.lower()}/{key}.mp3" for v in VOICES}}
+                for key, text in clips.items() if key in used}
+    for key, text in spoken.items():
+        segments[key]["spoken"] = text
+    return entries, segments
 
 
 def synthesize(project, token, voice, text):
@@ -141,12 +147,13 @@ def main():
     pattern = timetable_pattern(archive, names, data["timetable"])
     if [r for _, _, r in pattern] != [bool(s.get("request")) for s in data["stops"]]:
         raise ValueError("PID request flags differ from the built route")
-    entries, segments = announcement_plan(names, pattern, truth["stops"])
+    entries, segments = announcement_plan(names, pattern, truth["stops"], truth["announcementPronunciations"])
     manifest = {
         "line": LINE, "voices": list(VOICES), "speakingRate": RATE,
         "source": {"snapshot": snapshot, "gtfsSha256": source_hash,
                    "timetable": "https://pid.cz/en/opendata/",
-                   "roadway": "data/truth.json stops (maintainer, 2026-10-23)"},
+                   "roadway": "data/truth.json stops (maintainer, 2026-10-23 and 2026-11-28)",
+                   "pronunciations": "data/truth.json announcementPronunciations (maintainer, 2026-11-28)"},
         "synthesis": "Google Cloud Czech Chirp 3 HD",
         "outputTerms": "https://cloud.google.com/text-to-speech/docs/basics",
         "stops": entries,
@@ -154,9 +161,11 @@ def main():
     }
     target = OUTPUT / "manifest.json"
     old = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
-    cached = {path: s["text"] for s in old.get("segments", {}).values() for path in s["clips"].values()}
-    pending = [(voice, s["text"], OUTPUT / path) for s in segments.values() for voice, path in s["clips"].items()
-               if not (OUTPUT / path).is_file() or cached.get(path) != s["text"] or old.get("speakingRate") != RATE]
+    cached = {path: s.get("spoken", s["text"]) for s in old.get("segments", {}).values() for path in s["clips"].values()}
+    pending = [(voice, s.get("spoken", s["text"]), OUTPUT / path)
+               for s in segments.values() for voice, path in s["clips"].items()
+               if not (OUTPUT / path).is_file() or cached.get(path) != s.get("spoken", s["text"])
+               or old.get("speakingRate") != RATE]
     if pending:
         token = subprocess.run([args.gcloud, "auth", "application-default", "print-access-token"],
                                check=True, capture_output=True, text=True).stdout.strip()

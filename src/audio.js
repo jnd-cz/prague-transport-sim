@@ -96,14 +96,25 @@ function railImpactBuffer(ctx, noise, [body, rail, ring], offset) {
 const LINE = '17';
 const PACK = new URL('../assets/announcements/17/manifest.json', import.meta.url);
 const VOICES = ['Aoede', 'Algieba', 'Sulafat', 'off'];
+const BROWSER_VOICE = 'browser';
 const DISTANCES = [100, 50, 0];
 const options = { voice: VOICES[0], distance: DISTANCES[0] };
 try {
   const voice = localStorage.getItem('tram.announcementVoice');
   const distance = localStorage.getItem('tram.announcementDistance');
-  if (VOICES.includes(voice)) options.voice = voice;
+  if (VOICES.includes(voice) || voice === BROWSER_VOICE) options.voice = voice;
   if (distance !== null && DISTANCES.includes(+distance)) options.distance = +distance;
 } catch { /* storage unavailable */ }
+
+function czechSpeechVoice() {
+  if (typeof globalThis.SpeechSynthesisUtterance !== 'function') return null;
+  const voices = globalThis.speechSynthesis?.getVoices().filter(voice => /^cs(?:[-_]|$)/i.test(voice.lang));
+  return voices?.find(voice => voice.default) ?? voices?.find(voice => voice.localService) ?? voices?.[0];
+}
+
+function selectedAnnouncementVoice() {
+  return options.voice === BROWSER_VOICE && !czechSpeechVoice() ? VOICES[0] : options.voice;
+}
 
 export function initAnnouncementMenu(getLang, onLangChange) {
   const line = document.getElementById('selLine');
@@ -111,7 +122,8 @@ export function initAnnouncementMenu(getLang, onLangChange) {
   const distance = document.getElementById('optAnnouncementDistance');
   for (const value of VOICES) voice.add(new Option(value, value));
   for (const value of DISTANCES) distance.add(new Option(String(value), String(value)));
-  voice.value = options.voice;
+  const off = voice.options[VOICES.indexOf('off')];
+  const browser = new Option('', BROWSER_VOICE);
   distance.value = String(options.distance);
   const rows = [voice.closest('label'), distance.closest('label')];
   const visibility = () => { for (const row of rows) row.hidden = line.value !== LINE; };
@@ -119,7 +131,13 @@ export function initAnnouncementMenu(getLang, onLangChange) {
     const cs = getLang() === 'cs';
     rows[0].querySelector('span').textContent = cs ? 'Hlas hlášení' : 'Announcement voice';
     rows[1].querySelector('span').textContent = cs ? 'Spuštění hlášení' : 'Announcement timing';
-    voice.options[VOICES.indexOf('off')].text = cs ? 'Vypnuto' : 'Off';
+    off.text = cs ? 'Vypnuto' : 'Off';
+    const native = czechSpeechVoice();
+    if (native) {
+      browser.text = `${cs ? 'Český hlas prohlížeče' : 'Browser Czech voice'} (${native.name})`;
+      if (!browser.parentNode) voice.add(browser, off);
+    } else browser.remove();
+    voice.value = selectedAnnouncementVoice();
     for (const opt of distance.options) opt.text = +opt.value ? `${opt.value} m` : cs ? 'Při zastavení' : 'On arrival';
   };
   voice.addEventListener('change', () => {
@@ -132,6 +150,7 @@ export function initAnnouncementMenu(getLang, onLangChange) {
   });
   translate();
   onLangChange(translate);
+  globalThis.speechSynthesis?.addEventListener('voiceschanged', translate);
   visibility();
   // main populates the line menu after loading the world.
   new MutationObserver(visibility).observe(line, { childList: true });
@@ -148,6 +167,7 @@ export class StopAnnouncements {
 
   prepareRun(line, stops, startStop) {
     this.stopSource();
+    this.stopSpeech();
     this.current = null;
     this.run = String(line) === LINE ? {
       stops, startStop, queue: [], seen: new Set(), segments: new Map(), preloads: new Map(),
@@ -166,14 +186,26 @@ export class StopAnnouncements {
     this.output.gain.value = muted ? 0 : 0.6;
     this.active = active;
     this.playing = active || finishing;
+    this.muted = muted;
+    if (muted && this.run) {
+      this.run.queue = this.run.queue.filter(clip => clip.voice !== BROWSER_VOICE);
+      if (this.current?.voice === BROWSER_VOICE) {
+        this.stopSpeech();
+        this.current = null;
+      }
+    }
     if (!this.playing) {
+      this.stopSpeech();
       if (this.source) {
         this.current.offset += this.ctx.currentTime - this.current.started;
         this.stopSource();
       }
       return;
     }
-    if (active) this.startRun();
+    if (active) {
+      this.startRun();
+      if (this.run) this.preload(this.run.through);
+    }
     this.play();
   }
 
@@ -205,7 +237,8 @@ export class StopAnnouncements {
     const run = this.run;
     if (!run) return;
     run.through = Math.min(Math.max(run.through, i), run.stops.length - 1);
-    if (!run.pack) return;
+    const voice = selectedAnnouncementVoice();
+    if (!run.pack || voice === BROWSER_VOICE || voice === 'off') return;
     // Load all three voices at the previous stop so a voice change needs no new request on approach.
     for (let j = run.loadedThrough + 1; j <= run.through; j++) {
       const paths = run.pack.stops[j].segments.map(key => run.pack.segments[key].clips);
@@ -249,18 +282,24 @@ export class StopAnnouncements {
   announce(i) {
     const run = this.run;
     run.seen.add(i);
-    if (options.voice === 'off') return;
-    run.queue.push({ i, voice: options.voice });
+    const voice = selectedAnnouncementVoice();
+    if (voice === 'off' || (voice === BROWSER_VOICE && this.muted)) return;
+    run.queue.push({ i, voice });
     this.play();
   }
 
   play() {
     const run = this.run;
-    if (!this.playing || !run?.pack || this.source) return;
+    if (!this.playing || !run?.pack || this.source || this.utterance) return;
     if (!this.current) {
       const next = run.queue.shift();
       if (!next) return;
       const { i, voice } = next;
+      if (voice === BROWSER_VOICE) {
+        this.current = next;
+        this.playSpeech(next);
+        return;
+      }
       const buffers = run.preloads.get(i)?.get(voice);
       if (!buffers) { this.play(); return; }
       const clip = this.current = { i, voice, offset: 0 };
@@ -282,6 +321,10 @@ export class StopAnnouncements {
       return;
     }
     const clip = this.current;
+    if (clip.voice === BROWSER_VOICE) {
+      this.playSpeech(clip);
+      return;
+    }
     if (!clip.buffer) return;
     const source = this.source = this.ctx.createBufferSource();
     source.buffer = clip.buffer;
@@ -295,6 +338,39 @@ export class StopAnnouncements {
       this.play();
     };
     source.start(0, Math.min(clip.offset, clip.buffer.duration));
+  }
+
+  playSpeech(clip) {
+    const voice = czechSpeechVoice();
+    if (!voice || this.muted) {
+      this.current = null;
+      this.play();
+      return;
+    }
+    const { pack } = this.run;
+    const text = pack.stops[clip.i].segments.map(key => {
+      const segment = pack.segments[key];
+      return segment.spoken ?? segment.text;
+    }).join(' ');
+    const utterance = this.utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+    utterance.rate = pack.speakingRate;
+    utterance.volume = 0.6;
+    utterance.onend = utterance.onerror = () => {
+      if (this.utterance !== utterance) return;
+      this.utterance = null;
+      this.current = null;
+      this.play();
+    };
+    globalThis.speechSynthesis.speak(utterance);
+  }
+
+  stopSpeech() {
+    if (!this.utterance) return;
+    // Mobile engines can end paused speech. Restart the current announcement when the shift resumes.
+    this.utterance = null;
+    globalThis.speechSynthesis.cancel();
   }
 
   stopSource() {
