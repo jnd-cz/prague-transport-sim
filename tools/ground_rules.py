@@ -26,7 +26,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The tools a place's build runs (ground_mesh.build and what it imports at build time): a change to one is a ground
 # rule's, tried on places (tools/tiers.py).
 TOOLS = ("tools/ground_mesh.py", "tools/ground_partition.py", "tools/bed_surface.py", "tools/wall_lines.py",
-         "tools/covers.py", "tools/ties.py", "tools/ipr_dtm.py", "tools/ipr_pits.py")
+         "tools/covers.py", "tools/ties.py", "tools/ipr_dtm.py", "tools/ipr_pits.py", "tools/street_profile.py")
+# (street_profile.py builds the street surface the ground reads from data/lineN.streets.*: its rules show on a place
+# built with its squares, `streets` below, ground_place.py --streets)
 
 # (name: a place of groundPlaces, or {line, at} for one that is not; the kind of defect it showed, #812)
 LOCALITY = {
@@ -127,6 +129,21 @@ RULES = {
                    "repy-parking-kerb", "vystaviste-flush-parking", "belohorska-plain-kerb", "krejcarek-ramp",
                    "stairs-beside-a-building"],
     },
+    "walkways": {
+        "what": "the street surface's sidewalks at a wall or stairs: each walkway level to the wall at its own level, a "
+                "ramp's floor between walls (#653); tried on places with the street surface's squares built (--streets)",
+        "code": ["street_profile.sidewalks", "street_profile.walkway_level", "street_profile.TrustedWalks",
+                 "street_profile.lod2_plan", "street_profile.WallLevels", "street_profile.wall_edges",
+                 "street_profile.context", "street_profile.square_heights", "street_profile.rebuilt",
+                 "street_profile.WALK_*", "street_profile.TRUST_OFF", "street_profile.HOLD_OFF", "street_profile.WALL_*",
+                 "ground_mesh.Streets", "ground_mesh.STREETS"],
+        "streets": True,
+        "places": ["quay-walkway-at-a-walls-foot", "walkway-on-a-quay-wall-top", "sidewalk-under-a-track-wall",
+                   "kerb-level-walkway-at-a-wall", "footpath-beside-a-garden-stair", "ramp-down-to-an-underpass",
+                   "walkway-under-a-slab", "rasinovo-quay", "sidewalk-on-a-quay-wall", "sidewalk-under-a-road-wall",
+                   "wall-above-a-lower-walkway", "krejcarek-ramp", "branik-platform-ramps", "modranska-skola-ramp",
+                   "vysehrad-wall-over-the-ramp"],
+    },
     "lidar-pits": {
         "what": "IPR's pits under the survey's streets, filled from their rim in every reader of the raster (#867)",
         "code": ["ipr_pits.*", "ipr_dtm.IprDtm", "ipr_dtm.FILLS"],
@@ -179,6 +196,11 @@ def places_of(rules):
     for r in rules:
         out += [p for p in RULES[r]["places"] if p not in out]
     return out
+
+
+def with_streets(rules):
+    """Whether a rule among these is the street surface's: its places built with their street squares (--streets)."""
+    return any(RULES[r].get("streets") for r in rules)
 
 
 def git(*args, root=ROOT):

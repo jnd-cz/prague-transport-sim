@@ -168,6 +168,11 @@ same of the written file, both from above as pictures, and the **locality**: the
 and its ring only, so with unchanged tools every difference is a rule that reads something farther away, named by
 what gave the vertex its height. A ground rule is tried on its places first; the lines are rebuilt once for a
 batch of changes.
+`--streets` also builds the street surface's squares (`street_profile.build_square`, 300 m, about 9 s each after
+30 s reading the line) reaching the place's reach and 50 m round it, by the tools at hand, and the ground reads them
+in place of `data/lineN.streets.*` (`ground_mesh.STREETS`): a rule of the street surface shows on its places before
+the lines' rebuild (#653). The report gives the squares built and the cells over 1 cm off the file's; built by the
+file's own tools, a square matches it to the cell. A rule marked `streets` in `tools/ground_rules.py` turns it on.
 
 **Which places a ground change runs** (#865). Two sets:
 - **`--locality`:** a fixed set of 8, one place for each kind of defect #812 found reading past the ring (`tools/ground_rules.py` `LOCALITY`). It is built with one ring and with two in 13.5 min at 4 at once (2026-11-26), and each place must come out with 0 triangles and 0 heights differing.
