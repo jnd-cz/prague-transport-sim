@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 # the line's files the page loads besides data/lineN.json (src/main.js `built`; test_build_id holds the two to each other)
-FILES = ("geo.json", "dtm.json", "signals.json", "dtmpoints.json", "network.json", "ground.json")
+FILES = ("geo.json", "dtm.json", "signals.json", "features.json", "network.json", "ground.json")
 MESSAGE = "python -P -E tools/rebuild.py {line}"  # (the command the page names, src/buildId.js)
 
 

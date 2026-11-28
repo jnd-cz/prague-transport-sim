@@ -197,11 +197,13 @@ def osm_buildings():
 
 
 def dtm_points(kinds):
-    p = os.path.join(ROOT, "data", f"line{LINE}.dtmpoints.json")
+    """The archive survey's points of these kinds, from the line's feature layer (tools/features.py)."""
+    p = os.path.join(ROOT, "data", f"line{LINE}.features.json")
     if not os.path.exists(p):
         return np.zeros((0, 2))
-    pts = json.load(open(p, encoding="utf-8"))["points"]
-    return np.array([(q["x"], q["y"]) for q in pts if q["k"] in kinds])
+    out = [xy for g in json.load(open(p, encoding="utf-8"))["groups"] if g["kind"] in kinds and g["source"] == "dtmpoints"
+           for xy in zip(g["xy"][::2], g["xy"][1::2])]
+    return np.array(out) if out else np.zeros((0, 2))
 
 
 def trees(kinds=(0, 1, 2, 3)):

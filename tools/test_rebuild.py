@@ -463,7 +463,7 @@ with replacing(out, "w", encoding="utf-8") as f:
 L = "data/line9.json"
 CHAIN = {  # name: (what it reads, what it writes, a file of its own)
     "build_line": (["raw/in.txt"], L, True), "platforms": ([], L, False), "osm_speeds": ([], L, False),
-    "cant": ([], L, False), "clearances": ([], L, False), "dtm_points": ([L], "data/line9.dtmpoints.json", True),
+    "cant": ([], L, False), "clearances": ([], L, False), "features": ([L, "data/line9.dtm.json"], "data/line9.features.json", True),
     "osm_validate": ([L], "data/line9.validate.json", True), "geoportal": (["raw/in.txt"], "data/line9.geo.json", True),
     "dtm": (["raw/in.txt"], "data/line9.dtm.json", True), "zps_source": (["data/line9.dtm.json"], "data/line9.zps.json", True),
     "placement": (["data/line9.dtm.json"], L, False), "track_styles": (["data/line9.dtm.json"], L, False),
@@ -516,7 +516,7 @@ class ChainTest(unittest.TestCase):
         self.assertTrue(all("FAILED" not in r and "skipped" not in r for r in first), first)
         want, off = build_id.check("9", self.root)
         self.assertEqual(off, {})
-        self.assertEqual(set(build_id.ids("9", self.root)), {"line9.geo.json", "line9.dtm.json", "line9.dtmpoints.json",
+        self.assertEqual(set(build_id.ids("9", self.root)), {"line9.geo.json", "line9.dtm.json", "line9.features.json",
                                                             "line9.network.json", "line9.ground.json"})
         built = self.files()
         again = self.chain()
@@ -576,7 +576,7 @@ class StepsTest(unittest.TestCase):
             _, groups, then = rebuild.steps("17")
             self.assertEqual(rebuild.needs("17"), ("data/line17.dtm.json",))
         self.assertNotIn("placement.py", [st[0] for g in groups for st in g])
-        self.assertEqual([st[0] for st in then], ["placement.py", "track_styles.py"])
+        self.assertEqual([st[0] for st in then], ["placement.py", "track_styles.py", "features.py"])
         with mock.patch.dict(rebuild.DTM, {}, clear=True):
             self.assertEqual(rebuild.needs("17"), ())
         self.assertIn("placement", rebuild.names())

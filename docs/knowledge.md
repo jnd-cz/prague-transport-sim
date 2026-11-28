@@ -1131,6 +1131,20 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   8.4 km of `Hranice_schodiště`, which tells the stairs' own boundary from another feature's
   (`ground_mesh.StairsHeights`, #447).
 
+### Placed objects: the feature layer (#14)
+
+- **One record per object** in `data/lineN.features.json` (`tools/features.py`, `src/features.js`): the fields and
+  the reasons are in `docs/decisions/2026-11-28-feature-layer.md`.
+- **The archive survey's points** (`DTMP_CUR_TMISZNAK_B`, state 2024-06-30) carry an object number, kept as the id
+  (`dtmp:<number>`): of 76,142 objects along lines 9, 17, 22, 23 and 37, 11,775 lie along more than one line and
+  have one id on each. They have no height and no heading.
+- **One shaft is often recorded twice,** under two networks' codes: of a ground cover's kind, one record per 0.3 m
+  each way is kept (304-658 dropped a line).
+- **A grate has no heading in the survey:** it takes the nearest carriageway segment's. 317-652 grates a line have
+  no carriageway within the 20 m cells around them (courtyards, parks, squares) and lie unturned.
+- **A shelter's footprint** (#523) says which way its long side runs, not which side is its front: the front is
+  taken to face the nearer track of the line. Dvorce's two face each other across the tracks (117° and 297°).
+
 ### Street design: ČSN 73 6110 (2006, amendment Z1 2010)
 
 The norm for city streets is public: ÚNMZ publishes it with the ministry's consent (`raw/reference/norms/`, with
