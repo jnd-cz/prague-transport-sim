@@ -7088,6 +7088,203 @@
      "why": "the road lies level to the rim: IPR reads 212.11-212.13 m from 4 m out to 1 m, its own outline 212.08 m at the rim; the raster's 209.9-211.5 m in the last 0.5 m is its smear of the well"
     }
    ]
+  },
+  "quay-walkway-at-a-walls-foot": {
+   "line": "9",
+   "at": [
+    -761.3,
+    -1655.5
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the quay (náplavka) of Rašínovo nábřeží at the foot of its upright wall, line 9 and 17 (50.07169, 14.41394): the survey's sidewalk outline carries the wall's top, 192.93 m, along the foot; IPR is level at 188.0 m from 1 m out. The street surface held the quay's edge at the top's level and rose 4.4 m in its last 1.5 m; the quay runs level to the wall's foot (the maintainer's note on the review of sidewalks at a wall: under the wall the ground is flat and level, the bike path's height up to the wall's foot)",
+   "source": "the maintainer's answer to card sidewalk-wall-50.07169-14.41394 (data/truth.json sidewalkWallsReview), IPR's orthophoto and a profile across the wall, 2026-11-28",
+   "sections": [
+    {
+     "name": "on the quay from 3 m out to the wall's foot",
+     "from": [
+      -764.29,
+      -1655.3
+     ],
+     "to": [
+      -761.4,
+      -1655.49
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the quay lies level at 188.0 m to the wall; the written ground rose to 192.4 m"
+    }
+   ]
+  },
+  "walkway-on-a-quay-wall-top": {
+   "line": "9",
+   "at": [
+    -663.1,
+    -725.7
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the sidewalk along the railing on a quay wall's top, line 9 (50.08009, 14.41353): the paved strip of the wall's top is surveyed at the river's foot, 188.5 m, the walkway at 190.9 m. The street surface held the walkway's edge at 188.5-189.7 m (the maintainer: the wall here is at the sidewalk's level, the sidewalk kept from the drop by a railing)",
+   "source": "the maintainer's answer to card sidewalk-wall-50.08009-14.41353 (data/truth.json sidewalkWallsReview), IPR's orthophoto and a profile across the wall, 2026-11-28",
+   "sections": [
+    {
+     "name": "on the walkway from 3 m in to the railing",
+     "from": [
+      -660.3,
+      -724.63
+     ],
+     "to": [
+      -663.01,
+      -725.66
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the walkway lies level at 190.8-190.9 m to the railing; the written ground fell 1.2 m in its last metre"
+    }
+   ]
+  },
+  "sidewalk-under-a-track-wall": {
+   "line": "17",
+   "at": [
+    -2494.2,
+    -8363.0
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the sidewalk under the upright wall of the track corridor on line 17 (50.00982, 14.40276): the wall's outline at 198.6 m, the sidewalk at the kerb's level, 195.0-195.1 m (the maintainer's note and Street View). The street surface held its edge at the wall's 198.55 m",
+   "source": "the maintainer's answer to card sidewalk-wall-50.00982-14.40276 (data/truth.json sidewalkWallsReview), IPR's orthophoto and a profile across the wall, 2026-11-28",
+   "sections": [
+    {
+     "name": "on the sidewalk from 3 m out to the wall's foot",
+     "from": [
+      -2497.19,
+      -8363.23
+     ],
+     "to": [
+      -2494.3,
+      -8363.01
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the sidewalk lies level at 195.0-195.1 m to the wall; the written ground rose 3.5 m in its last 1.5 m"
+    }
+   ]
+  },
+  "kerb-level-walkway-at-a-wall": {
+   "line": "37",
+   "at": [
+    9285.7,
+    913.0
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the walkway at the kerb's level along the wall of the tram's raised corridor on line 37 (50.10682, 14.54819): the wall's strip surveyed at the top's 241.6 m, IPR level at 235.7 m on the walkway (the maintainer: as on Rašínovo nábřeží, a flat walkway up to the wall, the stairs down to the underpass apart)",
+   "source": "the maintainer's answer to card sidewalk-wall-50.10682-14.54819 (data/truth.json sidewalkWallsReview), IPR's orthophoto and a profile across the wall, 2026-11-28",
+   "sections": [
+    {
+     "name": "on the walkway from 2.5 m out to the wall",
+     "from": [
+      9285.81,
+      915.5
+     ],
+     "to": [
+      9285.7,
+      913.1
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the walkway lies level at 235.7-235.8 m to the wall; the written ground rose 3 m in its last 0.5 m. (From 2.5 m: 3 m out lies under the edge of the tram's bridge over the walkway, at the tram's level)"
+    }
+   ]
+  },
+  "footpath-beside-a-garden-stair": {
+   "line": "22",
+   "at": [
+    -1350.4,
+    82.8
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the footpath at the top beside the wall and the stairs in the garden on line 22 (50.08645, 14.40247): IPR level at 207.8-208.0 m on the path, the stairs' outline at the foot's 202.2 m along the wall (the maintainer: a fairly flat footpath at the top next to the wall and the staircase)",
+   "source": "the maintainer's answer to card sidewalk-wall-50.08645-14.40247 (data/truth.json sidewalkWallsReview), IPR's orthophoto and a profile across the wall, 2026-11-28",
+   "sections": [
+    {
+     "name": "on the footpath from 3 m in to the wall",
+     "from": [
+      -1353.24,
+      81.85
+     ],
+     "to": [
+      -1350.49,
+      82.77
+     ],
+     "expect": {
+      "off the chord m": 0.15
+     },
+     "why": "the footpath lies level at 207.8-208.0 m; the written ground fell 5 m to the foot's level in its last 2 m"
+    }
+   ]
+  },
+  "ramp-down-to-an-underpass": {
+   "line": "22",
+   "at": [
+    -5874.7,
+    -212.2
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the ramp down to an underpass on line 22 (50.07825, 14.34042), 2.5 m across between two walls: its outline carries the street's 373 m along both walls, its floor 368.3 m on IPR (the maintainer: a long ramp down to an underpass). Narrower than twice the walls' smear, the street surface took no reading of IPR on it and lay at the street's level over the floor",
+   "source": "the maintainer's answer to card sidewalk-wall-50.07825-14.34042 (data/truth.json sidewalkWallsReview), IPR's orthophoto and a profile across the wall, 2026-11-28",
+   "sections": [
+    {
+     "name": "across the ramp's floor from wall to wall",
+     "from": [
+      -5874.72,
+      -212.1
+     ],
+     "to": [
+      -5875.06,
+      -210.23
+     ],
+     "expect": {
+      "off the lidar m": 1.0,
+      "off the chord m": 0.15
+     },
+     "why": "the floor lies level on IPR's 368.3-368.4 m; the written ground lay 4.8 m over it, 2 m of the section off IPR. The section's ends lie within the walls' smear on IPR's 1 m raster, 0.75 m of it off IPR with the floor level"
+    }
+   ]
+  },
+  "walkway-under-a-slab": {
+   "line": "9",
+   "at": [
+    -8590.7,
+    -1268.9
+   ],
+   "reach": 15,
+   "issue": 653,
+   "what": "the walkway along the building's front under its concrete slab on line 9 (50.06548, 14.30486): the survey has it at 358.5-358.7 m, IPR reads 1.4 m over it, and IPR's LOD2 building covers it (the maintainer: a walkway under a solid slab of concrete roof, covered by the building model in the game). It keeps the survey's level",
+   "source": "the maintainer's answer to card sidewalk-wall-50.06548-14.30486 (data/truth.json sidewalkWallsReview), IPR's orthophoto and a profile across the wall, 2026-11-28",
+   "sections": [
+    {
+     "name": "from the wall's line 1 m in under the slab",
+     "from": [
+      -8590.72,
+      -1269.0
+     ],
+     "to": [
+      -8590.87,
+      -1269.88
+     ],
+     "expect": {
+      "off the lidar m at least": 0.5
+     },
+     "why": "the walkway stays at the survey's 358.7-359.1 m, 0.9-1.1 m under IPR"
+    }
+   ]
   }
  },
  "openTrackReview": {

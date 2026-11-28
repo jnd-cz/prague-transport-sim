@@ -1586,6 +1586,122 @@ class WallLevels:
         return np.where(np.isfinite(ref), c[k, np.arange(c.shape[1])], own)
 
 
+TRUST_OFF = 0.3  # m: a sidewalk whose own outline away from walls lies this near IPR (the median) is on the lidar's ground
+# (TrustedWalks)
+WALK_FROM, WALK_FAR, WALK_STEP = 0.5, 3.0, 0.25  # m in from a wall: where IPR is read for the walkway's level, and how often
+WALK_FLAT = 0.1  # m: IPR over half a metre in by no more than this is the walkway's level, the wall's smear behind it
+HOLD_OFF = 1.0  # m: a wall edge's survey heights all this far off the walkway's level clear of the smear carry another level
+
+
+class TrustedWalks:
+    """Where a level-0 sidewalk is on the lidar's ground: its own outline points away from walls and stairs (WALL_ON)
+    within TRUST_OFF of IPR (their median), and not under a building of IPR's LOD2 model (data/lineN.bld.bin,
+    registration.py; bridges left out). A walkway along a building's front under its concrete slab on line 9 (-8590.7,
+    -1268.9) lies at the survey's 358.5 m, IPR 1.4 m over it; the LOD2 building covers it, OSM's footprint stops 1.2 m
+    short (the maintainer's note, #653). The outline's own points do not tell it: a ramp's outline down to an underpass
+    carries the top's level 0.6-1 m off IPR within 8 m of its floor, line 22 (-5874.7, -212.2)."""
+
+    def __init__(self, dtm, walls, lidar, ln=None, root=ROOT):
+        import shapely
+        from shapely.geometry import Polygon
+        rings = [shapely.LineString([q[:2] for q in r] + [r[0][:2]]) for a in walls for r in [a["r"]] + a.get("h", [])
+                 if len(r) >= 2]
+        tree = shapely.STRtree(rings) if rings else None
+        keep = []
+        for a in dtm["areas"]:
+            if a["c"] != "sidewalk" or a["l"] != 0 or len(a["r"]) < 3:
+                continue
+            P = np.array([q[:3] for r in [a["r"]] + a.get("h", []) for q in r if q[2] is not None], float).reshape(-1, 3)
+            free = np.ones(len(P), bool)
+            if tree is not None and len(P):
+                hit, _ = tree.query(shapely.points(P[:, :2]), predicate="dwithin", distance=WALL_ON)
+                free[hit] = False
+            with np.errstate(invalid="ignore"):
+                d = np.abs(P[free, 2] - np.asarray(lidar(P[free, 0], P[free, 1]), float))
+            if np.isfinite(d).sum() >= 3 and np.nanmedian(d) <= TRUST_OFF:
+                g = Polygon([q[:2] for q in a["r"]], [[q[:2] for q in h] for h in a.get("h", []) if len(h) >= 3])
+                keep.append(g if g.is_valid else g.buffer(0))
+        self.walks = shapely.union_all(keep) if keep else None
+        if self.walks is not None:
+            shapely.prepare(self.walks)
+        self.roofs = lod2_plan(ln, root) if ln is not None else None
+
+    def ok(self, x, y):
+        import shapely
+        x, y = np.asarray(x, float), np.asarray(y, float)
+        if self.walks is None or not len(x):
+            return np.zeros(len(x), bool)
+        out = shapely.contains_xy(self.walks, x, y)
+        if self.roofs is not None and out.any():
+            hit, _ = self.roofs.query(shapely.points(x, y), predicate="within")
+            out[hit] = False
+        return out
+
+
+def lod2_plan(ln, root=ROOT):
+    """IPR's LOD2 buildings of a line in plan (data/lineN.geo.json `buildings`, .bld.bin: registration.py), bridges left
+    out: an STRtree of their triangles, or None."""
+    import shapely
+    p = os.path.join(root, "data", f"line{ln}.geo.json")
+    if not os.path.exists(p):
+        return None
+    tab = json.load(open(p, encoding="utf-8")).get("buildings")
+    if not tab:
+        return None
+    raw = open(os.path.join(root, "data", tab["file"]), "rb").read()
+    tris = []
+    for ch in tab["chunks"]:
+        v = np.frombuffer(raw, dtype="<i2", count=ch["n"] * 3, offset=ch["v"] * 6).reshape(-1, 3) * tab["q"] + ch["o"]
+        start = 0
+        for bi, cnt in enumerate(ch["b"]):
+            if ch.get("k", [0] * len(ch["b"]))[bi] == 0:
+                tris.append(v[start:start + cnt, :2].reshape(-1, 3, 2))
+            start += cnt
+    if not tris:
+        return None
+    T = np.concatenate(tris)
+    area = np.abs((T[:, 1, 0] - T[:, 0, 0]) * (T[:, 2, 1] - T[:, 0, 1]) - (T[:, 2, 0] - T[:, 0, 0]) * (T[:, 1, 1] - T[:, 0, 1]))
+    T = T[area > 0.02]
+    return shapely.STRtree(shapely.polygons(np.concatenate([T, T[:, :1]], 1))) if len(T) else None
+
+
+def walkway_level(lidar, walk, trusted, q, n):
+    """The walkway's level at wall edge points q (normals n into the sidewalk) read clear of the wall's smear, where it
+    can be read, and how far in it was read: (z, ok, depth). Going in from the wall every WALK_STEP from WALK_FROM to WALK_FAR while the sidewalk
+    runs on unbroken, the first IPR reading that those over the next half metre match within WALK_FLAT: the raster's
+    smear of the wall's face lies before it, the walkway's own surface from there. Read where the sidewalk is on the
+    lidar's ground (TrustedWalks). It overrules the survey's heights only where they all lie HOLD_OFF or more off it:
+    the user's walls stand 1.4-6 m; at 0.5 m an edge along a ramp 0.4-0.8 m off the survey switched between the two
+    and stepped 0.7 m (Braník's upper ramp, line 17 (-2040, -6262), groundPlaces branik-platform-ramps).
+    Across an upright wall each walkway is level to its foot or its top: on Rašínovo nábřeží's quay, line 9 (-761.3,
+    -1655.5), IPR is level at 188.0 m from 1 m out, and the street surface held the quay's edge at the top's 192.9 m; a
+    ramp 2.5 m across down to an underpass on line 22 (-5874.7, -212.2), its outline at the top's 373 m along its walls,
+    lay at 373 m over its floor at 368.3 m (the maintainer's notes on the review of sidewalks at a wall, #653)."""
+    q, n = np.asarray(q, float), np.asarray(n, float)
+    z, ok = np.full(len(q), np.nan), np.zeros(len(q), bool)
+    if walk is None or trusted is None or not len(q):
+        return z, ok, np.zeros(len(q))
+    d = np.arange(WALK_FROM, WALK_FAR + 1e-6, WALK_STEP)
+    P = q[:, None, :] + n[:, None, :] * d[None, :, None]
+    Z = np.asarray(lidar(P[..., 0].ravel(), P[..., 1].ravel()), float).reshape(P.shape[:2])
+    inside = np.column_stack([runs_in(walk, q, n, v) for v in d])
+    k = int(round(0.5 / WALK_STEP))
+    with np.errstate(invalid="ignore"):
+        # (every reading over the half metre within WALK_FLAT: its two ends alone matched across the bottom of a V, a
+        # ramp's side falling into the well beside a sidewalk's rim, line 37 (9265.1, 957.9): 237.79 m for the rim's
+        # 239.5 m, a step of 2 m in the sidewalk along the rim)
+        W = np.lib.stride_tricks.sliding_window_view(Z, k + 1, axis=1)
+        flat = np.zeros(Z.shape, bool)
+        flat[:, :-k] = (W.max(axis=2) - W.min(axis=2) <= WALK_FLAT) & inside[:, k:]
+    first = np.argmax(flat, axis=1)
+    got = flat[np.arange(len(q)), first]
+    at = P[np.arange(len(q)), first]
+    z = np.where(got, Z[np.arange(len(q)), first], np.nan)
+    ok = got & np.isfinite(z)
+    ok[ok] = trusted.ok(at[ok, 0], at[ok, 1])
+    return z, ok, d[first]
+
+
 def wall_heights(segs, X, Y, on, reach):
     """Per grid cell (`on` ones only): the nearest wall edge on whose left the cell lies (its sidewalk's side, WALL_ON's
     leeway), within `reach`: its own height at its nearest point, the distance, that point and the edge's inward normal
@@ -1853,7 +1969,34 @@ def sidewalks(ctx, road_z, box, cell=SW_CELL):
         ref = np.asarray(ipr.sample(r[:, 0] + F.E0, r[:, 1] + F.N0), float)
         wz[hold] = ctx["wall_levels"].pick(q[:, 0], q[:, 1], wz[hold], ref)
     known = np.where(hold, wz, known)
-    data = np.where(on & (wd <= SW_KERB_SMEAR), np.nan, data)
+    # (where the survey's heights at a wall's edge all lie HOLD_OFF or more off the walkway's level clear of the smear,
+    # the survey's outline carries the wall's other side: the walkway lies at its own level from the wall to where that
+    # level was read, every cell, no pull from IPR's smear between: walkway_level, #653. Read once per point of the edges
+    # every WALK_STEP, the cells taking their nearest point's)
+    over = np.zeros(X.shape, bool)
+    if ctx.get("walk_trusted") is not None and ctx.get("wall_levels") is not None:
+        oz, od, oq, on_ = wall_heights(edges, X, Y, on, WALK_FAR)
+        near = on & np.isfinite(od)
+        if near.any():
+            key = np.round(np.column_stack([oq[near], on_[near]]) / [WALK_STEP, WALK_STEP, 0.05, 0.05]).astype(np.int64)
+            u, inv = np.unique(key, axis=0, return_inverse=True)
+            inv = inv.ravel()
+            first = np.zeros(len(u), np.int64)
+            first[inv[::-1]] = np.arange(len(inv))[::-1]
+            q, n, own = oq[near][first], on_[near][first], oz[near][first]
+            r = q + n * SW_KERB_SMEAR
+            ref = np.asarray(ipr.sample(r[:, 0] + F.E0, r[:, 1] + F.N0), float)
+            pick = ctx["wall_levels"].pick(q[:, 0], q[:, 1], own, ref)
+            zl, ok, dep = walkway_level(lambda x, y: np.asarray(ipr.sample(np.asarray(x) + F.E0, np.asarray(y) + F.N0), float),
+                                        walk, ctx["walk_trusted"], q, n)
+            with np.errstate(invalid="ignore"):
+                ok &= np.abs(pick - zl) >= HOLD_OFF
+            hit = ok[inv] & (od[near] <= dep[inv])
+            over[near] = hit
+            kz = known[near]
+            kz[hit] = zl[inv][hit]
+            known[near] = kz
+    data = np.where((on & (wd <= SW_KERB_SMEAR)) | over, np.nan, data)
     # (and its edge on a paved strip the ground steps across (strip_edges, #786): the cells along it held on their own
     # side, at a kerb's plane where one reaches them, else at the walkway's level there; no pull from IPR there, nor
     # anywhere across a walkway narrower than twice the smear: IPR has such a one at its middle alone)
@@ -1973,6 +2116,7 @@ def context(ln):
            "cover": cover, "tris": tris,
            "sw_tris": sw_tris, "kerb_edges": edges, "walk": walk, "tram": class_area(dtm, ("tram",)),
            "rings": outlines(dtm), "wall_edges": wall_edges(dtm, walls), "wall_levels": WallLevels(dtm, walls),
+           "walk_trusted": TrustedWalks(dtm, walls, lidar, ln),
            "strip_edges": lambda box: strip_edges(ln, near_box(ctx, "walk", box), box, lidar) if walk is not None else None}
     return ctx
 
@@ -2295,6 +2439,32 @@ def build_square(ln, cell, ij, ctx=None):
     q = np.round((np.concatenate([z[on_road], z[on_walk]]) - base) / scale)
     return (ij, base, np.packbits(on_road.ravel()), np.packbits(on_walk.ravel()), q.astype(np.int16),
             int(on_road.sum()), int(on_walk.sum()), scale)
+
+
+def square_heights(r, cell=300.0):
+    """A square of build_square() as read_streets() gives it: ((i, j), (x0, y1, road heights, sidewalk heights))."""
+    ij, base, mr, mw, q, nr, nw, scale = r
+    n = int(round(cell / SW_CELL))
+    mr, mw = np.unpackbits(mr)[:n * n].astype(bool), np.unpackbits(mw)[:n * n].astype(bool)
+    z = q.astype(float) * scale + base
+    zr, zw = np.full(n * n, np.nan), np.full(n * n, np.nan)
+    zr[mr], zw[mw] = z[:nr], z[nr:]
+    return tuple(ij), (ij[0] * cell, (ij[1] + 1) * cell, zr.reshape(n, n), zw.reshape(n, n))
+
+
+def rebuilt(ln, box, cell=300.0, ctx=None):
+    """The squares of the street surface reaching a box (x0, y0, x1, y1), built by these tools: {(i, j): (x0, y1, road
+    heights, sidewalk heights)} as read_streets() (a square without a street left out). The place loop's
+    (ground_place.py --streets): a rule of the street surface tried on a place without the lines' rebuild (#653)."""
+    ctx = ctx or context(ln)
+    out = {}
+    for i in range(int(math.floor(box[0] / cell)), int(math.floor(box[2] / cell)) + 1):
+        for j in range(int(math.floor(box[1] / cell)), int(math.floor(box[3] / cell)) + 1):
+            r = build_square(ln, cell, (i, j), ctx)
+            if r is not None:
+                k, v = square_heights(r, cell)
+                out[k] = v
+    return out
 
 
 def squares(L, cell=300.0):

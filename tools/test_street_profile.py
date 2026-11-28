@@ -571,6 +571,82 @@ class Build(unittest.TestCase):
         self.assertTrue(np.array_equal(np.isfinite(r), np.isfinite(zr)))
         self.assertLess(np.nanmax(np.abs(r - zr)), sp.STREETS_SCALE)
         self.assertLess(np.nanmax(np.abs(w - zw)), sp.STREETS_SCALE)
+        # (and a square as build_square gives it, as the place loop reads it: square_heights, #653)
+        k, (x0, y1, r2, w2) = sp.square_heights(square(99, 300.0, (1, 2)))
+        self.assertEqual((k, x0, y1), ((1, 2), 300.0, 900.0))
+        self.assertTrue(np.array_equal(np.isfinite(w2), np.isfinite(zw)))
+        self.assertLess(np.nanmax(np.abs(w2 - zw)), sp.STREETS_SCALE)
+        self.assertLess(np.nanmax(np.abs(r2 - zr)), sp.STREETS_SCALE)
+
+
+class WalkwayAtAWall(unittest.TestCase):
+    """The street surface's sidewalks at a wall where the survey's outline carries the wall's other side (#653)."""
+
+    class Trust:
+        def __init__(self, yes):
+            self.yes = yes
+
+        def ok(self, x, y):
+            return np.full(len(np.atleast_1d(x)), self.yes)
+
+    def quay(self, trusted):
+        # a 6 m sidewalk at 188.0 m beside a road at 187.9 m (kerb at y = 0), its far edge on an upright wall whose
+        # outline carries the wall's top, 193 m, as does the sidewalk's own edge there; IPR's raster spreads the face
+        # over the walkway's last metre (y 5..6)
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        u = np.arange(0.125, 20, 0.25)
+        ipr = SimpleNamespace(sample=lambda x, y: 188.0 + 5.0 * np.clip(np.asarray(y, float) - 5.0, 0, 1))
+        wall = {"c": "wall", "l": 0, "r": [[0, 6, 193.0], [20, 6, 193.0], [20, 6.5, 193.0], [0, 6.5, 193.0]]}
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 6),
+               "kerb_edges": [(np.column_stack([u, np.zeros(len(u))]), np.tile([0.0, 1.0], (len(u), 1)))],
+               "wall_edges": np.array([[[20, 6, 193.0], [0, 6, 193.0]]]), "wall_levels": sp.WallLevels({"areas": [wall]}),
+               "walk_trusted": self.Trust(trusted) if trusted is not None else None}
+        # (the grid's rows 0.3 m off the wall's edge, as a square's grid lies across a sidewalk anywhere)
+        f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), 187.9), [(0, -0.2), (20, 6.2)])
+        return sp.bilinear(f, np.array([10.0, 10.0, 10.0]), np.array([3.2, 5.2, 5.7]))
+
+    def test_a_quays_walkway_runs_level_to_the_walls_foot(self):
+        z = self.quay(True)
+        np.testing.assert_allclose(z, [188.0, 188.0, 188.0], atol=0.05)
+        # (where the lidar's ground is not trusted, or none is known, the survey's height holds: as before)
+        self.assertGreater(self.quay(False)[2], 192.8)
+        self.assertGreater(self.quay(None)[2], 192.8)
+
+    def test_a_ramp_between_walls_lies_on_its_floor(self):
+        # a ramp 2.5 m across between two walls, both outlines at the street's 373 m; IPR's floor at 368.3 m across its
+        # middle metre, the walls' faces smeared over the rest: no reading of IPR reaches the fill there (within 1.5 m of
+        # a wall), and the held edges are the floor's level
+        from types import SimpleNamespace
+        from shapely.geometry import box
+        ipr = SimpleNamespace(sample=lambda x, y: 368.3 + 4.7 * np.clip(np.abs(np.asarray(y, float) - 1.25) - 0.5, 0, 1) / 0.75)
+        walls = [{"c": "wall", "l": 0, "r": [[0, -0.5, 373.0], [20, -0.5, 373.0], [20, 0, 373.0], [0, 0, 373.0]]},
+                 {"c": "wall", "l": 0, "r": [[0, 2.5, 373.0], [20, 2.5, 373.0], [20, 3, 373.0], [0, 3, 373.0]]}]
+        ctx = {"F": SimpleNamespace(E0=0.0, N0=0.0), "ipr": ipr, "walk": box(0, 0, 20, 2.5), "kerb_edges": [],
+               "wall_edges": np.array([[[0, 0, 373.0], [20, 0, 373.0]], [[20, 2.5, 373.0], [0, 2.5, 373.0]]]),
+               "wall_levels": sp.WallLevels({"areas": walls}), "walk_trusted": self.Trust(True)}
+        f = sp.sidewalks(ctx, lambda x, y: np.full(len(np.atleast_1d(x)), np.nan), [(0, -0.2), (20, 2.7)])
+        z = sp.bilinear(f, np.array([10.0, 10.0, 10.0]), np.array([0.2, 1.2, 2.2]))
+        np.testing.assert_allclose(z, [368.3, 368.3, 368.3], atol=0.1)
+
+    def test_the_walkways_level_past_the_smear(self):
+        # (the first IPR reading that half a metre further in matches: past a face's smear; none on a slope)
+        from shapely.geometry import box
+        q, n = np.array([[5.0, 0.0]]), np.array([[0.0, 1.0]])
+        z, ok, _ = sp.walkway_level(lambda x, y: 188.0 + 5.0 * np.clip(1.0 - np.asarray(y, float), 0, 1), box(0, 0, 10, 6),
+                                 self.Trust(True), q, n)
+        self.assertEqual(ok.tolist(), [True])
+        self.assertAlmostEqual(float(z[0]), 188.0)
+        z, ok, _ = sp.walkway_level(lambda x, y: 188.0 + 0.5 * np.asarray(y, float), box(0, 0, 10, 6), self.Trust(True), q, n)
+        self.assertEqual(ok.tolist(), [False])
+
+    def test_a_sidewalk_off_the_lidar_is_not_trusted(self):
+        # (its outline away from walls on IPR: trusted; 1.4 m under it, as under a slab: not)
+        lidar = lambda x, y: np.full(len(np.atleast_1d(x)), 200.0)  # noqa: E731
+        on = {"c": "sidewalk", "l": 0, "r": [[0, 0, 200.0], [10, 0, 200.05], [10, 4, 200.0], [0, 4, 199.95]]}
+        off = {"c": "sidewalk", "l": 0, "r": [[20, 0, 198.6], [30, 0, 198.6], [30, 4, 198.6], [20, 4, 198.6]]}
+        t = sp.TrustedWalks({"areas": [on, off]}, [], lidar)
+        self.assertEqual(t.ok(np.array([5.0, 25.0, 50.0]), np.array([2.0, 2.0, 2.0])).tolist(), [True, False, False])
 
 
 if __name__ == "__main__":

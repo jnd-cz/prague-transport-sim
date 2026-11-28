@@ -954,6 +954,24 @@ Sections (`tools/test_readme.py` holds this list to the headings):
     at 192.9 m over IPR's 188.0 m. At Vyšehrad (wall 1097, 102 m at 220.9 m over 214.4 m) the lidar is right: a path
     runs at the wall's foot and a walkway on its top (maintainer, #899). Which is right elsewhere waits for the review
     (`reports/review/sidewalk-walls-N.json`, 15 stretches by kind), before a rule overrules the survey there.
+  - *The review's answers* (data/truth.json `sidewalkWallsReview`, read against IPR's orthophoto and a profile across
+    each wall, 2026-11-28): at 12 of the 15 the walkway runs level to an upright wall, at the foot or on the top, or a
+    ramp or stairs go down between walls to an underpass, and IPR clear of the wall's smear is that walkway. Under a
+    building's concrete slab on line 9 (-8590.7, -1268.9) the survey is right and IPR reads 1.4 m over it. The review's
+    pins carry the right heights, but review mode draws them on the built ground, the wedge being asked about.
+  - *The walkway's own level at a wall* (`street_profile.walkway_level`): going in from the wall, the first IPR reading
+    whose half metre on lies within 0.1 m; where every survey height at the edge lies 1 m or more off it, the walkway
+    lies at it from the wall to where it was read. Only on a sidewalk whose outline away from walls lies on IPR (its
+    median within 0.3 m) and not under IPR's LOD2 building (`TrustedWalks`). Built on places with their street
+    squares (`ground_place.py --streets`), the cards' sections: the quay 0.72 → 0.01 m off its chord, a walkway on a
+    quay wall's top 0.17 → 0.00, the sidewalk under a track wall 0.30 → 0.07, a garden footpath at a wall 0.60 → 0.02,
+    a ramp's floor 4.8 m over IPR → on it; the walkway under the slab as before. The walls, stairs and structures
+    rules' places, their street squares built: every section as before, steep faces at sidewalk-on-a-quay-wall 52.7 →
+    2.9 m². What it was not: at 0.5 m instead of 1 m an edge along Braník's upper ramp, 0.4-0.8 m off the survey,
+    switched between the two and stepped 0.7 m; the two ends of the half metre alone matched across the bottom of a
+    V by line 37's stair well (a 2 m step along its rim); held at the edge alone, a footpath under a 5.6 m wall dipped
+    0.3 m into the smear 1.5-2 m in; OSM's footprint stops 1.2 m short of the slab; a sidewalk's outline points near
+    the reading did not tell the slab from a ramp, whose outline carries the top's level 0.6-1 m off IPR.
 - **A paved strip is a wall for the sidewalk beside it** (#786, measured 2026-11-21). The survey has many a
   retaining wall and parapet as a paved area 0.2-0.5 m across and nothing else: no wall area, no `Zeď` line. What
   kept a sidewalk off IPR's smear at a wall (#653: the cells along a wall held at its level, a street corner on its

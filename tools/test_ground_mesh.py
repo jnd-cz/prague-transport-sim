@@ -834,6 +834,29 @@ class Platforms(unittest.TestCase):
         self.assertEqual([round(g.area, 1) for g in got], [6.0])
 
 
+class StreetsBuiltHere(unittest.TestCase):
+    def test_squares_built_in_this_process_take_the_files_place(self):
+        # (ground_place.py --streets: a square of the street surface built by the tools at hand is read instead of the
+        # line's file, here a line without one, #653)
+        import street_profile as sp
+        n = int(round(300.0 / sp.SW_CELL))
+        zw = np.full((n, n), np.nan)
+        zw[0:10, 0:10] = 200.0   # (rows from the square's north-west corner)
+
+        def none(ln, root=None):
+            raise OSError("no file")
+        keep = sp.read_streets
+        sp.read_streets = none
+        try:
+            self.assertTrue(np.isnan(gm.Streets("99").at("sidewalk", np.array([2.0]), np.array([298.0])))[0])
+            gm.STREETS["99"] = {(0, 0): (0.0, 300.0, np.full((n, n), np.nan), zw)}
+            z = gm.Streets("99").at("sidewalk", np.array([2.0]), np.array([298.0]))
+        finally:
+            sp.read_streets = keep
+            gm.STREETS.clear()
+        self.assertAlmostEqual(float(z[0]), 200.0)
+
+
 class BesideAThinWall(unittest.TestCase):
     def test_a_road_beside_a_thin_wall_keeps_its_surface_from_past_the_smear(self):
         # (#779: a wall 0.3 m across along y = 0..0.3, a ramp at 258 m south of it and a road at 261 m north; the

@@ -366,15 +366,44 @@ def by_class(V, F, cls):
     return V / Q, {c: F[cls == i] for c, i in gm.CLASS_IDS.items()}
 
 
-def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False, build=True, over=False):
+STREETS_MARGIN = 50.0  # m past a place's reach: the street surface's squares built round it (--streets)
+
+
+def streets_of(ln, within):
+    """The street surface's squares reaching a box (`within`: the place's reach and STREETS_MARGIN), built by these
+    tools in place of the file's (ground_mesh.STREETS): {"squares", "cells changed" (over 1 cm, against the file),
+    "most m"}. Past them the build reads the file: what a rule changes shows on the place, not on its ring."""
+    import ground_mesh as gm
+    import street_profile
+    sq = street_profile.rebuilt(ln, within)
+    gm.STREETS[str(ln)] = sq
+    try:
+        old, _ = street_profile.read_streets(ln, ROOT)
+    except OSError:
+        old = {}
+    n, most = 0, 0.0
+    for k, (_, _, zr, zw) in sq.items():
+        o = old.get(k)
+        for a, b in ((zr, o[2] if o else None), (zw, o[3] if o else None)):
+            b = np.full(a.shape, np.nan) if b is None else b
+            d = np.where(np.isfinite(a) & np.isfinite(b), np.abs(a - b), np.where(np.isfinite(a) != np.isfinite(b), np.inf, 0))
+            n += int((d > 0.01).sum())
+            fin = d[np.isfinite(d)]
+            most = max(most, float(fin.max()) if len(fin) else 0.0)
+    return {"squares": len(sq), "cells changed": n, "most m": round(most, 2)}
+
+
+def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False, build=True, over=False, streets=False):
     """One place built, compared and measured: its report (also written to reports/places/NAME/place.json). build=False:
-    the written file alone."""
+    the written file alone. streets: the street surface's squares round it built too, by these tools (streets_of)."""
     import ground_mesh as gm
     ln, at, reach = str(pl["line"]), pl["at"], float(pl.get("reach") or REACH)
     mid, within = tiles_of(at, reach, ring)
     box = (at[0] - reach, at[1] - reach, at[0] + reach, at[1] + reach)
     t0 = time.time()
     built = mine = None
+    m = STREETS_MARGIN
+    st = streets_of(ln, (box[0] - m, box[1] - m, box[2] + m, box[3] + m)) if streets and build else None
     if build:
         built = gm.build(ln, mesh, threads, log=lambda s: None, within=within)
         gm.fit_mouths(ln, built, log=lambda s: None)
@@ -383,6 +412,8 @@ def run(name, pl, ring=1, mesh=None, threads=4, out=None, log=print, rings=False
     theirs = written(ln, mid)
     rep = {"place": name, "line": ln, "at": at, "reach": reach, "issue": pl.get("issue"),
            "tiles": [tile_name(e, n) for e, n in mid], "ring": ring, "seconds": round(secs, 1)}
+    if st is not None:
+        rep["streets"] = st
     if mine is not None:
         rep["built"] = measures(*mine, box)
     if theirs is not None:
@@ -451,7 +482,7 @@ def many(todo, a, work=one, out=None):
     from baseline_store import HeavyJob
     out = out or sys.stdout
     gb = PLACE_GB[1 if a.rings else 0]
-    kw = dict(ring=a.ring, mesh=a.mesh, threads=a.threads, rings=a.rings, over=a.overlay)
+    kw = dict(ring=a.ring, mesh=a.mesh, threads=a.threads, rings=a.rings, over=a.overlay, streets=getattr(a, "streets", False))
     n = max(1, min(a.jobs, len(todo)))
     est = {k: estimate(k, a.rings) for k in todo}
 
@@ -497,6 +528,9 @@ def line_of(rep):
         s += (f"\n    section \"{sec['name']}\": {'FAILS ' + str(m['breaks']) if m.get('breaks') else 'holds' if sec['expect'] else 'no expectation'}"
               f" (sloping {m.get('sloping m')} m, off the lidar {m.get('off the lidar m')} m, largest step {m.get('largest step m')} m, "
               f"off the chord {m.get('off the chord m')} m)")
+    if rep.get("streets"):
+        t = rep["streets"]
+        s += f"\n    streets: {t['squares']} squares built, {t['cells changed']} cells over 1 cm off the file's (most {t['most m']} m)"
     if w and rep.get("built"):
         s += f" (written: {w['walls']['m over 0.3 m']} m, {w['walls']['tallest m']} m, {w['steep faces that are no wall']['m2 in plan']} m2)"
     if loc:
@@ -522,6 +556,8 @@ def main(argv=None):
     ap.add_argument("--rings", action="store_true", help="also build with one ring more and compare the two")
     ap.add_argument("--written", action="store_true", help="build nothing: measure the written file alone")
     ap.add_argument("--overlay", action="store_true", help="also write the line's ground file with the place's tiles replaced")
+    ap.add_argument("--streets", action="store_true", help="also build the street surface's squares round the place by "
+                    "these tools, in place of the line's file (#653): a street surface rule tried on places")
     ap.add_argument("--mesh")
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--jobs", type=int, default=JOBS, help="several places: how many build at once, each in its own "
@@ -551,6 +587,7 @@ def main(argv=None):
         if bad := [r for r in rules if r not in gr.RULES]:
             raise SystemExit(f"ground_place: no rule {', '.join(bad)} (the rules: {', '.join(gr.RULES)})")
         names += gr.places_of(rules)
+        a.streets = a.streets or gr.with_streets(rules)  # (a street surface rule shows only on its squares built)
     if a.locality:
         a.rings = True
         for k, v in gr.LOCALITY.items():
@@ -569,7 +606,7 @@ def main(argv=None):
     t0 = time.time()
     if a.written or (len(todo) == 1 and not a.rings):
         for k, v in todo.items():
-            run(k, v, a.ring, a.mesh, a.threads, build=not a.written, over=a.overlay)
+            run(k, v, a.ring, a.mesh, a.threads, build=not a.written, over=a.overlay, streets=a.streets)
         return 0
     rc = many(todo, a)
     if a.locality:

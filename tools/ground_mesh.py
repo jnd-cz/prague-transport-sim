@@ -1994,9 +1994,14 @@ def plane(tri, x, y):
     return w0 * a[:, 2] + w1 * b[:, 2] + (1 - w0 - w1) * c[:, 2]
 
 
+STREETS = {}  # {line: {(i, j): (x0, y1, road, sidewalk)}}: street squares built in this process, read in place of the
+# file's (ground_place.py --streets, street_profile.rebuilt)
+
+
 class Streets:
     """The generated street surface (data/lineN.streets.*, #512): road and sidewalk heights on its grid, bilinear, the
-    nearest cell of the class within NEAR cells where a point lies on the class's edge."""
+    nearest cell of the class within NEAR cells where a point lies on the class's edge. The squares of STREETS[ln] take
+    the place of the file's."""
     NEAR = 2
 
     def __init__(self, ln):
@@ -2005,6 +2010,10 @@ class Streets:
             self.sq, self.meta = street_profile.read_streets(ln, ROOT)
         except OSError:
             self.sq, self.meta = {}, None
+        if STREETS.get(str(ln)):
+            self.sq = {**self.sq, **STREETS[str(ln)]}
+            self.meta = self.meta or {"cell": 300.0, "grid": street_profile.SW_CELL,
+                                      "side": int(round(300.0 / street_profile.SW_CELL))}
 
     def at(self, kind, x, y):
         out = np.full(len(x), np.nan)
