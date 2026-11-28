@@ -194,7 +194,8 @@ export class GameView {
       const half = Math.max(0.2, (box.max.x - box.min.x) / 2);
       place(obj, route, span.s, -(tramClearance(route, span.s) + half), 0, true);
       ud.hung = true;
-      obj.position.y = g.profile.height(span.s) + 5.04 - ud.boardTop;
+      // (its top 5.04 m over the rails, or just under a structure lower than that, #71)
+      obj.position.y = g.profile.height(span.s) + Math.min(5.04, (span.under ?? Infinity) - 0.1) - ud.boardTop;
       const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.25, 4), new THREE.MeshLambertMaterial({ color: 0x333333 }));
       rod.position.y = ud.boardTop + 0.62;
       obj.add(rod);

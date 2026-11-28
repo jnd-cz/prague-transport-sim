@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Browser tests of the contact wire's height under structures (src/wire.js, #71): python -P -E tools/test_wire.py
+(serves the checkout itself on a free port)."""
+import functools
+import http.server
+import os
+import sys
+import threading
+
+from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # (python -P leaves tools/ out)
+import gpu  # noqa: E402  (Chromium on the GPU where it has one, #463)
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+class Quiet(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+
+server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Quiet, directory=ROOT))
+threading.Thread(target=server.serve_forever, daemon=True).start()
+try:
+    with sync_playwright() as p:
+        browser = gpu.launch(p)[0]
+        page = browser.new_page()
+        page.goto(f'http://127.0.0.1:{server.server_port}/README.md')
+        print(page.evaluate('''async () => {
+          const {Ceilings, makeWire, COLLECTOR, WIRE_UNDER, WIRE_MIN, WIRE_GRADE, WIRE_FROM} = await import('/src/wire.js');
+          const check = (ok, msg) => { if (!ok) throw Error(msg); };
+          const near = (a, b, e = 1e-6) => Math.abs(a - b) <= e;
+          const N = 5.34;
+          // a straight track along x at rail height 200, a vertex every 1.5 m
+          const track = (y, z, x0 = -600, x1 = 600) => { const smooth = [], zs = []; for (let x = x0; x <= x1; x += 1.5) { smooth.push([x, y]); zs.push(z); } return {smooth, z: zs}; };
+          // a slab across the track at x = 0..4, its underside `under` m over the rails
+          const slab = (C, under, y0 = -5, y1 = 5, z = 200) => { for (let x = 0; x <= 4; x += 0.4) for (let y = y0; y <= y1; y += 0.4) C.add(x, y, z + under); };
+
+          // 1. the lookup: the lowest point within the collector's reach in plan, in the height band asked for
+          let C = new Ceilings();
+          C.add(0, 0.9, 204.5); C.add(0, 1.2, 204.0); C.add(0, 0, 203.0); C.add(0, 0, 206.0);
+          check(C.lowest(0, 0, 200 + WIRE_FROM, 200 + N + WIRE_UNDER) === 204.5, 'a point 1.2 m aside and one under the band are not over the collector');
+          check(C.lowest(0, 0, 200 + WIRE_FROM, 200 + N + WIRE_UNDER, 1.3) === 204.0, 'a wider reach finds the point 1.2 m aside');
+          check(C.lowest(50, 0, 0, 999) === null, 'nothing over a place 50 m on');
+          C.add(0, 0.9, 204.5);
+          check(C.count === 4, 'a point is kept once');
+
+          // 2. nothing over the tracks: the normal height everywhere
+          let W = makeWire([track(0, 200)], new Ceilings(), N);
+          check(W.over(0, 0, 200) === N && W.low.length === 0 && W.drops.length === 0, 'no structure, the normal height');
+
+          // 3. a bridge 4.32 m over the rails: the wire WIRE_UNDER m under it, back at 1 in 250 either way
+          C = new Ceilings(); slab(C, 4.32);
+          W = makeWire([track(0, 200)], C, N);
+          check(near(W.over(1.5, 0, 200), 4.32 - WIRE_UNDER), 'under the bridge the wire is WIRE_UNDER m under it');
+          // (the track's vertices under the slab: x = 0 to 4.5)
+          check(near(W.over(104.5, 0, 200), 4.32 - WIRE_UNDER + 100 * WIRE_GRADE, 0.001) && near(W.over(-97, 0, 200), 4.32 - WIRE_UNDER + 97 * WIRE_GRADE, 0.001), '100 m past the bridge it has risen 0.4 m, both ways');
+          check(W.over(400, 0, 200) === N, 'back at the normal height 400 m on');
+          check(W.drops.length === 1 && W.drops[0].under === 4.32 && W.drops[0].wire === 4.17 && W.drops[0].reach === 293 && W.impossible.length === 0, 'the place is listed with its heights and its reach: ' + JSON.stringify(W.drops));
+
+          // 4. the wire beside it comes down too; a track on another level does not
+          W = makeWire([track(0, 200), track(3.5, 200), track(20, 208)], C, N);
+          check(W.over(1.5, 3.5, 200) < 4.2, 'the opposite track under the same bridge');
+          check(near(W.over(1.5, 30, 200), 4.32 - WIRE_UNDER + 26.5 * WIRE_GRADE, 0.001), 'a wire 26.5 m from the nearer track on the same level is 0.11 m higher');
+          check(W.over(1.5, 20, 208) === N, 'a track 8 m higher, on the bridge, keeps the normal height');
+
+          // 5. a structure just over the normal wire lowers nothing
+          C = new Ceilings(); slab(C, 5.5);
+          W = makeWire([track(0, 200)], C, N);
+          check(W.over(1.5, 0, 200) === N && W.drops.length === 0, 'a bridge 5.5 m over the rails: the wire passes under it as it is');
+
+          // 6. lower than a collector reaches: no evidence, the wire stays and the place is listed
+          C = new Ceilings(); slab(C, 3.83);
+          W = makeWire([track(0, 200)], C, N);
+          check(W.over(1.5, 0, 200) === N && W.drops.length === 0 && W.impossible.length === 1 && W.impossible[0].under === 3.83, 'a structure 3.83 m over the rails: ' + JSON.stringify(W.impossible));
+          check(WIRE_MIN + WIRE_UNDER > 3.83 && COLLECTOR === 1, 'the figures the cases stand on');
+          return '6 wire cases pass';
+        }'''))
+        browser.close()
+finally:
+    server.shutdown()

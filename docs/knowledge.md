@@ -465,6 +465,15 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   underside 1.2 m apart, and Libeň's railway areas lie about 1 m under the top: a piece keeps its offset from the top,
   the nearest face flipped between the two.
   The rails, not our track profile, check the decks: `line_heights.py` runs after `dtm.py` and reads its sidecar.
+- **The contact wire comes down under a low structure** (#71, `src/wire.js`, the lint `wireUnderStructures`). What of the
+  bridge models stands within 1.0 m of a drawn track's axis from 3.6 m over its rails is over the collector; the wire
+  passes 0.15 m under the lowest of it, never lower than 3.9 m (the T3's collector reaches down to 3.89 m,
+  `assets/t3h/rig.json`), and rises back at 1 in 250 (Yarra Trams' CE-019-ST-0032, 4.11.4: at most 1 in 5 x the speed in
+  km/h, at 50 km/h). Every wire within reach on the same level comes down with it (the maintainer, #71: at Výtoň "the
+  whole overhead network gets noticeably low"). The collectors follow the wire, the span wires and poles are left out
+  under a structure, and the trams' space cut out of a model ends at the wire, so a low bridge is whole. A structure
+  lower than a collector reaches is no evidence of a low wire: the wire stays, the model is cut for the collector,
+  and the lint lists the place.
 - **A bridge's outline in the survey (class `deck`) is no surface** (#13, `src/groundDraw.js` `buildDtm`, the lint
   `outlineOverStreets`). It is one coarse area under everything the bridge carries, with heights only along its edges
   (the parapet's or the kerb's), and the page laid it with an offset of its own. Drawn as a slab like the streets on

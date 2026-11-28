@@ -4,18 +4,21 @@ import * as THREE from 'three';
 import { CONTACT_WIRE } from './models.js';
 import { FootprintIndex, SegmentIndex } from './worldMesh.js';
 
-// Overhead line: contact wire 5.34 m over top of rail of every track, hung from Prague-style cross-span wires.
+// Overhead line: contact wire 5.34 m over top of rail of every track, lower under a structure and near one (ground.wire,
+// src/wire.js, #71), hung from Prague-style cross-span wires.
 // Each span is anchored on both sides of the street: on a pole at the kerb (between the
 // carriageway and the sidewalk), or on a wall rosette where a building stands close to the
 // track. Where one side has no place for an anchor (a square, a junction) a single pole with
 // a bracket arm carries the wires. Poles are closer together on curves.
 export function buildCatenary(group, data, route, ground, trackDist) {
-  const wire = [];
+  const wire = [], W = ground.wire;
+  const wireAt = (x, y, zr) => (W ? W.over(x, y, zr) : CONTACT_WIRE);
   for (const t of data.tracks) {
     const line = t.smooth, z = t.z;
     for (let i = 0; i < line.length - 1; i += 2) {
       const j = Math.min(line.length - 1, i + 2);
-      wire.push(new THREE.Vector3(line[i][0], z[i] + CONTACT_WIRE, -line[i][1]), new THREE.Vector3(line[j][0], z[j] + CONTACT_WIRE, -line[j][1]));
+      wire.push(new THREE.Vector3(line[i][0], z[i] + wireAt(line[i][0], line[i][1], z[i]), -line[i][1]),
+        new THREE.Vector3(line[j][0], z[j] + wireAt(line[j][0], line[j][1], z[j]), -line[j][1]));
     }
   }
   // vehicle carriageways (poles stand outside them) and building footprints (rosettes)
@@ -59,8 +62,14 @@ export function buildCatenary(group, data, route, ground, trackDist) {
   // kerb finder for anything else that must stand off the carriageway
   route.catenary = [];
   route.kerbAt = (s, side) => anchor(s, side);
+  let under = 0;
   for (const s of stations) {
     const z = ground.profile.height(s);
+    // (under a structure that the span, 6.74 m over the rails, or a pole's top would stand in, the wire hangs from the
+    // structure: no span and no poles are drawn, and what hangs from the span there hangs under the structure, `under`
+    // m over the rails, src/gameView.js, #71)
+    const here = route.at(s), roof = W ? W.ceilings.lowest(here.x, here.y, z + 3.6, z + 7.2, 3) : null;
+    if (roof !== null) under++;
     // tracks this span crosses: ours and any parallel one within 6 m (the opposite direction)
     const tracksLat = [0];
     for (let lat = -6; lat <= 6; lat += 0.25) {
@@ -93,8 +102,9 @@ export function buildCatenary(group, data, route, ground, trackDist) {
       const e = route.offset(s, far);
       span.push([a, { wall: true, sl: far, x: e.x, y: e.y, end: true }]);
     }
-    const cat = { s, z, L, R: Rt, span: !!(L && Rt) || tracksLat.length > 0, tracksLat, attach: [] };
+    const cat = { s, z, L, R: Rt, span: !!(L && Rt) || tracksLat.length > 0, tracksLat, attach: [], under: roof === null ? null : roof - z };
     route.catenary.push(cat);
+    if (roof !== null) continue;
     for (const a of [L, Rt]) {
       if (!a) continue;
       if (a.wall) rosettes.push([a.x, z + 6.74, a.y]);
@@ -113,7 +123,8 @@ export function buildCatenary(group, data, route, ground, trackDist) {
         const c = route.offset(s, lat);
         const t = (lat - a.sl) / (b.sl - a.sl || 1);
         const zs = za - 0.4 + (zb - za) * Math.max(0, Math.min(1, t));
-        wire.push(new THREE.Vector3(c.x, zs, -c.y), new THREE.Vector3(c.x, z + 5.6, -c.y));
+        // (down to 0.26 m over the contact wire, which is lower near a structure)
+        wire.push(new THREE.Vector3(c.x, zs, -c.y), new THREE.Vector3(c.x, z + wireAt(c.x, c.y, z) + 0.26, -c.y));
       }
     }
   }
@@ -125,5 +136,5 @@ export function buildCatenary(group, data, route, ground, trackDist) {
   roseMesh.count = rosettes.length;
   const wg = new THREE.BufferGeometry().setFromPoints(wire);
   group.add(new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: 0x222222 })), poleMesh, roseMesh);
-  console.log(`catenary: ${poles.length} poles, ${rosettes.length} wall rosettes`);
+  console.log(`catenary: ${poles.length} poles, ${rosettes.length} wall rosettes` + (under ? `, ${under} spans left out under a structure` : ''));
 }
