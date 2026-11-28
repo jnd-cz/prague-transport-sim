@@ -1180,6 +1180,40 @@ export function groundUnderDecks(g, world) {
   return { ...check('deck-surfaces', n, [...bad.values()]), triangles: { ground: tris.ground.size, deck: tris.deck.size }, spans };
 }
 
+// A bridge's outline in the survey (class deck) drawn over a street the bridge carries (#13): every 2 m inside each span
+// of our route, every metre across to OUTLINE_ACROSS m both ways, cast down from over the rails. Where the first surface
+// on the structure is the outline and a street of the structure (any other class of it) lies within OUTLINE_BELOW m
+// under it, the street is covered: on Trojský most the outline stood 0.02-0.5 m over the carriageway and the sidewalks
+// in patches (line 17, the maintainer's notes of 2026-11-27). Counted per sample; places per span and 10 m, the highest.
+const OUTLINE_ACROSS = 20, OUTLINE_BELOW = 3;
+export function outlineOverStreets(g, world) {
+  const r = g.route, pr = r.ground?.profile;
+  if (!pr) return check('deck-outline-under-streets', 0, []);
+  const meshes = [];
+  world.traverse((m) => { if (m.isMesh && m.userData.surface === 'dtm') meshes.push(m); });
+  const rays = new DownRays(meshes), bad = new Map();
+  let n = 0;
+  for (const [a, b] of pr.bridges) {
+    for (let s = Math.ceil(a / 2) * 2; s <= b; s += 2) {
+      for (let l = -OUTLINE_ACROSS; l <= OUTLINE_ACROSS; l += 1) {
+        const p = r.offset(s, l), zt = pr.heightAt(s, l);
+        const hits = rays.cast(p.x, zt + 3, -p.y, 8).filter((h) => surveyOf(h)?.[1] > 0);
+        if (!hits.length) continue;
+        n++;
+        if (surveyOf(hits[0])[0] !== 'deck') continue;
+        const street = hits.find((h) => surveyOf(h)[0] !== 'deck' && hits[0].point.y - h.point.y < OUTLINE_BELOW);
+        if (!street) continue;
+        const mag = hits[0].point.y - street.point.y, key = `${Math.round(a)}:${Math.round(s / 10)}`;
+        if (!(bad.get(key)?.mag >= mag)) bad.set(key, { s, x: p.x, y: p.y, mag, n: 0, info: `the outline ${mag.toFixed(2)} m over the ${surveyOf(street)[0]}, ${l} m across` });
+        bad.get(key).n++;
+      }
+    }
+  }
+  const out = check('deck-outline-under-streets', n, [...bad.values()]);
+  // (and what src/groundDraw.js drew and cut of the outlines, m2 in plan)
+  return { ...out, samples: [...bad.values()].reduce((t, v) => t + v.n, 0), outline: r.ground.dtm?.outline ?? null };
+}
+
 // Roads passing under our route (OSM maxheight, tools/clearances.py; the profile keeps them as floors):
 // the track at least the clearance + 0.8 m over the road surface. Short by more than 0.1 m is listed.
 function underpassClearance(g) {
@@ -1271,6 +1305,7 @@ export async function lint({ bot = false, traffic = false, save = true, seeds = 
     lanes: laneQuality(g),
     deckClip: deckClip(g, world),
     groundUnderDecks: groundUnderDecks(g, world),
+    outlineOverStreets: outlineOverStreets(g, world),
     underpassClearance: underpassClearance(g),
     groundDrawn: groundDrawn(g, world),
     groundHidden: groundHidden(g),

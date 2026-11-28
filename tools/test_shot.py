@@ -41,6 +41,8 @@ btnStart.onclick = () => {
 if (params.has('review')) {
   const at = params.get('at').split(',').map(Number);
   window.review = {camera, T:{x:at[0],y:at[1],z:99}, ready:Promise.resolve(),
+    layers:{classes:true, wire:false, source:false, kerbs:true, seams:true, findings:true, track:true, buildings:true},
+    _applyLayers() {this.painted = this.layers.classes;}, painted:true,
     _render() {camera.position.fromArray([this.T.x,this.T.z,this.T.y]);}};
   review._render();
   const box = document.createElement('div'); box.id='review'; document.body.append(box);
@@ -52,6 +54,7 @@ function frame() {
   }
   const ctx = gl.getContext('2d'); ctx.fillStyle = '#344455'; ctx.fillRect(0,0,1280,720);
   ctx.fillStyle = '#778899'; ctx.fillRect(camera.position.values[0] % 400,20,50,50);
+  if (window.review?.painted) { ctx.fillStyle = '#ff0000'; ctx.fillRect(600,300,40,40); }
   drawCount++; requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -166,6 +169,30 @@ class Shots(unittest.TestCase):
             shot.main(['--line','17','--s','5064','--weather','snow','--out',str(output)], self.root)
         self.assertEqual(seen, ['snow', 'snow'])
         self.assertTrue((output/'line17-s5064-cab-snow-pair.png').exists())
+
+    def test_drawn_takes_the_reviews_own_layers_off_in_both_pictures(self):
+        """The review view paints the surface classes over the place; --drawn shows it as the game draws it (#13)."""
+        red = lambda path: Image.open(path).convert('RGB').getpixel((620, 320)) == (255, 0, 0)
+        capture(self.browser, self.root, 17, 10, 'review', self.root / 'painted.png', 10)
+        capture(self.browser, self.root, 17, 10, 'review', self.root / 'drawn.png', 10, drawn=True)
+        self.assertTrue(red(self.root / 'painted.png'))
+        self.assertFalse(red(self.root / 'drawn.png'))
+        output, seen = self.root / 'shots-d', []
+        def fake_capture(browser, root, line, s, view, dst, timeout, **kwargs):
+            seen.append(kwargs.get('drawn'))
+            Image.new('RGB', (10, 10), 'red').save(dst)
+            return {'camera': {}, 'target_xy': {}}
+        with patch.object(shot, 'git', return_value='reference'), patch.object(shot, 'capture', fake_capture), \
+             patch.object(shot, 'checkout', return_value=nullcontext(self.root)), \
+             patch.object(shot, 'sync_playwright', return_value=nullcontext()), \
+             patch.object(shot.gpu, 'launch', return_value=(MagicMock(), 'fake')):
+            shot.main(['--line', '17', '--s', '10', '--view', 'review', '--drawn', '--out', str(output)], self.root)
+        self.assertEqual(seen, [True, True])
+        self.assertTrue((output / 'line17-s10-review-drawn-pair.png').exists())
+        with patch.object(shot, 'capture') as capture_, self.assertRaises(SystemExit) as e:
+            shot.main(['--line', '17', '--s', '10', '--view', 'cab', '--drawn'], self.root)
+        self.assertEqual(e.exception.code, 2)
+        capture_.assert_not_called()
 
     def test_the_review_view_refuses_weather(self):
         """It paints the surface classes: a weather's pictures would be the same on both sides (#707, #835)."""

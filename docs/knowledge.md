@@ -465,6 +465,16 @@ Sections (`tools/test_readme.py` holds this list to the headings):
   underside 1.2 m apart, and Libeň's railway areas lie about 1 m under the top: a piece keeps its offset from the top,
   the nearest face flipped between the two.
   The rails, not our track profile, check the decks: `line_heights.py` runs after `dtm.py` and reads its sidecar.
+- **A bridge's outline in the survey (class `deck`) is no surface** (#13, `src/groundDraw.js` `buildDtm`, the lint
+  `outlineOverStreets`). It is one coarse area under everything the bridge carries, with heights only along its edges
+  (the parapet's or the kerb's), and the page laid it with an offset of its own. Drawn as a slab like the streets on
+  it, it stood 0.02-0.5 m over the carriageway and the sidewalks on 5,732 of its 8,940 m2 on Trojský most and within
+  1.5 cm of them on 1,059 m2 more, in soft-edged patches; on Čechův most over the sidewalks along both edges (line 17,
+  the maintainer's notes of 2026-11-27). Its top is not drawn where another area of a structure but a roof lies within
+  3 m of it in height: of the outlines' area 71,545 of 79,379 m2 is cut on line 17, 41,192 of 42,950 on line 9. What is
+  left is the bridge's body where the survey has no street: the strips past the sidewalks, the gaps between areas. The
+  check counts places on our bridges where the outline is the first surface over a street: 50, 46, 33, 31 and 3 on
+  lines 9, 17, 22, 23 and 37 before, none after.
 - **Along a kerb the survey and IPR's lidar are equally noisy** (#470, `tools/bench/street_scatter.py` on the five lines'
   data of 2026-11-12). Straight street outline over 8 cm off its 21 m mean, survey / IPR read 1 m inside the area:
   road 1.8-2.7 / 1.6-2.3 %, tram 1.7-3.3 / 0.4-2.1 %, sidewalk 4.0-5.1 / 3.6-5.9 %, parking 1.5-4.3 / 4.5-9.6 %, paved
