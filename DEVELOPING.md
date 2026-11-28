@@ -27,14 +27,23 @@ across machines. Steps, as a normal user with sudo (not root):
 1. **Packages** (Debian's own Python 3.13; `python-is-python3` lets the docs' `python` commands run as written):
    ```bash
    sudo apt update
-   sudo apt install -y git curl tmux gh python-is-python3 python3-pip python3-venv \
+   sudo apt install -y git curl tmux python-is-python3 python3-pip python3-venv \
        python3-pyosmium python3-pyproj python3-shapely python3-numpy python3-scipy python3-pil
-   python -m pip install --user --break-system-packages pydelatin==0.4.0 playwright lameenc
+   python -m pip install --user --break-system-packages pydelatin==0.4.0 brotli playwright lameenc
    python -m playwright install --with-deps chromium
-   python -P -E -c "import osmium, pyproj, shapely, numpy, scipy, PIL, pydelatin; print('ok')"
+   python -P -E -c "import osmium, pyproj, shapely, numpy, scipy, PIL, pydelatin, brotli; print('ok')"
    ```
    (Debian refuses `pip install --user` into its Python; `--break-system-packages` only lets it write
-   `~/.local`.)
+   `~/.local`.) **`gh` from GitHub's own packages, not Debian's:** Debian 13's gh 2.46 has no `blockedBy` field, so
+   `board.py`'s issue list fails and it says "GitHub not reachable" (Windows had 2.103.3; 2.106.0 works):
+   ```bash
+   curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+       | sudo tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null
+   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg]" \
+       "https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+   sudo apt update && sudo apt install -y gh && gh --version
+   ```
+   Without sudo, the release's `gh` binary in `~/.local/bin` does too (updated by hand).
 2. **Clock and environment.** The night window (23:00-07:00) is the machine's local time. `/tmp` is erased at boot,
    and `heavy.py`'s queue and history live under the temp folder: `TMPDIR=/var/tmp` keeps the history.
    ```bash
