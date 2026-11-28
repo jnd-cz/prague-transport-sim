@@ -85,8 +85,7 @@ BEFORE = ("platforms.py",)  # (the writers that run before the groups: a step be
 
 def writers(line):
     """The steps that read build_line's output and write beside it, in order."""
-    out = [["platforms.py", "--line", line], ["osm_speeds.py", "--line", line], ["cant.py", "--line", line], ["clearances.py", "--line", line],
-           ["dtm_points.py", line]]
+    out = [["platforms.py", "--line", line], ["osm_speeds.py", "--line", line], ["cant.py", "--line", line], ["clearances.py", "--line", line]]
     # (OSM's signals on line 17 alone: their placement solved there before they go elsewhere; maintainer, #348, #22)
     if line == "17":
         out.append(["osm_signals.py", line])
@@ -97,8 +96,9 @@ def writers(line):
 def after(line):
     """The steps after the groups, in order: placement (it reads the platforms and OSM's signals, and the survey for the
     stop types: beside dtm.py it read the previous build's survey, #701), then the track styles (they read the survey's
-    areas, and the heights read the styles: #479)."""
-    return [["placement.py", "--line", line], ["track_styles.py", "--line", line]]
+    areas, and the heights read the styles: #479), then the feature layer (it reads the survey's shelter footprints
+    and the line's roads and paths, #14)."""
+    return [["placement.py", "--line", line], ["track_styles.py", "--line", line], ["features.py", "--line", line]]
 
 
 def steps(line):

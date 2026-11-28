@@ -27,7 +27,7 @@ class BuildId(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root, True)
         os.makedirs(os.path.join(self.root, "data"))
         self.put("line9.json", {"line": "9", "signals": [1, 2], "provenance": {"lists": {}}})
-        for name in ("geo.json", "dtm.json", "dtmpoints.json", "network.json", "ground.json"):  # (no signals.json: line 9 has none)
+        for name in ("geo.json", "dtm.json", "features.json", "network.json", "ground.json"):  # (no signals.json: line 9 has none)
             self.put(f"line9.{name}", {"what": name, "příliš": "žluťoučký", "provenance": {"lists": {"x": {"tool": "t", "levels": [], "count": []}}}})
 
     def put(self, name, d):
@@ -46,7 +46,7 @@ class BuildId(unittest.TestCase):
 
     def test_stamp_puts_it_into_every_file_there_and_leaves_the_rest(self):
         want, done = build_id.stamp("9", self.root)
-        self.assertEqual(done, ["line9.geo.json", "line9.dtm.json", "line9.dtmpoints.json", "line9.network.json", "line9.ground.json"])
+        self.assertEqual(done, ["line9.geo.json", "line9.dtm.json", "line9.features.json", "line9.network.json", "line9.ground.json"])
         for f in done:
             d = self.get(f)
             self.assertEqual(d["provenance"], {"lists": {"x": {"tool": "t", "levels": [], "count": []}}, "build": want})

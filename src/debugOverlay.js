@@ -16,7 +16,10 @@
 //   orange / yellow /    over a standing car (live): what holds it: the car, tram or walker ahead / a junction's rule
 //     red / green dot,   / a tram it gives way to / a red light; the white line to the head of its chain (#560)
 //     white line
+//   posts, boxes         the feature layer's records of kinds no model draws yet (src/features.js PLACEHOLDER, #14):
+//                        lamps yellow, poles grey, signals red, sign carriers blue, stop signs green, shelters cyan boxes
 import * as THREE from 'three';
+import { PLACEHOLDER, yaw } from './features.js';
 import { findKerbs } from './review.js';
 import { chainHead } from './waits.js';
 
@@ -117,6 +120,25 @@ export function createDebugOverlay(scene) {
       const LOW = { crossing: 0x00e5ff, 'osm kerb=lowered': 0x22cc55, 'osm kerb=rolled': 0x22cc55, 'osm kerb=flush': 0x3a6cff,
         'osm kerb=no': 0x3a6cff, 'osm kerb=raised': 0xff8c00 };
       for (const k of findKerbs(game.data.dtm?.provenance)?.lowered?.stretches || []) add('dot', LOW[k.src] ?? 0xffffff, k.x, surf(k.x, k.y) + 0.8, -k.y);
+      // the feature layer's kinds no model draws yet (#14): a placeholder per record, standing in the world (depth
+      // tested, unlike the markers), one instanced mesh a kind
+      const feats = game.data.features, m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+      for (const kind of feats?.kinds() || []) {
+        const ph = PLACEHOLDER[kind], list = ph ? feats.of(kind) : [];
+        if (!list.length) continue;
+        const box = ph.r === undefined; // (a footprint: its length across its front, its width along it)
+        const shape = (box ? new THREE.BoxGeometry(1, 1, 1) : new THREE.CylinderGeometry(1, 1, 1, 6)).translate(0, 0.5, 0);
+        const mesh = new THREE.InstancedMesh(shape, new THREE.MeshBasicMaterial({ color: ph.color, transparent: box, opacity: box ? 0.6 : 1 }), list.length);
+        list.forEach((o, i) => {
+          q.setFromAxisAngle(up, o.heading === undefined ? 0 : yaw(o.heading));
+          m.compose(new THREE.Vector3(o.x, surf(o.x, o.y), -o.y), q, box ? new THREE.Vector3(o.length, ph.h, o.width) : new THREE.Vector3(ph.r, ph.h, ph.r));
+          mesh.setMatrixAt(i, m);
+        });
+        mesh.name = `placeholder:${kind}`;
+        mesh.computeBoundingSphere();
+        mesh.userData.dispose = () => { shape.dispose(); mesh.material.dispose(); };
+        g.add(mesh);
+      }
     }
     return g;
   }

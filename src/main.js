@@ -4,6 +4,7 @@ import { Route, checkBuiltRoute } from './route.js';
 import { Terrain, Profile, makeGround, rockTunnels, bridgeModel, DtmSurface, chainTunnels } from './terrain.js';
 import { buildWorld, WORLD_PARTS } from './world.js';
 import { widenTramStreets, buildStreetDetail } from './streets.js';
+import { readFeatures } from './features.js';
 import { groundStyles } from './groundDraw.js';
 import { fetchGround, GroundTiles, windowPoints } from './groundFile.js';
 import { Landmarks, LANDMARK_UNIFORMS, LANDMARK_STRETCH } from './landmarks.js';
@@ -59,7 +60,7 @@ let lineId = params.get('line');
 try { lineId = lineId || localStorage.getItem('tram.line'); } catch { /* storage unavailable */ }
 if (!lineId || (lines.length && !lines.some((l) => l.line === lineId))) lineId = lines[0]?.line || '22';
 // every file of the line at once (the optional ones may be missing); the T3 model alongside
-for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'dtmpoints.json', 'ground.json', 'ground.bin']) load.prefetch(`data/line${lineId}.${f}`);
+for (const f of ['json', 'geo.json', 'bld.bin', 'dtm.json', 'signals.json', 'features.json', 'ground.json', 'ground.bin']) load.prefetch(`data/line${lineId}.${f}`);
 // the tram models (assets/vehicles.json, #455): the ones loaded at start downloaded with the line
 const vehicles = await loadRegistry((u) => load.get(u));
 // the packages the player installed (#530, src/packages.js): checked and added after the repository's
@@ -119,10 +120,15 @@ try {
   const r = await load.get(`data/line${lineId}.signals.json`);
   if (r.ok) { data.osmSignals = await r.json(); built[`line${lineId}.signals.json`] = data.osmSignals; }
 } catch { /* none for this line */ }
-// optional street furniture of Prague's technical map (manholes, inlets, hydrants, …; .claude/tools/dtm_points.py)
+// the feature layer (#14, tools/features.py): the line's placed objects, each with its source's id, kind, place,
+// heading and mount (the archive survey's covers, lamps, poles and signs; the surveyed shelter footprints)
 try {
-  const r = await load.get(`data/line${lineId}.dtmpoints.json`);
-  if (r.ok) { const j = await r.json(); data.dtmPoints = j.points; built[`line${lineId}.dtmpoints.json`] = j.provenance ? j : { attribution: 'Street furniture: DTM Praha (archive), data base © IPR Praha (CC BY 4.0).' }; }
+  const r = await load.get(`data/line${lineId}.features.json`);
+  if (r.ok) {
+    const j = await r.json();
+    data.features = readFeatures(j);
+    if (data.features) built[`line${lineId}.features.json`] = j;
+  }
 } catch { /* none for this line */ }
 // the network the build made (tools/network.py, #658): the traffic's roads, lanes, footways and doors, the signals
 // bound to the lanes, what the platforms read of the survey, the heights of what Start places. Start builds none of it.
@@ -315,7 +321,7 @@ async function buildCity() {
   const t0 = performance.now(), s0 = data.stops[0].s + 6;
   await groundTiles.settle(windowPoints(previewSpot(s0), route, s0), groundTiles.reach(scene.fog.far));
   window.groundTimes = { ...groundTiles.times, window: Math.round(performance.now() - t0) }; // (the workers' ms, summed; the window's wait)
-  if (data.dtmPoints) world.add(buildStreetDetail(data, ground, world.userData.near));
+  if (data.features) world.add(buildStreetDetail(data, ground, world.userData.near));
   window.nearBatches = world.userData.near; // (what the distance rules leave out: .log)
   const lm = world.userData.landmarks;
   if (lm) landmarks = window.landmarks = new Landmarks(lm.pos, lm.nor, lm.col, [hemi, sun], lm.list);

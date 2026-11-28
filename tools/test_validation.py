@@ -62,7 +62,7 @@ class Build(unittest.TestCase):
             # found them, #22, and placement reads the survey dtm.py writes beside them, #701)
             self.assertEqual([st[0] for st in rebuild.after(line)][0], "placement.py")
             self.assertEqual("osm_signals.py" in names, line == "17")
-            self.assertIn("dtm_points.py", names)
+            self.assertEqual([st[0] for st in rebuild.after(line)][-1], "features.py")  # (after the survey: its shelters, #14)
 
 
 if __name__ == "__main__":

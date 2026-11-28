@@ -96,7 +96,8 @@ LAYERS = {
     # nothing else has a height (#202), the curve across a short hold; where none, the game's surface profile
     "heights": ("dtm-di", "dtmp-tracks", "truth", "zps", "ipr-dtm", "rule:curve", "rule:surface"),
     "structures": ("zps", "mosty3d", "osm"),  # bridge decks (survey) over the model over OSM tags (#13)
-    "furniture": ("dtmpoints", "osm", "rule:placement"),  # survey points over OSM over rules (#14)
+    # the feature layer (#14, tools/features.py): the archive survey's points, the survey's shelter footprints, OSM, rules
+    "furniture": ("dtmpoints", "zps", "osm", "rule:placement"),
     "buildings": ("lod2", "osm"),
     "walls": ("zps", "walls", "rule:placement"),
     "trees": ("trees", "osm"),

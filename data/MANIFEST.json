@@ -1,8 +1,8 @@
 {
  "snapshot": "2026-11-18",
- "built_at_commit": "f2cd3f2",
- "published": "2026-11-28 04:59",
- "note": "ground batch F (#885): the five lines rebuilt at 7d08f99 with the rules merged since batch E (#638 the long outline edges on the lidar's shape, #876 the lidar rule's under side on open track and Vinohradská's follow-the-ground area)",
+ "built_at_commit": "0f7503d",
+ "published": "2026-11-28 15:55",
+ "note": "the feature layer (#14): lineN.features.json for lines 9, 17, 22, 23, 37 in place of lineN.dtmpoints.json; no line rebuilt, every other file as published",
  "files": {
   "ipr.fills.json": {
    "size": 405736,
@@ -20,9 +20,9 @@
    "size": 9778993,
    "sha256": "624545923ca6f3245d027d63d59546abb94f3ffef7ee56eaef1ff5bb579d4858"
   },
-  "line17.dtmpoints.json": {
-   "size": 841343,
-   "sha256": "4390e4f16991dacb6eb830766d3b82ed5639ae33ac63cc1de5f873112a680dd4"
+  "line17.features.json": {
+   "size": 605087,
+   "sha256": "3c203f4d16d390310bc43b09a4cee3e130d03450b5e5ffdd3408b432e35f6fb9"
   },
   "line17.geo.json": {
    "size": 231607,
@@ -76,9 +76,9 @@
    "size": 10194009,
    "sha256": "4eab8293ffbc3b20704e2b7c878fbbee56aae1ae7feae11cc287f1d53299bc3a"
   },
-  "line22.dtmpoints.json": {
-   "size": 917193,
-   "sha256": "fe6bf5af28d562ebcaada9dfdd787845c8bef2695762dfbbb61af3d367e81cbd"
+  "line22.features.json": {
+   "size": 656063,
+   "sha256": "8506ceff98224731377661cd425c2d0067ce10f629ce12acd9ca3bf95e11a3a7"
   },
   "line22.geo.json": {
    "size": 210638,
@@ -128,9 +128,9 @@
    "size": 4604468,
    "sha256": "fc0f2c88e38e5d793fcf2083b3d481cdff32af3f9b2c651c6699e00bcad5dad6"
   },
-  "line23.dtmpoints.json": {
-   "size": 468890,
-   "sha256": "06dae578457016c002bd3d823d342b1f45ad7b7da0cb2a6e65a304fccc74b679"
+  "line23.features.json": {
+   "size": 332180,
+   "sha256": "444d37de6da4b90fbd040a79f8e7aae1525e9d1e7aab29e261ba7f003a7ee6ef"
   },
   "line23.geo.json": {
    "size": 83366,
@@ -180,9 +180,9 @@
    "size": 4908808,
    "sha256": "114076dd54425199283ef11635bb7cccb0ab645865390fc346a81b28353ccaf7"
   },
-  "line37.dtmpoints.json": {
-   "size": 487089,
-   "sha256": "23114e5c01da95ff6d5007bf90e3729c55bfba5f595f888e00ee37bf5c451a7b"
+  "line37.features.json": {
+   "size": 341075,
+   "sha256": "72ff1ee298bf0689e4f19d818100fcaba5e857b664db93fcf3c6350c124cabab"
   },
   "line37.geo.json": {
    "size": 175612,
@@ -232,9 +232,9 @@
    "size": 10334561,
    "sha256": "054226755170f507a9a453bd5c19ffa126d32f534acaf1294e944bce69de03f7"
   },
-  "line9.dtmpoints.json": {
-   "size": 1243471,
-   "sha256": "f2023d487fc2664d83c4afca0b6efac10fe2b5781c637a9f92f80cbcaef75407"
+  "line9.features.json": {
+   "size": 889983,
+   "sha256": "48b4ec7c6a4f721a2ffeb6efec5f54956ac157d6e6060ab6b70356b96b4339dd"
   },
   "line9.geo.json": {
    "size": 276163,

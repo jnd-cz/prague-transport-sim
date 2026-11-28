@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Dev prototype (not part of the game): what the surveyed traffic signal heads of Prague's technical map
-// (data/lineN.dtmpoints.json, tools/dtm_points.py) are for, and how they stand relative to what
+// (data/lineN.features.json, tools/features.py) are for, and how they stand relative to what
 // they serve, against where the game puts its heads. In the page, after a shift has started:
 //   const { run } = await import('/tools/bench/heads.js'); const r = await run(); r.report
 // Heads within 1.2 m are one pole. Each pole is labelled by its context (the nearest within reach wins,
@@ -17,9 +17,9 @@ const stats = (a) => ({ n: a.length, p10: q(a, 0.1), median: q(a, 0.5), p90: q(a
 
 export async function run() {
   const game = window.game, traffic = window.traffic, R = game.route;
-  const res = await fetch(`/data/line${game.data.line}.dtmpoints.json`);
-  if (!res.ok) throw new Error('no dtmpoints file: run tools/dtm_points.py first');
-  const pts = (await res.json()).points.filter((p) => p.k === 'signal' || p.k === 'signal_on_building');
+  const feats = game.data.features;
+  if (!feats) throw new Error('no feature layer: run tools/features.py first');
+  const pts = [...feats.of('signal'), ...feats.of('signal_on_building')];
   // heads -> poles
   const poles = [];
   for (const p of pts) {

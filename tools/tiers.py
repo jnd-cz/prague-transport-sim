@@ -50,7 +50,7 @@ KINDS = [
     ("track heights", ("tools/line_heights.py", "tools/track_profile.py", "tools/track_curve.py"),
      "also heights", ""),
     ("drawn geometry", ("src/terrain.js", "src/world.js", "src/worldMesh.js", "src/groundDraw.js", "src/streets.js",
-                        "src/heights.js", "src/platforms.js", "src/pedestrianCrossings.js", "src/structures.js",
+                        "src/features.js", "src/heights.js", "src/platforms.js", "src/pedestrianCrossings.js", "src/structures.js",
                         "src/gameView.js", "src/platformRules.js", "tools/lint.js"),
      f"--checks {DRAWN} on every line; every seedless move needs a reason", "seeded checks"),
     ("drawing", ("src/models.js", "src/buildings.js", "src/trees.js", "src/lamps.js", "src/figures.js", "src/rigged.js",
